@@ -1,0 +1,62 @@
+---
+title: "My take on a climate change model"
+layout: post
+date: 2016-04-14 00:18
+tag:
+- math
+- climate
+- modeling
+blog: true
+star: false
+---
+
+<script type="text/javascript">
+  window.MathJax = {
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  };
+</script>
+
+<script type="text/javascript"
+   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p align="justify">
+Hey there!
+</p>
+<p align="justify">For my first blog post, I will give my two cents on working towards establishing a mathematical approach to <b>climate change</b>, namely through mathematical modeling.</p>
+
+<p align="justify">In the prediction of climate and climactic activity, modeling of nonlinear features such as the effects of the atmosphere/ocean system, is crucial. Especially with the change of the questions of interest, current mathematical and computational models involving actual data obtained from the atmosphere fail to suit needs. For instance, climate prediction now covers the trends of several different variables and their effects on transport of heat, rather than the significance of the fluctuations of factors concerning the ocean/atmosphere system, which can be determined using current models. Thus, it's important to realize that <b>stochastic modeling</b> is the prime candidate to evaluate and demystify such activity that requires variation of variables over time. Stochastic modeling has come to predict and model short-term changes in the climate, such as El Nino, relatively well over the past. </p>
+
+<p align="justify">I will try to develop several mathematical strategies for stochastic climate change modeling and also interpret some of the phenomena that occur frequently after using said models.</p>
+
+<p align="justify">Climate is a system with multiple scales in which several different physical processes act on different temporal and spatial aspects. All processes, while acting on several different scales, also tend to interact with each other, leading to the system's nonlinearity. In many applications, one tends to be interested in processes on one specific scale, rather than multiple processes of smaller scales which tend to be unpredictable, and likely to not be accurately resolved.</p>
+
+<p align="justify">Of course, neglecting the existence and the significance of these processes of smaller scale can lead to evident biases in the models. Thus, unresolved processes are simplified in a way that will not cause a systematic error in the model. Unresolved small-scale effects on the model are considered <i>stochastic noise</i> and either discarded or considered as random fluctuation by the model.</p>
+
+<p align="justify">A stochastic model is based on scale separation. Two different components are classified as components of different scales so that the user is able to assume that the small-scale component is of random fluctuation, which would then allow for the evaluation of the large-scale component. For a climate system, this would mean a separation between temporal and spatial vectors. It is possible to split a state vector $ \vec{z} $ into a slow component $ \vec{x} $ and a fluctuating vector $ \vec{y} $, which would allow for the derivation of an expression for $ \vec{x} $ only.</p>
+
+<p align="justify">It should be noted, however, that there is no time scale separation in the climate system. A lack of scale separation complicates the parametrization of the model and introduces adverse systematic effects.</p>
+
+<p align="justify">Climate models have the general functional form (1):</p>
+<p align="middle">$$ d\vec{z} = (\bar{F}+\bar{L}\vec{z}+\bar{B}(\vec{z},\vec{z})) dt $$</p>
+<p align="justify">where $ \bar{F} $ is an external force, $ \bar{L} $ a linear operator and $ \bar{B} $ a non-linear quadratic operator.</p>
+<p align="justify">Now, a split of the variable $ \vec{z} $ to the said two components $ \vec{x} $ and $ \vec{y} $ yields the equations (2) and (3):</p>
+<p align="middle">$$ \frac{dx}{dt} = L_{1,1}\vec{x} + L_{1,2}\vec{y} + B^{1}_{1,1}(\vec{x},\vec{x}) + B^{1}_{1,2}(\vec{x},\vec{y}) + B^{1}_{2,2}(\vec{y},\vec{y}) $$</p>
+<p align="middle">$$ \frac{dy}{dt} = L_{2,1}\vec{x} + L_{2,2}\vec{y} + B^{2}_{1,1}(\vec{x},\vec{x}) + B^{2}_{1,2}(\vec{x},\vec{y}) + B^{2}_{2,2}(\vec{y},\vec{y}) $$</p>
+<p align="justify">The nonlinear operator $ B^{2}_{2,2}(\vec{y},\vec{y}) $ is a self-interaction of the unresolved variable $ \vec{y} $, represented by the stochastic operator (4):</p>
+<p align="middle">$$ B^{2}_{2,2}(\vec{y},\vec{y}) = \frac{1}{\sqrt{\varepsilon}}(\sigma\vec{W}(t) - \frac{\Gamma}{\sqrt{\varepsilon}}\vec{y}) $$</p>
+<p align="justify">where $ \sigma $ and $ \Gamma $ denote diagonal neighboring matrices of $ \vec{y} $ and a noise vector $ W(t) $. $ \varepsilon $ measures the correlation between the unresolved variable $ \vec{y} $ and the climate variable $ \vec{x} $. Note that as $ \varepsilon \rightarrow \infty $, the stochastic operator $ B^{2}_{2,2}(\vec{y},\vec{y}) $ only consists of noise, which would then lead to components $ \vec{x} $ and $ \vec{y} $ having the same value for $ B^1 $ and $ B^2 $, respectively. For stochastic models, usually $ \varepsilon \ll 1 $, which is optimal to only derive equations for $ \vec{x} $. For a longer time scale, i.e when $ t \rightarrow \varepsilon t $, we derive the stochastic model (5):
+<p align="middle">$$ \frac{dx}{dt} = \frac{1}{\varepsilon}[L_{1,1}\vec{x} + L_{1,2}\vec{y} + B^{1}_{1,1}(\vec{x},\vec{x}) + B^{1}_{1,2}(\vec{x},\vec{y}) + B^{1}_{2,2}(\vec{y},\vec{y})] $$</p>
+<p align="middle">$$ \frac{dy}{dt} = \frac{1}{\varepsilon}[L_{2,1}\vec{x} + L_{2,2}\vec{y} + B^{2}_{1,1}(\vec{x},\vec{x}) + B^{2}_{1,2}(\vec{x},\vec{y}) + B^{2}_{2,2}(\vec{y},\vec{y})] $$</p>
+<p align="justify">Because we are interested in the evaluation of the climate variable $ \vec{x} $ over a mean flow arising from zonal averaging, it is crucial to handle the unresolved variable $ \vec{y} $ as two modes of wave variables, $ y_1 $ and $ y_2 $. We are working towards determining the behavior of climate variable $ \vec{x} $ as $ \varepsilon \rightarrow 0 $ (6):
+<p align="middle">$$ \frac{dx}{dt}(t)=\frac{k_1}{\varepsilon}y_1(t) y_2(t) $$</p>
+<p align="middle">$$ \frac{dy_1}{dt}(t)=(\frac{a}{\varepsilon}y_2(t))(1+\frac{k_2}{\varepsilon}x(t) y_2(t))-\frac{i_1}{\varepsilon^2}y_1(t)+\frac{\sigma_1}{\varepsilon}dW_1(t) $$</p>
+<p align="middle">$$ \frac{dy_2}{dt}(t)=(\frac{b}{\varepsilon}y_1(t))(1+\frac{k_3}{\varepsilon}x(t) y_1(t))-\frac{i_2}{\varepsilon^2}y_2(t)+\frac{\sigma_2}{\varepsilon}dW_2(t) $$</p>
+<p align="justify">Notice how the relationships between $ \frac{dy_1}{dt} $ and $ \frac{dy_2}{dt} $ are based on inverse Markov relations. The equations satisfy that $ k_1 + k_2 + k_3 = 0 $ as $ \varepsilon \rightarrow 0 $ as the correlation between the fluctuations and the climate variable $ \vec{x} $ is assumed to not exist.</p>
+<p align="justify">(6) is popularly used in modeling of barotropic interactions in which pressure is the climate variable $ \vec{x} $ while $ \vec{y} $ is used for several different variables. Therefore (6) is a strong candidate for the stochastic modeling of climate predictions as the variables and their characteristics overlap.
+<p align="justify">That's it for now. In the next weeks I'll try to elaborate more on the deterministic nature of the parametrization in climate change models, and maybe how they are constructed relative to widely-made assumptions. I am hardly a mathematician, so if there are any glaring errors and/or misconceptions, please comment below or contact me and I'll be sure to correct them. If you have any questions or thoughts, please comment below. Until next time!
+
+

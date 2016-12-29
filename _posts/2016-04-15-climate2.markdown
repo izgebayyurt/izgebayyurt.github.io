@@ -1,0 +1,69 @@
+---
+title: "Deriving deterministic parameters for a climate change model"
+layout: post
+date: 2016-04-15 15:53
+tag:
+- math
+- climate
+- modeling
+blog: true
+star: false
+---
+
+<script type="text/javascript">
+  window.MathJax = {
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  };
+</script>
+
+<script type="text/javascript"
+   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p align="justify">
+Hello!
+</p>
+<p align="justify">
+I realized that many of the models and techniques used in climate change modeling are extremely deterministic (like (6) in the previous post), so accurate parametrization is crucial. I will elaborate on my attempt at a simple deterministic parameter climate change model, global average temperature. Deterministic and stochastic parameters coexist within a climate change model where the effect is approximated both by a nonzero $ \varepsilon $ and a deterministic expression. </p>
+<p align="justify">
+We define $ T_i(t) $ as the temperature of the Earth with uniform heat distribution at time $ t $, and the heat capacity as $ C_E $. Thus,</p>
+<p align="middle">$$ C_E T_i (t) = E_E $$</p>
+<p align="justify"> where $ E_E $ is the energy needed to heat up Earth from 0K to $ T_i (t) $.</p>
+<p align="justify"> Derivative on both sides: </p>
+<p align="middle">$$ C_E \frac{d T_i (t)}{dt} = \frac{dE}{dt} $$</p>
+<p align="justify"> Dividing by Earth's surface area:</p>
+<p align="middle">$$ \frac{C_E}{A_E} \frac{d T_i (t)}{dt} = \frac{1}{A} \frac{dE}{dt} $$</p>
+<p align="justify"> And we define $ \frac{C_E}{A_E}$ as $ c $, heat capacity per unit area.</p>
+<p align="justify"> The RHS has a unit of W/m^2, thus can be modified for radiative flux:</p>
+<p align="middle">$$ C_E \frac{d T_i (t)}{dt} = I(t) - O(t) $$</p>
+<p align="justify"> Applying the Stefan-Boltzmann Law on the RHS (net radiative output):</p>
+<p align="middle">$$ C_E \frac{d T_i (t)}{dt} = I(t) - \varepsilon \sigma T_i (t)^4 $$</p>
+<p align="justify">where $ \varepsilon $ is the emissivity of the Earth and $ \sigma $ is the Stefan-Boltzmann constant.</p>
+<p align="justify">In order to model change in temperature, we define</p>
+<p align="middle">$$ T_i (t) = T_{eq} + T(t) $$</p>
+<p align="justify">where $ T_{eq} $ is a constant equilibrium temperature, and $ T(t) $ is net change in temperature. We modify the equation so that:</p>
+<p align="middle">$$ C_E \frac{d (T_{eq} + T(t))}{dt} = I(t) - \varepsilon \sigma (T_{eq} + T(t))^4 $$</p>
+<p align="justify">and</p>
+<p align="middle">$$ C_E \frac{d (T_{eq} + T(t))}{dt} = I(t) - \varepsilon \sigma T_{eq}^4 (1 + \frac{T(t)}{T_{eq}})^4 $$</p>
+<p align="justify">Since we know that Earth's initial absolute temperature is 275K and we're looking for fluctuations around 3K, it is safe to assume that $ \frac{T(t)}{T_{eq}} \ll 1 $. So we contract the binomial:</p>
+<p align="middle">$$ = I(t) - \varepsilon \sigma T_{eq}^4 (1 + 4 \frac{T(t)}{T_{eq}}) $$</p>
+<p align="justify">and</p>
+<p align="middle">$$ = I(t) - \varepsilon \sigma T_{eq}^4 - 4 \varepsilon \sigma T_{eq}^3 T_(t) $$</p>
+<p align="justify">Modify using net radiative output:</p>
+<p align="middle">$$ = I(t) - O(t) - 4 \varepsilon \sigma T_{eq}^3 T_(t) $$</p>
+<p align="middle">$$ \frac{dT}{dt} = \frac{N(t) - 4 \varepsilon \sigma T_{eq}^3 T_(t)}{c} $$</p>
+<p align="justify">The approximate change given previous conditions of time $ t' $, as well as the equilibrium temperature $ T_{eq} $ can be approximately accounted for my the model.</p>
+<p align="justify">In the future I think I will spend some time on possible ways to apply heat distribution (diffusion equation via discrete 2D laplacian) to the climate model. Goodbye!</p>
+
+
+
+
+
+
+
+
+
+
