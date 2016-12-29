@@ -16,7 +16,7 @@ permalink: /about/index.html
 <p align="justify">I am a part of the <a href='http://sigmaturkey.org'>Society for Intellectual Guidance and Mentorship in Academia (SIGMA) Turkey</a>, a student-centered initiative through which students are able to match with mentors (graduate students, PhDs, and professors) to initiate ideas and pursue individual projects. SIGMA Turkey provides mentorship for middle and high schoolers in their pursuit of academic expertise and skill building, and guidance for parents to support gifted children. </p>
 
 <p align="justify">
-I am a current member of <a href='http://mensa.org.tr'>MENSA Turkey</a> and <a href="http://www.tsf.org.tr/">Turkish Chess Federation (TSF)</a>. My curriculum vitae is available <a href='/assets/izge_cv.pdf'>here</a>.
+I am a current member of <a href='http://mensa.org.tr'>MENSA Turkey</a> and <a href="http://www.tsf.org.tr/">Turkish Chess Federation (TSF)</a>. My curriculum vitae is available <a href='/assets/Curriculum Vitae.pdf'>here</a>.
 </p>
 
 <p align="justify">Let's have coffee! Contact me at <a href='mailto:izge.bayyurt@uwcim.net'>izge [dot] bayyurt [at] uwcim [dot] net.</a></p>
