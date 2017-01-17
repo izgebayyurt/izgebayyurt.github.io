@@ -12,4 +12,4 @@ permalink: /photography/index.html
 <img src="/assets/rainy_park.jpg" style="width:672px;height:378px;">
 
 <h2 style="margin-top: 50px"> Songwriting Sessions</h2>
-<img src="/assets/music.jpg" style="width:504px;height:672px" class="rotateimg90" >
+<img src="/assets/music.jpg" style="width:504px;height:672px" class="rotate90" >
