@@ -4,5 +4,5 @@ layout: page
 permalink: /photography/index.html
 ---
 
-<h2 align="center;" style="text indent:10px;" > Sunset in Istanbul </h2>
-<img src="/assets/sunset_istanbul.jpg" style="width:2016px;height:567px;">
+<h2 align="center;" style="text indent:100px;" > Sunset in Istanbul </h2>
+<img src="/assets/sunset_istanbul.jpg" style="width:600px;height:400px;">
