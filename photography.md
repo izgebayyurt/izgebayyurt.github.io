@@ -4,9 +4,10 @@ layout: page
 permalink: /photography/index.html
 ---
 <style>
-  h2 {
+  <h2> {
     align="center";
     style="text indent:100px;"
+    </h2>
   }
 </style>
 <h2  > Sunset in Istanbul </h2>
