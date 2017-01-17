@@ -5,4 +5,4 @@ permalink: /photography/index.html
 ---
 
 <h2> Sunset in Istanbul </h2>
-<img src="sunset_istanbul.jpg" style="width:304px;height:228px;">
+<img src="/assets/sunset_istanbul.jpg" style="width:304px;height:228px;">
