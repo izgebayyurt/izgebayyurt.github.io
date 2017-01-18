@@ -6,7 +6,7 @@ permalink: /photography/index.html
 
 <head>
 
-<link rel="stylesheet" type="text/css" href="photography.css">
+@import "photography.css";
 
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
