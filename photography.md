@@ -4,7 +4,6 @@ layout: page
 permalink: /photography/index.html
 ---
 
-
 <head>
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
