@@ -3,11 +3,11 @@ title: Photography
 layout: page
 permalink: /photography/index.html
 ---
-@import "newstyles.css";
+
 
 <head>
 
-
+<link rel="stylesheet" type="text/css" href="photography.css" media="screen" />
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
