@@ -9,9 +9,9 @@ permalink: /photography/index.html
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
-<p style="margin-top: 0px"> <i>15.01.2017</i> </p>
+<p> <i>15.01.2017</i> </p>
 <p> I watch the birds dive and then gone </p>
-<p> It's like nothing in this world's ever still </p>
+<p style="margin-top: 0px"> It's like nothing in this world's ever still </p>
 
 <h2 style="margin-top: 30px"> Songwriting Sessions </h2>
 <img src="/assets/music.jpg" style="width:504px;height:672px">
