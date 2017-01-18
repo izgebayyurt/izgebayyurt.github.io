@@ -7,7 +7,13 @@ permalink: /photography/index.html
 
 <head>
 
-<link rel="stylesheet" type="text/css" href="photography.css" media="screen" />
+<style media="screen" type="text/css">
+
+p {
+    margin: 2px;
+}
+
+</style>
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
