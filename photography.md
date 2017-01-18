@@ -7,17 +7,9 @@ permalink: /photography/index.html
 
 <head>
 
-<style media="screen" type="text/css">
-
-p {
-    margin: 2px;
-}
-
-</style>
-
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
-<p> <i>15.01.2017</i> </p>
+<p margin: 100px;> <i>15.01.2017</i> </p>
 <p> I watch the birds dive and then gone </p>
 <p> It's like nothing in this world's ever still </p>
 
