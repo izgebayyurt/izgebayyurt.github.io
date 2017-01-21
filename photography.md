@@ -4,7 +4,7 @@ layout: page
 permalink: /photography/index.html
 ---
 
-<head style="background-color:powderblue;">
+<head>
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
@@ -24,8 +24,8 @@ permalink: /photography/index.html
 <img src="/assets/rainy_park.jpg" style="width:672px;height:378px;">
 <p> <i>07.10.2016</i> </p>
 
-<h2 style="margin-top: 30px"> After the Rain </h2>
-<img src="/assets/rainy_park.jpg" style="width:672px;height:378px;">
-<p> <i>07.10.2016</i> </p>
+<h2 style="margin-top: 30px"> Artvin </h2>
+<img src="/assets/artvin.jpg" style="width:651px;height:225px;">
+<p> <i>09.09.2016</i> </p>
 
 </head>
