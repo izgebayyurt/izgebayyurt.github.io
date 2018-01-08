@@ -3,7 +3,6 @@ title: Photography
 layout: page
 permalink: /photography/index.html
 ---
-<link rel="stylesheet" type="text/css" href="photo.css">
 <head>
 <style>
   p {
@@ -62,7 +61,7 @@ permalink: /photography/index.html
 
 <div class="pagination">
   <a href="{{ site.url }}{{ paginator.previous_page_path }}">&laquo;</a>
-  <a href="#">1</a>
+  <a href="#">izgebayyurt.github.io/photography/p=1/index.html</a>
   <a class="active" href="https://izgebayyurt.github.io">2</a>
   <a href="#">3</a>
   <a href="#">4</a>
