@@ -44,8 +44,8 @@ permalink: /photography/p=2/index.html
 <p style="margin-top: 0px"> It's like nothing in this world's ever still </p>
 
 <div class="pagination">
-  <a href="#">&laquo;</a>
-  <a href="#">1</a>
+  <a href="https://izgebayyurt.github.io/photography/">&laquo;</a>
+  <a href="https://izgebayyurt.github.io/photography/">1</a>
   <a class="active" href="#">2</a>
  
 </div>
