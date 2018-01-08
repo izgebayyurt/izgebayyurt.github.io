@@ -11,9 +11,7 @@ permalink: /photography/index.html
     margin-top: 0.5em;
     margin-bottom: 0.5em;
     margin-left: 0;
-    margin-right: 0;
-    text-align: center;
-}
+    margin-right: 0; 
 }
   
   .pagination {
@@ -25,6 +23,7 @@ permalink: /photography/index.html
     float: left;
     padding: 8px 16px;
     text-decoration: none;
+    text-align: center;
 }
 
 .pagination a.active {
@@ -62,14 +61,14 @@ permalink: /photography/index.html
 <p> <i>09.09.2016</i> </p>
 
 <div class="pagination">
-  <a href="#">&laquo;</a>
+  <a href="{{ site.url }}{{ paginator.previous_page_path }}" class="previous">">&laquo;</a>
   <a href="#">1</a>
   <a class="active" href="https://izgebayyurt.github.io">2</a>
   <a href="#">3</a>
   <a href="#">4</a>
   <a href="#">5</a>
   <a href="#">6</a>
-  <a href="#">&raquo;</a>
+  <a href="{{ site.url }}{{ paginator.next_page_path }}" class="next">">&raquo;</a>
 </div>
 
 </body>
