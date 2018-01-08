@@ -30,7 +30,7 @@ permalink: /photography/index.html
     color: #4b0082;
 }
 
-.pagination a:hover:not(.active) {color: #ca80ff;}
+.pagination a:hover:not(.active) {color: #aa33ff;}
 
 </style>
 </head>
