@@ -60,8 +60,8 @@ permalink: /photography/index.html
 <p> <i>09.09.2016</i> </p>
 
 <div class="pagination">
-  <a href="#">1</a>
-  <a class="active" href="p=2/index.html">2</a>
+  <a class="active" href="#">1</a>
+  <a href="p=2/index.html">2</a>
   <a href="p=2">&raquo;</a>
 </div>
 
