@@ -12,6 +12,8 @@ permalink: /photography/index.html
     margin-bottom: 0.5em;
     margin-left: 0;
     margin-right: 0;
+    text-align: center;
+}
 }
   
   .pagination {
