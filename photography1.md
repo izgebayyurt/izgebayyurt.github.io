@@ -1,5 +1,5 @@
 ---
-title: Photo1
+title: Photography
 layout: page
 permalink: /photography/p=2/index.html
 ---
