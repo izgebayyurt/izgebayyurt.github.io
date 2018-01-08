@@ -61,7 +61,7 @@ permalink: /photography/index.html
 
 <div class="pagination">
   <a class="active" href="#">1</a>
-  <a href="p=2/index.html">2</a>
+  <a href="p=2">2</a>
   <a href="p=2">&raquo;</a>
 </div>
 
