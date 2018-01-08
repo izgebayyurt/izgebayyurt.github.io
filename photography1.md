@@ -1,7 +1,7 @@
 ---
 title: Photo1
 layout: page
-permalink: /photography/p=1/index.html
+permalink: /photography/p=2/index.html
 ---
 
 <head>
