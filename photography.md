@@ -13,6 +13,29 @@ permalink: /photography/index.html
     margin-left: 0;
     margin-right: 0;
 }
+  
+  .pagination {
+    display: inline-block;
+}
+
+.pagination a {
+    color: black;
+    float: left;
+    padding: 8px 16px;
+    text-decoration: none;
+}
+
+.pagination a.active {
+    background-color: white;
+    color: #4b0082;
+}
+
+.pagination a:hover:not(.active) {color: #ca80ff;}
+
+</style>
+</head>
+<body>
+
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
@@ -36,4 +59,15 @@ permalink: /photography/index.html
 <img src="/assets/artvin.jpg" style="width:651px;height:225px;">
 <p> <i>09.09.2016</i> </p>
 
-</head>
+<div class="pagination">
+  <a href="#">&laquo;</a>
+  <a href="#">1</a>
+  <a class="active" href="https://izgebayyurt.github.io">2</a>
+  <a href="#">3</a>
+  <a href="#">4</a>
+  <a href="#">5</a>
+  <a href="#">6</a>
+  <a href="#">&raquo;</a>
+</div>
+
+</body>
