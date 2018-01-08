@@ -61,7 +61,7 @@ permalink: /photography/index.html
 
 <div class="pagination">
   <a href="{{ site.url }}{{ paginator.previous_page_path }}">&laquo;</a>
-  <a href="izgebayyurt.github.io/photography/p=1/index.html">1</a>
+  <a href="p=1/index.html">1</a>
   <a class="active" href="https://izgebayyurt.github.io">2</a>
   <a href="#">3</a>
   <a href="#">4</a>
