@@ -1,7 +1,7 @@
 ---
 title: Photography
 layout: page
-permalink: /photography/p=1/index.html
+permalink: /photography/index.html
 ---
 <head>
 <style>
@@ -60,14 +60,9 @@ permalink: /photography/p=1/index.html
 <p> <i>09.09.2016</i> </p>
 
 <div class="pagination">
-  <a href="{{ site.url }}{{ paginator.previous_page_path }}">&laquo;</a>
-  <a href="p=1/index.html">1</a>
-  <a class="active" href="https://izgebayyurt.github.io">2</a>
-  <a href="#">3</a>
-  <a href="#">4</a>
-  <a href="#">5</a>
-  <a href="#">6</a>
-  <a href="{{ site.url }}{{ paginator.next_page_path }}">&raquo;</a>
+  <a href="#">1</a>
+  <a class="active" href="p=1/index.html">2</a>
+  <a href="p=1/index.html">&raquo;</a>
 </div>
 
 </body>
