@@ -3,7 +3,7 @@ title: Photography
 layout: page
 permalink: /photography/index.html
 ---
-
+<link rel="stylesheet" type="text/css" href="photo.css">
 <head>
 
 <h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
