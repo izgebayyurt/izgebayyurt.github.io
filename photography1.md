@@ -1,7 +1,7 @@
 ---
 title: Photography
 layout: page
-permalink: /photography/p=1/index.html
+permalink: /photography/index.html
 ---
 
 <head>
