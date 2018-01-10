@@ -40,7 +40,7 @@ permalink: /photography/2/index.html
 </head>
 <body>
 
-<h2 style="margin-top: 30px"> Songwriting Sessions </h2>
+<h2 style="margin-top: 75px"> Songwriting Sessions </h2>
 <img src="/assets/music.jpg" style="width:504px;height:672px">
 <p> <i>27.12.2016</i> </p>
 
@@ -52,7 +52,7 @@ permalink: /photography/2/index.html
 <img src="/assets/rainy_park.jpg" style="width:672px;height:378px;">
 <p> <i>07.10.2016</i> </p>
 
-<h2 style="margin-top: 75px"> Kravice Falls </h2>
+<h2 style="margin-top: 30px"> Kravice Falls </h2>
 <img src="/photos/kravice.jpg" style="width:504px;height:672px;">
 <p> <i>02.09.2017</i> </p>
 
