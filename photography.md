@@ -5,6 +5,10 @@ permalink: /photography/index.html
 ---
 <head>
 <style>
+.center {
+    text-align: center;
+}  
+  
   p {
     display: block;
     margin-top: 0.5em;
@@ -59,10 +63,14 @@ permalink: /photography/index.html
 <img src="/assets/artvin.jpg" style="width:651px;height:225px;">
 <p> <i>09.09.2016</i> </p>
 
-<div class="pagination">
-  <a class="active" href="#">1</a>
-  <a href="p=2">2</a>
-  <a href="p=2">&raquo;</a>
-</div>
+<div class="center">
+  <div class="pagination">
+    <a class="active" href="#">1</a>
+    <a href="p=2">2</a>
+    <a href="p=2">&raquo;</a>
+  </div>
+</div>  
+  
+  
 
 </body>
