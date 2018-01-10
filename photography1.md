@@ -44,8 +44,8 @@ permalink: /photography
 <div class="center">
   <div class="pagination">
     <a class="active" href="#">1</a>
-    <a href="2">2</a>
-    <a href="2">&raquo;</a>
+    <a href="/2">2</a>
+    <a href="/2">&raquo;</a>
   </div>
 </div>  
 
