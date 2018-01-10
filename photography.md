@@ -1,7 +1,7 @@
 ---
 title: Photography
 layout: page
-permalink: /photography/index.html
+permalink: /photography/2/index.html
 ---
 <head>
 <style>
@@ -65,9 +65,9 @@ permalink: /photography/index.html
 
 <div class="center">
   <div class="pagination">
-    <a class="active" href="#">1</a>
-    <a href="p=2">2</a>
-    <a href="p=2">&raquo;</a>
+    <a href="https://izgebayyurt.github.io/photography/">&laquo;</a>  
+    <a href="https://izgebayyurt.github.io/photography/">1</a>  
+    <a class="active" href="#">2</a>
   </div>
 </div>  
   
