@@ -36,10 +36,16 @@ permalink: /photography
 </style>
 </head>
 <body>
+  
+<h2 style="margin-top: 75px"> Mostar Red </h2>
+<img src="/photos/redmostar.jpg" style="width:672px;height:378px;">
+<p> <i>24.08.2017</i> </p>  
 
 <h2 style="margin-top: 75px"> Galata </h2>
 <img src="/photos/galata.jpg" style="width:672px;height:378px;">
 <p> <i>04.06.2017</i> </p>
+
+
 
 <div class="center">
   <div class="pagination">
