@@ -41,15 +41,15 @@ permalink: /photography
 <img src="/photos/redmostar.jpg" style="width:672px;height:378px;">
 <p> <i>24.08.2017</i> </p>  
 
-<h2 style="margin-top: 75px"> Heaven's Lights </h2>
+<h2 style="margin-top: 30px"> Heaven's Lights </h2>
 <img src="/photos/heavenly_sky.jpg" style="width:672px;height:378px;">
 <p> <i>17.08.2017</i> </p>  
 
-<h2 style="margin-top: 75px"> Galata </h2>
+<h2 style="margin-top: 30px"> Galata </h2>
 <img src="/photos/galata.jpg" style="width:672px;height:378px;">
 <p> <i>04.06.2017</i> </p>
 
-<h2 style="margin-top: 75px"> Sunset in Istanbul </h2>
+<h2 style="margin-top: 30px"> Sunset in Istanbul </h2>
 <img src="/assets/sunset_istanbul.jpg" style="width:672px;height:378px;">
 <p> <i>15.01.2017</i> </p>
 <p> I watch the birds dive and then gone </p>
