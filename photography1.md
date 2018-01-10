@@ -1,7 +1,7 @@
 ---
 title: Photography
 layout: page
-permalink: /photography/p=2/index.html
+permalink: /photography/p=1/index.html
 ---
 
 <head>
@@ -41,11 +41,12 @@ permalink: /photography/p=2/index.html
 <img src="/photos/galata.jpg" style="width:672px;height:378px;">
 <p> <i>04.06.2017</i> </p>
 
-<div class="pagination">
-  <a href="https://izgebayyurt.github.io/photography/">&laquo;</a>
-  <a href="https://izgebayyurt.github.io/photography/">1</a>
-  <a class="active" href="#">2</a>
- 
-</div>
+<div class="center">
+  <div class="pagination">
+    <a class="active" href="#">1</a>
+    <a href="2">2</a>
+    <a href="2">&raquo;</a>
+  </div>
+</div>  
 
 </body>
