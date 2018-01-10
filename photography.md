@@ -65,8 +65,8 @@ permalink: /photography/2/index.html
 
 <div class="center">
   <div class="pagination">
-    <a href="https://izgebayyurt.github.io/photography/">&laquo;</a>  
-    <a href="https://izgebayyurt.github.io/photography/">1</a>  
+    <a href="https://izgebayyurt.github.io/photography">&laquo;</a>  
+    <a href="https://izgebayyurt.github.io/photography">1</a>  
     <a class="active" href="#">2</a>
   </div>
 </div>  
