@@ -3,7 +3,7 @@ title: Photography
 layout: page
 permalink: /photography/2
 ----
- 
+
 <head>
  <style>
   
