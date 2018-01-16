@@ -1,5 +1,5 @@
 ----
-title: Photography
+title: Photography2
 layout: page
 permalink: /photography/2
 ----
