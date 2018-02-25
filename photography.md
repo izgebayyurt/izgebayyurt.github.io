@@ -68,6 +68,7 @@ permalink: /photography/2
   transform: translate(-50%, -50%);
   -ms-transform: translate(-50%, -50%);
   text-align: center;
+  opacity: 1
 }
 
 </style>
@@ -84,7 +85,7 @@ permalink: /photography/2
  <div class="container">
   <img src="/assets/blidinje.jpg" style="width:672px;height:378px;">
   <div class="overlay">
-    <div class="text">Test</div>
+    <div class="text">New Test</div>
   </div>
 </div>
  <p> <i>12.10.2016</i> </p>
