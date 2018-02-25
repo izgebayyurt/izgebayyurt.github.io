@@ -5,9 +5,7 @@ permalink: /photography/2
 ---
 
 <head>
- <link rel="stylesheet" type="text/css" href="photography.css" media="screen" />
-
-<style media="screen" type="text/css">
+<style>
 
  .center {
      text-align: center;
