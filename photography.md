@@ -79,7 +79,7 @@ permalink: /photography/2
  
  
 <div class="container">
-  <img src="/assets/music.jpg" alt="Avatar" class="image">
+  <img src="/assets/blidinje.jpg" alt="Avatar" class="image">
   <div class="overlay">
     <div class="text">Test</div>
   </div>
