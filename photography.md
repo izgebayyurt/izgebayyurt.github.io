@@ -10,6 +10,13 @@ permalink: /photography/2
  </head>
  <body>
  
+<div class="container">
+  <img src="/assets/music.jpg" class="image">
+  <div class="overlay">
+    <div class="text">Hello World</div>
+  </div>
+</div>
+
  <h2 style="margin-top: 75px"> Songwriting Sessions </h2>
  <img src="/assets/music.jpg" style="width:504px;height:672px">
  <p> <i>27.12.2016</i> </p>
