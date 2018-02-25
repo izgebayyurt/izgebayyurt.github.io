@@ -55,7 +55,7 @@ permalink: /photography/2
   width: 30%;
 }
 
-.container a:hover .overlay {
+.container:hover .overlay {
   opacity: 1;
 }
 
