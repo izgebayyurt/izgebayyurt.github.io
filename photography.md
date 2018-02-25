@@ -52,11 +52,11 @@ permalink: /photography/2
 
 .container {
   position: relative;
-  width: 30%;
+  width: 100%;
 }
 
 .container:hover .overlay {
-  opacity: 1;
+  opacity: 0.3;
 }
 
 .text {
@@ -75,22 +75,18 @@ permalink: /photography/2
 
 </head>
  <body>
- 
- 
- 
-<div class="container">
-  <img src="/assets/blidinje.jpg" alt="Avatar" class="image">
-  <div class="overlay">
-    <div class="text">Test</div>
-  </div>
-</div>
 
  <h2 style="margin-top: 75px"> Songwriting Sessions </h2>
  <img src="/assets/music.jpg" style="width:504px;height:672px">
  <p> <i>27.12.2016</i> </p>
  
  <h2 style="margin-top: 30px"> Blidinje </h2>
- <img src="/assets/blidinje.jpg" style="width:672px;height:378px;">
+ <div class="container">
+  <img src="/assets/blidinje.jpg" style="width:672px;height:378px;">
+  <div class="overlay">
+    <div class="text">Test</div>
+  </div>
+</div>
  <p> <i>12.10.2016</i> </p>
  
  <h2 style="margin-top: 30px"> After the Rain </h2>
