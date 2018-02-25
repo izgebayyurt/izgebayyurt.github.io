@@ -47,7 +47,7 @@ permalink: /photography/2
   width: 100%;
   opacity: 0;
   transition: .5s ease;
-  background-color: #008CBA;
+  background-color: black;
 }
 
 .container {
@@ -56,7 +56,7 @@ permalink: /photography/2
 }
 
 .container:hover .overlay {
-  opacity: 0.3;
+  opacity: 0.5;
 }
 
 .text {
@@ -85,7 +85,7 @@ permalink: /photography/2
  <div class="container">
   <img src="/assets/blidinje.jpg" style="width:672px;height:378px;">
   <div class="overlay">
-    <div class="text">New Test</div>
+    <div class="text">We were forgotten in a place no one remembers.</div>
   </div>
 </div>
  <p> <i>12.10.2016</i> </p>
