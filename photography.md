@@ -11,7 +11,7 @@ permalink: /photography/2
  <body>
  
 <div class="container">
-  <img src="/assets/music.jpg" class="image">
+  <img src="/assets/music.jpg" alt="Avatar" class="image">
   <div class="overlay">
     <div class="text">Hello World</div>
   </div>
