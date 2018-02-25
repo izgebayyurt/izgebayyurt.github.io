@@ -5,39 +5,8 @@ permalink: /photography/2
 ---
 
 <head>
- <style>
-  
- .center {
-     text-align: center;
- }  
-   
-   p {
-     display: block;
-     margin-top: 0.5em;
-     margin-bottom: 0.5em;
-     margin-left: 0;
-    margin-right: 0; 
- }
-   
-   .pagination {
-     display: inline-block;
- }
- .pagination a {
-     color: black;
-     float: left;
-     padding: 8px 16px;
-     text-decoration: none;
-     text-align: center;
- }
- 
- .pagination a.active {
-     background-color: white;
-     color: #4b0082;
- }
- 
- .pagination a:hover:not(.active) {color: #aa33ff;}
- 
- </style>
+ <link rel="stylesheet" type="text/css" href="photography.css" media="screen" />
+
  </head>
  <body>
  
