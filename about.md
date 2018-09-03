@@ -5,7 +5,7 @@ permalink: /about/index.html
 ---
 ![Profile Image]({{ site.url }}/{{ site.picture }})
 
-<p align="justify">Hey there! My name is <b>İzge Bayyurt</b>, I am from Istanbul, Turkey, and I am currently a junior in <a href='http://uwcmostar.ba/'>United World College in Mostar (UWCiM)</a> in Bosnia and Herzegovina. I aim to work towards new discoveries in the field of mathematics by pursuing higher education and aid in humanity’s progress toward growth and development by offering critical thinking, creativity and innovation.</p>
+<p align="justify">Hey there! My name is <b>İzge Bayyurt</b>, I am from Istanbul, Turkey, and I am currently a freshman in <a href='https://www.colby.edu'>Colby College</a> in USA. I aim to work towards new discoveries in the field of mathematics by pursuing higher education and aid in humanity’s progress toward growth and development by offering critical thinking, creativity and innovation.</p>
 
 <p align="justify">My research interests include group theory, analytic number theory, arithmetic topology and dynamics, combinatorial game theory, chess theory, and recreational mathematics. I partake a specific interest in combinatorial generalizations of optimal strategies for both players in chess endgames, <a href="https://en.wikipedia.org/wiki/Eight_queens_puzzle">the Eight Queens puzzle</a>, applications of differential equations and linear tensors on climate change modeling, and the generalization of group theory on the Rubik's Cube, for which my notes are available <a href="https://www.dropbox.com/sh/mdre4eksccb5ffc/AADJf4IoSxCdf1MHYK_SKCTra?dl=0">here</a>.</p>
 
@@ -19,5 +19,5 @@ permalink: /about/index.html
 I am a current member of <a href='http://mensa.org.tr'>MENSA Turkey</a> and <a href="http://www.tsf.org.tr/">Turkish Chess Federation (TSF)</a>. My curriculum vitae is available <a href='/assets/Curriculum Vitae.pdf'>here</a>.
 </p>
 
-<p align="justify">Let's have coffee! Contact me at <a href='mailto:izge.bayyurt@uwcim.net'>izge [dot] bayyurt [at] uwcim [dot] net.</a></p>
+<p align="justify">Let's have coffee! Contact me at <a href='mailto:ibayyu22@colby.edu'>ibayyu22 [at] colby [dot] edu.</a></p>
 
