@@ -5,7 +5,7 @@ permalink: /about/index.html
 ---
 ![Profile Image]({{ site.url }}/{{ site.picture }})
 
-<p align="justify">Hey there! My name is <b>İzge Bayyurt</b>, I am from Istanbul, Turkey, and I am currently a sophomore in <a href='https://www.colby.edu'>Colby College</a> in USA. I aim to work in the field of video game design by combining the technical skills that my education provides me with my artistic capabilities ranging from sketching to composing. Growing up, video games have been a huge part of my life; therefore, I intend to create games as a force to make an impact on people's lives.</p>
+<p align="justify">Hey there! My name is <b>İzge Bayyurt</b>, I am from Istanbul, Turkey, and I am currently a junior in <a href='https://www.colby.edu'>Colby College</a> in USA. I aim to work in the field of video game design by combining the technical skills that my education provides me with my artistic capabilities ranging from sketching to composing. Growing up, video games have been a huge part of my life; therefore, I intend to create games as a force to make an impact on people's lives.</p>
 
 <p align="justify">In Colby's Computer Science department, students pursue a project-oriented curriculum, driving them to go beyond of the scope of in class material. In my first semester, I wrote a modified clone of the classic game 'Astroids' in Python as my final project. This experience led me to pursue a career in video game design. I also had a chance to participate in Bowdoin College's hackathon held in February 2019, where my friend Tyler Hanson and I won the 2nd place prize with our arcade game 'Marblz', written from scratch in 8 hours.</p>
 
