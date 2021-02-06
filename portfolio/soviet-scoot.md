@@ -3,8 +3,6 @@ title: Soviet-Scoot
 layout: page
 permalink: /portfolio/soviet-scoot
 ---
-![Profile Image]({{ site.url }}/{{ site.picture }})
-
 <head>
 <style>
 
@@ -55,12 +53,9 @@ permalink: /portfolio/soviet-scoot
   opacity: 0.5;
 }
 
-
 </style>
-
-
 </head>
 
 <img src="/assets/soviet-scoot.png" style="width:250px;height:275px" class="center">
 
-<p align="justify">Soviet Scoot is a 2D side-scroller game we worked on during the January Term in our Game Design and Programming course. </p>
+<p align="justify">Soviet Scoot is a 2D side-scroller game we worked on during the 2020 January Term in our Game Design and Programming course. </p>
