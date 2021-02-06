@@ -77,7 +77,7 @@ permalink: /portfolio
 </head>
  <body>
 
- <h2 style="margin-top: 75px"> <a href="https://github.com/maxtheaxe/soviet-scoot"> Soviet Scoot </a> </h2>
+ <h2 style="margin-top: 75px"> <a href="{{ site.url }}/portfolio/soviet-scoot"> Soviet Scoot </a> </h2>
  <p> <i> 2020 Jan Plan Project </i> </p>
 
 
