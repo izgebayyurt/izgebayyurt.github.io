@@ -79,7 +79,7 @@ permalink: /portfolio
 
  <h2 style="margin-top: 75px"> <a href="https://github.com/maxtheaxe/soviet-scoot"> Soviet Scoot </a> </h2>
  <p> <i> 2020 Jan Plan Project </i> </p>
- <img src="/assets/soviet-scoot.png" style="width:250px;height:275px">
+
 
  <!-- <div class="center">
    <div class="pagination">
