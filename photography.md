@@ -5,8 +5,8 @@ permalink: /photography/2
 ---
 
 <head>
- <style>
-  
+<style>
+
  .center {
      text-align: center;
  }  
@@ -35,18 +35,59 @@ permalink: /photography/2
      color: #4b0082;
  }
  
- .pagination a:hover:not(.active) {color: #aa33ff;}
+.pagination a:hover:not(.active) {color: #aa33ff;}
  
- </style>
- </head>
+  .overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0;
+  transition: .5s ease;
+  background-color: black;
+}
+
+.container {
+  position: relative;
+  width: 100%;
+}
+
+.container:hover .overlay {
+  opacity: 0.5;
+}
+
+.text {
+  color: white;
+  font-size: 20px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  -ms-transform: translate(-50%, -50%);
+  text-align: center;
+  opacity: 1
+}
+
+</style>
+
+
+</head>
  <body>
- 
+
  <h2 style="margin-top: 75px"> Songwriting Sessions </h2>
  <img src="/assets/music.jpg" style="width:504px;height:672px">
  <p> <i>27.12.2016</i> </p>
  
  <h2 style="margin-top: 30px"> Blidinje </h2>
- <img src="/assets/blidinje.jpg" style="width:672px;height:378px;">
+ <div class="container">
+  <img src="/assets/blidinje.jpg" style="width:672px;height:378px;">
+  <div class="overlay">
+    <div class="text">We were forgotten in a place no one remembers.</div>
+  </div>
+</div>
  <p> <i>12.10.2016</i> </p>
  
  <h2 style="margin-top: 30px"> After the Rain </h2>
