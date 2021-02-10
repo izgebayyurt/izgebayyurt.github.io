@@ -13,7 +13,7 @@ permalink: /portfolio/soviet-scoot
   width: 100%;
 }
 
- .pagination {
+ <!-- .pagination {
      display: inline-block;
  }
  .pagination a {
@@ -51,7 +51,7 @@ permalink: /portfolio/soviet-scoot
 
 .container:hover .overlay {
   opacity: 0.5;
-}
+} -->
 
 </style>
 </head>
