@@ -10,7 +10,7 @@ permalink: /portfolio/soviet-scoot
   display: block;
   margin-left: auto;
   margin-right: auto;
-  width: 50%;
+  width: 100%;
 }
 
  .pagination {
@@ -55,8 +55,6 @@ permalink: /portfolio/soviet-scoot
 
 </style>
 </head>
-
-https://www.linkedin.com/in/owen-goldthwaite-04817717a/
 
 <img src="/assets/soviet-scoot/soviet-scoot.png" style="width:250px;height:275px" class="center">
 
