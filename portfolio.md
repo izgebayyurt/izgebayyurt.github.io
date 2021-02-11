@@ -10,7 +10,7 @@ permalink: /portfolio
 
 
 <body>
-    <h1 class="portfolio-centered" style="padding-top:1rem; margin-top:8rem; margin:auto; display:table;">
+    <h1 class="portfolio-centered" style="padding-top:1rem; margin-top:6rem; margin-right:auto; margin-left:auto; margin-bottom:auto; display:table;">
         <a href="{{ site.url }}/portfolio/games" class="random-colored" onmouseover="color()">
             Games
         </a>
