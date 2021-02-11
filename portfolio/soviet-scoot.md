@@ -64,8 +64,8 @@ permalink: /portfolio/soviet-scoot
                    assets my teammates created together. You can find the entire project <a href="https://github.com/maxtheaxe/soviet-scoot">
                    here. </a> </p>
 
-<img src="/assets/soviet-scoot/main_menu.png" style="width:960px; height:540px" class="full-width">
+<img src="/assets/soviet-scoot/main_menu.png" style="width:480px; height:270px" class="center">
 
-<img src="/assets/soviet-scoot/how_to_play.png" style="width:960px; height:540px" class="full-width">
+<img src="/assets/soviet-scoot/how_to_play.png" style="width:480px; height:270px" class="center">
 
-<img src="/assets/soviet-scoot/gameplay.gif" style="width:960px; height:540px" class="full-width">
+<img src="/assets/soviet-scoot/gameplay.gif" style="width:480px; height:270px" class="center">
