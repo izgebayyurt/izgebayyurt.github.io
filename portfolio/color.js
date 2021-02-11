@@ -10,12 +10,12 @@ var colorArr = [
 ];
 
 function color() {
-  var items = document.getElementsByClassName("portfolio-centered");
+  var items = document.getElementsByClassName("random-colored");
   var i;
   var randomColor = colorArr[Math.floor(Math.random()*colorArr.length)];
-  
+
   for (i = 0; i < x.length; i++) {
-    x[i].style.color = "#" + randomColor;
+    x[i].style.color = randomColor;
   }
 
 }
