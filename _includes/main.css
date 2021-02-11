@@ -1203,16 +1203,17 @@ pre {
 }
 
 .portfolio-centered {
-}
-
-.portfolio-centered h1{
     text-align: center;
     font-weight: 900;
     font-size: 6rem;
+}
+
+.portfolio-centered span{
+    cursor: pointer;
     transition: transform .3s; /* Animation */
 }
 
-.portfolio-centered:hover h1{
+.portfolio-centered:hover span{
   transform: scale(1.5);
 }
 

@@ -11,26 +11,26 @@ permalink: /portfolio
 
 <body>
     <div class="portfolio-centered">
-        <h1 style="margin-top: 3rem">
+        <span style="margin-top: 3rem" class="portfolio-centered">
             <a href="{{ site.url }}/portfolio/games" class="random-colored" onmouseover="color()">
                 Games
             </a>
-        </h1>
+        </span>
     </div>
 
     <div class="portfolio-centered">
-        <h1>
+        <span class="portfolio-centered">
             <a href="{{ site.url }}/portfolio/artwork" class="random-colored" onmouseover="color()">        
                 Artwork
             </a>
-        </h1>
+        </span>
     </div>
 
     <div class="portfolio-centered">
-        <h1>
+        <span class="portfolio-centered">
             <a href="{{ site.url }}/portfolio/music" class="random-colored" onmouseover="color()">
                 Music
             </a>
-        </h1>
+        </span>
     </div>
 </body>
