@@ -1190,6 +1190,8 @@ pre {
           transition: all ease-in-out 0.2s;
 }
 
+/************ Additions ************/
+
 .full-width {
 	left: 50%;
 	margin-left: -50vw;
@@ -1200,11 +1202,17 @@ pre {
 	width: 100vw;
 }
 
-.full-center {
+.portfolio-centered {
   text-align: center;
   font-weight: 900;
   font-size: 6rem;
+  transition: transform .3s; /* Animation */
 }
+
+.portfolio-centered:hover {
+  transform: scale(1.5);
+}
+
 
 <img src="assets/music.jpg" style="image-orientation:90deg;">
 <img src="assets/artvin.jpg" style="image-orientation:90deg;">
