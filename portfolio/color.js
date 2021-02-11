@@ -14,7 +14,7 @@ function color() {
   var i;
   var randomColor = colorArr[Math.floor(Math.random()*colorArr.length)];
 
-  for (i = 0; i < x.length; i++) {
-    x[i].style.color = randomColor;
+  for (i = 0; i < items.length; i++) {
+    items[i].style.color = randomColor;
   }
 }
