@@ -5,7 +5,7 @@ permalink: /portfolio
 ---
 
 <head>  
-<script src="color.js"></script>  
+<script src="portfolio/color.js"></script>  
 </head>  
 
 
