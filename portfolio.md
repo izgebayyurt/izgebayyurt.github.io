@@ -4,6 +4,11 @@ layout: page
 permalink: /portfolio
 ---
 
+<head>  
+<script src="color.js"></script>  
+</head>  
+
+
 <body>
     <h1 class="portfolio-centered" style="margin-top: 3rem"> <a href="{{ site.url }}/portfolio/games" class="random-colored" onmouseover="color()"> Games </a> </h1>
 
