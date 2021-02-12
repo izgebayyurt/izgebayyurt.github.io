@@ -56,7 +56,7 @@ permalink: /portfolio/soviet_scoot
 </style>
 </head>
 
-<img src="/assets/soviet_scoot/soviet_scoot.png" style="width:250px;height:275px" class="center">
+<img src="/assets/soviet_scoot/soviet_scoot_icon.png" style="width:250px;height:275px" class="center">
 
 <p align="justify">Soviet Scoot is a 2D side-scroller game we worked on during the 2020 January Term in our Game Design and Programming course.
                    During this one month term, our team built the game from scratch. As the lead programmers,
