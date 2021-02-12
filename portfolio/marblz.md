@@ -51,10 +51,32 @@ permalink: /portfolio/marblz
 .container:hover .overlay {
  opacity: 0.5;
 }
+
+/* Three image containers (use 25% for four, and 50% for two, etc) */
+.column {
+  float: left;
+  width: 50%;
+  padding: 5px;
+}
+
+/* Clear floats after image containers */
+.row::after {
+  content: "";
+  clear: both;
+  display: table;
+}
+
 </style>
 </head>
 
 <p align="justify" style="margin-top: 6rem;">
 Marblz was written during the 2019 Bowdoin Hackathon in collaboration with <a href="https://www.linkedin.com/in/tylerhansencode/"> Tyler Hansen. </a> During the 8 hour challenge, we worked together to create art and sound assets while building the game in Unity. The idea for the game came to me from a physical arcade game I played when I was a child. The premise of that game was to catch the balls falling to a setup similar to a <a href="https://en.wikipedia.org/wiki/Bean_machine"> bean machine </a> using a bucket controlled by the player and dropping them through the hole in the middle of the board. If you collected enough balls in given time you would get a plush toy as a prize. I must have played the game countless times because the bag filled with over 30 plush toys is still somewhere in the house :) </p>
 
-<img src="/assets/marblz/main_menu.png" style="width:265px; height:470px" class="center">
+<div class="row">
+    <div class="column">
+        <img src="/assets/marblz/main_menu.png" style="width:100%; height:470px">
+    </div>
+    <div class="column">
+        <img src="/assets/marblz/gameplay.gif" style="width:100%; height:470px">
+    </div>
+</div>
