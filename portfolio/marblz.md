@@ -74,9 +74,9 @@ Marblz was written during the 2019 Bowdoin Hackathon in collaboration with <a hr
 
 <div class="row">
     <div class="column">
-        <img src="/assets/marblz/main_menu.png" style="width:100%; height:470px">
+        <img src="/assets/marblz/main_menu.png" style="width:90%; height:470px">
     </div>
     <div class="column">
-        <img src="/assets/marblz/gameplay.gif" style="width:100%; height:470px">
+        <img src="/assets/marblz/gameplay.gif" style="width:90%; height:470px">
     </div>
 </div>
