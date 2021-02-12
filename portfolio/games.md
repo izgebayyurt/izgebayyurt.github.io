@@ -76,6 +76,6 @@ permalink: /portfolio/games
 
 
 <body>
-    <h2 style="margin-top: 30px"> <a href="{{ site.url }}/portfolio/soviet_scoot"> Soviet Scoot </a> </h2>
+    <h2 style="margin-top: 3rem"> <a href="{{ site.url }}/portfolio/soviet_scoot"> Soviet Scoot </a> </h2>
     <p> <i> 2020 January </i> </p>
 </body>
