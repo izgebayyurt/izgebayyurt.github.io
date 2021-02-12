@@ -56,14 +56,24 @@ permalink: /portfolio/marblz
   box-sizing: border-box;
 }
 
-.row {
-  display: flex;
+.column {
+  float: left;
+  width: 50%;
+  padding: 5px;
 }
 
-/* Create three equal columns that sits next to each other */
-.column {
-  flex: 50%;
-  padding: 5px;
+/* Clearfix (clear floats) */
+.row::after {
+  content: "";
+  clear: both;
+  display: table;
+}
+
+/* Responsive layout - makes the three columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 400px) {
+  .column {
+    width: 100%;
+  }
 }
 
 </style>
