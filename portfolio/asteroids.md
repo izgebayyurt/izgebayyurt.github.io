@@ -23,8 +23,8 @@ permalink: /portfolio/asteroids
 <p align="justify"> You can download the game <a href="https://github.com/izgebayyurt/asteroids"> here. </a> </p>
 
 
-<img src="/assets/asteroids/main_menu.png" style="width:696px; height:696px" class="center">
+<img src="/assets/asteroids/main_menu.png" style="width:348px; height:348px" class="center">
 
-<img src="/assets/asteroids/in_game.png" style="width:696px; height:696px" class="center">
+<img src="/assets/asteroids/in_game.png" style="width:348px; height:348px" class="center">
 
 <!-- <img src="/assets/asteroids/gameplay.gif" style="width:480px; height:270px" class="center"> -->

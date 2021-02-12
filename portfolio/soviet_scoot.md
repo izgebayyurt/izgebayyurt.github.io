@@ -1,7 +1,7 @@
 ---
 title: Soviet_Scoot
 layout: page
-permalink: /portfolio/soviet-scoot
+permalink: /portfolio/soviet_scoot
 ---
 <head>
 <style>
