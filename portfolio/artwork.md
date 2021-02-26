@@ -58,15 +58,21 @@ div.desc {
 </div> -->
 
 <h2 style="margin-top: 75px"> Iris</h2>
-<img src="/assets/artwork/iris.png" style="width: auto; height: auto;">
+<a href="/assets/artwork/iris.png">
+  <img src="/assets/artwork/iris_compressed.png" style="width: auto; height: auto;">
+</a>
 <p> <i>2021</i> </p>  
 
 <h2 style="margin-top: 30px"> Iliana </h2>
-<img src="/assets/artwork/ili.jpg" style="width: auto; height: auto;">
+<a href="/assets/artwork/ili.jpg">
+  <img src="/assets/artwork/ili_compressed.jpg" style="width: auto; height: auto;">
+</a>
 <p> <i>2020</i> </p>  
 
 <h2 style="margin-top: 30px"> Tusk </h2>
-<img src="/assets/artwork/tusk.jpg" style="width: auto; height: auto;">
+<a href="/assets/artwork/tusk.jpg">
+  <img src="/assets/artwork/tusk_compressed.jpg" style="width: auto; height: auto;">
+</a>
 <p> <i>2019</i> </p>
 
 <!-- <div class="center">
