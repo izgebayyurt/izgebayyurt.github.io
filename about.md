@@ -5,7 +5,7 @@ permalink: /about/index.html
 ---
 ![Profile Image]({{ site.url }}/{{ site.picture }})
 
-<p align="justify">Hey there! My name is <b>İzge Bayyurt</b>, I am from Istanbul, Turkey, and I am currently a junior in <a href='https://www.colby.edu'>Colby College</a> in USA. I aim to work in the field of video game design by combining the technical skills that my education provides me with my artistic capabilities ranging from sketching to composing. Growing up, video games have been a huge part of my life; therefore, I intend to create games as a force to make an impact on people's lives.</p>
+<p align="justify">Hey there! My name is <b>Izge Bayyurt</b>, I am from Istanbul, Turkey, and currently residing in San Francisco, CA. I graduated from Colby College in May 2022 with a degree in Computer Science and I am looking for software engineering opportunities.</p>
 
 <p align="justify">In Colby's Computer Science department, students pursue a project-oriented curriculum, driving them to go beyond of the scope of in class material. In my first semester, I wrote a modified clone of the classic game 'Astroids' in Python as my final project. This experience led me to pursue a career in video game design. I also had a chance to participate in Bowdoin College's hackathon held in February 2019, where my friend Tyler Hanson and I won the 2nd place prize with our arcade game 'Marblz', written from scratch in 8 hours.</p>
 
@@ -14,8 +14,8 @@ permalink: /about/index.html
 <p align="justify">I am a licensed chess player in <a href="http://www.tsf.org.tr/">Turkish Chess Federation (TSF)</a>, with an <a href="https://ratings.fide.com/card.phtml?event=6323154">ELO of 1844</a>, participated and placed highly on national and international tournaments, and covered in national and international media. I am also a certified chess coach and had voluntary experience of preparing young players between the age of 7-11 for an upcoming national tournament. I continue to play chess regularly, and find the intersection of chess and analytic mathematics and combinatorics especially intriguing.</p>
 
 <p align="justify">
-My curriculum vitae is available <a href='/assets/Curriculum Vitae.pdf'>here</a>.
+My resume is available <a href='/assets/Curriculum Vitae.pdf'>here</a>.
 </p>
 
-<p align="justify">Let's have coffee! Contact me at <a href='mailto:ibayyu22@colby.edu'>ibayyu22 [at] colby [dot] edu.</a></p>
+<p align="justify">Let's have coffee! Contact me at <a href='mailto:izgebayyurt@gmail.com'>izgebayyurt [at] gmail [dot] com.</a></p>
 
