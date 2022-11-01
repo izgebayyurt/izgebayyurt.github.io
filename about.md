@@ -14,7 +14,7 @@ permalink: /about/index.html
 <p align="justify">I am a licensed chess player in <a href="http://www.tsf.org.tr/">Turkish Chess Federation (TSF)</a>, with an <a href="https://ratings.fide.com/card.phtml?event=6323154">ELO of 1844</a>, participated and placed highly on national and international tournaments, and covered in national and international media. I am also a certified chess coach and had voluntary experience of preparing young players between the age of 7-11 for an upcoming national tournament. I continue to play chess regularly, and find the intersection of chess and analytic mathematics and combinatorics especially intriguing.</p>
 
 <p align="justify">
-My resume is available <a href='/assets/Curriculum Vitae.pdf'>here</a>.
+My resume is available <a href='/assets/resume.pdf'>here</a>.
 </p>
 
 <p align="justify">Let's have coffee! Contact me at <a href='mailto:izgebayyurt@gmail.com'>izgebayyurt [at] gmail [dot] com.</a></p>
