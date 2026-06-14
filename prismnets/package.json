@@ -1,0 +1,21 @@
+{
+  "name": "prismnets-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Native JavaScript (Three.js) port of PrismNets — net-hunting sandbox.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node test/logic.test.js",
+    "precompute:nets": "node scripts/precompute-nets.mjs",
+    "deploy": "node scripts/deploy.mjs"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

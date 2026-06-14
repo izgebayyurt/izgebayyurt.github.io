@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Asteroids · İzge Bayyurt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #ece9e1; color: #2a2730; font-family: "Geist", -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" data-presets="react" src="asteroidz.jsx"></script>
+  <script type="text/babel" data-presets="react" src="game-detail.jsx"></script>
+  <script type="text/babel" data-presets="react">
+    const GAME_DATA = {
+      title: 'Asteroids',
+      kicker: 'Playable · Python → JS · 2018',
+      tagline: 'A modified clone of the classic arcade game, written for my first computer-science course.',
+      playable: true,
+      accent: 1,
+      meta: [
+        { label: 'Course', value: 'CS152, Colby' },
+        { label: 'Year', value: '2018' },
+        { label: 'Built with', value: 'Python · Zelle graphics' },
+        { label: 'Role', value: 'Solo' }
+      ],
+      links: [
+        { label: 'Python source', href: 'https://github.com/izgebayyurt/asteroids' }
+      ],
+      about: [
+        'Asteroids is a modified clone of the classic arcade game. I built it with the Zelle graphics library as the final project for CS152: Introduction to Computational Thinking, in my first semester at Colby.',
+        'The objective is simple: steer your ship to dodge the asteroids drifting in from every edge. In the original you get a limited boost that recharges over time and three lives, and when they run out your score is set by how long you lasted. It was the first thing I made that felt like a real game, and a big part of why I kept going toward game design.',
+        'The version at the top of the page is a JavaScript port I wrote so you can play it right here in the browser. Every rock is still a procedurally generated lumpy polygon, just like the Python original.'
+      ],
+      galleryCols: 3,
+      gallery: [
+        { src: 'assets/asteroids-menu.png', caption: 'Main menu', dark: true, contain: true },
+        { src: 'assets/asteroids-ingame.png', caption: 'In game', dark: true, contain: true },
+        { src: 'assets/asteroids-play.gif', caption: 'Gameplay', dark: true, contain: true }
+      ]
+    };
+    renderGamePage(GAME_DATA);
+  </script>
+</body>
+</html>

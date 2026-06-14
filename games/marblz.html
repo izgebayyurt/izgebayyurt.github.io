@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Marblz · İzge Bayyurt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #ece9e1; color: #2a2730; font-family: "Geist", -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" data-presets="react" src="game-detail.jsx"></script>
+  <script type="text/babel" data-presets="react">
+    const GAME_DATA = {
+      title: 'Marblz',
+      kicker: 'Unity · Game jam · 2019',
+      tagline: 'A Plinko-style catcher built in eight hours at the Bowdoin Hackathon. Second place.',
+      playable: false,
+      accent: 2,
+      hero: 'assets/marblz-menu.jpg',
+      meta: [
+        { label: 'Event', value: 'Bowdoin Hackathon' },
+        { label: 'Year', value: '2019' },
+        { label: 'Built with', value: 'Unity' },
+        { label: 'With', value: 'Tyler Hansen' },
+        { label: 'Result', value: '2nd place' }
+      ],
+      links: [
+        { label: 'Soundtrack', href: 'https://soundcloud.com/izge-bayyurt' }
+      ],
+      about: [
+        'Marblz was written during the 2019 Bowdoin Hackathon with Tyler Hansen. Over the eight-hour challenge we built the whole thing in Unity, making the art and sound assets as we went.',
+        'The idea came from a physical arcade game I played constantly as a kid in Istanbul: you slide a bucket to catch balls falling through a peg board, like a bean machine, and funnel them out through a hole in the middle. Collect enough in time and you win a plush toy. I must have played it countless times, because the bag of thirty-plus plush toys is still somewhere in the house.',
+        'I made the art, the sound, and the soundtrack (you can hear it on the homepage). It took second place.'
+      ],
+      galleryCols: 2,
+      gallery: [
+        { src: 'assets/marblz-menu.jpg', caption: 'Main menu' },
+        { src: 'assets/marblz-play.gif', caption: 'Gameplay' }
+      ]
+    };
+    renderGamePage(GAME_DATA);
+  </script>
+</body>
+</html>

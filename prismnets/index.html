@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PrismNets — Net Hunting</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0e0f13; }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; }
+
+      /* ── Shared panel chrome ────────────────────────────────────── */
+      #hud {
+        position: fixed; top: 16px; left: 16px; z-index: 10;
+        font: 14px/1.4 system-ui, sans-serif; color: #e8e8ee;
+        user-select: none;
+      }
+      #hud .panel {
+        background: rgba(18, 19, 26, 0.85);
+        border: 1px solid #2a2c3a; border-radius: 10px;
+        padding: 12px 14px; margin-bottom: 10px; min-width: 200px;
+        backdrop-filter: blur(6px);
+      }
+      #hud h1 { font-size: 15px; margin: 0 0 8px; letter-spacing: 0.3px; }
+      #progress { font-variant-numeric: tabular-nums; }
+      #nethunt-topline { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+      #speedrun-time {
+        display: none; font-variant-numeric: tabular-nums; font-weight: 600;
+        color: #f2c238; font-size: 13px;
+      }
+      #speedrun-time.on { display: inline; }
+      #nethunt-hint {
+        display: none; align-items: center; gap: 9px; margin-top: 10px;
+        padding-top: 9px; border-top: 1px solid #23252f;
+      }
+      #nethunt-hint.on { display: flex; }
+      #nethunt-hint .hint-label { font-size: 11px; color: #8a8ea4; }
+      #hint-canvas { background: #1a1c24; border: 1px solid #333647; border-radius: 5px; }
+      #speedrun-btn[aria-pressed="true"] { background: #5a4a12; border-color: #f2c238; color: #ffe9a8; }
+      #gallery { display: grid; grid-template-columns: repeat(6, 22px); gap: 4px; margin-top: 8px; }
+      #gallery .cell {
+        width: 22px; height: 22px; border-radius: 4px;
+        background: #23252f; border: 1px solid #333647;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; color: #6a6e80;
+      }
+      #gallery .cell.found { background: #2e7d5b; border-color: #43c08a; color: #eafff5; }
+      .btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+      button {
+        font: 13px system-ui, sans-serif; color: #e8e8ee;
+        background: #262a3a; border: 1px solid #3a3f55; border-radius: 8px;
+        padding: 7px 12px; cursor: pointer;
+      }
+      button:hover { background: #313650; }
+      button:active { background: #3a4060; }
+
+      /* ── Shape selector ─────────────────────────────────────────── */
+      #solid-panel {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 12px !important;
+      }
+      #solid-panel label {
+        font-size: 11px; color: #7a7e98; text-transform: uppercase; letter-spacing: 0.8px;
+      }
+      #solid-btn {
+        flex: 1; font: 600 13px system-ui, sans-serif; color: #e8e8ee;
+        background: #262a3a; border: 1px solid #3a3f55; border-radius: 7px;
+        padding: 6px 10px; cursor: pointer; text-align: left;
+      }
+      #solid-btn:hover { background: #313650; }
+
+      /* ── Solid picker modal ─────────────────────────────────────── */
+      #solid-overlay {
+        position: fixed; inset: 0; z-index: 150;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+      }
+      #solid-modal {
+        display: flex; flex-direction: column;
+        width: min(520px, calc(100% - 40px)); max-height: 78vh;
+        background: rgba(18, 19, 26, 0.98);
+        border: 1px solid #363a4e; border-radius: 14px;
+        box-shadow: 0 16px 60px rgba(0,0,0,0.75); overflow: hidden;
+      }
+      #solid-modal-head {
+        display: flex; gap: 8px; padding: 14px; border-bottom: 1px solid #23252f;
+      }
+      #solid-search {
+        flex: 1; font: 14px system-ui, sans-serif; color: #e8e8ee;
+        background: #1b1d27; border: 1px solid #3a3f55; border-radius: 8px;
+        padding: 9px 12px;
+      }
+      #solid-search::placeholder { color: #6a6e80; }
+      #solid-close {
+        background: #23253a; border: 1px solid #3a3f55; border-radius: 8px;
+        color: #b8bcd0; padding: 0 14px; cursor: pointer; font-size: 15px;
+      }
+      #solid-close:hover { background: #313650; }
+      #solid-list { overflow-y: auto; padding: 8px; }
+      .solid-group {
+        font: 700 10px system-ui, sans-serif; text-transform: uppercase;
+        letter-spacing: 1px; color: #6a6e80; padding: 12px 10px 5px;
+      }
+      .solid-row {
+        display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+        width: 100%; text-align: left;
+        background: none; border: none; border-radius: 8px;
+        padding: 8px 10px; cursor: pointer; color: #d8dbec; font: 14px system-ui, sans-serif;
+      }
+      .solid-row:hover { background: rgba(255,255,255,0.07); }
+      .solid-row.current { background: rgba(67,192,138,0.16); color: #eafff5; }
+      .solid-meta { color: #6a6e80; font-size: 11px; flex-shrink: 0; }
+
+      /* ── Mode switcher ──────────────────────────────────────────── */
+      #mode-panel {
+        padding: 4px !important;
+        display: flex;
+        gap: 3px;
+      }
+      .mode-btn {
+        flex: 1;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 7px;
+        font: 600 13px system-ui, sans-serif;
+        color: #6a6e80;
+        padding: 7px 10px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        text-align: center;
+      }
+      .mode-btn:hover {
+        background: rgba(255,255,255,0.07) !important;
+        color: #b8bcd0;
+      }
+      .mode-btn.active {
+        background: rgba(255,255,255,0.14) !important;
+        color: #e8e8ee;
+      }
+
+      /* ── Toast ──────────────────────────────────────────────────── */
+      #toast {
+        position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+        z-index: 20; padding: 10px 18px; border-radius: 10px;
+        font: 600 14px system-ui, sans-serif; color: #fff;
+        background: rgba(46, 125, 91, 0.95); border: 1px solid #43c08a;
+        opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+      }
+      #toast.show { opacity: 1; }
+      #toast.dup { background: rgba(80, 84, 110, 0.95); border-color: #6a6e80; }
+
+      /* ── Hint bar ───────────────────────────────────────────────── */
+      #hint {
+        position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+        z-index: 10; color: #888ca0; font: 12px system-ui, sans-serif;
+      }
+
+      /* ── Face-colour legend (bottom-left) ───────────────────────── */
+      #legend {
+        position: fixed; bottom: 14px; left: 16px; z-index: 10;
+        display: flex; flex-direction: column; gap: 7px;
+        background: rgba(18, 19, 26, 0.85);
+        border: 1px solid #2a2c3a; border-radius: 10px;
+        padding: 11px 13px; backdrop-filter: blur(6px);
+        font: 12px system-ui, sans-serif; color: #c8ccdc; user-select: none;
+      }
+      #legend .legend-row { display: flex; align-items: center; gap: 9px; }
+      #legend .swatch {
+        width: 14px; height: 14px; border-radius: 50%;
+        border: 1.5px solid rgba(255,255,255,0.65); flex-shrink: 0;
+      }
+
+      /* ── Alert modal ────────────────────────────────────────────── */
+      #alert-overlay {
+        position: fixed; inset: 0; z-index: 200;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(4px);
+      }
+      #alert-box {
+        background: rgba(18, 19, 26, 0.98);
+        border: 1px solid #363a4e; border-radius: 14px;
+        padding: 28px 30px 22px;
+        max-width: 420px; width: calc(100% - 48px);
+        font: 14px/1.5 system-ui, sans-serif; color: #e8e8ee;
+        box-shadow: 0 16px 60px rgba(0,0,0,0.75);
+      }
+      #alert-box h3 {
+        margin: 0 0 14px; font-size: 18px; font-weight: 700; letter-spacing: 0.2px;
+      }
+      #alert-body {
+        margin: 0 0 22px; color: #9a9eb8; line-height: 1.7;
+        font-size: 13px; white-space: pre-line;
+      }
+      .alert-footer {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      }
+      .alert-dismiss-label {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 12px; color: #6a6e80; cursor: pointer; user-select: none;
+      }
+      .alert-dismiss-label input[type="checkbox"] { cursor: pointer; accent-color: #43c08a; }
+      #alert-ok {
+        background: #1e4a31; border-color: #43c08a;
+        font-weight: 600; font-size: 13px; padding: 7px 22px;
+        flex-shrink: 0;
+      }
+      #alert-ok:hover { background: #265c3e; }
+
+      /* ── Puzzle panel ───────────────────────────────────────────── */
+      #puzzle-panel {
+        position: fixed; top: 50%; right: 16px; transform: translateY(-50%);
+        z-index: 10; display: none;
+        font: 14px/1.4 system-ui, sans-serif; color: #e8e8ee;
+        user-select: none;
+        background: rgba(14, 16, 22, 0.95);
+        border: 1px solid #3a3f55; border-radius: 14px;
+        padding: 18px; min-width: 320px;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      }
+      #puzzle-panel h2 {
+        font-size: 11px; margin: 0 0 4px;
+        color: #a0a4c0; text-transform: uppercase; letter-spacing: 1.1px;
+        font-weight: 700;
+      }
+      #puzzle-question {
+        font-size: 15px; font-weight: 600; margin: 0 0 14px; line-height: 1.35;
+        color: #dde0f0;
+      }
+      #candidate-viewport {
+        border-radius: 10px; overflow: hidden;
+        border: 1px solid #3a3f55;
+        background: radial-gradient(ellipse at center, #1e2130 0%, #0c0d12 100%);
+      }
+      #candidate-viewport canvas { display: block; }
+      #candidate-counter {
+        text-align: center; color: #6a6e80; font-size: 12px;
+        margin: 10px 0 12px;
+      }
+      #candidate-controls {
+        display: flex; gap: 8px; align-items: center;
+      }
+      #prev-btn, #next-btn {
+        flex: 0 0 40px; padding: 8px 0;
+        font-size: 22px; text-align: center; line-height: 1;
+        background: #23253a; border-color: #3a3f55;
+      }
+      #select-btn {
+        flex: 1; background: #1e4a31; border-color: #43c08a;
+        font-weight: 700; font-size: 14px; padding: 9px;
+        letter-spacing: 0.3px;
+      }
+      #select-btn:hover { background: #265c3e; }
+      #puzzle-feedback {
+        text-align: center; font-size: 18px; font-weight: 700;
+        min-height: 26px; margin-top: 12px;
+      }
+      #puzzle-end-btn {
+        display: block; width: 100%; margin-top: 10px;
+        background: none; border: none; border-top: 1px solid #23252f;
+        padding: 9px 0 0; color: #4a4e66; font-size: 12px;
+        text-align: center; cursor: pointer;
+      }
+      #puzzle-end-btn:hover { color: #7a7e98; background: none; }
+
+      /* ── Gauntlet ───────────────────────────────────────────────── */
+      #gauntlet-panel {
+        position: fixed; top: 50%; right: 16px; transform: translateY(-50%);
+        z-index: 10; display: none;
+        font: 14px/1.45 system-ui, sans-serif; color: #e8e8ee; user-select: none;
+        background: rgba(14, 16, 22, 0.95);
+        border: 1px solid #3a3f55; border-radius: 14px;
+        padding: 18px; width: 300px;
+        backdrop-filter: blur(8px); box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      }
+      #gauntlet-panel h2 {
+        font-size: 11px; margin: 0 0 10px; color: #a0a4c0;
+        text-transform: uppercase; letter-spacing: 1.1px; font-weight: 700;
+      }
+      #gauntlet-statusbar {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 12px; color: #8a8ea4; margin-bottom: 12px;
+      }
+      #gauntlet-lives { color: #e0524d; font-size: 15px; letter-spacing: 2px; }
+      #gauntlet-ref { margin-bottom: 12px; }
+      #gauntlet-ref-head {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.9px;
+        color: #7a7e98; margin-bottom: 5px;
+      }
+      #gauntlet-ref-close {
+        background: none; border: none; color: #6a6e80; font-size: 13px;
+        cursor: pointer; padding: 0 2px; line-height: 1;
+      }
+      #gauntlet-ref-close:hover { color: #c0c4d6; }
+      #gauntlet-ref-viewport {
+        height: 150px; border-radius: 8px; overflow: hidden;
+        border: 1px solid #2a2c3a;
+        background: radial-gradient(ellipse at center, #1e2130 0%, #0c0d12 100%);
+      }
+      #gauntlet-ref-viewport canvas { display: block; }
+      #gauntlet-ref-show {
+        display: none; width: 100%; margin-bottom: 12px;
+        background: #20232f; border: 1px solid #3a3f55; border-radius: 8px;
+        color: #9a9eb8; font-size: 12px; padding: 7px; cursor: pointer;
+      }
+      #gauntlet-ref-show:hover { background: #2a2e40; }
+      #gauntlet-prompt { font-size: 15px; font-weight: 600; margin: 0 0 14px; color: #dde0f0; }
+      #gauntlet-tf { display: flex; gap: 10px; }
+      #gauntlet-tf button { flex: 1; font-weight: 700; font-size: 14px; padding: 11px; }
+      #g-true { background: #1e4a31; border-color: #43c08a; }
+      #g-true:hover { background: #265c3e; }
+      #g-false { background: #4a1e22; border-color: #c0434d; }
+      #g-false:hover { background: #5c2630; }
+      #gauntlet-pick-hint {
+        display: none; font-size: 13px; color: #9a9eb8;
+        background: rgba(255,255,255,0.04); border: 1px solid #2a2c3a;
+        border-radius: 8px; padding: 10px 12px; text-align: center;
+      }
+      #gauntlet-feedback {
+        text-align: center; font-size: 18px; font-weight: 700; min-height: 26px; margin-top: 12px;
+      }
+      #gauntlet-end {
+        display: block; width: 100%; margin-top: 10px;
+        background: none; border: none; border-top: 1px solid #23252f;
+        padding: 9px 0 0; color: #4a4e66; font-size: 12px; text-align: center; cursor: pointer;
+      }
+      #gauntlet-end:hover { color: #7a7e98; background: none; }
+
+      /* Gauntlet chooser + game-over overlays (share modal styling) */
+      #gauntlet-chooser, #gauntlet-over {
+        position: fixed; inset: 0; z-index: 200;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);
+      }
+      #gauntlet-chooser-box, #gauntlet-over-box {
+        background: rgba(18, 19, 26, 0.98);
+        border: 1px solid #363a4e; border-radius: 14px; padding: 26px 28px;
+        max-width: 460px; width: calc(100% - 48px);
+        font: 14px/1.5 system-ui, sans-serif; color: #e8e8ee;
+        box-shadow: 0 16px 60px rgba(0,0,0,0.75); text-align: center;
+      }
+      #gauntlet-chooser-box h3, #gauntlet-over-box h3 { margin: 0 0 16px; font-size: 18px; }
+      .g-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+      .g-card {
+        display: flex; flex-direction: column; gap: 4px; text-align: left;
+        background: #20232f; border: 1px solid #3a3f55; border-radius: 10px;
+        padding: 13px 15px; cursor: pointer;
+      }
+      .g-card:hover { background: #2a2e40; border-color: #5a608a; }
+      .g-card-title { font-weight: 700; font-size: 15px; color: #eef0fb; }
+      .g-card-sub { font-size: 12px; color: #9a9eb8; }
+      #gauntlet-chooser-close {
+        background: none; border: none; color: #6a6e80; font-size: 13px; cursor: pointer;
+      }
+      #gauntlet-chooser-close:hover { color: #9a9eb8; }
+      .g-over-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+      #g-again { background: #1e4a31; border-color: #43c08a; font-weight: 600; padding: 8px 20px; }
+      #g-again:hover { background: #265c3e; }
+
+      #puzzle-verify-hint {
+        display: none; margin-top: 10px; padding: 9px 12px;
+        background: rgba(255,255,255,0.04); border: 1px solid #2a2c3a;
+        border-radius: 8px; font-size: 12px; color: #9a9eb8;
+        text-align: center; line-height: 1.5;
+      }
+
+      /* ── Shared challenge panel (Practice + Gauntlet) ────────────── */
+      #challenge-panel {
+        position: fixed; top: 50%; right: 16px; transform: translateY(-50%);
+        z-index: 10; display: none;
+        font: 14px/1.45 system-ui, sans-serif; color: #e8e8ee; user-select: none;
+        background: rgba(14, 16, 22, 0.95);
+        border: 1px solid #3a3f55; border-radius: 14px;
+        padding: 18px; width: 300px;
+        backdrop-filter: blur(8px); box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      }
+      .cv-bar {
+        display: none; justify-content: space-between; align-items: center;
+        font-size: 12px; color: #8a8ea4; margin-bottom: 12px;
+      }
+      #gauntlet-lives { color: #e0524d; font-size: 15px; letter-spacing: 2px; }
+      #challenge-ref { margin-bottom: 12px; }
+      #challenge-ref-head {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.9px;
+        color: #7a7e98; margin-bottom: 5px;
+      }
+      #challenge-ref-close { background: none; border: none; color: #6a6e80; font-size: 13px; cursor: pointer; }
+      #challenge-ref-close:hover { color: #c0c4d6; }
+      #challenge-ref-viewport {
+        height: 140px; border-radius: 8px; overflow: hidden; border: 1px solid #2a2c3a;
+        background: radial-gradient(ellipse at center, #1e2130 0%, #0c0d12 100%);
+      }
+      #challenge-ref-viewport canvas, #challenge-cand-viewport canvas { display: block; }
+      #challenge-ref-show {
+        display: none; width: 100%; margin-bottom: 12px;
+        background: #20232f; border: 1px solid #3a3f55; border-radius: 8px;
+        color: #9a9eb8; font-size: 12px; padding: 7px; cursor: pointer;
+      }
+      #challenge-prompt { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: #dde0f0; }
+      #challenge-cands { display: none; }
+      #challenge-cand-viewport {
+        height: 200px; border-radius: 10px; overflow: hidden; border: 1px solid #3a3f55;
+        background: radial-gradient(ellipse at center, #1e2130 0%, #0c0d12 100%);
+      }
+      #challenge-cand-counter { text-align: center; color: #6a6e80; font-size: 12px; margin: 8px 0 10px; }
+      #challenge-cand-controls { display: flex; gap: 8px; align-items: center; }
+      #cv-prev, #cv-next { flex: 0 0 40px; padding: 8px 0; font-size: 22px; text-align: center; line-height: 1; background: #23253a; border-color: #3a3f55; }
+      #cv-select { flex: 1; background: #1e4a31; border-color: #43c08a; font-weight: 700; font-size: 14px; padding: 9px; }
+      #cv-select:hover { background: #265c3e; }
+      #challenge-tf { display: none; gap: 10px; }
+      #challenge-tf button { flex: 1; font-weight: 700; font-size: 14px; padding: 11px; }
+      #cv-true { background: #1e4a31; border-color: #43c08a; }
+      #cv-true:hover { background: #265c3e; }
+      #cv-false { background: #4a1e22; border-color: #c0434d; }
+      #cv-false:hover { background: #5c2630; }
+      #challenge-pick-hint {
+        display: none; font-size: 13px; color: #9a9eb8;
+        background: rgba(255,255,255,0.04); border: 1px solid #2a2c3a;
+        border-radius: 8px; padding: 10px 12px; text-align: center;
+      }
+      #challenge-feedback { text-align: center; font-size: 18px; font-weight: 700; min-height: 26px; margin-top: 12px; }
+      #practice-footer { display: none; align-items: center; justify-content: space-between; margin-top: 12px; }
+      #practice-auto-label { font-size: 12px; color: #9a9eb8; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+      #practice-auto-label input { accent-color: #43c08a; }
+      #practice-next { background: #264d6b; border-color: #4d8fe0; font-weight: 600; padding: 8px 16px; }
+      #practice-next:hover { background: #2e5d80; }
+      .cv-end {
+        display: block; width: 100%; margin-top: 10px;
+        background: none; border: none; border-top: 1px solid #23252f;
+        padding: 9px 0 0; color: #4a4e66; font-size: 12px; text-align: center; cursor: pointer;
+      }
+      .cv-end:hover { color: #7a7e98; background: none; }
+
+      /* ── Choosers / game-over (overlays) ────────────────────────── */
+      .cv-chooser {
+        position: fixed; inset: 0; z-index: 200;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);
+      }
+      .cv-chooser-box {
+        background: rgba(18, 19, 26, 0.98);
+        border: 1px solid #363a4e; border-radius: 14px; padding: 26px 28px;
+        max-width: 460px; width: calc(100% - 48px);
+        font: 14px/1.5 system-ui, sans-serif; color: #e8e8ee;
+        box-shadow: 0 16px 60px rgba(0,0,0,0.75); text-align: center;
+      }
+      .cv-chooser-box h3 { margin: 0 0 16px; font-size: 18px; }
+      .cv-tier-row { display: flex; gap: 6px; margin-bottom: 14px; }
+      .cv-tier { flex: 1; font-size: 12px; padding: 8px 4px; background: #20232f; border: 1px solid #3a3f55; }
+      .cv-tier.active { background: rgba(67,192,138,0.18); border-color: #43c08a; color: #eafff5; }
+      .cv-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+      .cv-card {
+        display: flex; flex-direction: column; gap: 4px; text-align: left;
+        background: #20232f; border: 1px solid #3a3f55; border-radius: 10px;
+        padding: 13px 15px; cursor: pointer;
+      }
+      .cv-card:hover { background: #2a2e40; border-color: #5a608a; }
+      .cv-card-title { font-weight: 700; font-size: 15px; color: #eef0fb; }
+      .cv-card-sub { font-size: 12px; color: #9a9eb8; }
+      .cv-chooser-close { background: none; border: none; color: #6a6e80; font-size: 13px; cursor: pointer; }
+      .cv-chooser-close:hover { color: #9a9eb8; }
+      .g-over-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+      #g-again { background: #1e4a31; border-color: #43c08a; font-weight: 600; padding: 8px 20px; }
+      #g-again:hover { background: #265c3e; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud">
+      <div class="panel" id="solid-panel">
+        <label>Shape</label>
+        <button id="solid-btn">Cube  ▾</button>
+      </div>
+      <div class="panel" id="mode-panel">
+        <button class="mode-btn active" id="mode-sandbox" title="Fold the shape freely">Sandbox</button>
+        <button class="mode-btn" id="mode-net" title="Find every distinct net of a small shape">Net Hunt</button>
+        <button class="mode-btn" id="mode-puzzle" title="Practise one challenge">Puzzle</button>
+        <button class="mode-btn" id="mode-gauntlet" title="A timed, rising-difficulty run">Gauntlet</button>
+      </div>
+      <div class="panel" id="nethunt-panel">
+        <h1>Net Hunting</h1>
+        <div id="nethunt-topline">
+          <span id="progress">0 / 11 nets found</span>
+          <span id="speedrun-time" title="Speed-run timer">0:00</span>
+        </div>
+        <div id="gallery"></div>
+        <div id="nethunt-hint">
+          <span class="hint-label">Try to make this →</span>
+          <canvas id="hint-canvas" width="40" height="40"></canvas>
+        </div>
+      </div>
+      <div class="panel btnrow" id="nethunt-buttons">
+        <button id="reset" title="Refold to the assembled shape (keeps found nets)">Reset</button>
+        <button id="hint-btn" title="Reveal the shape of a net you haven't found yet">Hint</button>
+        <button id="speedrun-btn" title="Time yourself finding every net" aria-pressed="false">⏱ Speed-run</button>
+        <button id="export" title="Download this session's interaction log as JSON">Export log</button>
+      </div>
+    </div>
+
+    <!-- Shared challenge panel (Practice + Gauntlet drive it) -->
+    <div id="challenge-panel">
+      <div id="gauntlet-bar" class="cv-bar">
+        <span id="gauntlet-lives">♥♥♥</span>
+        <span id="gauntlet-score">Score 0 · Streak 0</span>
+      </div>
+      <div id="practice-bar" class="cv-bar">
+        <span id="practice-label">—</span>
+        <span id="practice-score">Solved 0</span>
+      </div>
+
+      <div id="challenge-ref">
+        <div id="challenge-ref-head">
+          <span>Folds into</span>
+          <button id="challenge-ref-close" title="Hide reference">✕</button>
+        </div>
+        <div id="challenge-ref-viewport"></div>
+      </div>
+      <button id="challenge-ref-show">Show reference shape</button>
+
+      <p id="challenge-prompt"></p>
+
+      <div id="challenge-cands">
+        <div id="challenge-cand-viewport"></div>
+        <div id="challenge-cand-counter">1 / 4</div>
+        <div id="challenge-cand-controls">
+          <button id="cv-prev">‹</button>
+          <button id="cv-select">Select</button>
+          <button id="cv-next">›</button>
+        </div>
+      </div>
+
+      <div id="challenge-tf">
+        <button id="cv-false">False</button>
+        <button id="cv-true">True</button>
+      </div>
+      <div id="challenge-pick-hint">Tap a face on the net to answer.</div>
+      <div id="challenge-feedback"></div>
+
+      <div id="practice-footer">
+        <label id="practice-auto-label"><input type="checkbox" id="practice-auto"> Auto-advance</label>
+        <button id="practice-next">Next →</button>
+      </div>
+      <button id="cv-end" class="cv-end">← Exit</button>
+    </div>
+
+    <!-- Practice chooser: difficulty + challenge cards (cards filled by JS) -->
+    <div id="practice-chooser" class="cv-chooser">
+      <div class="cv-chooser-box">
+        <h3>Practice</h3>
+        <div id="practice-tiers" class="cv-tier-row">
+          <button class="cv-tier" data-tier="easy">Easy</button>
+          <button class="cv-tier active" data-tier="medium">Medium</button>
+          <button class="cv-tier" data-tier="hard">Hard</button>
+          <button class="cv-tier" data-tier="impossible">Impossible</button>
+        </div>
+        <div class="cv-cards" id="practice-cards"></div>
+        <button class="cv-chooser-close" data-close="practice">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Gauntlet chooser: challenge cards + Mixed (filled by JS) -->
+    <div id="gauntlet-chooser" class="cv-chooser">
+      <div class="cv-chooser-box">
+        <h3>Pick a Gauntlet</h3>
+        <div class="cv-cards" id="gauntlet-cards"></div>
+        <button class="cv-chooser-close" data-close="gauntlet">Cancel</button>
+      </div>
+    </div>
+
+    <div id="gauntlet-over" class="cv-chooser">
+      <div class="cv-chooser-box">
+        <h3>Out of lives</h3>
+        <p id="g-over-text">Score 0</p>
+        <div class="g-over-actions">
+          <button id="g-again">Play again</button>
+          <button id="g-exit">Exit</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="solid-overlay">
+      <div id="solid-modal">
+        <div id="solid-modal-head">
+          <input id="solid-search" type="text" placeholder="Search solids…" autocomplete="off" />
+          <button id="solid-close">✕</button>
+        </div>
+        <div id="solid-list"></div>
+      </div>
+    </div>
+
+    <div id="alert-overlay">
+      <div id="alert-box">
+        <h3 id="alert-title"></h3>
+        <p id="alert-body"></p>
+        <div class="alert-footer">
+          <label class="alert-dismiss-label">
+            <input type="checkbox" id="alert-dismiss"> Don't show again
+          </label>
+          <button id="alert-ok">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+    <div id="hint">Click an edge to fold/unfold · drag to orbit · scroll to zoom</div>
+
+    <div id="legend">
+      <div class="legend-row"><span class="swatch" style="background:#45afee"></span>Folded</div>
+      <div class="legend-row"><span class="swatch" style="background:#9b7fe0"></span>Unfolded</div>
+      <div class="legend-row"><span class="swatch" style="background:#f2c238"></span>Base</div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

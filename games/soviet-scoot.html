@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Soviet Scoot · İzge Bayyurt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #ece9e1; color: #2a2730; font-family: "Geist", -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" data-presets="react" src="game-detail.jsx"></script>
+  <script type="text/babel" data-presets="react">
+    const GAME_DATA = {
+      title: 'Soviet Scoot',
+      kicker: 'Unity · Studio course · 2020',
+      tagline: 'A 2D side-scroller built from scratch in a one-month studio term.',
+      playable: false,
+      accent: 1,
+      hero: 'assets/soviet-menu.jpg',
+      meta: [
+        { label: 'Course', value: 'Game Design & Programming' },
+        { label: 'Year', value: '2020' },
+        { label: 'Built with', value: 'Unity' },
+        { label: 'Role', value: 'Lead programmer' },
+        { label: 'With', value: 'Owen Goldthwaite' }
+      ],
+      links: [
+        { label: 'Project on GitHub', href: 'https://github.com/maxtheaxe/soviet-scoot' }
+      ],
+      about: [
+        'Soviet Scoot is a 2D side-scroller our team built from scratch during a one-month January-term course in game design and programming. As one of the two lead programmers, Owen Goldthwaite and I worked in Unity to bring together all the art and sound our teammates created.',
+        'You play Larry Showers, an American pilot shot down while investigating the Chernobyl accident. He is trying to outrun the authorities on his scooter, weaving down a cluttered highway. Will he make it to the border and escape?'
+      ],
+      galleryCols: 3,
+      gallery: [
+        { src: 'assets/soviet-menu.jpg', caption: 'Main menu' },
+        { src: 'assets/soviet-howto.png', caption: 'How to play' },
+        { src: 'assets/soviet-play.gif', caption: 'Gameplay' }
+      ]
+    };
+    renderGamePage(GAME_DATA);
+  </script>
+</body>
+</html>
