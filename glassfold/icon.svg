@@ -1,0 +1,35 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Glass Fold app icon (Aurora) — master; export to PNG for iOS AppIcon.appiconset -->
+  <defs>
+    <radialGradient id="bg" cx="30%" cy="20%" r="130%">
+      <stop offset="0" stop-color="#1E2142"/>
+      <stop offset="1" stop-color="#0A0B14"/>
+    </radialGradient>
+    <linearGradient id="pane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9C84FF"/>
+      <stop offset="1" stop-color="#6A45F0"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6FE9DF"/>
+      <stop offset="1" stop-color="#2BB8AE"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="26" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="229" fill="none" stroke="#2A2E55" stroke-width="2"/>
+  <!-- folded pair: a teal flap folding onto a violet pane -->
+  <g filter="url(#glow)">
+    <rect x="300" y="392" width="300" height="300" rx="64" fill="url(#pane)"/>
+    <rect x="300" y="392" width="300" height="300" rx="64" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
+    <g transform="translate(632 392)">
+      <rect width="120" height="300" rx="40" fill="url(#teal)" transform="skewY(-9)"/>
+    </g>
+    <!-- crease highlight -->
+    <rect x="596" y="372" width="8" height="340" rx="4" fill="rgba(255,255,255,0.28)"/>
+  </g>
+  <!-- top gloss -->
+  <path d="M230 120 Q512 60 794 120 L794 300 Q512 220 230 300 Z" fill="rgba(255,255,255,0.05)"/>
+</svg>
