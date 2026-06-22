@@ -1,1 +1,0 @@
-import{y as n}from"./index-C9R0VTv2.js";class r extends n{async show(e){}async hide(e){}}export{r as SplashScreenWeb};
