@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 860" width="1000" height="860" fill="none">
+  <!-- Griezwahlm Studios wordmark. Transparent background; two glass-pane tiles over a
+       tilted "GRIEZWAHLM" and an outlined "STUDIOS". Colors echo the Ember/Gold/Wine themes. -->
+  <defs>
+    <style>
+      .wm { font-family: 'Liberation Sans','DejaVu Sans','Arial',sans-serif; font-weight: 900; }
+    </style>
+  </defs>
+
+  <!-- left tile: cream frame + solid orange pane -->
+  <g transform="rotate(-4 430 270)">
+    <rect x="305" y="145" width="250" height="250" rx="72" fill="none" stroke="#F4E7C5" stroke-width="26"/>
+    <rect x="357" y="197" width="146" height="146" rx="40" fill="#ED8A1E"/>
+  </g>
+  <!-- right tile: cream frame + solid burgundy pane (drawn on top, slight opposite tilt) -->
+  <g transform="rotate(4 645 270)">
+    <rect x="520" y="145" width="250" height="250" rx="72" fill="none" stroke="#F4E7C5" stroke-width="26"/>
+    <rect x="572" y="197" width="146" height="146" rx="40" fill="#5C1A2E"/>
+  </g>
+
+  <!-- GRIEZWAHLM: orange, burgundy outline, playful upward tilt + per-letter wobble -->
+  <text x="500" y="600" text-anchor="middle" class="wm" font-size="138"
+        fill="#ED8A1E" stroke="#5C1A2E" stroke-width="6" paint-order="stroke"
+        stroke-linejoin="round" letter-spacing="2"
+        transform="rotate(-3 500 580)" rotate="-5 4 -3 5 -4 3 -5 4 -2 5">GRIEZWAHLM</text>
+
+  <!-- STUDIOS: cream outlined, widely tracked -->
+  <text x="500" y="720" text-anchor="middle" class="wm" font-size="74" font-weight="800"
+        fill="none" stroke="#5C1A2E" stroke-width="3.5" letter-spacing="34">STUDIOS</text>
+  <text x="500" y="720" text-anchor="middle" class="wm" font-size="74" font-weight="800"
+        fill="none" stroke="#F4E7C5" stroke-width="2" letter-spacing="34">STUDIOS</text>
+</svg>
