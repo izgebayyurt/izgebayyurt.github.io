@@ -139,6 +139,9 @@ const dl2 = new THREE.DirectionalLight(0xffffff, 0.25); dl2.position.set(-6, 5, 
 
 // shared geometry
 const ROUND = new RoundedBoxGeometry(0.92, 0.92, 0.92, 4, 0.12);
+// edge outline slightly outside the fill, so the cube's own opaque faces occlude the BACK edges
+// (leaving only the player-facing edges drawn) while the front ones stay visible
+const CUBE_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.94, 0.94, 0.94));
 
 // ── floor board + two walls ────────────────────────────────────────────────
 const board = new THREE.Group(); scene.add(board);
@@ -206,6 +209,7 @@ function makeCube(type) {
     // clear cube: same cute toon shading, but translucent so it reads as glass that passes light
     : new THREE.MeshToonMaterial({ color: CLEAR_COL, transparent: true, opacity: 0.38, depthWrite: false });
   g.add(new THREE.Mesh(ROUND, mat));
+  g.add(new THREE.LineSegments(CUBE_EDGES, new THREE.LineBasicMaterial({ color: 0x000000 })));
   return g;
 }
 
