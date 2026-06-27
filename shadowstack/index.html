@@ -53,12 +53,14 @@
   <canvas id="c"></canvas>
   <div id="title"><h1>SHADOWSTACK</h1><p>stack cubes · match both shadows</p></div>
   <div id="info">Level <b id="lvl">1</b><br/>cubes <b id="used">0</b> / par <b id="par">0</b></div>
-  <div id="hint">Drag a cube into the scene to stack it. Tap a cube to remove it. Clear cubes pass light.</div>
+  <div id="hint">Drag or tap to place. Tap a cube's top to stack on it, a side to place beside. Clear cubes pass light (no shadow). Undo to remove.</div>
   <div id="bar">
     <div class="pal">
       <div class="cube-btn sel" id="bSolid"><div class="sw" style="background:#ff9d5c"></div><div class="nm">Solid</div></div>
-      <div class="cube-btn" id="bClear"><div class="sw" style="background:#cfe7ff;opacity:.7"></div><div class="nm">Clear</div></div>
+      <div class="cube-btn" id="bClear"><div class="sw" style="background:#8ec5ff"></div><div class="nm">Clear</div></div>
     </div>
+    <button class="btn" id="undo">↶ Undo</button>
+    <button class="btn" id="rotate">⟳ Turn</button>
     <button class="btn" id="reset">Reset</button>
   </div>
   <div id="win"><div class="card"><h2>Shadows matched!</h2><div class="stars" id="stars">★ ★ ★</div><p id="winsub"></p><button class="btn primary" id="next">Next ▸</button></div></div>
@@ -72,7 +74,7 @@ const N = 4, H = 5;                 // footprint N×N, max stack height H
 const OFF = (N - 1) / 2;            // centre the lattice on origin
 const wx = (x) => x - OFF, wz = (z) => z - OFF;   // lattice -> world
 const INK = 0x2a2622, PAPER = 0xefe7d6;
-const SOLID_COL = 0xff9d5c, CLEAR_COL = 0xbfe0ff;
+const SOLID_COL = 0xff9d5c, CLEAR_COL = 0x8ec5ff;
 
 // stacks[x][z] = array of 'solid'|'clear' from bottom up
 let stacks = [];
@@ -114,8 +116,15 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 const scene = new THREE.Scene(); scene.background = new THREE.Color(PAPER);
 
 const VIEW = 5.2;
+const CAM_POS = [[9, 9], [-9, 9], [-9, -9], [9, -9]];   // 90-degree rotations around Y
+let camStep = 0;
+const camDesired = new THREE.Vector3(9, 8.5, 9);
 const camera = new THREE.OrthographicCamera(-VIEW, VIEW, VIEW, -VIEW, -100, 100);
-camera.position.set(9, 8.5, 9); camera.lookAt(0, 1.1, 0);
+camera.position.copy(camDesired); camera.lookAt(0, 1.1, 0);
+function setCamStep(s) {
+  camStep = ((s % 4) + 4) % 4;
+  const [x, z] = CAM_POS[camStep]; camDesired.set(x, 8.5, z); updateWallVis();
+}
 function resize() {
   const w = innerWidth, h = innerHeight, a = w / h;
   renderer.setSize(w, h);
@@ -128,9 +137,8 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.95));
 const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(6, 12, 4); scene.add(dl);
 const dl2 = new THREE.DirectionalLight(0xffffff, 0.25); dl2.position.set(-6, 5, -3); scene.add(dl2);
 
-// shared geometries
+// shared geometry
 const ROUND = new RoundedBoxGeometry(0.92, 0.92, 0.92, 4, 0.12);
-const EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.92, 0.92, 0.92));
 
 // ── floor board + two walls ────────────────────────────────────────────────
 const board = new THREE.Group(); scene.add(board);
@@ -148,9 +156,9 @@ function wallPlane(axis) {
   const p = new THREE.Mesh(g, m);
   if (axis === 'z') p.position.set(0, (H + 0.2) / 2 - 0.1, -WB - 0.5);
   else { p.position.set(-WB - 0.5, (H + 0.2) / 2 - 0.1, 0); p.rotation.y = Math.PI / 2; }
-  scene.add(p);
+  return p;
 }
-wallPlane('z'); wallPlane('x');
+const planeZ = wallPlane('z'), planeX = wallPlane('x');
 
 // cell rectangles on a wall: 'target' (thick ink outline) or 'live' (soft fill)
 function cellRect(axis, col, row, kind) {
@@ -167,27 +175,22 @@ function cellRect(axis, col, row, kind) {
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: INK }));
   at(l, 0.04); return l;
 }
-const targetGroup = new THREE.Group(), liveGroup = new THREE.Group(), cubeGroup = new THREE.Group();
-scene.add(targetGroup, liveGroup, cubeGroup);
+const tgtZ = new THREE.Group(), tgtX = new THREE.Group(), liveZ = new THREE.Group(), liveX = new THREE.Group(), cubeGroup = new THREE.Group();
+scene.add(planeZ, planeX, tgtZ, tgtX, liveZ, liveX, cubeGroup);
+// show a wall only while it is BEHIND the cubes for the current camera angle, so a
+// rotated view never has a wall (and its shadow) occluding the stack
+function updateWallVis() {
+  const vz = camDesired.z >= 0, vx = camDesired.x >= 0;
+  planeZ.visible = tgtZ.visible = liveZ.visible = vz;
+  planeX.visible = tgtX.visible = liveX.visible = vx;
+}
 
-// ── cube meshes (cute marker look) ──────────────────────────────────────────
+// ── cube meshes: cute rounded toon cubes, no outline ────────────────────────
+// Clear cubes look the same as solids (just a different colour); they still cast no
+// shadow, which is what makes them useful as invisible scaffolding.
 function makeCube(type) {
   const g = new THREE.Group();
-  if (type === 'solid') {
-    const fill = new THREE.Mesh(ROUND, new THREE.MeshToonMaterial({ color: SOLID_COL }));
-    g.add(fill);
-    // inverted-hull ink outline -> bold "marker" silhouette
-    const hull = new THREE.Mesh(ROUND, new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide }));
-    hull.scale.setScalar(1.08); g.add(hull);
-  } else {
-    const fill = new THREE.Mesh(ROUND, new THREE.MeshPhysicalMaterial({
-      color: CLEAR_COL, transparent: true, opacity: 0.32, roughness: 0.1, metalness: 0,
-      transmission: 0.6, thickness: 0.5, depthWrite: false,
-    }));
-    g.add(fill);
-  }
-  const line = new THREE.LineSegments(EDGES, new THREE.LineBasicMaterial({ color: INK, transparent: type === 'clear', opacity: type === 'clear' ? 0.85 : 1 }));
-  g.add(line);
+  g.add(new THREE.Mesh(ROUND, new THREE.MeshToonMaterial({ color: type === 'solid' ? SOLID_COL : CLEAR_COL })));
   return g;
 }
 
@@ -205,15 +208,15 @@ function rebuildCubes() {
 // ── target + live shadow drawing / win ──────────────────────────────────────
 let level = 0, target = null;
 function drawTarget() {
-  targetGroup.clear();
-  for (const k of target.front) { const [c, r] = k.split(',').map(Number); targetGroup.add(cellRect('z', c, r, 'target')); }
-  for (const k of target.side) { const [c, r] = k.split(',').map(Number); targetGroup.add(cellRect('x', c, r, 'target')); }
+  tgtZ.clear(); tgtX.clear();
+  for (const k of target.front) { const [c, r] = k.split(',').map(Number); tgtZ.add(cellRect('z', c, r, 'target')); }
+  for (const k of target.side) { const [c, r] = k.split(',').map(Number); tgtX.add(cellRect('x', c, r, 'target')); }
 }
 function drawLive() {
-  liveGroup.clear();
+  liveZ.clear(); liveX.clear();
   const sh = project(stacks);
-  for (const k of sh.front) { const [c, r] = k.split(',').map(Number); liveGroup.add(cellRect('z', c, r, 'live')); }
-  for (const k of sh.side) { const [c, r] = k.split(',').map(Number); liveGroup.add(cellRect('x', c, r, 'live')); }
+  for (const k of sh.front) { const [c, r] = k.split(',').map(Number); liveZ.add(cellRect('z', c, r, 'live')); }
+  for (const k of sh.side) { const [c, r] = k.split(',').map(Number); liveX.add(cellRect('x', c, r, 'live')); }
   document.getElementById('used').textContent = cubeCount(stacks);
   return sh;
 }
@@ -230,28 +233,49 @@ function loadLevel(i) {
   level = ((i % LEVELS.length) + LEVELS.length) % LEVELS.length;
   document.getElementById('lvl').textContent = level + 1;
   document.getElementById('par').textContent = LEVELS[level].par;
-  resetStacks(); target = targetOf(LEVELS[level]);
+  resetStacks(); history.length = 0; target = targetOf(LEVELS[level]);
   drawTarget(); rebuildCubes(); drawLive();
   document.getElementById('win').style.display = 'none';
 }
 
-// ── input: select type, drag-to-place with ghost, tap-to-remove ─────────────
+// ── input: select type, drag/tap to place, undo, rotate ─────────────────────
 let selType = 'solid';
 const bSolid = document.getElementById('bSolid'), bClear = document.getElementById('bClear');
 bSolid.onclick = () => { selType = 'solid'; bSolid.classList.add('sel'); bClear.classList.remove('sel'); };
 bClear.onclick = () => { selType = 'clear'; bClear.classList.add('sel'); bSolid.classList.remove('sel'); };
 document.getElementById('reset').onclick = () => loadLevel(level);
 document.getElementById('next').onclick = () => loadLevel(level + 1);
+document.getElementById('undo').onclick = () => undo();
+document.getElementById('rotate').onclick = () => setCamStep(camStep + 1);
 
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
+const history = [];
 let ghost = null, down = null, dragging = false, ghostCol = null;
 
-function colFromPointer(ev) {
+function setNdc(ev) {
   const r = canvas.getBoundingClientRect();
   ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
   ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
-  ray.setFromCamera(ndc, camera);
+}
+// Resolve the target column. Hit a cube's TOP -> stack on that column; a SIDE -> the
+// neighbour column; the floor -> that cell. (Point-based, so it is robust on the
+// rounded cubes and from any rotation -- no more ground-plane guessing.)
+function resolveCol(ev) {
+  setNdc(ev); ray.setFromCamera(ndc, camera);
+  const solids = cubeGroup.children.filter((c) => c !== ghost);
+  const hits = ray.intersectObjects(solids, true);
+  if (hits.length) {
+    let o = hits[0].object; while (o.parent && o.parent !== cubeGroup) o = o.parent;
+    let gx = Math.round(o.position.x + OFF), gz = Math.round(o.position.z + OFF);
+    const lp = hits[0].point.clone().sub(o.position);
+    const ax = Math.abs(lp.x), ay = Math.abs(lp.y), az = Math.abs(lp.z);
+    if (ay >= ax && ay >= az && lp.y > 0) { /* top -> same column, lands on top */ }
+    else if (ax >= az) gx += Math.sign(lp.x);          // side face -> neighbour column
+    else gz += Math.sign(lp.z);
+    if (gx < 0 || gz < 0 || gx >= N || gz >= N) return null;
+    return { x: gx, z: gz };
+  }
   ray.ray.intersectPlane(groundPlane, hitPt);
   if (!hitPt) return null;
   const x = Math.round(hitPt.x + OFF), z = Math.round(hitPt.z + OFF);
@@ -261,45 +285,40 @@ function colFromPointer(ev) {
 function showGhost(col) {
   if (ghost) { cubeGroup.remove(ghost); ghost = null; }
   if (!col) return;
-  const h = colHeight(col.x, col.z);
-  const valid = h < H;
+  const valid = colHeight(col.x, col.z) < H;
   ghost = makeCube(selType);
-  ghost.position.set(wx(col.x), (valid ? h : H - 1) + 0.5, wz(col.z));
-  ghost.traverse((o) => { if (o.material) { o.material.transparent = true; o.material.opacity = (o.material.opacity ?? 1) * 0.5; } });
-  if (!valid) ghost.traverse((o) => { if (o.material && o.material.color) o.material.color.set(0xff5a5a); });
+  ghost.position.set(wx(col.x), (valid ? colHeight(col.x, col.z) : H - 1) + 0.5, wz(col.z));
+  ghost.traverse((o) => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.45; if (!valid) o.material.color.set(0xff5a5a); } });
   cubeGroup.add(ghost);
+}
+function place(col) {
+  if (!col || colHeight(col.x, col.z) >= H) return;
+  stacks[col.x][col.z].push(selType); history.push({ x: col.x, z: col.z });
+  rebuildCubes(); checkWin(drawLive());
+}
+function undo() {
+  const m = history.pop(); if (!m) return;
+  if (stacks[m.x][m.z].length) stacks[m.x][m.z].pop();
+  rebuildCubes(); drawLive(); document.getElementById('win').style.display = 'none';
 }
 canvas.addEventListener('pointerdown', (ev) => { down = { x: ev.clientX, y: ev.clientY }; dragging = false; });
 canvas.addEventListener('pointermove', (ev) => {
   if (!down) return;
   if (!dragging && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 6) dragging = true;
-  if (dragging) { ghostCol = colFromPointer(ev); showGhost(ghostCol); }
+  if (dragging) { ghostCol = resolveCol(ev); showGhost(ghostCol); }
 });
 canvas.addEventListener('pointerup', (ev) => {
-  const wasDrag = dragging; const start = down; down = null; dragging = false;
+  const wasDrag = dragging; down = null; dragging = false;
   if (ghost) { cubeGroup.remove(ghost); ghost = null; }
-  if (wasDrag) {                          // commit a placement
-    const col = ghostCol || colFromPointer(ev);
-    if (col && colHeight(col.x, col.z) < H) { stacks[col.x][col.z].push(selType); rebuildCubes(); checkWin(drawLive()); }
-    return;
-  }
-  // tap: remove the top of the tapped column (raycast cubes), else quick-place on tapped floor cell
-  const r = canvas.getBoundingClientRect();
-  ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1; ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
-  ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(cubeGroup.children, true);
-  if (hit.length) {
-    let o = hit[0].object; while (o.parent && o.parent !== cubeGroup) o = o.parent;
-    const gx = Math.round(o.position.x + OFF), gz = Math.round(o.position.z + OFF);
-    if (gx >= 0 && gz >= 0 && gx < N && gz < N && stacks[gx][gz].length) { stacks[gx][gz].pop(); rebuildCubes(); drawLive(); }
-    return;
-  }
-  const col = colFromPointer(ev);
-  if (col && colHeight(col.x, col.z) < H) { stacks[col.x][col.z].push(selType); rebuildCubes(); checkWin(drawLive()); }
+  place(wasDrag ? (ghostCol || resolveCol(ev)) : resolveCol(ev));
 });
 
+updateWallVis();
 loadLevel(0);
-(function loop() { renderer.render(scene, camera); requestAnimationFrame(loop); })();
+(function loop() {
+  camera.position.lerp(camDesired, 0.2); camera.lookAt(0, 1.1, 0);
+  renderer.render(scene, camera); requestAnimationFrame(loop);
+})();
 
 // expose pure logic for external tests
 window.__ss = { project, cubeCount, targetOf, LEVELS, eqSet, N, H };
