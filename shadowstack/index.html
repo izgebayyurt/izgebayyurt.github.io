@@ -149,40 +149,51 @@ for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) {
   const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.35 }));
   e.position.copy(p.position); board.add(e);
 }
-const WB = OFF + 0.5 + 0.001;        // wall offset just behind the lattice
-function wallPlane(axis) {
+const WALLD = OFF + 1.0;              // wall distance from origin, just outside the lattice
+function wallPlane(axis, side) {
   const g = new THREE.PlaneGeometry(N + 0.2, H + 0.2);
-  const m = new THREE.MeshBasicMaterial({ color: 0xe2d8c2 });
+  const m = new THREE.MeshBasicMaterial({ color: 0xe2d8c2, side: THREE.DoubleSide });
   const p = new THREE.Mesh(g, m);
-  if (axis === 'z') p.position.set(0, (H + 0.2) / 2 - 0.1, -WB - 0.5);
-  else { p.position.set(-WB - 0.5, (H + 0.2) / 2 - 0.1, 0); p.rotation.y = Math.PI / 2; }
+  const y = (H + 0.2) / 2 - 0.1;
+  if (axis === 'z') p.position.set(0, y, side * WALLD);
+  else { p.position.set(side * WALLD, y, 0); p.rotation.y = Math.PI / 2; }
   return p;
 }
-const planeZ = wallPlane('z'), planeX = wallPlane('x');
 
-// cell rectangles on a wall: 'target' (thick ink outline) or 'live' (soft fill)
-function cellRect(axis, col, row, kind) {
-  const at = (obj, frontOffset) => {
-    if (axis === 'z') obj.position.set(wx(col), row + 0.5, -WB - 0.5 + frontOffset);
-    else { obj.position.set(-WB - 0.5 + frontOffset, row + 0.5, wz(col)); obj.rotation.y = Math.PI / 2; }
+// cell rectangles on a wall: 'target' (ink outline) or 'live' (soft fill). `side` picks which of
+// the two parallel walls: -1 = the -axis wall, +1 = the opposite wall.
+function cellRect(axis, side, col, row, kind) {
+  const at = (obj, fo) => {
+    const wp = side * WALLD - side * fo;          // nudge the cell toward the cubes (axis = 0)
+    if (axis === 'z') obj.position.set(wx(col), row + 0.5, wp);
+    else { obj.position.set(wp, row + 0.5, wz(col)); obj.rotation.y = Math.PI / 2; }
   };
   if (kind === 'live') {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9),
-      new THREE.MeshBasicMaterial({ color: 0x6b6f8c, transparent: true, opacity: 0.8 }));
+      new THREE.MeshBasicMaterial({ color: 0x6b6f8c, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
     at(m, 0.02); return m;
   }
   const s = 0.46, pts = [[-s, -s], [s, -s], [s, s], [-s, s], [-s, -s]].map(([a, b]) => new THREE.Vector3(a, b, 0));
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: INK }));
   at(l, 0.04); return l;
 }
-const tgtZ = new THREE.Group(), tgtX = new THREE.Group(), liveZ = new THREE.Group(), liveX = new THREE.Group(), cubeGroup = new THREE.Group();
-scene.add(planeZ, planeX, tgtZ, tgtX, liveZ, liveX, cubeGroup);
-// show a wall only while it is BEHIND the cubes for the current camera angle, so a
-// rotated view never has a wall (and its shadow) occluding the stack
+
+// Four walls: the front-projection drawn on BOTH z-walls, the side-projection on BOTH x-walls.
+// Only the two walls behind the cubes are shown, so turning 90deg swaps one shadow out and the
+// opposite wall's copy in -- you always see both shadows, never zero.
+const cubeGroup = new THREE.Group();
+const walls = [['z', -1], ['z', 1], ['x', -1], ['x', 1]].map(([axis, side]) => {
+  const plane = wallPlane(axis, side), tgt = new THREE.Group(), live = new THREE.Group();
+  scene.add(plane, tgt, live);
+  return { axis, side, plane, tgt, live };
+});
+scene.add(cubeGroup);
 function updateWallVis() {
-  const vz = camDesired.z >= 0, vx = camDesired.x >= 0;
-  planeZ.visible = tgtZ.visible = liveZ.visible = vz;
-  planeX.visible = tgtX.visible = liveX.visible = vx;
+  for (const w of walls) {
+    const back = (w.axis === 'z' ? camDesired.z : camDesired.x) >= 0 ? -1 : 1;
+    const vis = w.side === back;
+    w.plane.visible = w.tgt.visible = w.live.visible = vis;
+  }
 }
 
 // ── cube meshes: cute rounded toon cubes, no outline ────────────────────────
@@ -208,15 +219,19 @@ function rebuildCubes() {
 // ── target + live shadow drawing / win ──────────────────────────────────────
 let level = 0, target = null;
 function drawTarget() {
-  tgtZ.clear(); tgtX.clear();
-  for (const k of target.front) { const [c, r] = k.split(',').map(Number); tgtZ.add(cellRect('z', c, r, 'target')); }
-  for (const k of target.side) { const [c, r] = k.split(',').map(Number); tgtX.add(cellRect('x', c, r, 'target')); }
+  for (const w of walls) {
+    w.tgt.clear();
+    const set = w.axis === 'z' ? target.front : target.side;
+    for (const k of set) { const [c, r] = k.split(',').map(Number); w.tgt.add(cellRect(w.axis, w.side, c, r, 'target')); }
+  }
 }
 function drawLive() {
-  liveZ.clear(); liveX.clear();
   const sh = project(stacks);
-  for (const k of sh.front) { const [c, r] = k.split(',').map(Number); liveZ.add(cellRect('z', c, r, 'live')); }
-  for (const k of sh.side) { const [c, r] = k.split(',').map(Number); liveX.add(cellRect('x', c, r, 'live')); }
+  for (const w of walls) {
+    w.live.clear();
+    const set = w.axis === 'z' ? sh.front : sh.side;
+    for (const k of set) { const [c, r] = k.split(',').map(Number); w.live.add(cellRect(w.axis, w.side, c, r, 'live')); }
+  }
   document.getElementById('used').textContent = cubeCount(stacks);
   return sh;
 }
