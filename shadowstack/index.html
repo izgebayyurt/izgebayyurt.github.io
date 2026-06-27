@@ -73,8 +73,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 const N = 4, H = 5;                 // footprint N×N, max stack height H
 const OFF = (N - 1) / 2;            // centre the lattice on origin
 const wx = (x) => x - OFF, wz = (z) => z - OFF;   // lattice -> world
-const INK = 0x2a2622, PAPER = 0xefe7d6;
-const SOLID_COL = 0xff9d5c, CLEAR_COL = 0x8ec5ff;
+const INK = 0x2a2622, PAPER = 0xefe7d6, SOFT_EDGE = 0x9a93a0;
+const SOLID_COL = 0xff9d5c, CLEAR_COL = 0x9fd0ff;
 
 // stacks[x][z] = array of 'solid'|'clear' from bottom up
 let stacks = [];
@@ -146,7 +146,7 @@ for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) {
   const g = new THREE.PlaneGeometry(0.98, 0.98).rotateX(-Math.PI / 2);
   const m = new THREE.MeshBasicMaterial({ color: 0xe7ddc9 });
   const p = new THREE.Mesh(g, m); p.position.set(wx(x), 0, wz(z)); board.add(p);
-  const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.35 }));
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: SOFT_EDGE, transparent: true, opacity: 0.4 }));
   e.position.copy(p.position); board.add(e);
 }
 const WALLD = OFF + 1.0;              // wall distance from origin, just outside the lattice
@@ -174,7 +174,7 @@ function cellRect(axis, side, col, row, kind) {
     at(m, 0.02); return m;
   }
   const s = 0.46, pts = [[-s, -s], [s, -s], [s, s], [-s, s], [-s, -s]].map(([a, b]) => new THREE.Vector3(a, b, 0));
-  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: INK }));
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: SOFT_EDGE }));
   at(l, 0.04); return l;
 }
 
@@ -201,7 +201,11 @@ function updateWallVis() {
 // shadow, which is what makes them useful as invisible scaffolding.
 function makeCube(type) {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(ROUND, new THREE.MeshToonMaterial({ color: type === 'solid' ? SOLID_COL : CLEAR_COL })));
+  const mat = type === 'solid'
+    ? new THREE.MeshToonMaterial({ color: SOLID_COL })
+    // clear cube: same cute toon shading, but translucent so it reads as glass that passes light
+    : new THREE.MeshToonMaterial({ color: CLEAR_COL, transparent: true, opacity: 0.38, depthWrite: false });
+  g.add(new THREE.Mesh(ROUND, mat));
   return g;
 }
 
