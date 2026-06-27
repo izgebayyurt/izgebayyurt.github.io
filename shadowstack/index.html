@@ -57,7 +57,7 @@
   <div id="bar">
     <div class="pal">
       <div class="cube-btn sel" id="bSolid"><div class="sw" style="background:#ff9d5c"></div><div class="nm">Solid</div></div>
-      <div class="cube-btn" id="bClear"><div class="sw" style="background:#8ec5ff"></div><div class="nm">Clear</div></div>
+      <div class="cube-btn" id="bClear"><div class="sw" style="background:#ffffff"></div><div class="nm">Clear</div></div>
     </div>
     <button class="btn" id="undo">↶ Undo</button>
     <button class="btn" id="rotate">⟳ Turn</button>
@@ -74,7 +74,7 @@ const N = 4, H = 5;                 // footprint N×N, max stack height H
 const OFF = (N - 1) / 2;            // centre the lattice on origin
 const wx = (x) => x - OFF, wz = (z) => z - OFF;   // lattice -> world
 const INK = 0x2a2622, PAPER = 0xefe7d6, SOFT_EDGE = 0x9a93a0;
-const SOLID_COL = 0xff9d5c, CLEAR_COL = 0x9fd0ff;
+const SOLID_COL = 0xff9d5c, CLEAR_COL = 0xffffff;
 
 // stacks[x][z] = array of 'solid'|'clear' from bottom up
 let stacks = [];
