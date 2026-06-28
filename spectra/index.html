@@ -107,35 +107,57 @@
   const drk = (m) => { const c = CMAP[m]; return [c[0] * .55 | 0, c[1] * .55 | 0, c[2] * .55 | 0]; };
   const rgb = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a == null ? 1 : a})`;
 
-  // Baked levels (100, gradual ramp): r rows, c cols, s source mask per row, t target mask per row, g grid (0 = empty).
-  const LV = [{"r":2,"c":3,"s":[7,7],"t":[2,1],"g":[[0,2,0],[2,0,1]]},{"r":2,"c":3,"s":[7,7],"t":[1,2],"g":[[0,1,0],[0,2,1]]},{"r":2,"c":3,"s":[7,7],"t":[4,2],"g":[[0,0,0],[2,4,4]]},{"r":2,"c":3,"s":[7,7],"t":[4,1],"g":[[0,0,0],[1,1,4]]},{"r":2,"c":3,"s":[7,7],"t":[4,1],"g":[[0,1,4],[1,0,0]]},{"r":2,"c":3,"s":[7,7],"t":[2,1],"g":[[0,1,0],[1,2,0]]},{"r":2,"c":3,"s":[7,7],"t":[2,1],"g":[[0,0,2],[2,0,1]]},{"r":2,"c":3,"s":[7,7],"t":[2,4],"g":[[4,2,0],[0,0,4]]},{"r":2,"c":3,"s":[7,7],"t":[2,1],"g":[[0,2,1],[0,0,2]]},{"r":2,"c":3,"s":[7,7],"t":[4,2],"g":[[2,4,2],[0,0,0]]},{"r":2,"c":3,"s":[7,7],"t":[1,2],"g":[[0,1,2],[0,0,1]]},{"r":2,"c":3,"s":[7,7],"t":[2,1],"g":[[0,0,0],[2,1,1]]},{"r":2,"c":3,"s":[7,7],"t":[1,6],"g":[[0,0,2],[1,4,0]]},{"r":2,"c":3,"s":[7,7],"t":[5,2],"g":[[0,4,0],[2,1,0]]},{"r":2,"c":3,"s":[7,7],"t":[3,4],"g":[[0,2,0],[0,1,4]]},{"r":2,"c":3,"s":[7,7],"t":[2,6],"g":[[0,4,2],[0,2,0]]},{"r":2,"c":3,"s":[7,7],"t":[3,4],"g":[[0,4,1],[2,0,0]]},{"r":2,"c":3,"s":[7,7],"t":[3,4],"g":[[0,0,0],[1,2,4]]},{"r":2,"c":3,"s":[7,7],"t":[5,4],"g":[[4,0,4],[0,1,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,4,6],"g":[[4,0,4],[4,0,0],[2,2,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[6,3,1],"g":[[1,1,2],[0,4,2],[0,0,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[6,4,1],"g":[[0,0,4],[2,1,0],[0,4,1]]},{"r":3,"c":3,"s":[7,7,7],"t":[3,4,1],"g":[[2,1,0],[0,0,1],[1,4,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[5,2,2],"g":[[1,1,2],[0,2,4],[0,0,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[2,1,5],"g":[[2,1,0],[0,1,0],[4,1,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,6,3],"g":[[0,4,2],[0,0,4],[1,2,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,3,4],"g":[[4,0,2],[0,0,4],[4,0,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[4,1,2],"g":[[0,0,0,0],[4,0,2,1],[4,1,4,2]]},{"r":3,"c":3,"s":[7,7,7],"t":[1,6,3],"g":[[0,0,0],[2,0,1],[4,2,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[4,2,2],"g":[[0,4,0,0],[1,2,1,4],[0,2,0,2]]},{"r":3,"c":3,"s":[7,7,7],"t":[3,1,6],"g":[[0,0,1],[4,2,0],[0,2,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[1,4,6],"g":[[1,2,0,4],[2,0,0,1],[0,4,2,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[1,1,4],"g":[[0,1,0],[4,0,2],[1,0,4]]},{"r":3,"c":4,"s":[7,7,7],"t":[5,3,5],"g":[[0,0,1,1],[0,4,1,1],[4,0,0,2]]},{"r":3,"c":3,"s":[7,7,7],"t":[2,1,6],"g":[[0,2,4],[0,0,1],[2,0,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[4,1,1],"g":[[0,1,4,2],[4,2,0,1],[0,1,0,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,6,3],"g":[[4,0,2],[0,1,0],[4,0,2]]},{"r":3,"c":4,"s":[7,7,7],"t":[2,4,4],"g":[[2,0,0,0],[4,4,0,4],[4,1,0,1]]},{"r":3,"c":3,"s":[7,7,7],"t":[6,2,1],"g":[[2,2,1],[0,0,4],[0,1,0]]},{"r":3,"c":4,"s":[7,7,7],"t":[3,2,6],"g":[[2,0,0,4],[0,2,0,1],[0,2,1,2]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,1,5],"g":[[1,4,0],[0,4,0],[1,0,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[4,6,5],"g":[[0,0,0,0],[4,1,2,4],[4,2,1,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,7,3],"g":[[4,0,1],[4,0,0],[1,2,0]]},{"r":3,"c":4,"s":[7,7,7],"t":[2,7,6],"g":[[0,4,1,0],[0,2,2,0],[2,4,2,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[3,3,7],"g":[[0,0,1],[0,2,2],[2,0,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[4,7,1],"g":[[0,0,4,0],[1,4,1,4],[0,1,0,2]]},{"r":3,"c":3,"s":[7,7,7],"t":[7,2,1],"g":[[0,2,0],[1,1,2],[0,4,0]]},{"r":3,"c":4,"s":[7,7,7],"t":[6,7,3],"g":[[0,4,4,1],[0,0,0,2],[2,0,1,2]]},{"r":3,"c":3,"s":[7,7,7],"t":[7,7,6],"g":[[4,0,1],[4,2,0],[2,0,0]]},{"r":3,"c":4,"s":[7,7,7],"t":[7,2,4],"g":[[4,2,1,0],[2,2,4,1],[0,0,0,0]]},{"r":3,"c":3,"s":[7,7,7],"t":[4,7,5],"g":[[0,4,4],[1,0,4],[0,0,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[7,7,1],"g":[[1,2,0,0],[1,1,4,0],[0,2,0,4]]},{"r":3,"c":3,"s":[7,7,7],"t":[7,1,5],"g":[[1,0,4],[4,0,0],[0,1,1]]},{"r":3,"c":4,"s":[7,7,7],"t":[5,7,6],"g":[[0,4,2,0],[1,0,0,1],[2,0,4,4]]},{"r":3,"c":3,"s":[7,7,7],"t":[2,3,7],"g":[[2,0,1],[2,0,2],[1,0,0]]},{"r":3,"c":4,"s":[7,7,7],"t":[4,7,1],"g":[[1,0,4,1],[0,4,4,0],[1,0,0,2]]},{"r":3,"c":4,"s":[7,7,1],"t":[5,1,2],"g":[[4,0,0,4],[0,0,1,0],[2,1,2,1]]},{"r":3,"c":4,"s":[4,2,1],"t":[7,6,1],"g":[[2,2,1,1],[0,4,1,0],[0,0,4,0]]},{"r":3,"c":4,"s":[2,4,4],"t":[4,2,5],"g":[[1,0,4,0],[4,2,0,0],[1,2,2,0]]},{"r":3,"c":4,"s":[4,2,2],"t":[1,6,2],"g":[[0,0,1,0],[2,1,0,1],[2,4,4,0]]},{"r":3,"c":4,"s":[4,7,4],"t":[4,6,1],"g":[[1,4,0,0],[2,4,0,4],[1,0,0,2]]},{"r":3,"c":4,"s":[2,1,2],"t":[7,6,7],"g":[[1,2,2,4],[4,0,1,0],[0,0,4,0]]},{"r":3,"c":4,"s":[4,4,7],"t":[7,5,5],"g":[[0,1,0,1],[2,0,1,0],[0,4,2,4]]},{"r":3,"c":4,"s":[7,2,4],"t":[4,7,5],"g":[[1,0,0,0],[0,2,0,4],[2,4,4,1]]},{"r":3,"c":4,"s":[2,7,1],"t":[3,5,1],"g":[[1,0,2,0],[0,0,4,2],[1,0,1,1]]},{"r":3,"c":4,"s":[4,2,7],"t":[3,1,6],"g":[[0,0,2,1],[0,1,4,2],[0,0,2,1]]},{"r":3,"c":4,"s":[1,7,7],"t":[3,7,7],"g":[[2,1,4,2],[2,1,0,0],[0,2,0,0]]},{"r":3,"c":4,"s":[7,1,1],"t":[4,5,7],"g":[[4,0,0,4],[1,0,2,4],[0,1,2,0]]},{"r":3,"c":4,"s":[1,2,7],"t":[1,6,2],"g":[[0,0,2,0],[1,0,2,0],[2,4,4,4]]},{"r":3,"c":4,"s":[4,4,4],"t":[4,1,3],"g":[[2,4,0,0],[1,1,4,0],[0,2,1,0]]},{"r":3,"c":4,"s":[7,6,2],"t":[3,7,2],"g":[[2,0,2,0],[0,1,0,4],[0,2,1,4]]},{"r":4,"c":4,"s":[7,2,1,5],"t":[4,4,4,7],"g":[[1,0,4,4],[0,0,0,1],[0,4,4,4],[1,0,2,4]]},{"r":3,"c":4,"s":[2,3,3],"t":[5,2,2],"g":[[0,1,2,1],[0,4,1,0],[0,2,2,0]]},{"r":4,"c":4,"s":[3,2,1,6],"t":[3,2,4,4],"g":[[0,2,4,0],[4,1,0,0],[4,2,2,4],[0,0,4,2]]},{"r":3,"c":4,"s":[6,3,4],"t":[4,4,1],"g":[[0,2,1,0],[4,4,0,0],[1,2,0,4]]},{"r":4,"c":4,"s":[7,5,6,7],"t":[5,2,5,3],"g":[[0,0,0,1],[2,1,4,2],[1,0,0,2],[1,2,4,0]]},{"r":3,"c":4,"s":[2,2,1],"t":[6,7,6],"g":[[4,4,0,2],[0,0,4,1],[4,0,2,0]]},{"r":4,"c":4,"s":[4,3,2,5],"t":[7,4,4,5],"g":[[4,0,4,0],[1,4,4,2],[0,0,0,1],[2,4,0,4]]},{"r":3,"c":4,"s":[7,7,3],"t":[4,7,2],"g":[[0,2,0,2],[1,4,0,2],[4,0,0,4]]},{"r":4,"c":4,"s":[4,5,5,1],"t":[6,6,7,5],"g":[[0,2,4,0],[0,1,2,1],[2,0,0,4],[0,4,4,2]]},{"r":3,"c":4,"s":[2,6,2],"t":[4,2,1],"g":[[4,4,1,2],[4,0,0,1],[1,0,0,0]]},{"r":4,"c":4,"s":[3,4,4,3],"t":[1,6,4,1],"g":[[0,0,0,0],[0,2,2,4],[2,1,2,1],[0,4,1,1]]},{"r":3,"c":4,"s":[6,3,7],"t":[3,7,6],"g":[[2,4,0,4],[4,0,0,1],[4,0,2,0]]},{"r":4,"c":4,"s":[7,5,4,7],"t":[2,1,6,4],"g":[[1,0,2,4],[2,2,4,1],[0,0,0,4],[2,2,0,0]]},{"r":3,"c":4,"s":[3,4,4],"t":[1,3,6],"g":[[2,1,0,2],[0,0,0,2],[2,0,1,4]]},{"r":4,"c":4,"s":[5,7,6,4],"t":[5,4,3,2],"g":[[4,0,1,0],[2,4,0,2],[0,2,0,2],[2,1,1,0]]},{"r":4,"c":4,"s":[2,1,2,5],"t":[6,5,3,6],"g":[[0,2,4,4],[4,0,2,0],[2,0,0,1],[1,1,4,0]]},{"r":4,"c":4,"s":[7,4,4,2],"t":[2,6,6,4],"g":[[4,0,0,4],[1,2,0,0],[2,4,0,2],[4,2,0,1]]},{"r":4,"c":4,"s":[3,7,4,2],"t":[5,1,4,7],"g":[[4,0,0,4],[4,0,0,4],[2,1,1,0],[4,2,0,1]]},{"r":4,"c":4,"s":[5,5,7,4],"t":[3,7,7,3],"g":[[1,4,0,0],[1,0,0,2],[2,0,1,0],[4,2,2,2]]},{"r":4,"c":4,"s":[4,4,7,7],"t":[6,4,1,2],"g":[[4,2,0,1],[2,1,2,1],[0,0,0,0],[2,4,0,2]]},{"r":4,"c":4,"s":[6,7,5,7],"t":[6,1,2,1],"g":[[4,4,0,1],[0,1,0,0],[1,2,2,0],[1,0,2,4]]},{"r":4,"c":4,"s":[3,7,5,7],"t":[2,3,4,5],"g":[[1,0,2,1],[1,2,0,4],[0,2,4,4],[0,0,0,4]]},{"r":4,"c":4,"s":[4,3,7,4],"t":[7,7,4,7],"g":[[4,0,0,4],[2,2,0,1],[0,2,4,0],[0,1,4,4]]},{"r":4,"c":4,"s":[1,5,5,5],"t":[4,7,3,5],"g":[[4,0,2,0],[4,2,0,0],[2,1,4,4],[2,0,0,1]]},{"r":4,"c":4,"s":[4,7,6,7],"t":[7,1,4,3],"g":[[0,0,1,4],[0,1,2,4],[0,2,1,0],[4,4,0,1]]},{"r":4,"c":4,"s":[1,6,5,6],"t":[3,2,3,6],"g":[[4,2,0,0],[1,2,4,0],[4,1,0,2],[0,0,2,1]]},{"r":4,"c":4,"s":[4,6,7,1],"t":[7,3,2,5],"g":[[1,2,4,0],[1,1,0,1],[4,1,2,2],[0,0,0,0]]},{"r":4,"c":4,"s":[4,4,6,1],"t":[3,4,4,1],"g":[[2,0,4,2],[1,0,1,2],[1,0,1,0],[0,4,0,2]]},{"r":4,"c":4,"s":[6,6,4,5],"t":[4,4,5,5],"g":[[2,4,0,4],[1,0,1,1],[4,2,0,0],[1,0,0,4]]}];
+  // Baked levels (100): r rows, c cols, g grid (0 empty, 1/2/4 glass, 8 = "/" mirror, 9 = "\\" mirror),
+  //                      b beams [srcSide, srcIdx, srcColour, tgtSide, tgtIdx, tgtColour]; sides 0=L 1=R 2=T 3=B.
+  const LV = [{"r":2,"c":3,"g":[[0,4,2],[0,0,4]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2]]},{"r":2,"c":3,"g":[[2,2,1],[0,0,0]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,1]]},{"r":2,"c":3,"g":[[0,0,0],[4,4,4]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,4]]},{"r":2,"c":3,"g":[[0,2,1],[0,0,2]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,1]]},{"r":2,"c":3,"g":[[0,0,0],[2,2,4]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2]]},{"r":2,"c":3,"g":[[2,0,4],[4,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2]]},{"r":2,"c":3,"g":[[4,1,0],[1,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1]]},{"r":2,"c":3,"g":[[4,0,1],[1,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1]]},{"r":3,"c":3,"g":[[4,2,1],[0,4,0],[0,0,1]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,2],[0,2,7,1,2,5]]},{"r":3,"c":3,"g":[[0,4,2],[1,0,4],[0,4,0]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,5],[0,2,7,1,2,4]]},{"r":3,"c":3,"g":[[1,4,0],[2,1,2],[0,0,0]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,3],[0,2,7,1,2,1]]},{"r":3,"c":3,"g":[[0,1,1],[0,0,0],[2,1,4]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,3],[0,2,7,1,2,5]]},{"r":3,"c":3,"g":[[0,2,0],[1,0,1],[0,2,2]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,3],[0,2,7,1,2,2]]},{"r":3,"c":3,"g":[[0,4,0],[1,0,2],[0,2,2]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,6],[0,2,7,1,2,2]]},{"r":3,"c":3,"g":[[0,0,0],[2,0,2],[1,4,2]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,2],[0,2,7,1,2,6]]},{"r":3,"c":4,"g":[[0,0,2,2],[4,4,0,0],[1,2,1,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,6],[0,2,7,1,2,2]]},{"r":3,"c":3,"g":[[4,0,0],[2,0,0],[1,4,1]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1],[0,2,7,1,2,2]]},{"r":3,"c":4,"g":[[2,1,4,0],[0,2,0,0],[1,2,4,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,5],[0,2,7,1,2,6]]},{"r":3,"c":3,"g":[[2,2,0],[4,0,4],[4,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,4],[0,2,7,1,2,2]]},{"r":3,"c":4,"g":[[1,0,1,4],[1,2,0,0],[0,4,1,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,4],[0,2,7,1,2,1]]},{"r":3,"c":3,"g":[[2,4,0],[0,0,1],[4,0,2]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,6],[0,2,7,1,2,3]]},{"r":3,"c":4,"g":[[0,0,0,0],[2,2,4,0],[4,4,4,2]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,2],[0,2,7,1,2,4]]},{"r":3,"c":3,"g":[[1,4,0],[0,1,0],[0,2,2]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,4],[0,2,7,1,2,1]]},{"r":3,"c":4,"g":[[0,0,1,0],[2,1,4,2],[2,0,4,0]],"b":[[0,0,2,1,0,7],[0,1,7,1,1,3],[0,2,2,1,2,6]]},{"r":3,"c":4,"g":[[0,0,4,0],[2,0,0,1],[2,1,4,4]],"b":[[0,0,2,1,0,4],[0,1,4,1,1,7],[0,2,4,1,2,5]]},{"r":3,"c":4,"g":[[4,0,1,2],[2,4,0,0],[2,0,0,1]],"b":[[0,0,4,1,0,6],[0,1,2,1,1,7],[0,2,4,1,2,6]]},{"r":3,"c":4,"g":[[0,2,2,2],[4,0,1,1],[1,0,0,0]],"b":[[0,0,4,1,0,1],[0,1,1,1,1,7],[0,2,1,1,2,3]]},{"r":3,"c":4,"g":[[0,0,0,0],[4,1,4,4],[2,2,4,0]],"b":[[0,0,1,1,0,4],[0,1,2,1,1,6],[0,2,2,1,2,7]]},{"r":3,"c":4,"g":[[2,2,4,0],[2,0,0,0],[4,1,0,2]],"b":[[0,0,1,1,0,7],[0,1,2,1,1,2],[0,2,4,1,2,4]]},{"r":3,"c":4,"g":[[1,0,4,0],[2,0,0,0],[1,4,1,2]],"b":[[0,0,7,1,0,3],[0,1,4,1,1,5],[0,2,1,1,2,7]]},{"r":3,"c":3,"g":[[0,4,2],[4,0,1],[0,1,0]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,5],[0,2,7,1,2,1],[2,1,7,3,1,6]]},{"r":3,"c":3,"g":[[2,0,2],[4,2,0],[0,0,1]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,2],[2,2,7,3,2,3]]},{"r":3,"c":3,"g":[[0,1,4],[0,2,0],[1,0,1]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1],[0,2,7,1,2,3],[2,2,7,3,2,7]]},{"r":3,"c":3,"g":[[0,0,0],[2,4,2],[4,1,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2],[0,2,7,1,2,5],[2,0,7,3,0,1]]},{"r":3,"c":3,"g":[[0,4,0],[1,4,0],[0,4,2]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,4],[0,2,7,1,2,7],[2,0,7,3,0,2]]},{"r":3,"c":3,"g":[[4,0,4],[2,0,4],[0,1,0]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,5],[0,2,7,1,2,4],[2,0,7,3,0,4]]},{"r":3,"c":3,"g":[[2,2,0],[1,0,4],[0,0,2]],"b":[[0,0,7,1,0,6],[0,2,7,1,2,3],[2,0,7,3,0,2]]},{"r":3,"c":3,"g":[[2,1,0],[1,0,4],[0,2,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,2],[0,2,7,1,2,5],[2,2,7,3,2,1]]},{"r":3,"c":3,"g":[[2,0,2],[0,0,4],[1,4,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2],[0,2,7,1,2,1],[2,1,7,3,1,6]]},{"r":3,"c":3,"g":[[4,4,0],[4,1,4],[0,0,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,4],[0,2,7,1,2,4],[2,0,7,3,0,4]]},{"r":3,"c":4,"g":[[1,1,0,0],[0,0,0,2],[1,2,4,1]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,1],[0,2,7,1,2,7],[2,1,7,3,1,4]]},{"r":3,"c":4,"g":[[0,0,0,4],[1,0,4,1],[4,4,2,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,5],[0,2,7,1,2,4],[2,2,7,3,2,1]]},{"r":3,"c":4,"g":[[0,0,2,1],[0,4,2,0],[2,4,0,4]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,4],[0,2,7,1,2,2],[2,1,7,3,1,2]]},{"r":3,"c":4,"g":[[4,0,4,0],[0,0,2,1],[2,2,1,0]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,7],[0,2,7,1,2,2],[2,1,7,3,1,2]]},{"r":3,"c":4,"g":[[0,1,1,4],[0,0,2,1],[4,0,0,2]],"b":[[0,0,7,1,0,7],[0,1,7,1,1,7],[0,2,7,1,2,1],[2,0,7,3,0,4]]},{"r":3,"c":4,"g":[[4,0,4,4],[1,0,1,0],[1,4,0,0]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,5],[0,2,7,1,2,4],[2,0,7,3,0,4]]},{"r":3,"c":4,"g":[[2,1,0,0],[0,0,2,1],[1,1,2,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,3],[0,2,7,1,2,3],[2,0,7,3,0,2]]},{"r":3,"c":4,"g":[[1,2,2,2],[0,4,0,2],[0,1,0,0]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,6],[0,2,7,1,2,3],[2,1,7,3,1,5]]},{"r":3,"c":4,"g":[[0,0,1,1],[0,4,1,2],[0,2,2,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,7],[0,2,7,1,2,3],[2,1,7,3,1,7]]},{"r":3,"c":4,"g":[[1,0,1,4],[2,2,0,0],[0,4,0,1]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,3],[0,2,7,1,2,4],[2,1,7,3,1,5]]},{"r":3,"c":4,"g":[[0,0,4,4],[2,0,0,1],[1,1,2,0]],"b":[[0,0,4,1,0,4],[0,1,4,1,1,5],[0,2,1,1,2,3],[2,3,7,3,3,3],[2,0,7,3,0,1]]},{"r":3,"c":4,"g":[[0,0,0,4],[2,2,2,1],[0,4,0,4]],"b":[[0,0,4,1,0,6],[0,1,2,1,1,6],[0,2,4,1,2,5],[2,1,4,3,1,6],[2,3,7,3,3,4]]},{"r":3,"c":4,"g":[[0,2,1,1],[1,0,0,1],[0,0,2,4]],"b":[[0,0,1,1,0,1],[0,1,7,1,1,7],[0,2,7,1,2,1],[2,1,7,3,1,3],[2,2,4,3,2,6]]},{"r":3,"c":4,"g":[[0,1,2,0],[2,0,1,0],[2,4,1,0]],"b":[[0,0,7,1,0,3],[0,1,1,1,1,1],[0,2,2,1,2,3],[2,2,1,3,2,3],[2,1,2,3,1,6]]},{"r":3,"c":4,"g":[[1,0,1,0],[1,0,4,2],[1,0,2,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,2],[0,2,1,1,2,1],[2,0,2,3,0,3],[2,2,7,3,2,1]]},{"r":3,"c":4,"g":[[0,4,0,0],[1,2,1,4],[0,1,1,0]],"b":[[0,0,2,1,0,3],[0,1,2,1,1,4],[0,2,7,1,2,1],[2,3,4,3,3,4],[2,0,7,3,0,6]]},{"r":3,"c":4,"g":[[0,1,2,0],[1,1,0,4],[1,4,0,0]],"b":[[0,0,2,1,0,1],[0,1,2,1,1,6],[0,2,2,1,2,3],[2,3,7,3,3,4],[2,1,2,3,1,1]]},{"r":3,"c":4,"g":[[2,0,1,0],[1,2,0,2],[4,0,0,4]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,1],[0,2,2,1,2,4],[2,2,2,3,2,6],[2,3,1,3,3,7]]},{"r":3,"c":4,"g":[[1,0,1,0],[0,1,0,4],[0,2,4,4]],"b":[[0,0,7,1,0,1],[0,1,4,1,1,4],[0,2,2,1,2,5],[2,3,4,3,3,4],[2,2,7,3,2,1]]},{"r":3,"c":4,"g":[[2,0,4,2],[1,0,0,2],[4,2,0,0]],"b":[[0,0,2,1,0,2],[0,1,4,1,1,4],[0,2,4,1,2,2],[2,1,7,3,1,3],[2,2,2,3,2,2]]},{"r":4,"c":4,"g":[[2,1,4,1],[4,0,4,0],[0,2,4,0],[0,0,4,2]],"b":[[0,0,1,1,0,1],[0,1,4,1,1,2],[0,2,4,1,2,4],[0,3,7,1,3,4],[2,3,4,3,3,4],[2,0,2,3,0,6]]},{"r":4,"c":4,"g":[[4,0,4,1],[0,1,0,2],[2,0,2,0],[4,1,0,2]],"b":[[0,0,7,1,0,5],[0,1,4,1,1,6],[0,2,4,1,2,3],[0,3,7,1,3,2],[2,3,1,3,3,2],[2,2,1,3,2,1]]},{"r":4,"c":4,"g":[[0,1,0,0],[2,2,0,4],[4,0,4,0],[4,1,2,1]],"b":[[0,0,4,1,0,5],[0,1,2,1,1,3],[0,2,7,1,2,4],[0,3,2,1,3,6],[2,3,4,3,3,6],[2,1,7,3,1,7]]},{"r":4,"c":4,"g":[[1,2,4,1],[4,4,2,0],[0,0,0,2],[1,0,0,1]],"b":[[0,0,4,1,0,3],[0,1,2,1,1,4],[0,2,4,1,2,7],[0,3,4,1,3,5],[2,2,7,3,2,3],[2,0,4,3,0,1]]},{"r":4,"c":4,"g":[[1,1,0,0],[2,4,1,0],[1,0,0,2],[0,4,1,2]],"b":[[0,0,2,1,0,2],[0,1,2,1,1,2],[0,2,1,1,2,1],[0,3,7,1,3,3],[2,1,7,3,1,6],[2,3,7,3,3,2]]},{"r":4,"c":4,"g":[[4,0,0,2],[0,2,4,4],[4,4,0,1],[0,0,2,4]],"b":[[0,0,4,1,0,6],[0,1,2,1,1,6],[0,2,1,1,2,5],[0,3,4,1,3,4],[2,3,2,3,3,2],[2,1,1,3,1,2]]},{"r":4,"c":4,"g":[[0,2,0,4],[0,0,0,0],[2,4,4,1],[4,1,1,4]],"b":[[0,0,4,1,0,5],[0,1,1,1,1,7],[0,2,7,1,2,4],[0,3,2,1,3,5],[2,0,2,3,0,4],[2,2,4,3,2,5]]},{"r":4,"c":4,"g":[[4,4,2,2],[2,0,4,4],[0,2,0,0],[1,2,0,0]],"b":[[0,0,2,1,0,2],[0,1,7,1,1,4],[0,2,2,1,2,2],[0,3,2,1,3,3],[2,2,1,3,2,7],[2,1,2,3,1,6]]},{"r":4,"c":4,"g":[[2,0,4,0],[2,0,4,1],[4,0,4,4],[1,0,0,1]],"b":[[0,0,7,1,0,7],[0,1,1,1,1,4],[0,2,7,1,2,5],[0,3,1,1,3,1],[2,3,7,3,3,1],[2,1,2,3,1,3]]},{"r":4,"c":4,"g":[[0,0,2,1],[2,1,0,1],[1,1,0,0],[0,4,2,2]],"b":[[0,0,2,1,0,1],[0,1,1,1,1,3],[0,2,1,1,2,3],[0,3,4,1,3,6],[2,1,2,3,1,7],[2,0,4,3,0,5]]},{"r":3,"c":3,"g":[[4,9,1],[0,0,0],[0,2,1]],"b":[[2,0,2,3,0,6],[3,1,7,0,0,4]]},{"r":3,"c":3,"g":[[4,0,0],[8,1,4],[0,2,0]],"b":[[2,0,2,0,1,6],[3,1,7,2,1,5]]},{"r":3,"c":3,"g":[[0,0,2],[0,8,4],[4,0,2]],"b":[[3,1,4,1,1,6],[1,1,7,3,1,6]]},{"r":3,"c":3,"g":[[0,1,0],[0,2,4],[8,1,0]],"b":[[2,0,4,0,2,7],[2,2,1,3,2,5]]},{"r":3,"c":3,"g":[[0,2,8],[0,2,4],[0,0,4]],"b":[[0,0,4,2,2,6],[1,0,2,3,2,2]]},{"r":3,"c":3,"g":[[1,4,4],[8,0,0],[0,4,0]],"b":[[1,0,2,0,0,3],[2,0,4,0,1,5]]},{"r":3,"c":3,"g":[[0,0,8],[2,2,1],[4,0,0]],"b":[[3,2,2,1,0,2],[2,2,7,0,0,1]]},{"r":3,"c":3,"g":[[0,1,2],[9,0,0],[2,4,0]],"b":[[1,2,2,0,2,6],[1,1,2,2,0,3]]},{"r":3,"c":3,"g":[[9,0,0],[2,2,2],[0,0,4]],"b":[[3,0,4,0,0,6],[0,1,1,1,1,7]]},{"r":3,"c":3,"g":[[1,2,8],[0,0,2],[0,0,1]],"b":[[1,0,7,3,2,2],[2,2,4,0,0,6]]},{"r":3,"c":3,"g":[[0,1,8],[2,4,0],[0,2,0]],"b":[[2,2,1,0,0,2],[0,2,1,1,2,1]]},{"r":3,"c":3,"g":[[0,2,0],[4,9,1],[0,0,4]],"b":[[1,1,4,2,1,5],[2,2,2,3,2,6]]},{"r":3,"c":3,"g":[[0,0,2],[0,9,1],[0,2,1]],"b":[[0,1,7,3,1,1],[2,1,1,1,1,3]]},{"r":3,"c":3,"g":[[1,1,0],[2,8,4],[0,0,0]],"b":[[1,1,4,3,1,5],[3,0,7,2,0,2]]},{"r":3,"c":3,"g":[[9,1,1],[2,2,0],[0,0,0]],"b":[[3,0,1,0,0,2],[3,1,7,2,1,1]]},{"r":4,"c":4,"g":[[1,0,1,0],[0,2,0,0],[0,4,4,9],[8,4,0,2]],"b":[[0,3,7,2,0,4],[2,0,2,0,3,6],[2,1,1,3,1,5]]},{"r":4,"c":4,"g":[[0,2,0,0],[4,4,1,0],[4,1,9,9],[0,0,4,0]],"b":[[1,3,2,0,3,4],[3,2,2,0,2,3],[0,0,2,1,0,3]]},{"r":4,"c":4,"g":[[0,0,0,1],[2,4,2,0],[2,2,8,0],[9,0,2,0]],"b":[[1,2,5,3,2,4],[2,2,7,0,2,2],[1,3,2,2,0,2]]},{"r":4,"c":4,"g":[[1,0,8,0],[2,9,0,2],[0,2,0,0],[0,4,1,4]],"b":[[3,2,1,1,0,5],[2,0,3,3,0,6],[0,1,6,3,1,2]]},{"r":4,"c":4,"g":[[1,0,8,0],[8,4,0,0],[4,0,4,1],[0,0,4,2]],"b":[[2,0,4,0,1,5],[1,1,3,3,0,1],[0,1,4,2,0,5]]},{"r":4,"c":4,"g":[[0,9,4,0],[2,4,4,0],[0,1,0,8],[4,0,2,0]],"b":[[1,1,3,0,1,5],[0,2,7,2,3,6],[1,0,6,2,1,4]]},{"r":4,"c":4,"g":[[9,1,4,0],[0,0,2,0],[4,0,2,0],[1,4,1,0]],"b":[[1,2,3,0,2,3],[2,0,6,1,0,7],[1,1,1,0,1,7]]},{"r":4,"c":4,"g":[[9,0,1,0],[1,8,0,2],[0,1,0,2],[2,0,0,2]],"b":[[2,3,4,3,3,6],[2,0,3,1,0,1],[3,1,7,1,1,2]]},{"r":4,"c":4,"g":[[1,9,8,0],[0,4,2,0],[0,2,0,4],[0,0,4,1]],"b":[[1,3,7,0,3,4],[3,3,6,2,3,3],[0,0,3,3,1,3]]},{"r":4,"c":4,"g":[[0,0,0,4],[4,2,0,0],[2,8,0,1],[1,0,1,9]],"b":[[3,3,6,0,3,3],[2,3,7,1,3,1],[2,2,6,3,2,5]]},{"r":4,"c":4,"g":[[0,8,0,1],[2,0,0,0],[8,1,0,4],[2,2,0,1]],"b":[[1,0,6,3,1,7],[2,2,7,3,2,1],[3,2,5,2,2,1]]},{"r":4,"c":4,"g":[[4,0,8,4],[0,1,0,1],[0,0,0,4],[2,2,0,9]],"b":[[3,1,4,2,1,7],[0,2,3,1,2,2],[0,0,2,2,2,6]]},{"r":4,"c":4,"g":[[2,4,2,0],[8,8,4,0],[0,1,0,0],[2,4,0,0]],"b":[[1,3,3,0,3,7],[0,2,7,1,2,4],[3,1,7,1,1,4]]},{"r":4,"c":4,"g":[[4,1,9,2],[0,2,0,8],[0,1,4,0],[0,0,4,0]],"b":[[1,1,3,3,3,4],[3,0,3,2,0,7],[0,0,2,3,2,2]]},{"r":4,"c":4,"g":[[4,2,1,1],[1,1,0,4],[0,8,0,0],[0,0,8,0]],"b":[[3,3,7,2,3,1],[0,2,4,2,1,4],[0,0,7,1,0,7]]}];
   const LEVELS = LV.length;
 
   let W, H, cs, gx, gy, cols, rows, screen = 'select';
-  let grid, tiles, src, tgt, moves = 0, history = [], won = false, curLevel = 0;
+  let grid, tiles, beams, moves = 0, history = [], won = false, curLevel = 0;
   let solved = load('spectra_solved_v3');     // pure puzzles: just track which levels are beaten
   function load(k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } }
   function saveSolved() { try { localStorage.setItem('spectra_solved_v3', JSON.stringify(solved)); } catch (e) {} }
 
   function layout() {
     W = cv.width = innerWidth; H = cv.height = innerHeight;
-    // Reserve full side gutters (~1.5 cells each for source + receiver) so nothing clips off-screen.
-    cs = Math.min((W - 24) / (cols + 3.0), (H - 168) / rows, 104);
-    gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 6;
+    // Reserve gutters on all four sides (beams can enter/exit any edge) so nothing clips off-screen.
+    cs = Math.min((W - 24) / (cols + 3.0), (H - 150) / (rows + 3.0), 100);
+    gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 10;
   }
   const cx0 = (c) => gx + c * cs, cy0 = (r) => gy + r * cs, ccx = (c) => gx + (c + .5) * cs, ccy = (r) => gy + (r + .5) * cs;
   const inb = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows;
   const cloneG = (g) => g.map(row => row.slice());
 
-  // ---------- filter model ----------
-  // White light takes a glass's colour. A new colour mixes in; a colour already present purifies down to it.
-  function rowOut(g, r) { let m = src[r]; for (let c = 0; c < cols; c++) { const p = g[r][c]; if (p) m = (m & p) ? p : (m | p); } return m; }
-  function wonG(g) { for (let r = 0; r < rows; r++) { let m = src[r]; for (let c = 0; c < cols; c++) { const p = g[r][c]; if (p) m = (m & p) ? p : (m | p); } if (m !== tgt[r]) return false; } return true; }
+  // ---------- beam model ----------
+  // A beam enters from an edge and walks the grid. Glass filters colour (new colour mixes in; a colour
+  // it already has purifies down to that colour). Mirrors ('/'=8, '\'=9) bend it 90 degrees.
+  const isGlass = (v) => v === 1 || v === 2 || v === 4;
+  const isMirror = (v) => v === 8 || v === 9;
+  function entry(ss, si) { if (ss === 0) return [si, 0, 0, 1]; if (ss === 1) return [si, cols - 1, 0, -1]; if (ss === 2) return [0, si, 1, 0]; return [rows - 1, si, -1, 0]; }
+  // Walk a beam. Returns { cells:[{r,c,inDir,outDir,inCol,outCol}], exit:{side,idx,col}|null }.
+  function walk(g, ss, si, sc) {
+    let p = entry(ss, si), r = p[0], c = p[1], dr = p[2], dc = p[3], col = sc;
+    const cells = []; let steps = 0, max = rows * cols * 4 + 4;
+    while (r >= 0 && c >= 0 && r < rows && c < cols) {
+      if (++steps > max) return { cells, exit: null };
+      const v = g[r][c], inDir = [dr, dc], inCol = col;
+      if (v === 8) { const t = dr; dr = -dc; dc = -t; }
+      else if (v === 9) { const t = dr; dr = dc; dc = t; }
+      else if (isGlass(v)) { col = (col & v) ? v : (col | v); }
+      cells.push({ r, c, inDir, outDir: [dr, dc], inCol, outCol: col });
+      r += dr; c += dc;
+    }
+    const lr = r - dr, lc = c - dc; let side, idx;
+    if (dc === 1) { side = 1; idx = lr; } else if (dc === -1) { side = 0; idx = lr; } else if (dr === 1) { side = 3; idx = lc; } else { side = 2; idx = lc; }
+    return { cells, exit: { side, idx, col } };
+  }
+  function beamOK(g, b) { const e = walk(g, b[0], b[1], b[2]).exit; return !!e && e.side === b[3] && e.idx === b[4] && e.col === b[5]; }
+  function wonG(g) { for (const b of beams) if (!beamOK(g, b)) return false; return true; }
 
   // ---------- level lifecycle ----------
   function openLevel(i) {
     curLevel = i; const L = LV[i];
-    rows = L.r; cols = L.c; src = L.s.slice(); tgt = L.t.slice(); grid = cloneG(L.g);
+    rows = L.r; cols = L.c; beams = L.b.map(x => x.slice()); grid = cloneG(L.g);
     layout(); moves = 0; history = []; won = false; buildTiles();
     document.getElementById('mv').textContent = 0;
     document.getElementById('won').classList.remove('show');
@@ -161,20 +183,21 @@
       d.onclick = () => openLevel(i); el.appendChild(d);
     }
   }
-  function buildTiles() { tiles = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c]) tiles.push({ c, r, col: grid[r][c], x: ccx(c), y: ccy(r) }); }
+  function buildTiles() { tiles = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (isGlass(grid[r][c])) tiles.push({ c, r, col: grid[r][c], x: ccx(c), y: ccy(r) }); }
 
   // ---------- input ----------
   let down = null;
   cv.addEventListener('pointerdown', e => {
     if (screen !== 'play' || won) return; aOn();
     const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs);
-    if (inb(c, r) && grid[r][c]) down = { c, r, x: e.clientX, y: e.clientY };
+    if (inb(c, r) && isGlass(grid[r][c])) down = { c, r, x: e.clientX, y: e.clientY };   // only glass moves; mirrors are fixed
   });
   cv.addEventListener('pointerup', e => {
     if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y, d = down; down = null;
     if (Math.hypot(dx, dy) < cs * 0.28) return;
     let dc = 0, dr = 0; if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
-    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr) || grid[d.r][d.c] === grid[nr][nc]) return;
+    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr)) return;
+    const dv = grid[nr][nc]; if (isMirror(dv) || grid[d.r][d.c] === dv) return;   // can't push into a mirror, or no-op swap
     doSwap(d.r, d.c, nr, nc);
   });
   function doSwap(r1, c1, r2, c2) {
@@ -211,35 +234,49 @@
     ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
   }
 
+  const PAD = () => cs * 0.5, GUT = () => cs * 0.62;
+  // a point just outside the board at an edge slot (side 0=L 1=R 2=T 3=B)
+  function edgePt(side, idx) { const g2 = GUT(); if (side === 0) return [gx - g2, ccy(idx)]; if (side === 1) return [gx + cols * cs + g2, ccy(idx)]; if (side === 2) return [ccx(idx), gy - g2]; return [ccx(idx), gy + rows * cs + g2]; }
+  const inDirOf = (side) => side === 0 ? [0, 1] : side === 1 ? [0, -1] : side === 2 ? [1, 0] : [-1, 0];
   function render() {
     ctx.fillStyle = '#f4eee1'; ctx.fillRect(0, 0, W, H);
     if (screen !== 'play') return;
-    const pad = cs * 0.5, gut = cs * 0.62;
-    // board panel
+    const pad = PAD();
     ctx.fillStyle = '#fffdf8'; ctx.strokeStyle = '#e4dccb'; ctx.lineWidth = 2;
     rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 20); ctx.fill(); ctx.stroke();
-    // grid cells (empty slots)
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill();
-    }
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill(); }
     const bw = Math.max(5, cs * 0.11);
-    const exC = gx - pad - gut, rxC = gx + cols * cs + pad + gut;   // emitter / receiver centres
-    const eStart = exC - cs * 0.12, rEdge = rxC - cs * 0.21;        // beam runs behind the triangle, up to the receiver edge
-    for (let r = 0; r < rows; r++) {
-      const y = ccy(r); let m = src[r];
-      seg(eStart, y, gx, y, m, bw);                                 // beam from behind the emitter into the board (triangle drawn on top)
-      for (let c = 0; c < cols; c++) {
-        const xl = cx0(c), xm = ccx(c), xr = cx0(c) + cs;
-        seg(xl, y, xm, y, m, bw);                                   // pre-tile colour
-        const p = grid[r][c]; if (p) m = (m & p) ? p : (m | p);     // glass acts at the cell centre
-        seg(xm, y, xr, y, m, bw);                                   // post-tile colour
+    const traced = beams.map(b => { const w = walk(grid, b[0], b[1], b[2]); return { b, cells: w.cells, exit: w.exit }; });
+    // beam paths (bent, colour changes at glass centres)
+    for (const T of traced) {
+      const cells = T.cells; if (!cells.length) continue;
+      const f = cells[0], ep = edgePt(T.b[0], T.b[1]);
+      seg(ep[0], ep[1], ccx(f.c) - f.inDir[1] * cs / 2, ccy(f.r) - f.inDir[0] * cs / 2, f.inCol, bw);   // emitter stub (behind triangle)
+      for (const cell of cells) {
+        const X = ccx(cell.c), Y = ccy(cell.r);
+        seg(X - cell.inDir[1] * cs / 2, Y - cell.inDir[0] * cs / 2, X, Y, cell.inCol, bw);
+        seg(X, Y, X + cell.outDir[1] * cs / 2, Y + cell.outDir[0] * cs / 2, cell.outCol, bw);
       }
-      seg(gx + cols * cs, y, rEdge, y, m, bw);                      // out to the receiver
-      emitter(exC, y, src[r]);
-      receiver(rxC, y, m, tgt[r]);
+      if (T.exit) { const l = cells[cells.length - 1], xp = edgePt(T.exit.side, T.exit.idx); seg(ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2, xp[0], xp[1], T.exit.col, bw); }
+    }
+    // mirrors
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (isMirror(grid[r][c])) mirror(ccx(c), ccy(r), grid[r][c]);
+    // emitters + receivers
+    for (const T of traced) {
+      const b = T.b, ep = edgePt(b[0], b[1]); emitter(ep[0], ep[1], b[2], inDirOf(b[0]));
+      const rp = edgePt(b[3], b[4]), lit = !!T.exit && T.exit.side === b[3] && T.exit.idx === b[4] && T.exit.col === b[5];
+      receiver(rp[0], rp[1], b[5], lit);
     }
     // glass tiles (tween to cell centres)
     for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; tile(t.x, t.y, t.col); }
+  }
+  function mirror(X, Y, kind) {
+    const s = cs * 0.34; let x0, y0, x1, y1;
+    if (kind === 8) { x0 = X - s; y0 = Y + s; x1 = X + s; y1 = Y - s; } else { x0 = X - s; y0 = Y - s; x1 = X + s; y1 = Y + s; }
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(60,46,30,.16)'; ctx.lineWidth = cs * 0.2; ctx.beginPath(); ctx.moveTo(x0, y0 + 2); ctx.lineTo(x1, y1 + 2); ctx.stroke();
+    ctx.strokeStyle = '#9aa6b2'; ctx.lineWidth = cs * 0.15; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = cs * 0.045; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
   }
 
   function tile(x, y, col) {
@@ -253,17 +290,19 @@
     // glassy top highlight
     ctx.fillStyle = 'rgba(255,255,255,.4)'; rr(x - s / 2 + s * .14, y - s / 2 + s * .13, s * .42, s * .14, 5); ctx.fill();
   }
-  // Emitter: a projector that casts light to the right (triangle). Distinct from the ring receiver.
-  function emitter(x, y, m) {
-    const c = CMAP[m], d = drk(m), r = cs * .17;
-    ctx.beginPath(); ctx.moveTo(x - r * .85, y - r * 1.08); ctx.lineTo(x + r * 1.2, y); ctx.lineTo(x - r * .85, y + r * 1.08); ctx.closePath();
+  // Emitter: a projector that casts light along `dir` ([dr,dc] into the board). Distinct from the ring receiver.
+  function emitter(x, y, m, dir) {
+    const c = CMAP[m], d = drk(m), r = cs * .17, ang = Math.atan2(dir[0], dir[1]);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-r * .85, -r * 1.08); ctx.lineTo(r * 1.2, 0); ctx.lineTo(-r * .85, r * 1.08); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.fillStyle = rgb(c); ctx.fill();
     ctx.lineWidth = Math.max(2.4, cs * .032); ctx.strokeStyle = rgb(d); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.moveTo(x - r * .5, y - r * .5); ctx.lineTo(x + r * .1, y - r * .12); ctx.lineTo(x - r * .5, y + r * .05); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.moveTo(-r * .5, -r * .5); ctx.lineTo(r * .1, -r * .12); ctx.lineTo(-r * .5, r * .05); ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
   // Receiver: a concentric target ring that fills + checks when satisfied.
-  function receiver(x, y, cur, t) {
-    const ok = cur === t, c = CMAP[t], d = drk(t), rad = cs * .21;
+  function receiver(x, y, t, ok) {
+    const c = CMAP[t], d = drk(t), rad = cs * .21;
     if (ok) { ctx.fillStyle = rgb(c, .26); ctx.beginPath(); ctx.arc(x, y, rad * 1.85, 0, 7); ctx.fill(); }
     ctx.beginPath(); ctx.arc(x, y, rad, 0, 7);
     ctx.fillStyle = ok ? rgb(c) : rgb(c, .18); ctx.fill();
@@ -282,6 +321,9 @@
   function itri(cx, cy, m) { const r = 16; return `<polygon points="${cx - r * .85},${cy - r * 1.08} ${cx + r * 1.2},${cy} ${cx - r * .85},${cy + r * 1.08}" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3" stroke-linejoin="round"/>`; }
   function irc(cx, cy, m, ok, r) { r = r || 17; let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ok ? IHEX[m] : 'rgba(60,46,30,.08)'}" stroke="${dk(IHEX[m])}" stroke-width="3"/>`; if (ok) s += `<path d="M ${cx - r * .42} ${cy} L ${cx - r * .1} ${cy + r * .32} L ${cx + r * .48} ${cy - r * .34}" fill="none" stroke="${m === 7 ? '#2a211a' : '#fff'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`; else s += `<circle cx="${cx}" cy="${cy}" r="${r * .42}" fill="none" stroke="${dk(IHEX[m])}" stroke-width="2.4"/>`; return s; }
   function osq(cx, cy, m) { const s = 24, x = cx - s / 2, yy = cy - s / 2; return `<rect x="${x}" y="${yy}" width="${s}" height="${s}" rx="7" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="2.5"/>`; }
+  function ivbar(x, y0, y1, m) { return `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" stroke="${dk(IHEX[m])}" stroke-width="13"/><line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" stroke="${IHEX[m]}" stroke-width="8"/>`; }
+  function itriD(cx, cy, m) { const r = 16; return `<polygon points="${cx - r * 1.08},${cy - r * .85} ${cx + r * 1.08},${cy - r * .85} ${cx},${cy + r * 1.2}" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3" stroke-linejoin="round"/>`; }
+  function imir(cx, cy, slash) { const s = 18; const x0 = cx - s, x1 = cx + s, y0 = slash ? cy + s : cy - s, y1 = slash ? cy - s : cy + s; return `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="#9aa6b2" stroke-width="9" stroke-linecap="round"/><line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,255,255,.85)" stroke-width="3" stroke-linecap="round"/>`; }
   // one "light -> glass -> result" row; beams meet the glass edges, result exits the tile
   function eqRow(y, inM, gM, outM) { return ibar(20, 108, y, inM) + igl(126, y, gM, 36) + ibar(144, 214, y, outM) + irc(240, y, outM, true, 16); }
   // full light x glass result chart (screen 5)
@@ -314,7 +356,20 @@
     // 4: combination drops back to a component
     { art: svg(eqRow(46, 6, 2, 2) + eqRow(96, 6, 4, 4), 142),
       cap: 'A combined colour passing through one of its parts drops back to that part. Green through yellow is yellow, green through blue is blue.' },
-    // 5: full reference chart
+    // 5: vertical lights -- one glass colours both beams crossing it
+    { art: svg(
+        ibar(40, 144, 90, 7) + ibar(176, 256, 90, 4) + itri(28, 90, 7) + irc(282, 90, 4, true) +              // across
+        ivbar(160, 36, 74, 7) + ivbar(160, 106, 150, 4) + itriD(160, 22, 7) + irc(160, 168, 4, true) +         // down
+        igl(160, 90, 4),
+        190),
+      cap: 'Light can also come from the top. One glass colours both the beam across it and the beam down it.' },
+    // 6: mirrors bend a beam 90 degrees
+    { art: svg(
+        itriD(120, 18, 7) + ivbar(120, 32, 58, 7) + igl(120, 58, 1) + ivbar(120, 80, 110, 1) +
+        imir(120, 110, true) + ibar(132, 250, 110, 1) + irc(278, 110, 1, true),
+        150),
+      cap: 'Mirrors bend a beam ninety degrees. The glass still colours it along the way.' },
+    // 7: full reference chart
     { art: chart(),
       cap: 'Every light and glass combination.' }
   ];
@@ -327,7 +382,7 @@
     document.getElementById('inext').textContent = icur === CARDS.length - 1 ? 'Play ›' : 'Next ›';
   }
   function openIntro() { icur = 0; renderIntro(); document.getElementById('intro').classList.add('show'); }
-  function closeIntro() { document.getElementById('intro').classList.remove('show'); try { localStorage.setItem('spectra_intro_v1', '1'); } catch (e) {} }
+  function closeIntro() { document.getElementById('intro').classList.remove('show'); try { localStorage.setItem('spectra_intro_v2', '1'); } catch (e) {} }
   document.getElementById('inext').onclick = () => { if (icur < CARDS.length - 1) { icur++; renderIntro(); } else closeIntro(); };
   document.getElementById('iback').onclick = () => { if (icur > 0) { icur--; renderIntro(); } };
   document.getElementById('help').onclick = openIntro;
@@ -340,7 +395,7 @@
   function loop() { render(); requestAnimationFrame(loop); }
   addEventListener('resize', () => { if (screen === 'play') { layout(); for (const t of (tiles || [])) { t.x = ccx(t.c); t.y = ccy(t.r); } } });
   showMenu();
-  let seenIntro = false; try { seenIntro = localStorage.getItem('spectra_intro_v1') === '1'; } catch (e) {}
+  let seenIntro = false; try { seenIntro = localStorage.getItem('spectra_intro_v2') === '1'; } catch (e) {}
   if (!seenIntro) openIntro();
   requestAnimationFrame(loop);
   window.__sp = { levels: LEVELS, open: (i) => openLevel(i), solved: () => wonG(grid), win: () => onWin(),
