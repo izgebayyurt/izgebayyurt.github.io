@@ -5,136 +5,152 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Spectra</title>
 <style>
-  html,body{margin:0;height:100%;background:#15121f;overflow:hidden;color:#e8e4f2;
+  html,body{margin:0;height:100%;background:#12101c;overflow:hidden;color:#e8e4f2;
     font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
   #c{position:fixed;inset:0;display:block;cursor:pointer;}
-  #top{position:fixed;top:12px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:10px;align-items:center;}
-  #title{font-weight:800;letter-spacing:.22em;font-size:15px;color:#c9c2e6;}
-  .btn{background:#241d36;border:2px solid #4a3f6b;border-radius:11px;color:#e8e4f2;font:800 13px ui-rounded,system-ui;
-    padding:8px 14px;cursor:pointer;box-shadow:0 3px 0 #120f1c;}
-  .btn:active{transform:translateY(1px);box-shadow:0 2px 0 #120f1c;}
-  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;color:#8a82a8;font-size:12.5px;text-align:center;max-width:90%;}
-  #won{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:6;font-size:34px;font-weight:900;
-    letter-spacing:.06em;opacity:0;transition:opacity .25s;pointer-events:none;
-    background:linear-gradient(90deg,#ff6a6a,#f5d24a,#6fd07a,#6f9cf0,#b06ff0);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #top{position:fixed;top:13px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:9px;align-items:center;}
+  #title{font-weight:800;letter-spacing:.26em;font-size:14px;color:#bdb5dc;margin-right:4px;}
+  #moves{font-weight:800;font-size:14px;color:#e8e4f2;background:#211b33;border:1.5px solid #3a3157;border-radius:10px;padding:6px 12px;}
+  #moves b{color:#8fd0ff;} #moves .par{color:#8a82a8;font-weight:700;}
+  .btn{background:#221b35;border:1.5px solid #3a3157;border-radius:10px;color:#e8e4f2;font:800 13px ui-rounded,system-ui;padding:7px 13px;cursor:pointer;}
+  .btn:active{transform:translateY(1px);}
+  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;color:#766e96;font-size:12.5px;text-align:center;max-width:90%;}
+  #won{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:6;text-align:center;opacity:0;
+    transition:opacity .3s,transform .3s;pointer-events:none;}
+  #won.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto;}
+  #won .card{background:#1b1730;border:2px solid #3a3157;border-radius:18px;padding:22px 30px;box-shadow:0 16px 40px rgba(0,0,0,.5);}
+  #won h2{margin:0;font-size:24px;background:linear-gradient(90deg,#ff6a6a,#f5d24a,#6fd07a,#6f9cf0,#b06ff0);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #won .stars{font-size:30px;letter-spacing:4px;margin:8px 0;}
+  #won p{margin:0 0 14px;color:#8a82a8;font-size:13px;}
+  #won .btn{background:#2b67ff;border:none;padding:11px 22px;font-size:15px;}
 </style>
 </head>
 <body>
   <canvas id="c"></canvas>
-  <div id="top"><span id="title">SPECTRA</span><button class="btn" id="new">New</button></div>
+  <div id="top">
+    <span id="title">SPECTRA</span>
+    <span id="moves"><b id="mv">0</b> <span class="par">/ par <span id="pr">-</span></span></span>
+    <button class="btn" id="undo">Undo</button>
+    <button class="btn" id="new">New</button>
+  </div>
   <div id="hint">Swipe a glass tile to slide or swap it. Mix the light so every receiver gets its colour.</div>
-  <div id="won">SOLVED</div>
+  <div id="won"><div class="card"><h2>SOLVED</h2><div class="stars" id="stars">★ ★ ★</div><p id="wsub"></p><button class="btn" id="wnext">Next puzzle</button></div></div>
 
 <script>
 (function () {
   'use strict';
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  const R = 1, Y = 2, B = 4;                                   // primary bits
-  // mask -> rgb (the RYB colour wheel)
-  const CMAP = { 0: [248, 246, 236], 1: [238, 72, 72], 2: [245, 208, 70], 4: [78, 120, 240], 3: [245, 140, 52], 6: [86, 200, 104], 5: [176, 96, 222], 7: [150, 104, 74] };
+  const R = 1, Y = 2, B = 4;
+  const CMAP = { 0: [250, 248, 240], 1: [235, 86, 86], 2: [240, 200, 80], 4: [86, 128, 232], 3: [240, 142, 64], 6: [96, 194, 110], 5: [168, 104, 214], 7: [150, 110, 86] };
   const NAME = { 0: 'white', 1: 'red', 2: 'yellow', 4: 'blue', 3: 'orange', 6: 'green', 5: 'purple', 7: 'brown' };
-  const rgb = (m) => `rgb(${CMAP[m][0]},${CMAP[m][1]},${CMAP[m][2]})`;
-  const INK = '#191324';
+  const rgba = (m, a) => `rgba(${CMAP[m][0]},${CMAP[m][1]},${CMAP[m][2]},${a})`;
 
   let W, H, cs, gx, gy, cols = 5, rows = 5;
-  let grid, tiles, hBeam, vBeam, hTarget, vTarget, drag, winT = 0, solvedShown = false;
-  function layout() { W = cv.width = innerWidth; H = cv.height = innerHeight; cs = Math.min((Math.min(W, H * 0.92) - 120) / cols, 96); gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 6; }
+  let grid, tiles, hBeam, vBeam, hTarget, vTarget, par = 0, moves = 0, history = [], won = false, t0 = 0;
+  function layout() { W = cv.width = innerWidth; H = cv.height = innerHeight; cs = Math.min((Math.min(W, H * 0.9) - 130) / cols, 92); gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 8; }
   layout();
-  const cellX = (c) => gx + c * cs, cellY = (r) => gy + r * cs, ccx = (c) => gx + (c + .5) * cs, ccy = (r) => gy + (r + .5) * cs;
+  const cx0 = (c) => gx + c * cs, cy0 = (r) => gy + r * cs, ccx = (c) => gx + (c + .5) * cs, ccy = (r) => gy + (r + .5) * cs;
   const inb = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows;
+  const cloneG = (g) => g.map(row => row.slice());
 
-  // ---------- masks ----------
-  function rowMask(r) { let m = 0; for (let c = 0; c < cols; c++) m |= grid[r][c]; return m; }
-  function colMask(c) { let m = 0; for (let r = 0; r < rows; r++) m |= grid[r][c]; return m; }
-  function solved() { for (const r of hBeam) if (rowMask(r) !== hTarget[r]) return false; for (const c of vBeam) if (colMask(c) !== vTarget[c]) return false; return true; }
+  // ---------- masks / win ----------
+  const rowMaskG = (g, r) => { let m = 0; for (let c = 0; c < cols; c++) m |= g[r][c]; return m; };
+  const colMaskG = (g, c) => { let m = 0; for (let r = 0; r < rows; r++) m |= g[r][c]; return m; };
+  function wonG(g) { for (const r of hBeam) if (rowMaskG(g, r) !== hTarget[r]) return false; for (const c of vBeam) if (colMaskG(g, c) !== vTarget[c]) return false; return true; }
 
-  // ---------- generation: build a board, read targets, then scramble ----------
+  // ---------- PAR solver: BFS over colour-grids (same-colour tiles interchangeable) ----------
+  function findPar(start) {
+    if (wonG(start)) return 0;
+    const key = (g) => { let s = ''; for (let r = 0; r < rows; r++) s += g[r].join(',') + ';'; return s; };
+    let frontier = [start]; const seen = new Set([key(start)]); let depth = 0, nodes = 0;
+    while (frontier.length && depth < 12) {
+      depth++; const next = [];
+      for (const g of frontier) {
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+          for (const [dc, dr] of [[1, 0], [0, 1]]) { const nc = c + dc, nr = r + dr; if (nc >= cols || nr >= rows) continue; if (g[r][c] === g[nr][nc]) continue;
+            const ng = cloneG(g); const t = ng[r][c]; ng[r][c] = ng[nr][nc]; ng[nr][nc] = t; const k = key(ng); if (seen.has(k)) continue; seen.add(k);
+            if (wonG(ng)) return depth; next.push(ng); if (++nodes > 45000) return -1;
+          }
+        }
+      }
+      frontier = next;
+    }
+    return -1;
+  }
+
+  // ---------- generation: solved board -> targets -> scramble (with computed par) ----------
   function gen() {
-    grid = Array.from({ length: rows }, () => Array(cols).fill(0));
-    const prim = [R, Y, B];
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (Math.random() < 0.5) grid[r][c] = prim[Math.floor(Math.random() * 3)];
-    hBeam = [0, 2, 4]; vBeam = [1, 3];
-    hTarget = {}; vTarget = {};
-    for (const r of hBeam) hTarget[r] = rowMask(r);
-    for (const c of vBeam) vTarget[c] = colMask(c);
-    // scramble with real swaps until clearly unsolved
     let tries = 0;
-    do { for (let k = 0; k < 7; k++) { const r = (Math.random() * rows) | 0, c = (Math.random() * cols) | 0; const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]][(Math.random() * 4) | 0]; const nc = c + dir[0], nr = r + dir[1]; if (inb(nc, nr)) { const t = grid[r][c]; grid[r][c] = grid[nr][nc]; grid[nr][nc] = t; } } } while (solved() && ++tries < 30);
-    buildTiles(); winT = 0; solvedShown = false;
+    do {
+      grid = Array.from({ length: rows }, () => Array(cols).fill(0));
+      const prim = [R, Y, B];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (Math.random() < 0.56) grid[r][c] = prim[(Math.random() * 3) | 0];
+      hBeam = [0, 1, 2, 3, 4]; vBeam = [1, 3]; hTarget = {}; vTarget = {};   // every row is a beam -> every tile matters
+      for (const r of hBeam) hTarget[r] = rowMaskG(grid, r);
+      for (const c of vBeam) vTarget[c] = colMaskG(grid, c);
+      for (let k = 0; k < 9; k++) { const r = (Math.random() * rows) | 0, c = (Math.random() * cols) | 0, d = [[1, 0], [-1, 0], [0, 1], [0, -1]][(Math.random() * 4) | 0], nc = c + d[0], nr = r + d[1]; if (inb(nc, nr)) { const t = grid[r][c]; grid[r][c] = grid[nr][nc]; grid[nr][nc] = t; } }
+      par = findPar(grid);
+    } while ((par < 3 || par > 5) && ++tries < 80);
+    if (par < 0 || par < 3) par = Math.max(3, par);
+    buildTiles(); moves = 0; history = []; won = false;
+    document.getElementById('pr').textContent = par; document.getElementById('mv').textContent = 0;
+    document.getElementById('won').classList.remove('show');
   }
   function buildTiles() { tiles = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c]) tiles.push({ c, r, col: grid[r][c], x: ccx(c), y: ccy(r) }); }
-  function tileAt(c, r) { return tiles.find(t => t.c === c && t.r === r); }
 
-  // ---------- input: swipe a tile (slide into empty / swap) ----------
+  // ---------- input ----------
   let down = null;
-  cv.addEventListener('pointerdown', e => { const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs); if (inb(c, r) && grid[r][c]) down = { c, r, x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointerdown', e => { aOn(); const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs); if (!won && inb(c, r) && grid[r][c]) down = { c, r, x: e.clientX, y: e.clientY }; });
   cv.addEventListener('pointerup', e => {
-    if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; const d = down; down = null;
+    if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y, d = down; down = null;
     if (Math.hypot(dx, dy) < cs * 0.28) return;
     let dc = 0, dr = 0; if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
-    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr)) return;
-    const t1 = grid[d.r][d.c]; grid[d.r][d.c] = grid[nr][nc]; grid[nr][nc] = t1;   // slide-or-swap (symmetric)
-    syncTiles(); sfx('move');
-    if (solved()) onWin();
+    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr)) return; if (grid[d.r][d.c] === grid[nr][nc]) return;
+    history.push(cloneG(grid)); const t = grid[d.r][d.c]; grid[d.r][d.c] = grid[nr][nc]; grid[nr][nc] = t;
+    moves++; document.getElementById('mv').textContent = moves; syncTiles(); sfx('move');
+    if (wonG(grid)) onWin();
   });
-  function syncTiles() { // reconcile tile objects to grid by matching nearest unused tile of each colour (keeps render pos for the tween)
+  function syncTiles() {
     const cells = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c]) cells.push({ c, r, col: grid[r][c] });
-    const avail = tiles.slice(); const out = [];
-    for (const cell of cells) { let best = -1, bd = 1e9; for (let i = 0; i < avail.length; i++) { if (avail[i].col !== cell.col) continue; const dd = Math.hypot(avail[i].c - cell.c, avail[i].r - cell.r); if (dd < bd) { bd = dd; best = i; } } const t = best >= 0 ? avail.splice(best, 1)[0] : { x: ccx(cell.c), y: ccy(cell.r), col: cell.col }; t.c = cell.c; t.r = cell.r; out.push(t); }
+    const avail = tiles.slice(), out = [];
+    for (const cell of cells) { let best = -1, bd = 1e9; for (let i = 0; i < avail.length; i++) { if (avail[i].col !== cell.col) continue; const dd = Math.abs(avail[i].c - cell.c) + Math.abs(avail[i].r - cell.r); if (dd < bd) { bd = dd; best = i; } } const tt = best >= 0 ? avail.splice(best, 1)[0] : { x: ccx(cell.c), y: ccy(cell.r), col: cell.col }; tt.c = cell.c; tt.r = cell.r; out.push(tt); }
     tiles = out;
   }
-  function onWin() { winT = 1.4; sfx('win'); }
+  function onWin() { won = true; const stars = moves <= par ? 3 : moves <= par + 2 ? 2 : 1; document.getElementById('stars').textContent = ['★', '★', '★'].map((s, i) => i < stars ? '★' : '☆').join(' '); document.getElementById('wsub').textContent = moves <= par ? 'Perfect -- solved at par!' : `Solved in ${moves}. Par is ${par}.`; setTimeout(() => document.getElementById('won').classList.add('show'), 350); sfx('win'); }
+  document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); moves = Math.max(0, moves - 1); document.getElementById('mv').textContent = moves; syncTiles(); };
+  document.getElementById('new').onclick = () => { aOn(); gen(); };
+  document.getElementById('wnext').onclick = () => { aOn(); gen(); };
 
   // ---------- render ----------
-  function maskColorGlow(x0, y0, x1, y1, mask, w) { ctx.strokeStyle = rgb(mask); ctx.shadowColor = rgb(mask); ctx.shadowBlur = w * 1.6; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.shadowBlur = 0; }
+  function beam(x0, y0, x1, y1, m, w) { ctx.lineCap = 'round'; ctx.strokeStyle = rgba(m, .16); ctx.lineWidth = w * 2.3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = rgba(m, m === 0 ? .9 : 1); ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
   function render() {
-    ctx.fillStyle = '#15121f'; ctx.fillRect(0, 0, W, H);
-    // cell frames
-    ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) ctx.strokeRect(cellX(c), cellY(r), cs, cs);
-    const bw = cs * 0.15;
-    // horizontal beams
-    for (const r of hBeam) { let m = 0; const y = ccy(r);
-      maskColorGlow(gx - cs * 0.6, y, gx, y, 0, bw);
-      for (let c = 0; c < cols; c++) { m |= grid[r][c]; maskColorGlow(cellX(c), y, cellX(c) + cs, y, m, bw); }
-      drawSource(gx - cs * 0.6, y); drawReceiver(gx + cols * cs + cs * 0.6, y, m, hTarget[r]);
-    }
-    // vertical beams
-    for (const c of vBeam) { let m = 0; const x = ccx(c);
-      maskColorGlow(x, gy - cs * 0.6, x, gy, 0, bw);
-      for (let r = 0; r < rows; r++) { m |= grid[r][c]; maskColorGlow(x, cellY(r), x, cellY(r) + cs, m, bw); }
-      drawSource(x, gy - cs * 0.6); drawReceiver(x, gy + rows * cs + cs * 0.6, m, vTarget[c]);
-    }
-    // tiles (stained glass) -- tween toward home
-    for (const t of tiles) { const hx = ccx(t.c), hy = ccy(t.r); t.x += (hx - t.x) * 0.35; t.y += (hy - t.y) * 0.35; drawTile(t.x, t.y, t.col); }
-    if (winT > 0) { winT -= 0.016; const w = document.getElementById('won'); w.style.opacity = Math.min(1, winT); if (!solvedShown) solvedShown = true; }
-    else document.getElementById('won').style.opacity = 0;
+    ctx.fillStyle = '#12101c'; ctx.fillRect(0, 0, W, H);
+    // board panel
+    const pad = cs * 0.42; ctx.fillStyle = '#181425'; ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1.5; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 18); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1; for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(gx, gy + r * cs); ctx.lineTo(gx + cols * cs, gy + r * cs); ctx.stroke(); } for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(gx + c * cs, gy); ctx.lineTo(gx + c * cs, gy + rows * cs); ctx.stroke(); }
+    const bw = cs * 0.13;
+    for (const r of hBeam) { let m = 0; const y = ccy(r); beam(gx - pad, y, gx, y, 0, bw); for (let c = 0; c < cols; c++) { m |= grid[r][c]; beam(cx0(c), y, cx0(c) + cs, y, m, bw); } src(gx - pad, y); rcv(gx + cols * cs + pad, y, m, hTarget[r]); }
+    for (const c of vBeam) { let m = 0; const x = ccx(c); beam(x, gy - pad, x, gy, 0, bw); for (let r = 0; r < rows; r++) { m |= grid[r][c]; beam(x, cy0(r), x, cy0(r) + cs, m, bw); } src(x, gy - pad); rcv(x, gy + rows * cs + pad, m, vTarget[c]); }
+    for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; tile(t.x, t.y, t.col); }
   }
-  function drawTile(x, y, col) { const s = cs * 0.78; const c = CMAP[col];
-    ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.82)`; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(3, cs * 0.06);
-    rr(x - s / 2, y - s / 2, s, s, s * 0.2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.22)'; rr(x - s / 2 + 5, y - s / 2 + 5, s * 0.34, s * 0.16, 4); ctx.fill();
-  }
-  function drawSource(x, y) { ctx.fillStyle = '#fff7e0'; ctx.shadowColor = '#fff7e0'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(x, y, cs * 0.12, 0, 7); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.stroke(); }
-  function drawReceiver(x, y, cur, tgt) { const ok = cur === tgt; const c = CMAP[tgt]; const rad = cs * 0.2;
-    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${ok ? 0.95 : 0.28})`; if (ok) { ctx.shadowColor = rgb(tgt); ctx.shadowBlur = 16; } ctx.fill(); ctx.shadowBlur = 0;
-    ctx.strokeStyle = ok ? '#fff' : INK; ctx.lineWidth = ok ? 3.5 : 3; ctx.stroke();
-    if (ok) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - rad * .4, y); ctx.lineTo(x - rad * .08, y + rad * .35); ctx.lineTo(x + rad * .45, y - rad * .35); ctx.stroke(); }
-  }
+  function tile(x, y, col) { const s = cs * 0.72, c = CMAP[col]; const g = ctx.createLinearGradient(0, y - s / 2, 0, y + s / 2); g.addColorStop(0, `rgba(${Math.min(255, c[0] + 30)},${Math.min(255, c[1] + 30)},${Math.min(255, c[2] + 30)},.95)`); g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},.95)`);
+    ctx.fillStyle = g; ctx.strokeStyle = `rgba(${c[0] * .45 | 0},${c[1] * .45 | 0},${c[2] * .45 | 0},1)`; ctx.lineWidth = Math.max(2.5, cs * 0.04); rr(x - s / 2, y - s / 2, s, s, s * .22); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; rr(x - s / 2 + s * .12, y - s / 2 + s * .12, s * .34, s * .12, 4); ctx.fill(); }
+  function src(x, y) { ctx.fillStyle = '#fff7e6'; ctx.beginPath(); ctx.arc(x, y, cs * 0.11, 0, 7); ctx.fill(); ctx.strokeStyle = '#cdbfae'; ctx.lineWidth = 2; ctx.stroke(); }
+  function rcv(x, y, cur, tgt) { const ok = cur === tgt, c = CMAP[tgt], rad = cs * 0.19; if (ok) { ctx.fillStyle = rgba(tgt, .22); ctx.beginPath(); ctx.arc(x, y, rad * 1.7, 0, 7); ctx.fill(); }
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = ok ? rgba(tgt, .98) : `rgba(${c[0]},${c[1]},${c[2]},.26)`; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = ok ? '#fff' : `rgba(${c[0]},${c[1]},${c[2]},.7)`; ctx.stroke();
+    if (ok) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .36); ctx.lineTo(x + rad * .46, y - rad * .36); ctx.stroke(); } }
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
   // ---------- audio ----------
   let ac = null; function aOn() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
   function tone(f, d, t, g) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = t || 'sine'; o.frequency.value = f; n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .05, s + .01); n.gain.exponentialRampToValueAtTime(.0001, s + d); o.connect(n); n.connect(ac.destination); o.start(s); o.stop(s + d + .02); }
-  function sfx(n) { aOn(); if (!ac) return; if (n === 'move') tone(440, .05, 'triangle', .03); else if (n === 'win') { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .3, 'triangle', .05), i * 90)); } }
+  function sfx(n) { if (!ac) return; if (n === 'move') tone(460, .05, 'triangle', .03); else if (n === 'win') [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .3, 'triangle', .05), i * 95)); }
 
-  // ---------- loop ----------
   function loop() { render(); requestAnimationFrame(loop); }
-  document.getElementById('new').onclick = () => { aOn(); gen(); };
-  cv.addEventListener('pointerdown', aOn, { once: true });
   addEventListener('resize', () => { layout(); for (const t of tiles) { t.x = ccx(t.c); t.y = ccy(t.r); } });
   gen(); requestAnimationFrame(loop);
-  window.__sp = { solved: () => solved(), gen: () => gen(), state: () => ({ rows: hBeam.map(r => ({ r, cur: NAME[rowMask(r)], tgt: NAME[hTarget[r]] })), cols: vBeam.map(c => ({ c, cur: NAME[colMask(c)], tgt: NAME[vTarget[c]] })) }), solveTo: () => { /* set grid so targets met: brute not needed -- restore by clearing to a known solve is hard; expose swap */ }, swap: (r1, c1, r2, c2) => { const t = grid[r1][c1]; grid[r1][c1] = grid[r2][c2]; grid[r2][c2] = t; syncTiles(); return solved(); } };
+  window.__sp = { solved: () => wonG(grid), gen: () => gen(), par: () => par, moves: () => moves, parOf: (g) => findPar(g || grid), grid: () => grid };
 })();
 </script>
 </body>
