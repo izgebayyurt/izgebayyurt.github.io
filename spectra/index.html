@@ -24,19 +24,16 @@
     font-size:12.5px;text-align:center;max-width:92%;line-height:1.5;}
   /* level select */
   #select{position:fixed;inset:0;z-index:8;background:var(--paper);overflow-y:auto;display:none;
-    flex-direction:column;align-items:center;padding:26px 16px 44px;}
-  #select h1{font-size:34px;letter-spacing:.18em;margin:10px 0 4px;font-weight:900;
+    flex-direction:column;align-items:center;padding:18px 14px 40px;}
+  #select h1{font-size:30px;letter-spacing:.18em;margin:6px 0 18px;font-weight:900;
     background:linear-gradient(90deg,#e2685f,#e0a23a,#5aae6e,#4f86e0,#8a63d8);-webkit-background-clip:text;background-clip:text;color:transparent;}
-  #select .sub{color:var(--ink-dim);font-size:13px;margin-bottom:8px;text-align:center;max-width:430px;line-height:1.55;}
-  #select .rule{color:var(--ink-dim);font-size:12px;margin-bottom:22px;text-align:center;max-width:430px;line-height:1.55;
-    background:var(--surface);border:1.5px solid var(--hairline);border-radius:12px;padding:10px 14px;}
-  #select .rule b{color:var(--ink);}
-  #grid{display:grid;grid-template-columns:repeat(auto-fill,68px);gap:12px;justify-content:center;max-width:540px;}
-  .lvl{width:68px;height:74px;border-radius:15px;border:2px solid var(--hairline);background:var(--surface);cursor:pointer;
+  #help{position:fixed;top:14px;right:14px;z-index:9;width:38px;height:38px;padding:0;border-radius:50%;font-size:18px;}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,62px);gap:11px;justify-content:center;max-width:520px;width:100%;}
+  .lvl{width:62px;height:68px;border-radius:15px;border:2px solid var(--hairline);background:var(--surface);cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:0 4px 0 var(--hairline);position:relative;}
   .lvl:active{transform:translateY(2px);box-shadow:0 2px 0 var(--hairline);}
-  .lvl .n{font-size:20px;font-weight:900;color:var(--ink);}
-  .lvl .st{font-size:10px;letter-spacing:1px;color:#e0a23a;height:12px;}
+  .lvl .n{font-size:19px;font-weight:900;color:var(--ink);}
+  .lvl .st{font-size:9px;letter-spacing:1px;color:#e0a23a;height:11px;}
   .lvl .tg{position:absolute;top:-6px;right:-5px;width:11px;height:11px;border-radius:50%;border:2px solid var(--paper);}
   .lvl.t0 .tg{background:#5aae6e;} .lvl.t1 .tg{background:#e0a23a;} .lvl.t2 .tg{background:#e2685f;}
   #won{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:9;text-align:center;opacity:0;
@@ -48,6 +45,19 @@
   #won .stars{font-size:30px;letter-spacing:5px;margin:8px 0;color:#e0a23a;}
   #won p{margin:0 0 16px;color:var(--ink-dim);font-size:13px;}
   #won .row{display:flex;gap:10px;justify-content:center;}
+  /* intro card stack */
+  #intro{position:fixed;inset:0;z-index:12;background:rgba(40,30,18,.34);display:none;align-items:center;justify-content:center;padding:18px;}
+  #intro.show{display:flex;}
+  .icard{background:var(--surface);border:2px solid var(--hairline);border-radius:22px;box-shadow:var(--shadow);
+    width:min(380px,92vw);padding:22px 22px 18px;display:flex;flex-direction:column;align-items:center;}
+  .icard .art{width:100%;}
+  .icard .art svg{width:100%;height:auto;display:block;}
+  .icard .cap{font-size:15px;font-weight:700;color:var(--ink);text-align:center;margin:14px 6px 4px;min-height:42px;line-height:1.45;}
+  .icard .cap b{color:#c8743f;}
+  .dots{display:flex;gap:7px;margin:8px 0 14px;}
+  .dots i{width:8px;height:8px;border-radius:50%;background:var(--hairline);}
+  .dots i.on{background:#6a45f0;}
+  .inav{display:flex;gap:10px;width:100%;justify-content:space-between;}
 </style>
 </head>
 <body>
@@ -58,14 +68,20 @@
     <button class="btn" id="undo">Undo</button>
     <button class="btn" id="reset">Reset</button>
   </div>
-  <div id="hint">Swipe a glass tile to slide or swap it. Light through a glass takes its colour. No move limit, just light up every receiver.</div>
+  <div id="hint">Swipe a glass to slide or swap it.</div>
 
   <div id="select">
+    <button class="btn" id="help" title="How to play">?</button>
     <h1>SPECTRA</h1>
-    <div class="sub">Slide the coloured glass so each beam reaches its receiver in the right colour.</div>
-    <div class="rule">White light through a glass becomes that <b>colour</b>. A <b>new</b> colour mixes in (red + yellow = orange). A colour the light <b>already has</b> purifies it back down to that colour.</div>
     <div id="grid"></div>
   </div>
+
+  <div id="intro"><div class="icard">
+    <div class="art" id="iart"></div>
+    <div class="cap" id="icap"></div>
+    <div class="dots" id="idots"></div>
+    <div class="inav"><button class="btn" id="iback">Back</button><button class="btn pri" id="inext">Next ›</button></div>
+  </div></div>
 
   <div id="won"><div class="card"><h2>SOLVED</h2><div class="stars" id="stars">★ ★ ★</div><p id="wsub"></p>
     <div class="row"><button class="btn" id="wmenu">Levels</button><button class="btn pri" id="wnext">Next ›</button></div></div></div>
@@ -75,15 +91,16 @@
   'use strict';
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
   const R = 1, Y = 2, B = 4;
-  // Soft paper-friendly palette. mask 7 = white (light source / full mix).
+  // High-contrast palette: separated in hue AND value so neighbours read apart.
+  // red (dark) vs orange (mid) vs yellow (light); blue (dark) vs green (mid).
   const CMAP = {
-    1: [226, 104, 95],   // R  coral
-    2: [224, 162, 58],   // Y  gold
-    4: [79, 134, 224],   // B  blue
-    3: [236, 139, 60],   // R|Y orange
-    6: [90, 174, 110],   // Y|B green
-    5: [138, 99, 216],   // R|B purple
-    7: [250, 247, 240]    // R|Y|B white
+    1: [214, 40, 40],    // R  red   (dark)
+    2: [248, 208, 50],   // Y  yellow (light)
+    4: [38, 92, 206],    // B  blue  (dark)
+    3: [242, 128, 24],   // R|Y orange (mid)
+    6: [44, 168, 92],    // Y|B green  (mid)
+    5: [150, 74, 212],   // R|B purple
+    7: [255, 255, 255]   // R|Y|B white
   };
   const drk = (m) => { const c = CMAP[m]; return [c[0] * .55 | 0, c[1] * .55 | 0, c[2] * .55 | 0]; };
   const rgb = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a == null ? 1 : a})`;
@@ -101,8 +118,8 @@
 
   function layout() {
     W = cv.width = innerWidth; H = cv.height = innerHeight;
-    const availW = W - 150, availH = H - 200;       // leave room for src/receiver gutters + HUD
-    cs = Math.min(availW / (cols + 1.2), availH / rows, 104);
+    // Reserve full side gutters (~1.5 cells each for source + receiver) so nothing clips off-screen.
+    cs = Math.min((W - 24) / (cols + 3.0), (H - 168) / rows, 104);
     gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 6;
   }
   const cx0 = (c) => gx + c * cs, cy0 = (r) => gy + r * cs, ccx = (c) => gx + (c + .5) * cs, ccy = (r) => gy + (r + .5) * cs;
@@ -244,20 +261,60 @@
     // glassy top highlight
     ctx.fillStyle = 'rgba(255,255,255,.4)'; rr(x - s / 2 + s * .14, y - s / 2 + s * .13, s * .42, s * .14, 5); ctx.fill();
   }
+  // Emitter: a projector that casts light to the right (triangle). Distinct from the ring receiver.
   function emitter(x, y, m) {
-    const c = CMAP[m];
-    ctx.fillStyle = rgb(c, .16); ctx.beginPath(); ctx.arc(x, y, cs * .26, 0, 7); ctx.fill();
-    ctx.fillStyle = rgb(c); ctx.beginPath(); ctx.arc(x, y, cs * .15, 0, 7); ctx.fill();
-    ctx.strokeStyle = rgb(drk(m)); ctx.lineWidth = 2.4; ctx.stroke();
+    const c = CMAP[m], d = drk(m), r = cs * .17;
+    ctx.fillStyle = rgb(c, .18); ctx.beginPath(); ctx.arc(x + r * .2, y, cs * .27, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - r * .85, y - r * 1.08); ctx.lineTo(x + r * 1.2, y); ctx.lineTo(x - r * .85, y + r * 1.08); ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.fillStyle = rgb(c); ctx.fill();
+    ctx.lineWidth = Math.max(2.4, cs * .032); ctx.strokeStyle = rgb(d); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.moveTo(x - r * .5, y - r * .5); ctx.lineTo(x + r * .1, y - r * .12); ctx.lineTo(x - r * .5, y + r * .05); ctx.closePath(); ctx.fill();
   }
+  // Receiver: a concentric target ring that fills + checks when satisfied.
   function receiver(x, y, cur, t) {
-    const ok = cur === t, c = CMAP[t], d = drk(t), rad = cs * .2;
-    if (ok) { ctx.fillStyle = rgb(c, .25); ctx.beginPath(); ctx.arc(x, y, rad * 1.85, 0, 7); ctx.fill(); }
+    const ok = cur === t, c = CMAP[t], d = drk(t), rad = cs * .21;
+    if (ok) { ctx.fillStyle = rgb(c, .26); ctx.beginPath(); ctx.arc(x, y, rad * 1.85, 0, 7); ctx.fill(); }
     ctx.beginPath(); ctx.arc(x, y, rad, 0, 7);
-    ctx.fillStyle = ok ? rgb(c) : rgb(c, .22); ctx.fill();
-    ctx.lineWidth = 3.2; ctx.strokeStyle = ok ? rgb(d) : rgb(d, .65); ctx.stroke();
-    if (ok) { ctx.strokeStyle = t === 7 ? '#2a211a' : '#fff'; ctx.lineWidth = 3.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .38); ctx.lineTo(x + rad * .48, y - rad * .36); ctx.stroke(); }
+    ctx.fillStyle = ok ? rgb(c) : rgb(c, .18); ctx.fill();
+    ctx.lineWidth = 3.6; ctx.strokeStyle = ok ? rgb(d) : rgb(d, .7); ctx.stroke();
+    if (ok) { ctx.strokeStyle = t === 7 ? '#2a211a' : '#fff'; ctx.lineWidth = 3.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .38); ctx.lineTo(x + rad * .48, y - rad * .36); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(x, y, rad * .46, 0, 7); ctx.lineWidth = 2.6; ctx.strokeStyle = rgb(d, .7); ctx.stroke(); }
   }
+
+  // ---------- intro card stack (visual, minimal text) ----------
+  const IHEX = { 1: '#d62828', 2: '#f8d032', 4: '#265ece', 3: '#f2801c', 6: '#2ca85c', 5: '#964ed4', 7: '#ffffff' };
+  function dk(hex) { const n = parseInt(hex.slice(1), 16); return `rgb(${(n >> 16 & 255) * .5 | 0},${(n >> 8 & 255) * .5 | 0},${(n & 255) * .5 | 0})`; }
+  function iBeam(x0, x1, y, m) { return `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${dk(IHEX[m])}" stroke-width="13"/><line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${IHEX[m]}" stroke-width="8"/>`; }
+  function iGlass(cx, cy, m) { const s = 44, x = cx - s / 2, yy = cy - s / 2; return `<rect x="${x}" y="${yy}" width="${s}" height="${s}" rx="12" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3.5"/><rect x="${x + 7}" y="${yy + 7}" width="${s * .38}" height="6" rx="3" fill="rgba(255,255,255,.55)"/>`; }
+  function iSrc(cx, cy, m) { const r = 16; return `<polygon points="${cx - r * .85},${cy - r * 1.08} ${cx + r * 1.2},${cy} ${cx - r * .85},${cy + r * 1.08}" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3" stroke-linejoin="round"/>`; }
+  function iRcv(cx, cy, m, ok) { let s = `<circle cx="${cx}" cy="${cy}" r="17" fill="${ok ? IHEX[m] : 'rgba(60,46,30,.08)'}" stroke="${dk(IHEX[m])}" stroke-width="3.5"/>`; if (ok) s += `<path d="M ${cx - 7} ${cy} L ${cx - 2} ${cy + 5} L ${cx + 8} ${cy - 6}" fill="none" stroke="${m === 7 ? '#2a211a' : '#fff'}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>`; else s += `<circle cx="${cx}" cy="${cy}" r="7.5" fill="none" stroke="${dk(IHEX[m])}" stroke-width="2.6"/>`; return s; }
+  const svg = (inner) => `<svg viewBox="0 0 320 120">${inner}</svg>`;
+  const CARDS = [
+    { art: svg(iBeam(37, 124, 60, 7) + iGlass(150, 60, 1) + iBeam(176, 274, 60, 1) + iSrc(22, 60, 7) + iRcv(298, 60, 1, true)),
+      cap: 'Slide the glass so every beam fills its receiver.' },
+    { art: svg(iBeam(37, 124, 60, 7) + iGlass(150, 60, 4) + iBeam(176, 274, 60, 4) + iSrc(22, 60, 7) + iRcv(298, 60, 4, true)),
+      cap: 'White light takes the <b>glass colour</b>.' },
+    { art: svg(iSrc(22, 60, 1) + iBeam(37, 124, 60, 1) + iGlass(150, 60, 2) + iBeam(176, 274, 60, 3) + iRcv(298, 60, 3, true)),
+      cap: 'A <b>new</b> colour mixes in. Red + yellow = orange.' },
+    { art: svg(iSrc(22, 60, 7) + iBeam(37, 124, 60, 7) + iGlass(150, 60, 1) + iBeam(176, 274, 60, 1) + iRcv(298, 60, 1, true)),
+      cap: 'A colour it <b>already has</b> purifies back to it. White through red = red.' },
+    { art: svg('<text x="160" y="30" font-size="26" text-anchor="middle">👆</text>' + iGlass(118, 66, 4) + iGlass(202, 66, 6) +
+        '<path d="M 130 100 L 196 100" stroke="#8b8170" stroke-width="3"/><path d="M 138 94 L 128 100 L 138 106" fill="none" stroke="#8b8170" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M 188 94 L 198 100 L 188 106" fill="none" stroke="#8b8170" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'),
+      cap: '<b>Swipe</b> a glass to slide or swap it. No move limit, just solve it.' }
+  ];
+  let icur = 0;
+  function renderIntro() {
+    document.getElementById('iart').innerHTML = CARDS[icur].art;
+    document.getElementById('icap').innerHTML = CARDS[icur].cap;
+    document.getElementById('idots').innerHTML = CARDS.map((_, i) => `<i class="${i === icur ? 'on' : ''}"></i>`).join('');
+    document.getElementById('iback').style.visibility = icur === 0 ? 'hidden' : 'visible';
+    document.getElementById('inext').textContent = icur === CARDS.length - 1 ? 'Play ›' : 'Next ›';
+  }
+  function openIntro() { icur = 0; renderIntro(); document.getElementById('intro').classList.add('show'); }
+  function closeIntro() { document.getElementById('intro').classList.remove('show'); try { localStorage.setItem('spectra_intro_v1', '1'); } catch (e) {} }
+  document.getElementById('inext').onclick = () => { if (icur < CARDS.length - 1) { icur++; renderIntro(); } else closeIntro(); };
+  document.getElementById('iback').onclick = () => { if (icur > 0) { icur--; renderIntro(); } };
+  document.getElementById('help').onclick = openIntro;
 
   // ---------- audio ----------
   let ac = null; function aOn() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
@@ -266,7 +323,10 @@
 
   function loop() { render(); requestAnimationFrame(loop); }
   addEventListener('resize', () => { if (screen === 'play') { layout(); for (const t of (tiles || [])) { t.x = ccx(t.c); t.y = ccy(t.r); } } });
-  showMenu(); requestAnimationFrame(loop);
+  showMenu();
+  let seenIntro = false; try { seenIntro = localStorage.getItem('spectra_intro_v1') === '1'; } catch (e) {}
+  if (!seenIntro) openIntro();
+  requestAnimationFrame(loop);
   window.__sp = { levels: LEVELS, levelPar: (i) => LV[i].p, open: (i) => openLevel(i), solved: () => wonG(grid), win: () => onWin() };
 })();
 </script>
