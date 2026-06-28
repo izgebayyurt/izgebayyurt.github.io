@@ -9,103 +9,153 @@
     font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
   #c{position:fixed;inset:0;display:block;cursor:pointer;}
   #top{position:fixed;top:13px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:9px;align-items:center;}
-  #title{font-weight:800;letter-spacing:.26em;font-size:14px;color:#bdb5dc;margin-right:4px;}
+  #title{font-weight:800;letter-spacing:.26em;font-size:14px;color:#bdb5dc;margin-right:2px;}
   #moves{font-weight:800;font-size:14px;color:#e8e4f2;background:#211b33;border:1.5px solid #3a3157;border-radius:10px;padding:6px 12px;}
   #moves b{color:#8fd0ff;} #moves .par{color:#8a82a8;font-weight:700;}
   .btn{background:#221b35;border:1.5px solid #3a3157;border-radius:10px;color:#e8e4f2;font:800 13px ui-rounded,system-ui;padding:7px 13px;cursor:pointer;}
   .btn:active{transform:translateY(1px);}
   #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;color:#766e96;font-size:12.5px;text-align:center;max-width:90%;}
-  #won{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:6;text-align:center;opacity:0;
+  /* level select */
+  #select{position:fixed;inset:0;z-index:8;background:#12101c;overflow-y:auto;display:none;flex-direction:column;align-items:center;padding:24px 16px 40px;}
+  #select h1{font-size:30px;letter-spacing:.16em;margin:14px 0 2px;
+    background:linear-gradient(90deg,#ff6a6a,#f5d24a,#6fd07a,#6f9cf0,#b06ff0);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #select .sub{color:#8a82a8;font-size:12.5px;margin-bottom:22px;}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,84px);gap:14px;justify-content:center;max-width:520px;}
+  .lvl{width:84px;height:92px;border-radius:16px;border:2px solid #3a3157;background:#1c1730;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;box-shadow:0 5px 0 #0f0c18;position:relative;}
+  .lvl:active{transform:translateY(2px);box-shadow:0 3px 0 #0f0c18;}
+  .lvl .n{font-size:23px;font-weight:900;}
+  .lvl .st{font-size:11px;letter-spacing:1px;color:#f5d24a;height:13px;}
+  .lvl .tg{position:absolute;top:-7px;right:-6px;font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    padding:2px 6px;border-radius:7px;border:2px solid #12101c;color:#12101c;}
+  .lvl.t0 .tg{background:#6fd07a;} .lvl.t1 .tg{background:#f5d24a;} .lvl.t2 .tg{background:#ff7a6a;}
+  #won{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:9;text-align:center;opacity:0;
     transition:opacity .3s,transform .3s;pointer-events:none;}
   #won.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto;}
   #won .card{background:#1b1730;border:2px solid #3a3157;border-radius:18px;padding:22px 30px;box-shadow:0 16px 40px rgba(0,0,0,.5);}
   #won h2{margin:0;font-size:24px;background:linear-gradient(90deg,#ff6a6a,#f5d24a,#6fd07a,#6f9cf0,#b06ff0);-webkit-background-clip:text;background-clip:text;color:transparent;}
-  #won .stars{font-size:30px;letter-spacing:4px;margin:8px 0;}
+  #won .stars{font-size:30px;letter-spacing:4px;margin:8px 0;color:#f5d24a;}
   #won p{margin:0 0 14px;color:#8a82a8;font-size:13px;}
-  #won .btn{background:#2b67ff;border:none;padding:11px 22px;font-size:15px;}
+  #won .row{display:flex;gap:10px;justify-content:center;}
+  #won .btn.pri{background:#2b67ff;border:none;}
 </style>
 </head>
 <body>
   <canvas id="c"></canvas>
   <div id="top">
-    <span id="title">SPECTRA</span>
+    <button class="btn" id="menu">‹ Levels</button>
     <span id="moves"><b id="mv">0</b> <span class="par">/ par <span id="pr">-</span></span></span>
     <button class="btn" id="undo">Undo</button>
-    <button class="btn" id="new">New</button>
   </div>
   <div id="hint">Swipe a glass tile to slide or swap it. Mix the light so every receiver gets its colour.</div>
-  <div id="won"><div class="card"><h2>SOLVED</h2><div class="stars" id="stars">★ ★ ★</div><p id="wsub"></p><button class="btn" id="wnext">Next puzzle</button></div></div>
+
+  <div id="select">
+    <h1>SPECTRA</h1><div class="sub">Mix light. Solve at par for three stars.</div>
+    <div id="grid"></div>
+  </div>
+
+  <div id="won"><div class="card"><h2>SOLVED</h2><div class="stars" id="stars">★ ★ ★</div><p id="wsub"></p>
+    <div class="row"><button class="btn" id="wmenu">Levels</button><button class="btn pri" id="wnext">Next ›</button></div></div></div>
 
 <script>
 (function () {
   'use strict';
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  const R = 1, Y = 2, B = 4;
-  const CMAP = { 0: [250, 248, 240], 1: [235, 86, 86], 2: [240, 200, 80], 4: [86, 128, 232], 3: [240, 142, 64], 6: [96, 194, 110], 5: [168, 104, 214], 7: [150, 110, 86] };
-  const NAME = { 0: 'white', 1: 'red', 2: 'yellow', 4: 'blue', 3: 'orange', 6: 'green', 5: 'purple', 7: 'brown' };
+  const R = 1, Y = 2, B = 4, PRIM = [R, Y, B];
+  // RYB wheel; all three = WHITE (additive)
+  const CMAP = { 0: [70, 66, 86], 1: [235, 86, 86], 2: [240, 200, 80], 4: [86, 128, 232], 3: [240, 142, 64], 6: [96, 194, 110], 5: [168, 104, 214], 7: [252, 250, 245] };
   const rgba = (m, a) => `rgba(${CMAP[m][0]},${CMAP[m][1]},${CMAP[m][2]},${a})`;
+  const SRCPOOL = [R, Y, B, R | Y, Y | B, R | B];
 
-  let W, H, cs, gx, gy, cols = 5, rows = 5;
-  let grid, tiles, hBeam, vBeam, hTarget, vTarget, par = 0, moves = 0, history = [], won = false, t0 = 0;
+  const LEVELS = 12;
+  let W, H, cs, gx, gy, cols = 5, rows = 5, screen = 'select';
+  let grid, tiles, hBeam, vBeam, hSrc, vSrc, hTarget, vTarget, par = 0, moves = 0, history = [], won = false, curLevel = 0;
+  const cache = {};
+  let stars = load();
+  function load() { try { return JSON.parse(localStorage.getItem('spectra_v1') || '[]'); } catch (e) { return []; } }
+  function save() { try { localStorage.setItem('spectra_v1', JSON.stringify(stars)); } catch (e) {} }
+
   function layout() { W = cv.width = innerWidth; H = cv.height = innerHeight; cs = Math.min((Math.min(W, H * 0.9) - 130) / cols, 92); gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 8; }
   layout();
   const cx0 = (c) => gx + c * cs, cy0 = (r) => gy + r * cs, ccx = (c) => gx + (c + .5) * cs, ccy = (r) => gy + (r + .5) * cs;
   const inb = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows;
   const cloneG = (g) => g.map(row => row.slice());
+  function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-  // ---------- masks / win ----------
-  const rowMaskG = (g, r) => { let m = 0; for (let c = 0; c < cols; c++) m |= g[r][c]; return m; };
-  const colMaskG = (g, c) => { let m = 0; for (let r = 0; r < rows; r++) m |= g[r][c]; return m; };
+  // ---------- masks / win (use current level context) ----------
+  const rowMaskG = (g, r) => { let m = hSrc[r] || 0; for (let c = 0; c < cols; c++) m |= g[r][c]; return m; };
+  const colMaskG = (g, c) => { let m = vSrc[c] || 0; for (let r = 0; r < rows; r++) m |= g[r][c]; return m; };
   function wonG(g) { for (const r of hBeam) if (rowMaskG(g, r) !== hTarget[r]) return false; for (const c of vBeam) if (colMaskG(g, c) !== vTarget[c]) return false; return true; }
 
-  // ---------- PAR solver: BFS over colour-grids (same-colour tiles interchangeable) ----------
-  function findPar(start) {
+  function findPar(start, budget) {
     if (wonG(start)) return 0;
     const key = (g) => { let s = ''; for (let r = 0; r < rows; r++) s += g[r].join(',') + ';'; return s; };
     let frontier = [start]; const seen = new Set([key(start)]); let depth = 0, nodes = 0;
     while (frontier.length && depth < 12) {
       depth++; const next = [];
-      for (const g of frontier) {
-        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-          for (const [dc, dr] of [[1, 0], [0, 1]]) { const nc = c + dc, nr = r + dr; if (nc >= cols || nr >= rows) continue; if (g[r][c] === g[nr][nc]) continue;
-            const ng = cloneG(g); const t = ng[r][c]; ng[r][c] = ng[nr][nc]; ng[nr][nc] = t; const k = key(ng); if (seen.has(k)) continue; seen.add(k);
-            if (wonG(ng)) return depth; next.push(ng); if (++nodes > 45000) return -1;
-          }
-        }
+      for (const g of frontier) for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) for (const [dc, dr] of [[1, 0], [0, 1]]) {
+        const nc = c + dc, nr = r + dr; if (nc >= cols || nr >= rows || g[r][c] === g[nr][nc]) continue;
+        const ng = cloneG(g); const t = ng[r][c]; ng[r][c] = ng[nr][nc]; ng[nr][nc] = t; const k = key(ng); if (seen.has(k)) continue; seen.add(k);
+        if (wonG(ng)) return depth; next.push(ng); if (++nodes > (budget || 120000)) return -1;
       }
       frontier = next;
     }
     return -1;
   }
 
-  // ---------- generation: solved board -> targets -> scramble (with computed par) ----------
-  function gen() {
-    let tries = 0;
-    do {
-      grid = Array.from({ length: rows }, () => Array(cols).fill(0));
-      const prim = [R, Y, B];
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (Math.random() < 0.56) grid[r][c] = prim[(Math.random() * 3) | 0];
-      hBeam = [0, 1, 2, 3, 4]; vBeam = [1, 3]; hTarget = {}; vTarget = {};   // every row is a beam -> every tile matters
-      for (const r of hBeam) hTarget[r] = rowMaskG(grid, r);
-      for (const c of vBeam) vTarget[c] = colMaskG(grid, c);
-      for (let k = 0; k < 9; k++) { const r = (Math.random() * rows) | 0, c = (Math.random() * cols) | 0, d = [[1, 0], [-1, 0], [0, 1], [0, -1]][(Math.random() * 4) | 0], nc = c + d[0], nr = r + d[1]; if (inb(nc, nr)) { const t = grid[r][c]; grid[r][c] = grid[nr][nc]; grid[nr][nc] = t; } }
-      par = findPar(grid);
-    } while ((par < 3 || par > 5) && ++tries < 80);
-    if (par < 0 || par < 3) par = Math.max(3, par);
-    buildTiles(); moves = 0; history = []; won = false;
+  // ---------- generate a fixed (seeded) level by index, with a target par range ----------
+  function genLevel(i) {
+    if (cache[i]) return cache[i];
+    try { const s = localStorage.getItem("spectra_lvl_v2_" + i); if (s) { cache[i] = JSON.parse(s); return cache[i]; } } catch (e) {}
+    const tier = i < 4 ? 0 : i < 8 ? 1 : 2;
+    const want = tier === 0 ? [3, 3] : tier === 1 ? [4, 5] : [5, 6];
+    const depth = tier === 0 ? 4 : tier === 1 ? 7 : 10;
+    const rnd = mulberry(1000 + i * 7919);
+    let best = null;
+    for (let attempt = 0; attempt < 120 && !(best && best.par >= want[0] && best.par <= want[1]); attempt++) {
+      const g = Array.from({ length: rows }, () => Array(cols).fill(0));
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (rnd() < 0.55) g[r][c] = PRIM[(rnd() * 3) | 0];
+      const hB = [0, 1, 2, 3, 4], vB = [1, 3], hS = {}, vS = {};
+      for (const r of hB) hS[r] = SRCPOOL[(rnd() * SRCPOOL.length) | 0];
+      for (const c of vB) vS[c] = SRCPOOL[(rnd() * SRCPOOL.length) | 0];
+      hBeam = hB; vBeam = vB; hSrc = hS; vSrc = vS;
+      const hT = {}, vT = {}; for (const r of hB) hT[r] = rowMaskG(g, r); for (const c of vB) vT[c] = colMaskG(g, c);
+      hTarget = hT; vTarget = vT;
+      for (let k = 0; k < depth; k++) { const r = (rnd() * rows) | 0, c = (rnd() * cols) | 0, d = [[1, 0], [-1, 0], [0, 1], [0, -1]][(rnd() * 4) | 0], nc = c + d[0], nr = r + d[1]; if (inb(nc, nr)) { const t = g[r][c]; g[r][c] = g[nr][nc]; g[nr][nc] = t; } }
+      const p = findPar(g, tier === 2 ? 170000 : 130000);
+      if (p >= 2 && (!best || Math.abs(p - (want[0] + want[1]) / 2) < Math.abs(best.par - (want[0] + want[1]) / 2))) best = { grid: cloneG(g), hB, vB, hS, vS, hT, vT, par: p, tier };
+    }
+    if (!best) best = { grid, hB: hBeam, vB: vBeam, hS: hSrc, vS: vSrc, hT: hTarget, vT: vTarget, par: 4, tier };
+    cache[i] = best; try { localStorage.setItem("spectra_lvl_v2_" + i, JSON.stringify(best)); } catch (e) {}
+    return best;
+  }
+
+  function openLevel(i) {
+    curLevel = i; const L = genLevel(i);
+    grid = cloneG(L.grid); hBeam = L.hB; vBeam = L.vB; hSrc = L.hS; vSrc = L.vS; hTarget = L.hT; vTarget = L.vT; par = L.par;
+    moves = 0; history = []; won = false; buildTiles();
     document.getElementById('pr').textContent = par; document.getElementById('mv').textContent = 0;
     document.getElementById('won').classList.remove('show');
+    document.getElementById('select').style.display = 'none'; document.getElementById('top').style.display = 'flex'; document.getElementById('hint').style.display = 'block';
+    screen = 'play'; aOn();
+  }
+  function showMenu() { screen = 'select'; document.getElementById('top').style.display = 'none'; document.getElementById('hint').style.display = 'none'; document.getElementById('won').classList.remove('show'); buildGrid(); document.getElementById('select').style.display = 'flex'; }
+  function buildGrid() {
+    const el = document.getElementById('grid'); el.innerHTML = '';
+    for (let i = 0; i < LEVELS; i++) { const tier = i < 4 ? 0 : i < 8 ? 1 : 2; const s = stars[i] || 0; const d = document.createElement('div'); d.className = 'lvl t' + tier;
+      d.innerHTML = `<div class="tg">${['easy', 'med', 'hard'][tier]}</div><div class="n">${i + 1}</div><div class="st">${s ? '★'.repeat(s) : ''}</div>`;
+      d.onclick = () => openLevel(i); el.appendChild(d); }
   }
   function buildTiles() { tiles = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c]) tiles.push({ c, r, col: grid[r][c], x: ccx(c), y: ccy(r) }); }
 
   // ---------- input ----------
   let down = null;
-  cv.addEventListener('pointerdown', e => { aOn(); const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs); if (!won && inb(c, r) && grid[r][c]) down = { c, r, x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointerdown', e => { if (screen !== 'play') return; aOn(); const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs); if (!won && inb(c, r) && grid[r][c]) down = { c, r, x: e.clientX, y: e.clientY }; });
   cv.addEventListener('pointerup', e => {
     if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y, d = down; down = null;
     if (Math.hypot(dx, dy) < cs * 0.28) return;
     let dc = 0, dr = 0; if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
-    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr)) return; if (grid[d.r][d.c] === grid[nr][nc]) return;
+    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr) || grid[d.r][d.c] === grid[nr][nc]) return;
     history.push(cloneG(grid)); const t = grid[d.r][d.c]; grid[d.r][d.c] = grid[nr][nc]; grid[nr][nc] = t;
     moves++; document.getElementById('mv').textContent = moves; syncTiles(); sfx('move');
     if (wonG(grid)) onWin();
@@ -116,30 +166,35 @@
     for (const cell of cells) { let best = -1, bd = 1e9; for (let i = 0; i < avail.length; i++) { if (avail[i].col !== cell.col) continue; const dd = Math.abs(avail[i].c - cell.c) + Math.abs(avail[i].r - cell.r); if (dd < bd) { bd = dd; best = i; } } const tt = best >= 0 ? avail.splice(best, 1)[0] : { x: ccx(cell.c), y: ccy(cell.r), col: cell.col }; tt.c = cell.c; tt.r = cell.r; out.push(tt); }
     tiles = out;
   }
-  function onWin() { won = true; const stars = moves <= par ? 3 : moves <= par + 2 ? 2 : 1; document.getElementById('stars').textContent = ['★', '★', '★'].map((s, i) => i < stars ? '★' : '☆').join(' '); document.getElementById('wsub').textContent = moves <= par ? 'Perfect -- solved at par!' : `Solved in ${moves}. Par is ${par}.`; setTimeout(() => document.getElementById('won').classList.add('show'), 350); sfx('win'); }
+  function onWin() { won = true; const s = moves <= par ? 3 : moves <= par + 2 ? 2 : 1; stars[curLevel] = Math.max(stars[curLevel] || 0, s); save();
+    document.getElementById('stars').textContent = [0, 1, 2].map(i => i < s ? '★' : '☆').join(' ');
+    document.getElementById('wsub').textContent = moves <= par ? 'Perfect -- solved at par!' : `Solved in ${moves}. Par is ${par}.`;
+    setTimeout(() => document.getElementById('won').classList.add('show'), 350); sfx('win');
+  }
   document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); moves = Math.max(0, moves - 1); document.getElementById('mv').textContent = moves; syncTiles(); };
-  document.getElementById('new').onclick = () => { aOn(); gen(); };
-  document.getElementById('wnext').onclick = () => { aOn(); gen(); };
+  document.getElementById('menu').onclick = showMenu;
+  document.getElementById('wmenu').onclick = showMenu;
+  document.getElementById('wnext').onclick = () => openLevel(Math.min(LEVELS - 1, curLevel + 1));
 
   // ---------- render ----------
-  function beam(x0, y0, x1, y1, m, w) { ctx.lineCap = 'round'; ctx.strokeStyle = rgba(m, .16); ctx.lineWidth = w * 2.3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = rgba(m, m === 0 ? .9 : 1); ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
+  function beam(x0, y0, x1, y1, m, w) { ctx.lineCap = 'round'; ctx.strokeStyle = rgba(m, .16); ctx.lineWidth = w * 2.3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = rgba(m, 1); ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
   function render() {
     ctx.fillStyle = '#12101c'; ctx.fillRect(0, 0, W, H);
-    // board panel
+    if (screen !== 'play') return;
     const pad = cs * 0.42; ctx.fillStyle = '#181425'; ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1.5; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 18); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1; for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(gx, gy + r * cs); ctx.lineTo(gx + cols * cs, gy + r * cs); ctx.stroke(); } for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(gx + c * cs, gy); ctx.lineTo(gx + c * cs, gy + rows * cs); ctx.stroke(); }
     const bw = cs * 0.13;
-    for (const r of hBeam) { let m = 0; const y = ccy(r); beam(gx - pad, y, gx, y, 0, bw); for (let c = 0; c < cols; c++) { m |= grid[r][c]; beam(cx0(c), y, cx0(c) + cs, y, m, bw); } src(gx - pad, y); rcv(gx + cols * cs + pad, y, m, hTarget[r]); }
-    for (const c of vBeam) { let m = 0; const x = ccx(c); beam(x, gy - pad, x, gy, 0, bw); for (let r = 0; r < rows; r++) { m |= grid[r][c]; beam(x, cy0(r), x, cy0(r) + cs, m, bw); } src(x, gy - pad); rcv(x, gy + rows * cs + pad, m, vTarget[c]); }
+    for (const r of hBeam) { let m = hSrc[r]; const y = ccy(r); beam(gx - pad, y, gx, y, m, bw); for (let c = 0; c < cols; c++) { m |= grid[r][c]; beam(cx0(c), y, cx0(c) + cs, y, m, bw); } src(gx - pad, y, hSrc[r]); rcv(gx + cols * cs + pad, y, m, hTarget[r]); }
+    for (const c of vBeam) { let m = vSrc[c]; const x = ccx(c); beam(x, gy - pad, x, gy, m, bw); for (let r = 0; r < rows; r++) { m |= grid[r][c]; beam(x, cy0(r), x, cy0(r) + cs, m, bw); } src(x, gy - pad, vSrc[c]); rcv(x, gy + rows * cs + pad, m, vTarget[c]); }
     for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; tile(t.x, t.y, t.col); }
   }
   function tile(x, y, col) { const s = cs * 0.72, c = CMAP[col]; const g = ctx.createLinearGradient(0, y - s / 2, 0, y + s / 2); g.addColorStop(0, `rgba(${Math.min(255, c[0] + 30)},${Math.min(255, c[1] + 30)},${Math.min(255, c[2] + 30)},.95)`); g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},.95)`);
     ctx.fillStyle = g; ctx.strokeStyle = `rgba(${c[0] * .45 | 0},${c[1] * .45 | 0},${c[2] * .45 | 0},1)`; ctx.lineWidth = Math.max(2.5, cs * 0.04); rr(x - s / 2, y - s / 2, s, s, s * .22); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,.28)'; rr(x - s / 2 + s * .12, y - s / 2 + s * .12, s * .34, s * .12, 4); ctx.fill(); }
-  function src(x, y) { ctx.fillStyle = '#fff7e6'; ctx.beginPath(); ctx.arc(x, y, cs * 0.11, 0, 7); ctx.fill(); ctx.strokeStyle = '#cdbfae'; ctx.lineWidth = 2; ctx.stroke(); }
+  function src(x, y, m) { ctx.fillStyle = rgba(m, 1); ctx.beginPath(); ctx.arc(x, y, cs * 0.12, 0, 7); ctx.fill(); ctx.strokeStyle = '#0e0b16'; ctx.lineWidth = 2.5; ctx.stroke(); }
   function rcv(x, y, cur, tgt) { const ok = cur === tgt, c = CMAP[tgt], rad = cs * 0.19; if (ok) { ctx.fillStyle = rgba(tgt, .22); ctx.beginPath(); ctx.arc(x, y, rad * 1.7, 0, 7); ctx.fill(); }
     ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = ok ? rgba(tgt, .98) : `rgba(${c[0]},${c[1]},${c[2]},.26)`; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = ok ? '#fff' : `rgba(${c[0]},${c[1]},${c[2]},.7)`; ctx.stroke();
-    if (ok) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .36); ctx.lineTo(x + rad * .46, y - rad * .36); ctx.stroke(); } }
+    if (ok) { ctx.strokeStyle = tgt === 7 ? '#2a2622' : '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .36); ctx.lineTo(x + rad * .46, y - rad * .36); ctx.stroke(); } }
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
   // ---------- audio ----------
@@ -148,9 +203,9 @@
   function sfx(n) { if (!ac) return; if (n === 'move') tone(460, .05, 'triangle', .03); else if (n === 'win') [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .3, 'triangle', .05), i * 95)); }
 
   function loop() { render(); requestAnimationFrame(loop); }
-  addEventListener('resize', () => { layout(); for (const t of tiles) { t.x = ccx(t.c); t.y = ccy(t.r); } });
-  gen(); requestAnimationFrame(loop);
-  window.__sp = { solved: () => wonG(grid), gen: () => gen(), par: () => par, moves: () => moves, parOf: (g) => findPar(g || grid), grid: () => grid };
+  addEventListener('resize', () => { layout(); for (const t of (tiles || [])) { t.x = ccx(t.c); t.y = ccy(t.r); } });
+  showMenu(); requestAnimationFrame(loop);
+  window.__sp = { levelPar: (i) => genLevel(i).par, levels: LEVELS, open: (i) => openLevel(i), solved: () => wonG(grid), grid: () => grid, win: () => onWin() };
 })();
 </script>
 </body>
