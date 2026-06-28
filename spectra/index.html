@@ -174,20 +174,16 @@
     if (Math.hypot(dx, dy) < cs * 0.28) return;
     let dc = 0, dr = 0; if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
     const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr) || grid[d.r][d.c] === grid[nr][nc]) return;
-    history.push(cloneG(grid)); const t = grid[d.r][d.c]; grid[d.r][d.c] = grid[nr][nc]; grid[nr][nc] = t;
-    moves++; document.getElementById('mv').textContent = moves; syncTiles(); sfx('move');
-    if (wonG(grid)) onWin();
+    doSwap(d.r, d.c, nr, nc);
   });
-  function syncTiles() {
-    const cells = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c]) cells.push({ c, r, col: grid[r][c] });
-    const avail = tiles.slice(), out = [];
-    for (const cell of cells) {
-      let best = -1, bd = 1e9;
-      for (let i = 0; i < avail.length; i++) { if (avail[i].col !== cell.col) continue; const dd = Math.abs(avail[i].c - cell.c) + Math.abs(avail[i].r - cell.r); if (dd < bd) { bd = dd; best = i; } }
-      const tt = best >= 0 ? avail.splice(best, 1)[0] : { x: ccx(cell.c), y: ccy(cell.r), col: cell.col };
-      tt.c = cell.c; tt.r = cell.r; out.push(tt);
-    }
-    tiles = out;
+  function doSwap(r1, c1, r2, c2) {
+    history.push(cloneG(grid));
+    const t = grid[r1][c1]; grid[r1][c1] = grid[r2][c2]; grid[r2][c2] = t;
+    // Move the actual tile objects by identity (no colour guessing -- fixes the triangular shuffle).
+    const a = tiles.find(o => o.c === c1 && o.r === r1), b = tiles.find(o => o.c === c2 && o.r === r2);
+    if (a) { a.c = c2; a.r = r2; } if (b) { b.c = c1; b.r = r1; }
+    moves++; document.getElementById('mv').textContent = moves; sfx('move');
+    if (wonG(grid)) onWin();
   }
   function onWin() {
     won = true;
@@ -202,8 +198,8 @@
     document.getElementById('bs').textContent = best;
     setTimeout(() => document.getElementById('won').classList.add('show'), 360); sfx('win');
   }
-  document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); moves = Math.max(0, moves - 1); document.getElementById('mv').textContent = moves; syncTiles(); };
-  document.getElementById('reset').onclick = () => { if (won) return; if (!history.length) return; grid = history[0]; history = []; moves = 0; document.getElementById('mv').textContent = 0; syncTiles(); };
+  document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); moves = Math.max(0, moves - 1); document.getElementById('mv').textContent = moves; buildTiles(); };
+  document.getElementById('reset').onclick = () => { if (won) return; if (!history.length) return; grid = history[0]; history = []; moves = 0; document.getElementById('mv').textContent = 0; buildTiles(); };
   document.getElementById('menu').onclick = showMenu;
   document.getElementById('wmenu').onclick = showMenu;
   document.getElementById('wnext').onclick = () => openLevel(Math.min(LEVELS - 1, curLevel + 1));
@@ -232,19 +228,20 @@
       ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill();
     }
     const bw = Math.max(5, cs * 0.11);
-    // beams, sources, receivers (horizontal only)
+    const exC = gx - pad - gut, rxC = gx + cols * cs + pad + gut;   // emitter / receiver centres
+    const eTip = exC + cs * 0.2, rEdge = rxC - cs * 0.21;           // beam meets the triangle tip and the receiver edge
     for (let r = 0; r < rows; r++) {
       const y = ccy(r); let m = src[r];
-      seg(gx - pad - gut * .2, y, gx, y, m, bw);                 // source stub into board
+      seg(eTip, y, gx, y, m, bw);                                   // from emitter into the board
       for (let c = 0; c < cols; c++) {
         const xl = cx0(c), xm = ccx(c), xr = cx0(c) + cs;
-        seg(xl, y, xm, y, m, bw);                                // pre-tile colour
-        const p = grid[r][c]; if (p) m = (m & p) ? p : (m | p);  // glass acts at the cell centre
-        seg(xm, y, xr, y, m, bw);                                // post-tile colour
+        seg(xl, y, xm, y, m, bw);                                   // pre-tile colour
+        const p = grid[r][c]; if (p) m = (m & p) ? p : (m | p);     // glass acts at the cell centre
+        seg(xm, y, xr, y, m, bw);                                   // post-tile colour
       }
-      seg(gx + cols * cs, y, gx + cols * cs + pad + gut * .2, y, m, bw);
-      emitter(gx - pad - gut, y, src[r]);
-      receiver(gx + cols * cs + pad + gut, y, m, tgt[r]);
+      seg(gx + cols * cs, y, rEdge, y, m, bw);                      // out to the receiver
+      emitter(exC, y, src[r]);
+      receiver(rxC, y, m, tgt[r]);
     }
     // glass tiles (tween to cell centres)
     for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; tile(t.x, t.y, t.col); }
@@ -264,7 +261,6 @@
   // Emitter: a projector that casts light to the right (triangle). Distinct from the ring receiver.
   function emitter(x, y, m) {
     const c = CMAP[m], d = drk(m), r = cs * .17;
-    ctx.fillStyle = rgb(c, .18); ctx.beginPath(); ctx.arc(x + r * .2, y, cs * .27, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.moveTo(x - r * .85, y - r * 1.08); ctx.lineTo(x + r * 1.2, y); ctx.lineTo(x - r * .85, y + r * 1.08); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.fillStyle = rgb(c); ctx.fill();
     ctx.lineWidth = Math.max(2.4, cs * .032); ctx.strokeStyle = rgb(d); ctx.stroke();
@@ -327,7 +323,8 @@
   let seenIntro = false; try { seenIntro = localStorage.getItem('spectra_intro_v1') === '1'; } catch (e) {}
   if (!seenIntro) openIntro();
   requestAnimationFrame(loop);
-  window.__sp = { levels: LEVELS, levelPar: (i) => LV[i].p, open: (i) => openLevel(i), solved: () => wonG(grid), win: () => onWin() };
+  window.__sp = { levels: LEVELS, levelPar: (i) => LV[i].p, open: (i) => openLevel(i), solved: () => wonG(grid), win: () => onWin(),
+    swap: (r1, c1, r2, c2) => doSwap(r1, c1, r2, c2), tiles: () => tiles.map(t => ({ c: t.c, r: t.r, col: t.col })), grid: () => grid };
 })();
 </script>
 </body>
