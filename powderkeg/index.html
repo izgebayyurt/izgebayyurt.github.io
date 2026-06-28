@@ -10,10 +10,15 @@
     font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
   #c{position:fixed;inset:0;display:block;cursor:crosshair;}
   #top{position:fixed;top:10px;left:12px;z-index:5;display:flex;align-items:center;gap:12px;}
-  #wallhp{width:200px;height:13px;border:2.5px solid #2a2622;border-radius:8px;background:#e2d8c2;overflow:hidden;box-shadow:2px 2px 0 #2a2622;}
-  #wallf{height:100%;width:100%;background:#7a9e5e;transition:width .12s;}
+  #basehp{width:200px;height:13px;border:2.5px solid #2a2622;border-radius:8px;background:#e2d8c2;overflow:hidden;box-shadow:2px 2px 0 #2a2622;}
+  #basef{height:100%;width:100%;background:#7a9e5e;transition:width .12s;}
   #score{font-weight:800;font-size:16px;}
   #wv{font-weight:700;color:#8a8170;font-size:12px;}
+  /* power bar on the right */
+  #power{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:5;width:18px;height:240px;
+    border:2.5px solid #2a2622;border-radius:11px;background:#e2d8c2;overflow:hidden;box-shadow:2px 3px 0 #2a2622;}
+  #powerf{position:absolute;left:0;bottom:0;width:100%;height:0;background:linear-gradient(0deg,#7a9e5e,#ff8a3b);}
+  #powerlbl{position:fixed;right:10px;top:calc(50% + 132px);z-index:5;font-size:10px;font-weight:800;color:#8a8170;letter-spacing:.08em;}
   /* barrel queue */
   #queue{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:6;display:flex;align-items:flex-end;gap:8px;}
   .slot{background:#fbf6ea;border:2.5px solid #2a2622;border-radius:13px;box-shadow:2px 3px 0 #2a2622;
@@ -40,19 +45,20 @@
 </head>
 <body>
   <canvas id="c"></canvas>
-  <div id="top"><div id="wallhp"><div id="wallf"></div></div><div><div id="score">0</div><div id="wv">Wave 1</div></div></div>
-  <div id="hint">Pull back to aim, release to lob. Tap <b>HOLD</b> to stash a barrel. Light oil with gunpowder.</div>
+  <div id="top"><div id="basehp"><div id="basef"></div></div><div><div id="score">0</div><div id="wv">Wave 1</div></div></div>
+  <div id="power"><div id="powerf"></div></div><div id="powerlbl">PWR</div>
+  <div id="hint">Pull back anywhere to aim, release to lob to that spot. Tap <b>HOLD</b> to stash. Light oil with gunpowder.</div>
   <div id="queue"></div>
 
   <div id="ovStart" class="overlay">
     <h1>POWDERKEG</h1>
-    <p>The horde pours down on your wall. You're handed barrels -- mostly <b>gunpowder</b> (it explodes), sometimes
-    <b>oil</b>, <b>water</b>, <b>fire</b>. Splatter oil on a pack, then blow it up. You can't pick your barrels, so
-    use what you're dealt. Kills load the next one faster.</p>
+    <p>Top-down. The horde marches down on your line. Pull back anywhere to aim a barrel and release to lob it to that
+    spot. You're dealt <b>gunpowder</b> (explodes), <b>oil</b>, <b>water</b>, <b>fire</b>. Splat oil on a pack, drop
+    gunpowder on it, watch it light. Kills load the next barrel faster.</p>
     <button class="btn" id="bStart">Defend</button>
   </div>
   <div id="ovOver" class="overlay hidden">
-    <h1>WALL BREACHED</h1><p id="ovStat"></p><button class="btn" id="bRetry">Again</button>
+    <h1>LINE BROKEN</h1><p id="ovStat"></p><button class="btn" id="bRetry">Again</button>
   </div>
 
 <script>
@@ -60,11 +66,12 @@
   'use strict';
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
   const SC = 8;
-  let W, H, gw, gh, mat, life, moved, off, octx, img, data, wallTopY, ax, ay;
-  const EMPTY = 0, WALL = 1, OIL = 2, WATER = 3, FIRE = 4, STEAM = 5;
-  const COL = { 0: [239, 231, 214], 1: [110, 96, 76], 2: [74, 63, 99], 3: [63, 139, 230], 4: [255, 122, 51], 5: [205, 205, 215] };
+  let W, H, gw, gh, mat, life, moved, off, octx, img, data, lineY, ax, ay;
+  const EMPTY = 0, OIL = 2, WATER = 3, FIRE = 4, STEAM = 5;
+  const COL = { 0: [239, 231, 214], 2: [74, 63, 99], 3: [63, 139, 230], 4: [255, 122, 51], 5: [205, 205, 215] };
   const INK = '#2a2622';
-  const FIRE_LIFE = 38, STEAM_LIFE = 55;
+  const FIRE_LIFE = 40, STEAM_LIFE = 50;
+  const MAXPULL = 230, RANGE_MIN = 120;
 
   function build() {
     W = cv.width = innerWidth; H = cv.height = innerHeight;
@@ -72,97 +79,94 @@
     mat = new Uint8Array(gw * gh); life = new Uint8Array(gw * gh); moved = new Uint8Array(gw * gh);
     off = document.createElement('canvas'); off.width = gw; off.height = gh; octx = off.getContext('2d');
     img = octx.createImageData(gw, gh); data = img.data;
-    const wallRows = 11; const top = gh - wallRows; wallTopY = top * SC;
-    mat.fill(0);
-    for (let y = top; y < gh; y++) for (let x = 0; x < gw; x++) mat[y * gw + x] = WALL;
-    for (let x = 0; x < gw; x++) if ((Math.floor(x / 3)) % 2 === 0) mat[(top - 1) * gw + x] = WALL; // battlements
-    ax = W / 2; ay = wallTopY - 6;
+    lineY = H - 96; ax = W / 2; ay = H - 52;
   }
   const gi = (x, y) => y * gw + x;
   const inb = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh;
+  const isLiq = (m) => m === OIL || m === WATER;
 
-  // ---------- falling-sand sim ----------
-  const passable = (m) => m === EMPTY || m === STEAM;
-  function tryMove(i, nx, ny) { if (!inb(nx, ny)) return false; const ni = gi(nx, ny); if (moved[ni] || !passable(mat[ni])) return false; const tm = mat[ni], tl = life[ni]; mat[ni] = mat[i]; life[ni] = life[i]; mat[i] = tm; life[i] = tl; moved[ni] = 1; moved[i] = 1; return true; }
+  // ---------- top-down liquid sim (spread flat, no gravity) ----------
   const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  function liqCount(x, y) { let n = 0; for (const [dx, dy] of N4) if (inb(x + dx, y + dy) && isLiq(mat[gi(x + dx, y + dy)])) n++; return n; }
   function neigh(x, y, m) { for (const [dx, dy] of N4) if (inb(x + dx, y + dy) && mat[gi(x + dx, y + dy)] === m) return true; return false; }
   let sf = 0;
   function step() {
-    moved.fill(0); const dir = (sf & 1) ? 1 : -1;
-    for (let y = gh - 1; y >= 0; y--) for (let k = 0; k < gw; k++) {
-      const x = dir > 0 ? k : gw - 1 - k, i = gi(x, y), m = mat[i];
-      if (m === EMPTY || m === WALL || moved[i]) continue;
+    moved.fill(0); const d = (sf & 1) ? 1 : -1;
+    for (let y = 0; y < gh; y++) for (let kx = 0; kx < gw; kx++) {
+      const x = d > 0 ? kx : gw - 1 - kx, i = gi(x, y), m = mat[i];
+      if (m === EMPTY || moved[i]) continue;
       if (m === FIRE) {
         if (neigh(x, y, WATER)) { mat[i] = STEAM; life[i] = STEAM_LIFE; continue; }
-        for (const [dx, dy] of N4) if (inb(x + dx, y + dy)) { const ni = gi(x + dx, y + dy); if (mat[ni] === OIL && Math.random() < 0.5) { mat[ni] = FIRE; life[ni] = FIRE_LIFE; } }
-        if (--life[i] <= 0) { mat[i] = Math.random() < 0.25 ? STEAM : EMPTY; life[i] = STEAM_LIFE; } else if (Math.random() < 0.04) tryMove(i, x, y - 1);
-      } else if (m === STEAM) { if (--life[i] <= 0) { mat[i] = EMPTY; continue; } const lr = Math.random() < .5 ? -1 : 1; tryMove(i, x, y - 1) || tryMove(i, x + lr, y - 1) || tryMove(i, x - lr, y - 1) || tryMove(i, x + lr, y); }
-      else { if (m === WATER && inb(x, y - 1) && mat[gi(x, y - 1)] === OIL && !moved[gi(x, y - 1)]) { mat[gi(x, y - 1)] = WATER; mat[i] = OIL; moved[gi(x, y - 1)] = 1; moved[i] = 1; continue; } const lr = Math.random() < .5 ? 1 : -1; tryMove(i, x, y + 1) || tryMove(i, x + lr, y + 1) || tryMove(i, x - lr, y + 1) || tryMove(i, x + lr, y) || tryMove(i, x - lr, y); }
+        for (const [dx, dy] of N4) if (inb(x + dx, y + dy)) { const ni = gi(x + dx, y + dy); if (mat[ni] === OIL && Math.random() < 0.45) { mat[ni] = FIRE; life[ni] = FIRE_LIFE; } }
+        if (--life[i] <= 0) { mat[i] = Math.random() < 0.2 ? STEAM : EMPTY; life[i] = STEAM_LIFE; }
+      } else if (m === STEAM) {
+        if (--life[i] <= 0) { mat[i] = EMPTY; continue; }
+        if (Math.random() < 0.25) { const [dx, dy] = N4[Math.floor(Math.random() * 4)]; const nx = x + dx, ny = y + dy; if (inb(nx, ny) && mat[gi(nx, ny)] === EMPTY && !moved[gi(nx, ny)]) { mat[gi(nx, ny)] = STEAM; life[gi(nx, ny)] = life[i]; mat[i] = EMPTY; moved[gi(nx, ny)] = 1; } }
+      } else { // OIL / WATER: flow toward emptier neighbours (flatten into a puddle)
+        const myN = liqCount(x, y); const order = N4.slice().sort(() => Math.random() - .5);
+        for (const [dx, dy] of order) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; const ni = gi(nx, ny);
+          if (mat[ni] !== EMPTY || moved[ni]) continue;
+          if (liqCount(nx, ny) < myN && Math.random() < 0.6) { mat[ni] = m; life[ni] = life[i]; mat[i] = EMPTY; moved[ni] = 1; moved[i] = 1; break; }
+        }
+      }
     }
     sf++;
   }
-  function stamp(cx, cy, r, m) { for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (dx * dx + dy * dy > r * r + 1) continue; const x = cx + dx, y = cy + dy; if (inb(x, y) && mat[gi(x, y)] !== WALL && (m === FIRE || mat[gi(x, y)] === EMPTY || mat[gi(x, y)] === STEAM)) { mat[gi(x, y)] = m; if (m === FIRE) life[gi(x, y)] = FIRE_LIFE; } } }
+  function stamp(cx, cy, r, m) { for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (dx * dx + dy * dy > r * r + 1) continue; const x = cx + dx, y = cy + dy; if (inb(x, y) && (m === FIRE || mat[gi(x, y)] === EMPTY || mat[gi(x, y)] === STEAM)) { mat[gi(x, y)] = m; if (m === FIRE) life[gi(x, y)] = FIRE_LIFE; } } }
 
   // ---------- entities ----------
-  let enemies, barrels, parts, wallHP, wallMax, score, wave, spawnT, toSpawn, spawned, state, shake, reloadT, queue, bag, hold, holdLock;
+  let enemies, barrels, parts, baseHP, baseMax, score, wave, spawnT, toSpawn, spawned, state, shake, reloadT, queue, bag, hold, holdLock;
   const MAT = { oil: OIL, water: WATER, fire: FIRE };
-  const ETYPE = { grunt: { hp: 18, spd: 26, r: 12, dmg: 7, hue: 350 }, runner: { hp: 11, spd: 44, r: 9, dmg: 5, hue: 45 }, brute: { hp: 60, spd: 16, r: 18, dmg: 16, hue: 285 } };
+  const ETYPE = { grunt: { hp: 18, spd: 24, r: 12, dmg: 18, hue: 350 }, runner: { hp: 11, spd: 42, r: 9, dmg: 12, hue: 45 }, brute: { hp: 64, spd: 15, r: 18, dmg: 34, hue: 285 } };
 
-  function reset() {
-    build(); enemies = []; barrels = []; parts = []; wallMax = wallHP = 100; score = 0; wave = 1; spawnT = 1; toSpawn = 8; spawned = 0; shake = 0; reloadT = 0; hold = null; holdLock = false;
-    bag = []; queue = []; refillQueue(); renderQueue();
-  }
+  function reset() { build(); enemies = []; barrels = []; parts = []; baseMax = baseHP = 100; score = 0; wave = 1; spawnT = 1; toSpawn = 8; spawned = 0; shake = 0; reloadT = 0; hold = null; holdLock = false; bag = []; queue = []; refillQueue(); renderQueue(); }
 
-  // ---------- barrel queue (tetris bag) ----------
+  // ---------- barrel queue ----------
   function refillBag() { const b = ['gp', 'gp', 'gp', 'gp', 'oil', 'oil', 'fire', 'water']; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } bag.push(...b); }
   function refillQueue() { while (queue.length < 4) { if (!bag.length) refillBag(); queue.push(bag.pop()); } }
   const BINFO = { gp: { ic: '🛢️', nm: 'Gunpowder' }, oil: { ic: '🟣', nm: 'Oil' }, fire: { ic: '🔥', nm: 'Fire' }, water: { ic: '💧', nm: 'Water' } };
   function renderQueue() {
     const el = document.getElementById('queue'); el.innerHTML = '';
-    const mk = (id, cls, lbl) => { const d = document.createElement('div'); d.className = 'slot ' + cls; d.innerHTML = (lbl ? `<div class="lbl">${lbl}</div>` : '') + `<div class="ic">${BINFO[id] ? BINFO[id].ic : '·'}</div>` + (cls === 'loaded' ? `<div class="nm">${BINFO[id].nm}</div><div id="reload"></div>` : ''); return d; };
+    const mk = (id, cls, lbl) => { const dv = document.createElement('div'); dv.className = 'slot ' + cls; dv.innerHTML = (lbl ? `<div class="lbl">${lbl}</div>` : '') + `<div class="ic">${BINFO[id] ? BINFO[id].ic : '·'}</div>` + (cls === 'loaded' ? `<div class="nm">${BINFO[id].nm}</div><div id="reload"></div>` : ''); return dv; };
     const h = document.createElement('div'); h.className = 'slot hold'; h.innerHTML = `<div class="lbl">hold</div><div class="ic">${hold ? BINFO[hold].ic : '·'}</div>`; h.onclick = doHold; el.appendChild(h);
     el.appendChild(mk(queue[0], 'loaded'));
     for (let i = 1; i < 4; i++) el.appendChild(mk(queue[i], 'next', i === 1 ? 'next' : ''));
   }
   function doHold() { if (state !== 'play' || holdLock) return; if (hold == null) { hold = queue.shift(); refillQueue(); } else { const t = queue[0]; queue[0] = hold; hold = t; } holdLock = true; renderQueue(); }
 
-  // ---------- spawn / waves ----------
-  function spawn() { const r = Math.random(); let t = 'grunt'; if (wave >= 2 && r < .2) t = 'runner'; if (wave >= 3 && r < .32) t = 'brute'; const d = ETYPE[t]; const hp = d.hp + wave * 6; enemies.push({ x: 30 + Math.random() * (W - 60), y: -20, type: t, r: d.r, hp, max: hp, spd: d.spd + wave * 1.5, dmg: d.dmg, hue: d.hue, burn: 0, wet: 0, oil: 0, kb: 0 }); }
+  // ---------- spawn ----------
+  function spawn() { const r = Math.random(); let t = 'grunt'; if (wave >= 2 && r < .2) t = 'runner'; if (wave >= 3 && r < .32) t = 'brute'; const d = ETYPE[t]; const hp = d.hp + wave * 6; enemies.push({ x: 30 + Math.random() * (W - 60), y: -20, type: t, r: d.r, hp, max: hp, spd: d.spd + wave * 1.2, dmg: d.dmg, hue: d.hue, burn: 0, wet: 0, oil: 0 }); }
 
-  // ---------- slingshot ----------
-  let aiming = false, pull = null;
-  cv.addEventListener('pointerdown', e => { if (state !== 'play') return; aiming = true; pull = [e.clientX, e.clientY]; });
-  cv.addEventListener('pointermove', e => { if (aiming) pull = [e.clientX, e.clientY]; });
-  cv.addEventListener('pointerup', () => { if (aiming) { aiming = false; fire(); pull = null; } });
-  function launchVel() { let dx = ax - pull[0], dy = ay - pull[1]; const l = Math.hypot(dx, dy), max = 280; if (l > max) { dx *= max / l; dy *= max / l; } return [dx * 6.5, dy * 6.5]; }
-  function fire() { if (!pull || reloadT > 0) return; const [vx, vy] = launchVel(); if (vy > -40) return; const type = queue.shift(); barrels.push({ x: ax, y: ay - 12, vx, vy, type }); refillQueue(); reloadT = 0.9; holdLock = false; renderQueue(); aOn(); sfx('throw'); }
+  // ---------- aim / fire (pull anywhere -> target spot) ----------
+  let aiming = false, origin = null, cur = null, power = 0, target = null;
+  function computeAim() { if (!origin || !cur) { target = null; power = 0; return; } let dx = origin[0] - cur[0], dy = origin[1] - cur[1]; const l = Math.hypot(dx, dy); power = Math.min(1, l / MAXPULL); if (l < 6) { target = null; return; } const range = RANGE_MIN + power * (Math.hypot(W, H) * 0.62 - RANGE_MIN); target = [ax + (dx / l) * range, ay + (dy / l) * range]; }
+  cv.addEventListener('pointerdown', e => { if (state !== 'play') return; aiming = true; origin = [e.clientX, e.clientY]; cur = origin.slice(); computeAim(); });
+  cv.addEventListener('pointermove', e => { if (aiming) { cur = [e.clientX, e.clientY]; computeAim(); } });
+  cv.addEventListener('pointerup', () => { if (!aiming) return; aiming = false; fire(); origin = cur = target = null; power = 0; });
+  function fire() { if (!target || reloadT > 0) return; const type = queue.shift(); const dx = target[0] - ax, dy = target[1] - ay, l = Math.hypot(dx, dy), sp = 900; barrels.push({ x: ax, y: ay, vx: dx / l * sp, vy: dy / l * sp, tx: target[0], ty: target[1], rem: l, type }); refillQueue(); reloadT = 0.85; holdLock = false; renderQueue(); aOn(); sfx('throw'); }
 
   // ---------- impacts ----------
-  const G = 1000;
   function explode(x, y) {
     shake = Math.min(14, shake + 9); sfx('boom'); for (let i = 0; i < 22; i++) part(x, y, '#ff9040', 240); for (let i = 0; i < 10; i++) part(x, y, '#6b6357', 150);
-    const cx = Math.floor(x / SC), cy = Math.floor(y / SC); for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) if (dx * dx + dy * dy <= 38 && inb(cx + dx, cy + dy)) { const i = gi(cx + dx, cy + dy); if (mat[i] === OIL) { mat[i] = FIRE; life[i] = FIRE_LIFE; } }
-    for (const e of enemies) { const d = Math.hypot(e.x - x, e.y - y); if (d < 80) { const f = 1 - d / 80; hurtE(e, 34 * f); const a = Math.atan2(e.y - y, e.x - x); e.kbx = Math.cos(a) * 320 * f; e.kby = Math.sin(a) * 320 * f - 60 * f; e.kb = .3; } }
+    const cx = Math.floor(x / SC), cy = Math.floor(y / SC); for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) if (dx * dx + dy * dy <= 40 && inb(cx + dx, cy + dy)) { const i = gi(cx + dx, cy + dy); if (mat[i] === OIL) { mat[i] = FIRE; life[i] = FIRE_LIFE; } }
+    for (const e of enemies) { const dd = Math.hypot(e.x - x, e.y - y); if (dd < 84) { const f = 1 - dd / 84; e.hp -= 36 * f; const a = Math.atan2(e.y - y, e.x - x); e.kbx = Math.cos(a) * 320 * f; e.kby = Math.sin(a) * 320 * f; e.kb = .3; } }
   }
-  function hurtE(e, d) { e.hp -= d; }
+  function impact(b) {
+    if (b.type === 'gp') explode(b.tx, b.ty);
+    else { stamp(Math.floor(b.tx / SC), Math.floor(b.ty / SC), 4, MAT[b.type]);
+      for (const e of enemies) if (Math.hypot(e.x - b.tx, e.y - b.ty) < 42) { if (b.type === 'oil') e.oil = 3.5; if (b.type === 'water') { e.wet = 4; e.burn = 0; } if (b.type === 'fire' && e.wet <= 0) e.burn = 1.7; }
+      sfx(b.type === 'fire' ? 'ignite' : 'splash'); for (let i = 0; i < 8; i++) part(b.tx, b.ty, `rgb(${COL[MAT[b.type]].join(',')})`, 130);
+    }
+  }
 
   function update(dt) {
     for (let s = 0; s < 2; s++) step();
     reloadT = Math.max(0, reloadT - dt);
-    // spawn
     if (spawned < toSpawn) { spawnT -= dt; if (spawnT <= 0) { spawn(); spawned++; spawnT = Math.max(.4, 1.1 - wave * .05); } }
     else if (enemies.length === 0) { wave++; document.getElementById('wv').textContent = 'Wave ' + wave; toSpawn = 8 + wave * 2; spawned = 0; spawnT = .8; }
-    // barrels
-    for (let i = barrels.length - 1; i >= 0; i--) { const b = barrels[i]; b.vy += G * dt; let dead = false;
-      for (let s = 0; s < 3 && !dead; s++) { b.x += b.vx * dt / 3; b.y += b.vy * dt / 3;
-        for (const e of enemies) if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + 6) { impact(b); dead = true; break; }
-        if (dead) break;
-        const cx = Math.floor(b.x / SC), cy = Math.floor(b.y / SC);
-        if (b.y > H || b.x < 0 || b.x > W || (inb(cx, cy) && mat[gi(cx, cy)] === WALL)) { impact(b); dead = true; }
-      }
-      if (dead) barrels.splice(i, 1);
-    }
-    // enemies
+    // barrels travel straight to their spot then splat
+    for (let i = barrels.length - 1; i >= 0; i--) { const b = barrels[i]; const dseg = 900 * dt; b.rem -= dseg; b.x += b.vx * dt; b.y += b.vy * dt; if (b.rem <= 0) { b.x = b.tx; b.y = b.ty; impact(b); barrels.splice(i, 1); } }
+    // enemies march down
     for (let i = enemies.length - 1; i >= 0; i--) { const e = enemies[i];
       const cx = Math.floor(e.x / SC), cy = Math.floor(e.y / SC), m = inb(cx, cy) ? mat[gi(cx, cy)] : 0;
       if (m === FIRE && e.wet <= 0) e.burn = 1.4; if (m === WATER || m === STEAM) { e.wet = 3; e.burn = 0; } if (m === OIL) e.oil = 2.5;
@@ -170,31 +174,25 @@
       if (e.burn > 0) { e.hp -= 9 * (e.oil > 0 ? 2 : 1) * dt; e.burn -= dt; if (Math.random() < dt * 6) part(e.x, e.y, '#ff9040', 70); }
       if (e.wet > 0) e.wet -= dt;
       if (e.kb > 0) { e.x += e.kbx * dt; e.y += e.kby * dt; e.kbx *= .9; e.kby *= .9; e.kb -= dt; e.x = Math.max(10, Math.min(W - 10, e.x)); }
-      else if (e.y + e.r < wallTopY) e.y += e.spd * mul * dt;
-      else { wallHP -= e.dmg * dt; if (Math.random() < dt * 3) part(e.x, wallTopY, '#b06a4a', 90); }
-      if (e.hp <= 0) { for (let k = 0; k < 8; k++) part(e.x, e.y, `hsl(${e.hue},80%,60%)`, 150); enemies.splice(i, 1); score += 10; document.getElementById('score').textContent = score; reloadT = Math.max(0, reloadT - 0.22); sfx('die'); }
+      else e.y += e.spd * mul * dt;
+      if (e.hp <= 0) { for (let k = 0; k < 8; k++) part(e.x, e.y, `hsl(${e.hue},80%,60%)`, 150); enemies.splice(i, 1); score += 10; document.getElementById('score').textContent = score; reloadT = Math.max(0, reloadT - 0.2); sfx('die'); continue; }
+      if (e.y > lineY) { baseHP -= e.dmg; shake = Math.min(14, shake + 5); for (let k = 0; k < 8; k++) part(e.x, lineY, '#b06a4a', 120); enemies.splice(i, 1); sfx('breach'); }
     }
-    if (wallHP <= 0) return gameOver();
-    document.getElementById('wallf').style.width = (100 * Math.max(0, wallHP) / wallMax) + '%';
-    const rl = document.getElementById('reload'); if (rl) rl.style.width = (100 * (1 - reloadT / 0.9)) + '%';
-    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.vy += 400 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; }
+    if (baseHP <= 0) return gameOver();
+    document.getElementById('basef').style.width = (100 * Math.max(0, baseHP) / baseMax) + '%';
+    document.getElementById('powerf').style.height = (100 * power) + '%';
+    const rl = document.getElementById('reload'); if (rl) rl.style.width = (100 * (1 - reloadT / 0.85)) + '%';
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .95; p.vy *= .95; }
     if (shake > 0) shake = Math.max(0, shake - dt * 30);
-  }
-  function impact(b) {
-    if (b.type === 'gp') explode(b.x, b.y);
-    else { const cx = Math.floor(b.x / SC), cy = Math.floor(b.y / SC); stamp(cx, cy, 4, MAT[b.type]);
-      for (const e of enemies) if (Math.hypot(e.x - b.x, e.y - b.y) < 40) { if (b.type === 'oil') e.oil = 3.5; if (b.type === 'water') { e.wet = 4; e.burn = 0; } if (b.type === 'fire' && e.wet <= 0) e.burn = 1.6; }
-      sfx(b.type === 'fire' ? 'ignite' : 'splash'); for (let i = 0; i < 8; i++) part(b.x, b.y, `rgb(${COL[MAT[b.type]].join(',')})`, 120);
-    }
   }
   function part(x, y, c, sp) { const a = Math.random() * 7, s = sp * (.3 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .4 + Math.random() * .5, max: .9, c, r: 1.5 + Math.random() * 2.5 }); }
 
-  // ---------- render (marker) ----------
+  // ---------- render (top-down marker) ----------
   function render() {
     for (let i = 0; i < gw * gh; i++) { let c = COL[mat[i]]; if (mat[i] === FIRE) c = life[i] > 9 ? [255, 205, 74] : [255, 122, 51]; const j = i * 4; data[j] = c[0]; data[j + 1] = c[1]; data[j + 2] = c[2]; data[j + 3] = 255; }
     octx.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, gw, gh, 0, 0, gw * SC, gh * SC);
     ctx.save(); if (shake > 0) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
-    // ink outlines for goo + wall
+    // ink outlines for goo
     ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath();
     for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const m = mat[gi(x, y)]; if (m === EMPTY || m === STEAM) continue; const px = x * SC, py = y * SC;
       if (!inb(x, y - 1) || edge(mat[gi(x, y - 1)])) { ctx.moveTo(px, py); ctx.lineTo(px + SC, py); }
@@ -202,33 +200,35 @@
       if (!inb(x - 1, y) || edge(mat[gi(x - 1, y)])) { ctx.moveTo(px, py); ctx.lineTo(px, py + SC); }
       if (x + 1 >= gw || edge(mat[gi(x + 1, y)])) { ctx.moveTo(px + SC, py); ctx.lineTo(px + SC, py + SC); }
     } ctx.stroke();
-    // enemies (chunky marker creeps)
-    for (const e of enemies) { ctx.fillStyle = `hsl(${e.hue},62%,58%)`; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(e.x - e.r * .32, e.y + e.r * .15, 1.8, 0, 7); ctx.arc(e.x + e.r * .32, e.y + e.r * .15, 1.8, 0, 7); ctx.fill();
+    // defense line
+    ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.setLineDash([14, 9]); ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(W, lineY); ctx.stroke(); ctx.setLineDash([]);
+    // enemies
+    for (const e of enemies) { ctx.fillStyle = `hsl(${e.hue},62%,58%)`; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(e.x - e.r * .32, e.y + e.r * .2, 1.8, 0, 7); ctx.arc(e.x + e.r * .32, e.y + e.r * .2, 1.8, 0, 7); ctx.fill();
       if (e.burn > 0) { ctx.strokeStyle = '#ff7a33'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 3, 0, 7); ctx.stroke(); }
       if (e.wet > 0) { ctx.strokeStyle = '#3f8be6'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 3, 0, 7); ctx.stroke(); }
       if (e.hp < e.max) { ctx.fillStyle = '#2a2622'; ctx.fillRect(e.x - e.r, e.y - e.r - 7, e.r * 2, 3); ctx.fillStyle = '#7a9e5e'; ctx.fillRect(e.x - e.r, e.y - e.r - 7, e.r * 2 * Math.max(0, e.hp / e.max), 3); }
     }
-    // barrels
-    for (const b of barrels) { ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx) + 1.57); ctx.fillStyle = b.type === 'gp' ? '#3a342c' : `rgb(${COL[MAT[b.type]].join(',')})`; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; rr(-7, -9, 14, 18, 4); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    // barrels in flight
+    for (const b of barrels) { ctx.fillStyle = b.type === 'gp' ? '#3a342c' : `rgb(${COL[MAT[b.type]].join(',')})`; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, 7); ctx.fill(); ctx.stroke(); }
+    // slingshot
+    ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(ax - 15, ay + 16); ctx.lineTo(ax, ay - 4); ctx.lineTo(ax + 15, ay + 16); ctx.stroke();
+    // aim: target reticle + line
+    if (aiming && target) { ctx.strokeStyle = 'rgba(42,38,34,.4)'; ctx.lineWidth = 2; ctx.setLineDash([6, 7]); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(target[0], target[1]); ctx.stroke(); ctx.setLineDash([]);
+      const col = queue[0] === 'gp' ? '#3a342c' : `rgb(${COL[MAT[queue[0]]].join(',')})`; ctx.fillStyle = col; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(target[0], target[1], 13, 0, 7); ctx.globalAlpha = .35; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(target[0] - 18, target[1]); ctx.lineTo(target[0] + 18, target[1]); ctx.moveTo(target[0], target[1] - 18); ctx.lineTo(target[0], target[1] + 18); ctx.stroke();
+    }
     // particles
     for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
-    // slingshot + aim
-    ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(ax - 16, ay - 16); ctx.lineTo(ax, ay + 4); ctx.lineTo(ax + 16, ay - 16); ctx.stroke();
-    if (aiming && pull) { const [vx, vy] = launchVel(); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ax - 16, ay - 16); ctx.lineTo(pull[0], pull[1]); ctx.lineTo(ax + 16, ay - 16); ctx.stroke();
-      ctx.fillStyle = queue[0] === 'gp' ? '#3a342c' : `rgb(${COL[MAT[queue[0]]].join(',')})`; ctx.beginPath(); ctx.arc(pull[0], pull[1], 9, 0, 7); ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
-      let sx = ax, sy = ay - 12, svx = vx, svy = vy; ctx.fillStyle = 'rgba(42,38,34,.5)'; for (let t = 0; t < 30; t++) { svy += G * .03; sx += svx * .03; sy += svy * .03; if (t % 2 === 0) { ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, 7); ctx.fill(); } if (sy > H || sx < 0 || sx > W) break; } }
     ctx.restore();
   }
   const edge = (m) => m === EMPTY || m === STEAM;
-  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
   // ---------- audio ----------
   let ac = null; function aOn() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
   function tn(f, d, t, g, gl) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = t || 'sine'; o.frequency.setValueAtTime(f, s); if (gl) o.frequency.exponentialRampToValueAtTime(Math.max(1, gl), s + d); n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .04, s + .008); n.gain.exponentialRampToValueAtTime(.0001, s + d); o.connect(n); n.connect(ac.destination); o.start(s); o.stop(s + d + .02); }
   function nz(d, g, f) { if (!ac) return; const n = Math.floor(ac.sampleRate * d), b = ac.createBuffer(1, n, ac.sampleRate), dd = b.getChannelData(0); for (let i = 0; i < n; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / n); const s = ac.createBufferSource(); s.buffer = b; const fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = f || 900; const gg = ac.createGain(); gg.gain.value = g || .05; s.connect(fl); fl.connect(gg); gg.connect(ac.destination); s.start(); s.stop(ac.currentTime + d); }
-  function sfx(n) { if (!ac) return; switch (n) { case 'throw': tn(420, .08, 'triangle', .025, 240); break; case 'boom': nz(.34, .12, 700); tn(90, .3, 'sine', .08, 50); break; case 'ignite': nz(.2, .05, 600); tn(120, .22, 'sine', .05, 70); break; case 'splash': nz(.18, .03, 1800); break; case 'die': tn(200, .1, 'triangle', .03, 80); break; } }
+  function sfx(n) { if (!ac) return; switch (n) { case 'throw': tn(420, .08, 'triangle', .025, 240); break; case 'boom': nz(.34, .12, 700); tn(90, .3, 'sine', .08, 50); break; case 'ignite': nz(.2, .05, 600); tn(120, .22, 'sine', .05, 70); break; case 'splash': nz(.18, .03, 1800); break; case 'die': tn(200, .1, 'triangle', .03, 80); break; case 'breach': tn(140, .25, 'sawtooth', .06, 60); break; } }
 
   // ---------- loop / flow ----------
   let last = 0;
@@ -237,10 +237,10 @@
   function gameOver() { state = 'over'; document.getElementById('ovStat').textContent = `Wave ${wave} · ${score} points`; document.getElementById('ovOver').classList.remove('hidden'); }
   document.getElementById('bStart').onclick = () => { aOn(); start(); };
   document.getElementById('bRetry').onclick = () => { aOn(); start(); };
-  addEventListener('resize', () => { if (state === 'play') { /* keep simple: rebuild grid keeps wall */ } build(); });
+  addEventListener('resize', () => build());
   state = 'start'; build(); reset(); state = 'start';
   requestAnimationFrame(loop);
-  window.__pk = { get state() { return state; }, get wall() { return Math.round(wallHP); }, get score() { return score; }, get enemies() { return enemies.length; }, fireAt(vx, vy) { if (reloadT > 0) return; const type = queue.shift(); barrels.push({ x: ax, y: ay - 12, vx, vy, type }); refillQueue(); reloadT = 0.9; renderQueue(); }, spawnNow() { spawn(); } };
+  window.__pk = { get state() { return state; }, get base() { return Math.round(baseHP); }, get score() { return score; }, get enemies() { return enemies.length; }, fireAt(tx, ty) { if (reloadT > 0) return; const type = queue.shift(); const dx = tx - ax, dy = ty - ay, l = Math.hypot(dx, dy), sp = 900; barrels.push({ x: ax, y: ay, vx: dx / l * sp, vy: dy / l * sp, tx, ty, rem: l, type }); refillQueue(); reloadT = 0.85; renderQueue(); }, spawnNow() { spawn(); }, enems() { return enemies.map(e => [Math.round(e.x), Math.round(e.y)]); }, fireCells() { let n = 0; for (let i = 0; i < gw * gh; i++) if (mat[i] === FIRE) n++; return n; } };
 })();
 </script>
 </body>
