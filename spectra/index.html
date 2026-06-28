@@ -92,17 +92,16 @@
 (function () {
   'use strict';
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  const R = 1, Y = 2, B = 4;
-  // High-contrast palette: separated in hue AND value so neighbours read apart.
-  // red (dark) vs orange (mid) vs yellow (light); blue (dark) vs green (mid).
+  const R = 1, G = 2, B = 4;
+  // Additive light primaries (RGB). Secondaries are the additive mixes; all three = white.
   const CMAP = {
-    1: [214, 40, 40],    // R  red   (dark)
-    2: [248, 208, 50],   // Y  yellow (light)
-    4: [38, 92, 206],    // B  blue  (dark)
-    3: [242, 128, 24],   // R|Y orange (mid)
-    6: [44, 168, 92],    // Y|B green  (mid)
-    5: [150, 74, 212],   // R|B purple
-    7: [255, 255, 255]   // R|Y|B white
+    1: [228, 58, 58],    // R  red
+    2: [54, 184, 92],    // G  green
+    4: [58, 104, 226],   // B  blue
+    3: [244, 206, 48],   // R|G yellow
+    6: [40, 188, 206],   // G|B cyan
+    5: [206, 74, 196],   // R|B magenta
+    7: [255, 255, 255]   // R|G|B white
   };
   const drk = (m) => { const c = CMAP[m]; return [c[0] * .55 | 0, c[1] * .55 | 0, c[2] * .55 | 0]; };
   const rgb = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a == null ? 1 : a})`;
@@ -279,18 +278,19 @@
     for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; if (isMirror(t.col)) mirror(t.x, t.y, t.col); else tile(t.x, t.y, t.col); }
   }
   function mirror(X, Y, kind) {
-    // neutral tile base so it reads as a movable piece, distinct from coloured glass
+    // Translucent glass block: a movable piece you can still see the beam pass through and bend inside.
     const sz = cs * 0.74;
-    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.22)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 4;
-    ctx.fillStyle = '#eceef2'; rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.fill(); ctx.restore();
-    ctx.strokeStyle = '#b6bdc7'; ctx.lineWidth = Math.max(2, cs * .032); rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.stroke();
-    // the silver diagonal
-    const s = cs * 0.27; let x0, y0, x1, y1;
+    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.16)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = 'rgba(244,246,250,.26)'; rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = 'rgba(150,160,174,.95)'; ctx.lineWidth = Math.max(2, cs * .032); rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(X - sz / 2 + sz * .14, Y - sz / 2 + sz * .13, sz * .42, sz * .12, 5); ctx.fill();   // glass glint
+    // the reflective diagonal surface
+    const s = cs * 0.3; let x0, y0, x1, y1;
     if (kind === 8) { x0 = X - s; y0 = Y + s; x1 = X + s; y1 = Y - s; } else { x0 = X - s; y0 = Y - s; x1 = X + s; y1 = Y + s; }
     ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(60,46,30,.16)'; ctx.lineWidth = cs * 0.16; ctx.beginPath(); ctx.moveTo(x0, y0 + 2); ctx.lineTo(x1, y1 + 2); ctx.stroke();
-    ctx.strokeStyle = '#8e97a3'; ctx.lineWidth = cs * 0.13; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = cs * 0.04; ctx.beginPath(); ctx.moveTo(x0 + 1, y0 - 1); ctx.lineTo(x1 + 1, y1 - 1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(60,46,30,.14)'; ctx.lineWidth = cs * 0.15; ctx.beginPath(); ctx.moveTo(x0, y0 + 2); ctx.lineTo(x1, y1 + 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,160,174,.95)'; ctx.lineWidth = cs * 0.12; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = cs * 0.04; ctx.beginPath(); ctx.moveTo(x0 + 1, y0 - 1); ctx.lineTo(x1 + 1, y1 - 1); ctx.stroke();
   }
 
   function tile(x, y, col) {
@@ -326,7 +326,7 @@
   }
 
   // ---------- intro card stack (visual, minimal text) ----------
-  const IHEX = { 1: '#d62828', 2: '#f8d032', 4: '#265ece', 3: '#f2801c', 6: '#2ca85c', 5: '#964ed4', 7: '#ffffff' };
+  const IHEX = { 1: '#e43a3a', 2: '#36b85c', 4: '#3a68e2', 3: '#f4ce30', 6: '#28bcce', 5: '#ce4ac4', 7: '#ffffff' };
   function dk(hex) { const n = parseInt(hex.slice(1), 16); return `rgb(${(n >> 16 & 255) * .5 | 0},${(n >> 8 & 255) * .5 | 0},${(n & 255) * .5 | 0})`; }
   const svg = (inner, h) => `<svg viewBox="0 0 320 ${h || 120}">${inner}</svg>`;
   // beam bar between two x's
@@ -366,10 +366,10 @@
       cap: 'Swipe a glass up, down, left or right. It slides into an empty space, or swaps with the tile beside it.' },
     // 3: light changes colour + mixes
     { art: svg(eqRow(30, 7, 1, 1) + eqRow(76, 1, 4, 5) + eqRow(122, 2, 4, 6) + eqRow(168, 1, 2, 3), 198),
-      cap: 'Light through a glass changes colour. White takes the glass colour. Two primaries mix: red + blue = purple, yellow + blue = green, red + yellow = orange.' },
+      cap: 'Light through a glass changes colour. White takes the glass colour. Two primaries mix: red + green = yellow, green + blue = cyan, red + blue = magenta.' },
     // 4: combination drops back to a component
     { art: svg(eqRow(46, 6, 2, 2) + eqRow(96, 6, 4, 4), 142),
-      cap: 'A combined colour passing through one of its parts drops back to that part. Green through yellow is yellow, green through blue is blue.' },
+      cap: 'A combined colour passing through one of its parts drops back to that part. Cyan through green is green, cyan through blue is blue.' },
     // 5: full reference chart
     { art: chart(),
       cap: 'Every light and glass combination.' }
