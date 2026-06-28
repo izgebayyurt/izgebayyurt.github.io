@@ -228,18 +228,26 @@
   // ---------- render ----------
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
-  // one beam segment with a soft glow + a solid core outlined so even white reads on paper
-  function seg(x0, y0, x1, y1, m, w) {
-    const c = CMAP[m];
-    ctx.lineCap = 'butt';
-    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-    ctx.strokeStyle = rgb(drk(m), .9); ctx.lineWidth = w + 2.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  // Draw a beam as colour-runs: one continuous polyline per colour (no per-cell seams), round bends at mirrors.
+  // A run keeps butt end-caps (clean colour transitions) but round joins (smooth mirror bends).
+  function strokeRun(run, c, d, w) {
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+    const path = () => { ctx.beginPath(); ctx.moveTo(run[0][0], run[0][1]); for (let k = 1; k < run.length; k++) ctx.lineTo(run[k][0], run[k][1]); };
+    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();
+    ctx.strokeStyle = rgb(d, .9); ctx.lineWidth = w + 2.4; path(); ctx.stroke();
+    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();
+  }
+  function drawBeamRuns(pts, segc, w) {
+    let i = 0;
+    while (i < segc.length) {
+      let j = i; while (j + 1 < segc.length && segc[j + 1] === segc[i]) j++;
+      const m = segc[i]; strokeRun(pts.slice(i, j + 2), CMAP[m], drk(m), w); i = j + 1;
+    }
   }
 
   const PAD = () => cs * 0.5, GUT = () => cs * 0.62;
   // a point just outside the board at an edge slot (side 0=L 1=R 2=T 3=B)
-  function edgePt(side, idx) { const g2 = GUT(); if (side === 0) return [gx - g2, ccy(idx)]; if (side === 1) return [gx + cols * cs + g2, ccy(idx)]; if (side === 2) return [ccx(idx), gy - g2]; return [ccx(idx), gy + rows * cs + g2]; }
+  function edgePt(side, idx) { const g2 = PAD() + GUT(); if (side === 0) return [gx - g2, ccy(idx)]; if (side === 1) return [gx + cols * cs + g2, ccy(idx)]; if (side === 2) return [ccx(idx), gy - g2]; return [ccx(idx), gy + rows * cs + g2]; }
   const inDirOf = (side) => side === 0 ? [0, 1] : side === 1 ? [0, -1] : side === 2 ? [1, 0] : [-1, 0];
   function render() {
     ctx.fillStyle = '#f4eee1'; ctx.fillRect(0, 0, W, H);
@@ -250,17 +258,16 @@
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill(); }
     const bw = Math.max(5, cs * 0.11);
     const traced = beams.map(b => { const w = walk(grid, b[0], b[1], b[2]); return { b, cells: w.cells, exit: w.exit }; });
-    // beam paths (bent, colour changes at glass centres)
+    // beam paths: build a polyline through emitter edge -> each cell centre -> exit edge, with a colour per
+    // segment (the beam colour only changes at glass centres), then draw it as continuous same-colour runs.
     for (const T of traced) {
       const cells = T.cells; if (!cells.length) continue;
-      const f = cells[0], ep = edgePt(T.b[0], T.b[1]);
-      seg(ep[0], ep[1], ccx(f.c) - f.inDir[1] * cs / 2, ccy(f.r) - f.inDir[0] * cs / 2, f.inCol, bw);   // emitter stub (behind triangle)
-      for (const cell of cells) {
-        const X = ccx(cell.c), Y = ccy(cell.r);
-        seg(X - cell.inDir[1] * cs / 2, Y - cell.inDir[0] * cs / 2, X, Y, cell.inCol, bw);
-        seg(X, Y, X + cell.outDir[1] * cs / 2, Y + cell.outDir[0] * cs / 2, cell.outCol, bw);
-      }
-      if (T.exit) { const l = cells[cells.length - 1], xp = edgePt(T.exit.side, T.exit.idx); seg(ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2, xp[0], xp[1], T.exit.col, bw); }
+      const pts = [edgePt(T.b[0], T.b[1])];
+      for (const cell of cells) pts.push([ccx(cell.c), ccy(cell.r)]);
+      if (T.exit) pts.push(edgePt(T.exit.side, T.exit.idx));
+      else { const l = cells[cells.length - 1]; pts.push([ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2]); }
+      const segc = [cells[0].inCol]; for (const cell of cells) segc.push(cell.outCol);
+      drawBeamRuns(pts, segc, bw);
     }
     // emitters + receivers
     for (const T of traced) {
