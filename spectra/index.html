@@ -314,15 +314,23 @@
     ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.moveTo(-r * .5, -r * .5); ctx.lineTo(r * .1, -r * .12); ctx.lineTo(-r * .5, r * .05); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
-  // Receiver: a concentric target ring that fills + checks when satisfied.
+  // Receiver. Unlit: a bold colour ring (reads the wanted colour, even yellow/white). Lit: solid fill + glow + check.
+  // A dark frame keeps light colours legible on the cream paper; the check colour adapts so it's always visible.
   function receiver(x, y, t, ok) {
-    const c = CMAP[t], d = drk(t), rad = cs * .21;
-    if (ok) { ctx.fillStyle = rgb(c, .26); ctx.beginPath(); ctx.arc(x, y, rad * 1.85, 0, 7); ctx.fill(); }
-    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7);
-    ctx.fillStyle = ok ? rgb(c) : rgb(c, .18); ctx.fill();
-    ctx.lineWidth = 3.6; ctx.strokeStyle = ok ? rgb(d) : rgb(d, .7); ctx.stroke();
-    if (ok) { ctx.strokeStyle = t === 7 ? '#2a211a' : '#fff'; ctx.lineWidth = 3.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .38); ctx.lineTo(x + rad * .48, y - rad * .36); ctx.stroke(); }
-    else { ctx.beginPath(); ctx.arc(x, y, rad * .46, 0, 7); ctx.lineWidth = 2.6; ctx.strokeStyle = rgb(d, .7); ctx.stroke(); }
+    const c = CMAP[t], rad = cs * .21;
+    const lum = .299 * c[0] + .587 * c[1] + .114 * c[2];   // perceived brightness
+    const ink = 'rgba(58,44,30,.55)';
+    if (ok) {
+      ctx.fillStyle = rgb(c, .30); ctx.beginPath(); ctx.arc(x, y, rad * 1.9, 0, 7); ctx.fill();   // glow halo
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = rgb(c); ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = ink; ctx.stroke();
+      ctx.strokeStyle = lum > 150 ? '#2a211a' : '#fff'; ctx.lineWidth = 3.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(x - rad * .42, y); ctx.lineTo(x - rad * .08, y + rad * .38); ctx.lineTo(x + rad * .5, y - rad * .36); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = '#fffdf8'; ctx.fill();            // paper centre
+      ctx.lineWidth = cs * .15; ctx.strokeStyle = rgb(c); ctx.beginPath(); ctx.arc(x, y, rad * .58, 0, 7); ctx.stroke();   // bold colour ring
+      ctx.lineWidth = 2.4; ctx.strokeStyle = ink; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.stroke();                  // dark frame
+    }
   }
 
   // ---------- intro card stack (visual, minimal text) ----------
@@ -408,7 +416,7 @@
   if (!seenIntro) openDeck(CARDS, 'spectra_intro_v2');
   requestAnimationFrame(loop);
   window.__sp = { levels: LEVELS, open: (i) => openLevel(i), solved: () => wonG(grid), win: () => onWin(),
-    swap: (r1, c1, r2, c2) => doSwap(r1, c1, r2, c2), tiles: () => tiles.map(t => ({ c: t.c, r: t.r, col: t.col })), grid: () => grid };
+    swap: (r1, c1, r2, c2) => doSwap(r1, c1, r2, c2), tiles: () => tiles.map(t => ({ c: t.c, r: t.r, col: t.col })), grid: () => grid, beams: () => beams.map(x => x.slice()) };
 })();
 </script>
 </body>
