@@ -11,7 +11,7 @@
   #top{position:fixed;top:13px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:9px;align-items:center;}
   #title{font-weight:800;letter-spacing:.26em;font-size:14px;color:#bdb5dc;margin-right:2px;}
   #moves{font-weight:800;font-size:14px;color:#e8e4f2;background:#211b33;border:1.5px solid #3a3157;border-radius:10px;padding:6px 12px;}
-  #moves b{color:#8fd0ff;} #moves .par{color:#8a82a8;font-weight:700;}
+  #moves b{color:#8fd0ff;} #moves .par{color:#8a82a8;font-weight:700;margin-left:4px;}
   .btn{background:#221b35;border:1.5px solid #3a3157;border-radius:10px;color:#e8e4f2;font:800 13px ui-rounded,system-ui;padding:7px 13px;cursor:pointer;}
   .btn:active{transform:translateY(1px);}
   #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;color:#766e96;font-size:12.5px;text-align:center;max-width:90%;}
@@ -44,13 +44,13 @@
   <canvas id="c"></canvas>
   <div id="top">
     <button class="btn" id="menu">‹ Levels</button>
-    <span id="moves"><b id="mv">0</b> <span class="par">/ par <span id="pr">-</span></span></span>
+    <span id="moves"><b id="mv">0</b> moves<span class="par">best <span id="pr">-</span></span></span>
     <button class="btn" id="undo">Undo</button>
   </div>
-  <div id="hint">Swipe a glass tile to slide or swap it. Mix the light so every receiver gets its colour.</div>
+  <div id="hint">Swipe a glass tile to slide or swap it. Mix the light so every receiver gets its colour. No move limit, just solve it.</div>
 
   <div id="select">
-    <h1>SPECTRA</h1><div class="sub">Mix light. Solve at par for three stars.</div>
+    <h1>SPECTRA</h1><div class="sub">Mix light to feed every receiver. Solve in fewer moves for more stars.</div>
     <div id="grid"></div>
   </div>
 
@@ -74,6 +74,9 @@
   let stars = load();
   function load() { try { return JSON.parse(localStorage.getItem('spectra_v1') || '[]'); } catch (e) { return []; } }
   function save() { try { localStorage.setItem('spectra_v1', JSON.stringify(stars)); } catch (e) {} }
+  let bestMv = loadBest();
+  function loadBest() { try { return JSON.parse(localStorage.getItem('spectra_best_v1') || '[]'); } catch (e) { return []; } }
+  function saveBest() { try { localStorage.setItem('spectra_best_v1', JSON.stringify(bestMv)); } catch (e) {} }
 
   function layout() { W = cv.width = innerWidth; H = cv.height = innerHeight; cs = Math.min((Math.min(W, H * 0.9) - 130) / cols, 92); gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 8; }
   layout();
@@ -134,7 +137,7 @@
     curLevel = i; const L = genLevel(i);
     grid = cloneG(L.grid); hBeam = L.hB; vBeam = L.vB; hSrc = L.hS; vSrc = L.vS; hTarget = L.hT; vTarget = L.vT; par = L.par;
     moves = 0; history = []; won = false; buildTiles();
-    document.getElementById('pr').textContent = par; document.getElementById('mv').textContent = 0;
+    document.getElementById('pr').textContent = bestMv[i] != null ? bestMv[i] : '-'; document.getElementById('mv').textContent = 0;
     document.getElementById('won').classList.remove('show');
     document.getElementById('select').style.display = 'none'; document.getElementById('top').style.display = 'flex'; document.getElementById('hint').style.display = 'block';
     screen = 'play'; aOn();
@@ -166,9 +169,18 @@
     for (const cell of cells) { let best = -1, bd = 1e9; for (let i = 0; i < avail.length; i++) { if (avail[i].col !== cell.col) continue; const dd = Math.abs(avail[i].c - cell.c) + Math.abs(avail[i].r - cell.r); if (dd < bd) { bd = dd; best = i; } } const tt = best >= 0 ? avail.splice(best, 1)[0] : { x: ccx(cell.c), y: ccy(cell.r), col: cell.col }; tt.c = cell.c; tt.r = cell.r; out.push(tt); }
     tiles = out;
   }
-  function onWin() { won = true; const s = moves <= par ? 3 : moves <= par + 2 ? 2 : 1; stars[curLevel] = Math.max(stars[curLevel] || 0, s); save();
+  function onWin() {
+    won = true;
+    const prev = bestMv[curLevel] != null ? bestMv[curLevel] : Infinity;
+    const isPB = moves < prev; if (isPB) { bestMv[curLevel] = moves; saveBest(); }
+    const best = Math.min(moves, prev);
+    // Generous, never punishing: solving always celebrates; fewer moves earns more stars.
+    const s = moves <= par + 1 ? 3 : moves <= Math.ceil(par * 1.8) ? 2 : 1;
+    stars[curLevel] = Math.max(stars[curLevel] || 0, s); save();
     document.getElementById('stars').textContent = [0, 1, 2].map(i => i < s ? '★' : '☆').join(' ');
-    document.getElementById('wsub').textContent = moves <= par ? 'Perfect -- solved at par!' : `Solved in ${moves}. Par is ${par}.`;
+    const head = s === 3 ? 'Brilliant, a clean solve!' : s === 2 ? 'Nicely done.' : 'Solved! Fewer moves earns more stars.';
+    document.getElementById('wsub').textContent = isPB ? `${head} New best: ${moves} moves.` : `${head} ${moves} moves (best ${best}).`;
+    document.getElementById('pr').textContent = best;
     setTimeout(() => document.getElementById('won').classList.add('show'), 350); sfx('win');
   }
   document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); moves = Math.max(0, moves - 1); document.getElementById('mv').textContent = moves; syncTiles(); };
@@ -177,15 +189,17 @@
   document.getElementById('wnext').onclick = () => openLevel(Math.min(LEVELS - 1, curLevel + 1));
 
   // ---------- render ----------
-  function beam(x0, y0, x1, y1, m, w) { ctx.lineCap = 'round'; ctx.strokeStyle = rgba(m, .16); ctx.lineWidth = w * 2.3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = rgba(m, 1); ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
+  // Butt caps so adjacent segments meet flush (no bulging circles where colour changes mid-row).
+  function beam(x0, y0, x1, y1, m, w) { ctx.lineCap = 'butt'; ctx.strokeStyle = rgba(m, .14); ctx.lineWidth = w * 2.3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.strokeStyle = rgba(m, 1); ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
   function render() {
     ctx.fillStyle = '#12101c'; ctx.fillRect(0, 0, W, H);
     if (screen !== 'play') return;
     const pad = cs * 0.42; ctx.fillStyle = '#181425'; ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1.5; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 18); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1; for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(gx, gy + r * cs); ctx.lineTo(gx + cols * cs, gy + r * cs); ctx.stroke(); } for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(gx + c * cs, gy); ctx.lineTo(gx + c * cs, gy + rows * cs); ctx.stroke(); }
     const bw = cs * 0.13;
-    for (const r of hBeam) { let m = hSrc[r]; const y = ccy(r); beam(gx - pad, y, gx, y, m, bw); for (let c = 0; c < cols; c++) { m |= grid[r][c]; beam(cx0(c), y, cx0(c) + cs, y, m, bw); } src(gx - pad, y, hSrc[r]); rcv(gx + cols * cs + pad, y, m, hTarget[r]); }
-    for (const c of vBeam) { let m = vSrc[c]; const x = ccx(c); beam(x, gy - pad, x, gy, m, bw); for (let r = 0; r < rows; r++) { m |= grid[r][c]; beam(x, cy0(r), x, cy0(r) + cs, m, bw); } src(x, gy - pad, vSrc[c]); rcv(x, gy + rows * cs + pad, m, vTarget[c]); }
+    // Each cell: draw left half with the incoming colour, mix at the cell centre (where the tile sits), draw right half mixed.
+    for (const r of hBeam) { let m = hSrc[r]; const y = ccy(r); beam(gx - pad, y, gx, y, m, bw); for (let c = 0; c < cols; c++) { const xl = cx0(c), xm = ccx(c), xr = cx0(c) + cs; beam(xl, y, xm, y, m, bw); m |= grid[r][c]; beam(xm, y, xr, y, m, bw); } src(gx - pad, y, hSrc[r]); rcv(gx + cols * cs + pad, y, m, hTarget[r]); }
+    for (const c of vBeam) { let m = vSrc[c]; const x = ccx(c); beam(x, gy - pad, x, gy, m, bw); for (let r = 0; r < rows; r++) { const yl = cy0(r), ym = ccy(r), yr = cy0(r) + cs; beam(x, yl, x, ym, m, bw); m |= grid[r][c]; beam(x, ym, x, yr, m, bw); } src(x, gy - pad, vSrc[c]); rcv(x, gy + rows * cs + pad, m, vTarget[c]); }
     for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; tile(t.x, t.y, t.col); }
   }
   function tile(x, y, col) { const s = cs * 0.72, c = CMAP[col]; const g = ctx.createLinearGradient(0, y - s / 2, 0, y + s / 2); g.addColorStop(0, `rgba(${Math.min(255, c[0] + 30)},${Math.min(255, c[1] + 30)},${Math.min(255, c[2] + 30)},.95)`); g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},.95)`);
