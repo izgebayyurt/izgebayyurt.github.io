@@ -369,26 +369,28 @@
     ctx.strokeStyle = nearWhite ? 'rgba(108,112,122,.95)' : rgb(d, .9); ctx.lineWidth = w + (nearWhite ? 3.4 : 2.4); path(); ctx.stroke();   // casing (stronger for white so it reads on paper)
     ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // solid core
   }
-  // Two glowing dots (ray-coloured) riding each beam, like Glass Fold's Orbit skin. Spaced half a path apart.
-  const lite = (c, t) => [c[0] + (255 - c[0]) * t, c[1] + (255 - c[1]) * t, c[2] + (255 - c[2]) * t];
+  // A brighter-ray-colour circle (no white highlight) glides along each beam border -- one on the top
+  // edge, one on the bottom edge -- with a same-colour glow. Each takes the LOCAL ray colour.
+  const bright = (c) => [Math.min(255, c[0] * 1.12 + 44), Math.min(255, c[1] * 1.12 + 44), Math.min(255, c[2] * 1.12 + 44)];
   function beamDots(pts, segc, w) {
     if (reduceMotion || pts.length < 2) return;
     const seglen = [], cum = [0]; let total = 0;
     for (let k = 0; k < pts.length - 1; k++) { const L = Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]); seglen.push(L); total += L; cum.push(total); }
     if (total < cs * 0.3) return;
-    const speed = cs * 1.5, rad = Math.max(3, w * 0.62);
-    for (let di = 0; di < 2; di++) {
-      let dist = (T * speed + di * total / 2) % total, k = 0;
+    const speed = cs * 1.5, rad = Math.max(2.4, w * 0.42), off = w * 0.55;
+    const dist = (T * speed) % total;
+    for (let di = 0; di < 2; di++) {       // one circle on the top border, one on the bottom, travelling together
+      let k = 0;
       while (k < seglen.length - 1 && dist > cum[k + 1]) k++;
-      const f = seglen[k] > 0.001 ? (dist - cum[k]) / seglen[k] : 0;
-      const x = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f, y = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f;
+      const ax = pts[k][0], ay = pts[k][1], L = seglen[k] || 1, f = (dist - cum[k]) / L;
+      const dx = (pts[k + 1][0] - ax) / L, dy = (pts[k + 1][1] - ay) / L;            // unit direction along the beam
+      const sign = di === 0 ? 1 : -1;                                                // dot 0 -> one border, dot 1 -> the other
+      const x = ax + dx * (dist - cum[k]) - dy * off * sign, y = ay + dy * (dist - cum[k]) + dx * off * sign;
       const c = CMAP[segc[Math.min(k, segc.length - 1)]];
-      const g = ctx.createRadialGradient(x, y, 0, x, y, rad * 3.2);                                   // same-colour glow halo
-      g.addColorStop(0, rgb(c, .85)); g.addColorStop(1, rgb(c, 0));
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad * 3.2, 0, 7); ctx.fill();
-      const bg = ctx.createRadialGradient(x - rad * .3, y - rad * .3, rad * .1, x, y, rad);            // solid ball with a light highlight
-      bg.addColorStop(0, rgb(lite(c, .65))); bg.addColorStop(1, rgb(c));
-      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad * 2.8);                  // same-colour glow
+      g.addColorStop(0, rgb(c, .8)); g.addColorStop(1, rgb(c, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad * 2.8, 0, 7); ctx.fill();
+      ctx.fillStyle = rgb(bright(c)); ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();   // brighter ray-colour circle
     }
   }
   function drawBeamRuns(pts, segc, w) {
