@@ -377,7 +377,7 @@
     const seglen = [], cum = [0]; let total = 0;
     for (let k = 0; k < pts.length - 1; k++) { const L = Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]); seglen.push(L); total += L; cum.push(total); }
     if (total < cs * 0.3) return;
-    const speed = cs * 1.5, rad = Math.max(2.4, w * 0.42), off = w * 0.55;
+    const speed = cs * 1.5, rad = Math.max(1.7, w * 0.3), off = w * 0.55;
     const dist = (T * speed) % total;
     for (let di = 0; di < 2; di++) {       // one circle on the top border, one on the bottom, travelling together
       let k = 0;
