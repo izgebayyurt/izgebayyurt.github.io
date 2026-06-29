@@ -362,19 +362,34 @@
   // Draw a beam as colour-runs: one continuous polyline per colour (no per-cell seams), round bends at mirrors.
   // A run keeps butt end-caps (clean colour transitions) but round joins (smooth mirror bends).
   function strokeRun(run, c, d, w) {
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
     const path = () => { ctx.beginPath(); ctx.moveTo(run[0][0], run[0][1]); for (let k = 1; k < run.length; k++) ctx.lineTo(run[k][0], run[k][1]); };
     const nearWhite = c[0] + c[1] + c[2] > 700;
-    ctx.lineCap = 'butt';
     ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();                                                  // soft outer glow
-    // a soft, slow sheen travelling along the EDGES -- drawn under the casing+core so it never lights the bright centre
-    if (!reduceMotion) {
-      ctx.save(); ctx.lineCap = 'round'; ctx.shadowColor = 'rgba(255,255,255,.7)'; ctx.shadowBlur = cs * 0.17;
-      ctx.setLineDash([cs * 0.7, cs * 2.1]); ctx.lineDashOffset = -((T * cs * 0.55) % (cs * 2.8));
-      ctx.strokeStyle = 'rgba(255,255,255,.46)'; ctx.lineWidth = w * 1.95; path(); ctx.stroke(); ctx.restore();
-    }
     ctx.strokeStyle = nearWhite ? 'rgba(108,112,122,.95)' : rgb(d, .9); ctx.lineWidth = w + (nearWhite ? 3.4 : 2.4); path(); ctx.stroke();   // casing (stronger for white so it reads on paper)
-    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // solid core (last -> the sheen only shows on the edges)
+    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // solid core
+  }
+  // Two glowing dots (ray-coloured) riding each beam, like Glass Fold's Orbit skin. Spaced half a path apart.
+  const lite = (c, t) => [c[0] + (255 - c[0]) * t, c[1] + (255 - c[1]) * t, c[2] + (255 - c[2]) * t];
+  function beamDots(pts, segc, w) {
+    if (reduceMotion || pts.length < 2) return;
+    const seglen = [], cum = [0]; let total = 0;
+    for (let k = 0; k < pts.length - 1; k++) { const L = Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]); seglen.push(L); total += L; cum.push(total); }
+    if (total < cs * 0.3) return;
+    const speed = cs * 1.5, rad = Math.max(3, w * 0.62);
+    for (let di = 0; di < 2; di++) {
+      let dist = (T * speed + di * total / 2) % total, k = 0;
+      while (k < seglen.length - 1 && dist > cum[k + 1]) k++;
+      const f = seglen[k] > 0.001 ? (dist - cum[k]) / seglen[k] : 0;
+      const x = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f, y = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f;
+      const c = CMAP[segc[Math.min(k, segc.length - 1)]];
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad * 3.2);                                   // same-colour glow halo
+      g.addColorStop(0, rgb(c, .85)); g.addColorStop(1, rgb(c, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad * 3.2, 0, 7); ctx.fill();
+      const bg = ctx.createRadialGradient(x - rad * .3, y - rad * .3, rad * .1, x, y, rad);            // solid ball with a light highlight
+      bg.addColorStop(0, rgb(lite(c, .65))); bg.addColorStop(1, rgb(c));
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();
+    }
   }
   function drawBeamRuns(pts, segc, w) {
     let i = 0;
@@ -402,6 +417,7 @@
       const bw = Math.max(5, cs * 0.11);
       const traced = beams.map(b => { const w = walk(grid, b[0], b[1], b[2]); return { b, cells: w.cells, exit: w.exit }; });
       // beam paths: emitter edge -> each cell centre -> exit edge, a colour per segment, drawn as same-colour runs
+      const beamPaths = [];
       for (const Tr of traced) {
         const cells = Tr.cells; if (!cells.length) continue;
         const pts = [edgePt(Tr.b[0], Tr.b[1])];
@@ -409,8 +425,10 @@
         if (Tr.exit) pts.push(edgePt(Tr.exit.side, Tr.exit.idx));
         else { const l = cells[cells.length - 1]; pts.push([ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2]); }
         const segc = [cells[0].inCol]; for (const cell of cells) segc.push(cell.outCol);
-        drawBeamRuns(pts, segc, bw);
+        drawBeamRuns(pts, segc, bw); beamPaths.push([pts, segc]);
       }
+      for (const [pts, segc] of beamPaths) beamDots(pts, segc, bw);   // glowing dots ride on top of all beams
+      ctx.globalAlpha = 1;
       // emitters + receivers; fire a connect burst + chime when a receiver newly lights
       traced.forEach((Tr, i) => {
         const b = Tr.b, ep = edgePt(b[0], b[1]); emitter(ep[0], ep[1], b[2], inDirOf(b[0]));
