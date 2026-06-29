@@ -251,12 +251,15 @@
     const path = () => { ctx.beginPath(); ctx.moveTo(run[0][0], run[0][1]); for (let k = 1; k < run.length; k++) ctx.lineTo(run[k][0], run[k][1]); };
     const nearWhite = c[0] + c[1] + c[2] > 700;
     ctx.lineCap = 'butt';
-    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();                                                  // soft glow
-    ctx.strokeStyle = nearWhite ? 'rgba(108,112,122,.95)' : rgb(d, .9); ctx.lineWidth = w + (nearWhite ? 3.4 : 2.4); path(); ctx.stroke();   // casing (stronger for white so it reads on paper)
-    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // core
-    if (!reduceMotion) {                                                                                                           // flowing light: a bright dash crawling toward the receiver
-      ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([cs * 0.16, cs * 0.92]); ctx.lineDashOffset = -((T * cs * 1.8) % (cs * 1.08)); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = w * 0.5; path(); ctx.stroke(); ctx.restore();
+    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();                                                  // soft outer glow
+    // a soft, slow sheen travelling along the EDGES -- drawn under the casing+core so it never lights the bright centre
+    if (!reduceMotion) {
+      ctx.save(); ctx.lineCap = 'round'; ctx.shadowColor = 'rgba(255,255,255,.7)'; ctx.shadowBlur = cs * 0.17;
+      ctx.setLineDash([cs * 0.7, cs * 2.1]); ctx.lineDashOffset = -((T * cs * 0.55) % (cs * 2.8));
+      ctx.strokeStyle = 'rgba(255,255,255,.46)'; ctx.lineWidth = w * 1.95; path(); ctx.stroke(); ctx.restore();
     }
+    ctx.strokeStyle = nearWhite ? 'rgba(108,112,122,.95)' : rgb(d, .9); ctx.lineWidth = w + (nearWhite ? 3.4 : 2.4); path(); ctx.stroke();   // casing (stronger for white so it reads on paper)
+    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // solid core (last -> the sheen only shows on the edges)
   }
   function drawBeamRuns(pts, segc, w) {
     let i = 0;
