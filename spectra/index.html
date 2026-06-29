@@ -14,8 +14,10 @@
   #c{position:fixed;inset:0;display:block;cursor:pointer;}
   #top{position:fixed;top:13px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:9px;align-items:center;}
   .btn{background:var(--surface);border:1.5px solid var(--hairline);border-radius:11px;color:var(--ink);
-    font:800 13px ui-rounded,system-ui;padding:7px 13px;cursor:pointer;box-shadow:0 2px 0 var(--hairline);}
-  .btn:active{transform:translateY(2px);box-shadow:none;}
+    font:800 13px ui-rounded,system-ui;padding:7px 13px;cursor:pointer;box-shadow:0 2px 0 var(--hairline);
+    transition:transform .11s cubic-bezier(.34,1.56,.64,1),box-shadow .11s,filter .11s;}
+  .btn:hover{filter:brightness(1.03);}
+  .btn:active{transform:translateY(2px) scale(.96);box-shadow:none;}
   .btn.pri{background:#6a45f0;border-color:#5a3ce0;color:#fff;box-shadow:0 2px 0 #4a31c0;}
   #hint{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);z-index:5;color:var(--ink-dim);
     font-size:12.5px;text-align:center;max-width:92%;line-height:1.5;}
@@ -35,8 +37,11 @@
   .lvl .tg{position:absolute;top:-6px;right:-5px;width:11px;height:11px;border-radius:50%;border:2px solid var(--paper);}
   .lvl.t0 .tg{background:#5aae6e;} .lvl.t1 .tg{background:#e0a23a;} .lvl.t2 .tg{background:#e2685f;}
   #won{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:9;text-align:center;opacity:0;
-    transition:opacity .3s,transform .3s;pointer-events:none;}
+    transition:opacity .3s,transform .42s cubic-bezier(.34,1.56,.64,1);pointer-events:none;}
   #won.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto;}
+  #won.show .wmark{animation:wpop .5s cubic-bezier(.34,1.56,.64,1) both;}
+  @keyframes wpop{0%{transform:scale(0) rotate(-25deg);}60%{transform:scale(1.18) rotate(6deg);}100%{transform:scale(1) rotate(0);}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
   #won .card{background:var(--surface);border:2px solid var(--hairline);border-radius:20px;padding:24px 32px;box-shadow:var(--shadow);}
   #won h2{margin:0;font-size:25px;letter-spacing:.06em;background:linear-gradient(90deg,#e2685f,#e0a23a,#5aae6e,#4f86e0,#8a63d8);
     -webkit-background-clip:text;background-clip:text;color:transparent;}
@@ -110,6 +115,12 @@
   let W, H, cs, gx, gy, cols, rows, screen = 'select';
   let grid, tiles, beams, history = [], won = false, curLevel = 0;
   let solved = load('spectra_solved_v3');     // pure puzzles: just track which levels are beaten
+  // ---- juice / game-feel state ----
+  let T = 0;                                  // seconds clock, fed by the render loop
+  const effects = [];                         // transient particles / pulses
+  let litState = [];                          // per-beam lit memory, to fire a connect burst on false->true
+  let flash = 0, shake = 0;                   // win screen feedback
+  const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
   function load(k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } }
   function saveSolved() { try { localStorage.setItem('spectra_solved_v3', JSON.stringify(solved)); } catch (e) {} }
 
@@ -154,6 +165,8 @@
     curLevel = i; const L = LV[i];
     rows = L.r; cols = L.c; beams = L.b.map(x => x.slice()); grid = cloneG(L.g);
     layout(); history = []; won = false; buildTiles();
+    effects.length = 0; flash = 0; shake = 0;
+    litState = beams.map(beamOK.bind(null, grid));   // seed lit memory so pre-lit receivers don't fire a chime on open
     document.getElementById('won').classList.remove('show');
     document.getElementById('select').style.display = 'none';
     document.getElementById('top').style.display = 'flex';
@@ -188,14 +201,18 @@
   cv.addEventListener('pointerdown', e => {
     if (screen !== 'play' || won) return; aOn();
     const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs);
-    if (inb(c, r) && isMovable(grid[r][c])) down = { c, r, x: e.clientX, y: e.clientY };   // pick up any glass or mirror
+    if (inb(c, r) && isMovable(grid[r][c])) { const tt = tiles.find(o => o.c === c && o.r === r); down = { c, r, x: e.clientX, y: e.clientY, lift: 0, tile: tt }; }   // pick up any glass or mirror
   });
   cv.addEventListener('pointerup', e => {
     if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y, d = down; down = null;
     if (Math.hypot(dx, dy) < cs * 0.28) return;
     let dc = 0, dr = 0; if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
-    const nc = d.c + dc, nr = d.r + dr; if (!inb(nc, nr) || grid[d.r][d.c] === grid[nr][nc]) return;   // slide into a gap or swap with a neighbour
-    doSwap(d.r, d.c, nr, nc);
+    const nc = d.c + dc, nr = d.r + dr;
+    if (!inb(nc, nr) || grid[d.r][d.c] === grid[nr][nc]) {   // blocked: nudge the tile toward the wall and buzz
+      if (d.tile && !reduceMotion) { d.tile.vx = (d.tile.vx || 0) + dc * cs * 0.14; d.tile.vy = (d.tile.vy || 0) + dr * cs * 0.14; }
+      sfx('nope'); return;
+    }
+    doSwap(d.r, d.c, nr, nc);   // slide into a gap or swap with a neighbour
   });
   function doSwap(r1, c1, r2, c2) {
     history.push(cloneG(grid));
@@ -210,10 +227,16 @@
     won = true;
     solved[curLevel] = true; saveSolved();
     document.getElementById('wnext').textContent = curLevel < LEVELS - 1 ? 'Next ›' : 'Levels';
-    setTimeout(() => document.getElementById('won').classList.add('show'), 360); sfx('win');
+    if (!reduceMotion) { winBurst(); flash = 1; shake = 1; }
+    setTimeout(() => document.getElementById('won').classList.add('show'), reduceMotion ? 200 : 600); sfx('win');
   }
-  document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); buildTiles(); };
-  document.getElementById('reset').onclick = () => { if (won) return; if (!history.length) return; grid = history[0]; history = []; buildTiles(); };
+  function winBurst() {
+    const cxp = gx + cols * cs / 2, cyp = gy + rows * cs / 2, pal = beams.map(b => b[5]);
+    for (let i = 0; i < 56; i++) { const a = (i / 56) * 6.283 + Math.random() * .4, sp = 2 + Math.random() * 5.5; effects.push({ type: 'confetti', x: cxp, y: cyp, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.6, col: pal[i % pal.length], born: T, life: 1.0 + Math.random() * .7, rot: Math.random() * 6.283, vr: (Math.random() - .5) * .35 }); }
+    effects.push({ type: 'rays', x: cxp, y: cyp, born: T, life: .7 });
+  }
+  document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); buildTiles(); sfx('undo'); };
+  document.getElementById('reset').onclick = () => { if (won) return; if (!history.length) return; grid = history[0]; history = []; buildTiles(); sfx('undo'); };
   document.getElementById('menu').onclick = showMenu;
   document.getElementById('wmenu').onclick = showMenu;
   document.getElementById('wnext').onclick = () => openLevel(Math.min(LEVELS - 1, curLevel + 1));
@@ -224,11 +247,16 @@
   // Draw a beam as colour-runs: one continuous polyline per colour (no per-cell seams), round bends at mirrors.
   // A run keeps butt end-caps (clean colour transitions) but round joins (smooth mirror bends).
   function strokeRun(run, c, d, w) {
-    ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+    ctx.lineJoin = 'round';
     const path = () => { ctx.beginPath(); ctx.moveTo(run[0][0], run[0][1]); for (let k = 1; k < run.length; k++) ctx.lineTo(run[k][0], run[k][1]); };
-    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();
-    ctx.strokeStyle = rgb(d, .9); ctx.lineWidth = w + 2.4; path(); ctx.stroke();
-    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();
+    const nearWhite = c[0] + c[1] + c[2] > 700;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();                                                  // soft glow
+    ctx.strokeStyle = nearWhite ? 'rgba(108,112,122,.95)' : rgb(d, .9); ctx.lineWidth = w + (nearWhite ? 3.4 : 2.4); path(); ctx.stroke();   // casing (stronger for white so it reads on paper)
+    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // core
+    if (!reduceMotion) {                                                                                                           // flowing light: a bright dash crawling toward the receiver
+      ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([cs * 0.16, cs * 0.92]); ctx.lineDashOffset = -((T * cs * 1.8) % (cs * 1.08)); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = w * 0.5; path(); ctx.stroke(); ctx.restore();
+    }
   }
   function drawBeamRuns(pts, segc, w) {
     let i = 0;
@@ -243,38 +271,71 @@
   function edgePt(side, idx) { const g2 = PAD() + GUT(); if (side === 0) return [gx - g2, ccy(idx)]; if (side === 1) return [gx + cols * cs + g2, ccy(idx)]; if (side === 2) return [ccx(idx), gy - g2]; return [ccx(idx), gy + rows * cs + g2]; }
   const inDirOf = (side) => side === 0 ? [0, 1] : side === 1 ? [0, -1] : side === 2 ? [1, 0] : [-1, 0];
   function render() {
-    ctx.fillStyle = '#f4eee1'; ctx.fillRect(0, 0, W, H);
-    if (screen !== 'play') return;
-    const pad = PAD();
-    ctx.fillStyle = '#fffdf8'; ctx.strokeStyle = '#e4dccb'; ctx.lineWidth = 2;
-    rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 20); ctx.fill(); ctx.stroke();
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill(); }
-    const bw = Math.max(5, cs * 0.11);
-    const traced = beams.map(b => { const w = walk(grid, b[0], b[1], b[2]); return { b, cells: w.cells, exit: w.exit }; });
-    // beam paths: build a polyline through emitter edge -> each cell centre -> exit edge, with a colour per
-    // segment (the beam colour only changes at glass centres), then draw it as continuous same-colour runs.
-    for (const T of traced) {
-      const cells = T.cells; if (!cells.length) continue;
-      const pts = [edgePt(T.b[0], T.b[1])];
-      for (const cell of cells) pts.push([ccx(cell.c), ccy(cell.r)]);
-      if (T.exit) pts.push(edgePt(T.exit.side, T.exit.idx));
-      else { const l = cells[cells.length - 1]; pts.push([ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2]); }
-      const segc = [cells[0].inCol]; for (const cell of cells) segc.push(cell.outCol);
-      drawBeamRuns(pts, segc, bw);
+    ctx.fillStyle = '#f4eee1'; ctx.fillRect(-30, -30, W + 60, H + 60);
+    if (screen === 'play') {
+      ctx.save();
+      if (shake > 0.02) { const s = shake * cs * 0.05; ctx.translate((Math.random() - .5) * s, (Math.random() - .5) * s); shake *= 0.86; } else shake = 0;
+      const pad = PAD();
+      // board panel with a soft drop shadow so it floats above the paper
+      ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.16)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 12;
+      ctx.fillStyle = '#fffdf8'; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 20); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = '#e4dccb'; ctx.lineWidth = 2; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 20); ctx.stroke();
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill(); }
+      const bw = Math.max(5, cs * 0.11);
+      const traced = beams.map(b => { const w = walk(grid, b[0], b[1], b[2]); return { b, cells: w.cells, exit: w.exit }; });
+      // beam paths: emitter edge -> each cell centre -> exit edge, a colour per segment, drawn as same-colour runs
+      for (const Tr of traced) {
+        const cells = Tr.cells; if (!cells.length) continue;
+        const pts = [edgePt(Tr.b[0], Tr.b[1])];
+        for (const cell of cells) pts.push([ccx(cell.c), ccy(cell.r)]);
+        if (Tr.exit) pts.push(edgePt(Tr.exit.side, Tr.exit.idx));
+        else { const l = cells[cells.length - 1]; pts.push([ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2]); }
+        const segc = [cells[0].inCol]; for (const cell of cells) segc.push(cell.outCol);
+        drawBeamRuns(pts, segc, bw);
+      }
+      // emitters + receivers; fire a connect burst + chime when a receiver newly lights
+      traced.forEach((Tr, i) => {
+        const b = Tr.b, ep = edgePt(b[0], b[1]); emitter(ep[0], ep[1], b[2], inDirOf(b[0]));
+        const rp = edgePt(b[3], b[4]), lit = !!Tr.exit && Tr.exit.side === b[3] && Tr.exit.idx === b[4] && Tr.exit.col === b[5];
+        if (lit && !litState[i]) { effects.push({ type: 'connect', x: rp[0], y: rp[1], col: b[5], born: T, life: .5 }); sfx('connect'); }
+        litState[i] = lit;
+        receiver(rp[0], rp[1], b[5], lit);
+      });
+      // movable pieces (glass + mirrors): spring-settle to their cells, lift while held
+      for (const t of tiles) {
+        if (reduceMotion) { t.x = ccx(t.c); t.y = ccy(t.r); }
+        else { t.vx = (t.vx || 0) + (ccx(t.c) - t.x) * 0.5; t.vx *= 0.62; t.x += t.vx; t.vy = (t.vy || 0) + (ccy(t.r) - t.y) * 0.5; t.vy *= 0.62; t.y += t.vy; }
+        const lift = (down && down.tile === t) ? (down.lift || 0) : 0;
+        if (isMirror(t.col)) mirror(t.x, t.y, t.col, lift); else tile(t.x, t.y, t.col, lift);
+      }
+      drawEffects();
+      ctx.restore();
     }
-    // emitters + receivers
-    for (const T of traced) {
-      const b = T.b, ep = edgePt(b[0], b[1]); emitter(ep[0], ep[1], b[2], inDirOf(b[0]));
-      const rp = edgePt(b[3], b[4]), lit = !!T.exit && T.exit.side === b[3] && T.exit.idx === b[4] && T.exit.col === b[5];
-      receiver(rp[0], rp[1], b[5], lit);
-    }
-    // movable pieces (glass + mirrors) tween to their cell centres
-    for (const t of tiles) { t.x += (ccx(t.c) - t.x) * 0.34; t.y += (ccy(t.r) - t.y) * 0.34; if (isMirror(t.col)) mirror(t.x, t.y, t.col); else tile(t.x, t.y, t.col); }
+    if (flash > 0.02) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.3})`; ctx.fillRect(0, 0, W, H); flash *= 0.9; } else flash = 0;
   }
-  function mirror(X, Y, kind) {
+  // transient particles / pulses; updated + culled each frame
+  function drawEffects() {
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const e = effects[i], p = (T - e.born) / e.life;
+      if (p >= 1) { effects.splice(i, 1); continue; }
+      if (e.type === 'connect') {
+        ctx.strokeStyle = rgb(CMAP[e.col], (1 - p) * .8); ctx.lineWidth = (1 - p) * 6 + 1; ctx.beginPath(); ctx.arc(e.x, e.y, cs * .21 * (1 + 3 * p), 0, 7); ctx.stroke();
+      } else if (e.type === 'confetti') {
+        e.vy += 0.12; e.x += e.vx; e.y += e.vy; e.rot += e.vr;
+        const s = cs * 0.12 * (1 - p * .4); ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.globalAlpha = 1 - p * p; ctx.fillStyle = rgb(CMAP[e.col]); rr(-s / 2, -s / 2, s, s, s * .25); ctx.fill(); ctx.restore();
+      } else if (e.type === 'rays') {
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(T * 0.4); ctx.globalAlpha = (1 - p) * .18; ctx.fillStyle = '#fff';
+        for (let k = 0; k < 9; k++) { ctx.rotate(6.283 / 9); const len = cs * (2 + 6 * Math.min(1, p * 2)); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-cs * .12, -len); ctx.lineTo(cs * .12, -len); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function mirror(X, Y, kind, lift) {
     // Translucent glass block: a movable piece you can still see the beam pass through and bend inside.
-    const sz = cs * 0.74;
-    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.16)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+    lift = lift || 0;
+    const sz = cs * 0.74 * (1 + 0.07 * lift), b = 16 * lift;
+    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.16)'; ctx.shadowBlur = 8 + b; ctx.shadowOffsetY = 3 + b * .5;
     ctx.fillStyle = 'rgba(244,246,250,.26)'; rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.fill(); ctx.restore();
     ctx.strokeStyle = 'rgba(150,160,174,.95)'; ctx.lineWidth = Math.max(2, cs * .032); rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(X - sz / 2 + sz * .14, Y - sz / 2 + sz * .13, sz * .42, sz * .12, 5); ctx.fill();   // glass glint
@@ -287,11 +348,12 @@
     ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = cs * 0.04; ctx.beginPath(); ctx.moveTo(x0 + 1, y0 - 1); ctx.lineTo(x1 + 1, y1 - 1); ctx.stroke();
   }
 
-  function tile(x, y, col) {
-    const s = cs * 0.74, c = CMAP[col], d = drk(col);
-    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.22)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 4;
+  function tile(x, y, col, lift) {
+    lift = lift || 0;
+    const s = cs * 0.74 * (1 + 0.07 * lift), c = CMAP[col], d = drk(col), b = 18 * lift;
+    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.22)'; ctx.shadowBlur = 9 + b; ctx.shadowOffsetY = 4 + b * .55;
     const g = ctx.createLinearGradient(0, y - s / 2, 0, y + s / 2);
-    g.addColorStop(0, rgb([Math.min(255, c[0] + 26), Math.min(255, c[1] + 26), Math.min(255, c[2] + 26)]));
+    g.addColorStop(0, rgb([Math.min(255, c[0] + 26 + 18 * lift), Math.min(255, c[1] + 26 + 18 * lift), Math.min(255, c[2] + 26 + 18 * lift)]));
     g.addColorStop(1, rgb(c));
     ctx.fillStyle = g; rr(x - s / 2, y - s / 2, s, s, s * .24); ctx.fill(); ctx.restore();
     ctx.strokeStyle = rgb(d); ctx.lineWidth = Math.max(2, cs * 0.032); rr(x - s / 2, y - s / 2, s, s, s * .24); ctx.stroke();
@@ -301,6 +363,7 @@
   // Emitter: a projector that casts light along `dir` ([dr,dc] into the board). Distinct from the ring receiver.
   function emitter(x, y, m, dir) {
     const c = CMAP[m], d = drk(m), r = cs * .17, ang = Math.atan2(dir[0], dir[1]);
+    if (!reduceMotion) { ctx.fillStyle = rgb(c, .14); ctx.beginPath(); ctx.arc(x, y, r * (1.5 + 0.22 * Math.sin(T * 2.2 + (x + y) * .03)), 0, 7); ctx.fill(); }   // gentle breathing glow
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
     ctx.beginPath(); ctx.moveTo(-r * .85, -r * 1.08); ctx.lineTo(r * 1.2, 0); ctx.lineTo(-r * .85, r * 1.08); ctx.closePath();
     ctx.lineJoin = 'round'; ctx.fillStyle = rgb(c); ctx.fill();
@@ -322,9 +385,12 @@
       ctx.strokeStyle = lum > 150 ? '#2a211a' : '#fff'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.beginPath(); ctx.moveTo(x - rad * .44, y); ctx.lineTo(x - rad * .08, y + rad * .4); ctx.lineTo(x + rad * .5, y - rad * .38); ctx.stroke();
     } else {
-      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = '#fbf6ec'; ctx.fill();            // flat paper centre
-      ctx.lineWidth = cs * .14; ctx.strokeStyle = rgb(c); ctx.beginPath(); ctx.arc(x, y, rad * .6, 0, 7); ctx.stroke();    // colour band
-      ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(58,44,30,.35)'; ctx.beginPath(); ctx.arc(x, y, rad * .38, 0, 7); ctx.stroke();  // inner edge frames the band (so white reads)
+      const nearWhite = lum > 224;
+      // White targets get a solid white centre framed in dark so they read as "wants white" on the cream paper;
+      // coloured targets show a bold colour band on a paper centre.
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = nearWhite ? '#ffffff' : '#fbf6ec'; ctx.fill();
+      ctx.lineWidth = cs * .14; ctx.strokeStyle = nearWhite ? 'rgba(150,160,174,.95)' : rgb(c); ctx.beginPath(); ctx.arc(x, y, rad * .6, 0, 7); ctx.stroke();   // colour band
+      ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(58,44,30,.35)'; ctx.beginPath(); ctx.arc(x, y, rad * .38, 0, 7); ctx.stroke();  // inner edge
       ctx.lineWidth = 2.4; ctx.strokeStyle = ink; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.stroke();                  // outer frame
     }
   }
@@ -400,12 +466,35 @@
   document.getElementById('iback').onclick = () => { if (icur > 0) { icur--; renderIntro(); } };
   document.getElementById('help').onclick = () => openDeck(CARDS, 'spectra_intro_v2');
 
-  // ---------- audio ----------
-  let ac = null; function aOn() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
-  function tone(f, d, t, g) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = t || 'sine'; o.frequency.value = f; n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .05, s + .01); n.gain.exponentialRampToValueAtTime(.0001, s + d); o.connect(n); n.connect(ac.destination); o.start(s); o.stop(s + d + .02); }
-  function sfx(n) { if (!ac) return; if (n === 'move') tone(440, .05, 'triangle', .03); else if (n === 'win') [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .3, 'triangle', .05), i * 95)); }
+  // ---------- audio ---------- (synthesized, no assets; everything runs through a soft lowpass bus)
+  let ac = null, bus = null;
+  function aOn() {
+    try {
+      if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200; const m = ac.createGain(); m.gain.value = .5; lp.connect(m); m.connect(ac.destination); bus = lp; }
+      if (ac.state === 'suspended') ac.resume();
+    } catch (e) {}
+  }
+  // tone with optional pitch glide + attack
+  function tone(f, dur, type, g, glide, atk) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = type || 'sine'; o.frequency.setValueAtTime(f, s); if (glide) o.frequency.exponentialRampToValueAtTime(glide, s + dur); n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .05, s + (atk || .012)); n.gain.exponentialRampToValueAtTime(.0001, s + dur); o.connect(n); n.connect(bus || ac.destination); o.start(s); o.stop(s + dur + .02); }
+  function noise(dur, g, fType, freq) { if (!ac) return; const s = ac.currentTime, len = Math.max(1, (ac.sampleRate * dur) | 0), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len); const src = ac.createBufferSource(); src.buffer = buf; const f = ac.createBiquadFilter(); f.type = fType || 'highpass'; f.frequency.value = freq || 1200; const n = ac.createGain(); n.gain.value = g || .05; src.connect(f); f.connect(n); n.connect(bus || ac.destination); src.start(s); }
+  function sfx(name) {
+    if (!ac) return;
+    if (name === 'move') { tone(330, .07, 'triangle', .05, null, .004); tone(334, .06, 'sine', .022, null, .004); }                 // soft wooden click
+    else if (name === 'connect') { tone(880, .18, 'sine', .06, 1320, .004); setTimeout(() => tone(1760, .12, 'triangle', .03), 22); noise(.05, .018, 'highpass', 3200); }  // bright "ting"
+    else if (name === 'undo') { tone(520, .16, 'sine', .045, 390); }                                                                // gentle downglide
+    else if (name === 'nope') { tone(200, .09, 'sine', .04, 150); }                                                                 // soft thunk
+    else if (name === 'win') {
+      tone(262, 1.2, 'sine', .04, null, .4);                                                                                        // warm pad under it
+      [392, 523, 587, 784, 880, 1047].forEach((f, i) => setTimeout(() => { tone(f, .4, 'triangle', .05); tone(f * 2, .3, 'sine', .02); }, i * 90));   // harp run
+      setTimeout(() => { tone(1568, .5, 'triangle', .03); tone(2093, .5, 'sine', .018); }, 6 * 90);                                  // shimmer tail
+    }
+  }
 
-  function loop() { render(); requestAnimationFrame(loop); }
+  function loop(now) {
+    T = (now || 0) * 0.001;
+    if (down && !reduceMotion) down.lift = (down.lift || 0) + (1 - (down.lift || 0)) * 0.3;
+    render(); requestAnimationFrame(loop);
+  }
   addEventListener('resize', () => { if (screen === 'play') { layout(); for (const t of (tiles || [])) { t.x = ccx(t.c); t.y = ccy(t.r); } } });
   showMenu();
   let seenIntro = false; try { seenIntro = localStorage.getItem('spectra_intro_v2') === '1'; } catch (e) {}
