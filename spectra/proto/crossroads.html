@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Crossroads -- prototype</title>
+<style>
+  :root{
+    --bg:#14151c; --panel:#1d1f29; --ink:#f3f0e8; --muted:#9aa0b0; --line:#2c3040;
+    --R:#e23b3b; --Y:#f4c63a; --B:#2f6fd0;
+    --orange:#ef8a2b; --green:#3fae6b; --purple:#8a5cd0; --white:#f3f0e8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100%; padding:14px; gap:12px; user-select:none; touch-action:manipulation;
+  }
+  header{width:100%; max-width:680px; text-align:center;}
+  h1{font-size:20px; margin:0 0 4px;}
+  .rule{font-size:13px; color:var(--muted); line-height:1.45; margin:0 auto; max-width:560px;}
+  .levelbar{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:8px;}
+  .levelbar .name{font-weight:600; min-width:118px; text-align:center;}
+  button{
+    background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:10px; padding:9px 14px; font-size:14px; cursor:pointer; touch-action:manipulation;
+  }
+  button:active{transform:translateY(1px);}
+  button:disabled{opacity:.4; cursor:default;}
+
+  /* stage holds the grid plus the emitter gutters around it */
+  #stageWrap{position:relative;}
+  #stage{position:relative; touch-action:none;}
+  canvas{display:block; border-radius:12px; background:#0f1016;}
+
+  .banner{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:14px; background:rgba(10,11,16,.74); border-radius:12px;
+    backdrop-filter:blur(2px); z-index:5;
+  }
+  .banner.show{display:flex; animation:pop .25s ease;}
+  @keyframes pop{from{transform:scale(.9); opacity:0;} to{transform:scale(1); opacity:1;}}
+  .banner h2{margin:0; font-size:30px; color:#9be7b6;}
+  .banner .sub{color:var(--muted); font-size:14px;}
+  .banner button{background:#2a6f47; border-color:#3fae6b; font-size:16px; padding:11px 20px;}
+
+  .legend{display:flex; gap:10px 16px; flex-wrap:wrap; justify-content:center; font-size:12px; color:var(--muted); max-width:680px;}
+  .legend .sw{display:inline-flex; align-items:center; gap:6px;}
+  .legend i{width:13px; height:13px; border-radius:4px; display:inline-block;}
+  footer{font-size:11px; color:#5b6172; text-align:center;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Crossroads</h1>
+  <p class="rule">Slide the colored emitters. Light mixes only where two beams cross. Fill each ringed cell with its target color.</p>
+  <div class="levelbar">
+    <button id="prev">&larr; Prev</button>
+    <span class="name" id="lvlName">Level 1/5</span>
+    <button id="next">Next &rarr;</button>
+    <button id="reset">Reset</button>
+  </div>
+</header>
+
+<div id="stageWrap">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="banner" id="banner">
+      <h2>Solved!</h2>
+      <div class="sub" id="bannerSub"></div>
+      <button id="nextLevel">Next level &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <span class="sw"><i style="background:var(--R)"></i>Red</span>
+  <span class="sw"><i style="background:var(--Y)"></i>Yellow</span>
+  <span class="sw"><i style="background:var(--B)"></i>Blue</span>
+  <span class="sw"><i style="background:var(--orange)"></i>Orange = R+Y</span>
+  <span class="sw"><i style="background:var(--green)"></i>Green = Y+B</span>
+  <span class="sw"><i style="background:var(--purple)"></i>Purple = R+B</span>
+  <span class="sw"><i style="background:var(--white)"></i>White = R+Y+B</span>
+</div>
+<footer>Prototype. Drag the chips on the grid's edges. Works with mouse and touch.</footer>
+
+<script>
+/* ============================================================
+   CROSSROADS -- mechanic prototype (single file, vanilla JS)
+   ------------------------------------------------------------
+   Model
+   - Grid N x N. Emitters live in EDGE slots.
+       left / right  -> the emitter's slot is a ROW index; its
+                        beam covers every cell in that row.
+       top  / bottom -> the emitter's slot is a COL index; its
+                        beam covers every cell in that column.
+   - Beams are straight; never bend, never blocked.
+   - A cell's color = additive (RYB) union of the primaries of
+     every beam passing through it.
+       1 primary  -> that primary
+       R+Y orange | Y+B green | R+B purple | R+Y+B white
+   - Drag an emitter chip along its edge to a new slot. Snap to
+     slots. Two emitters may not share the same slot on the same
+     edge. Beams + crossings update live.
+   - Goal cells each want a target color. Level solved when every
+     goal's computed color equals its target.
+   ============================================================ */
+
+const COLORS = {
+  R:'#e23b3b', Y:'#f4c63a', B:'#2f6fd0',
+  orange:'#ef8a2b', green:'#3fae6b', purple:'#8a5cd0', white:'#f3f0e8',
+  none:'#0f1016'
+};
+const LABEL = {R:'Red', Y:'Yellow', B:'Blue', orange:'Orange', green:'Green', purple:'Purple', white:'White'};
+
+function mix(set){
+  const r=set.has('R'), y=set.has('Y'), b=set.has('B');
+  const n=(r?1:0)+(y?1:0)+(b?1:0);
+  if(n===0) return 'none';
+  if(n===3) return 'white';
+  if(n===1) return r?'R':y?'Y':'B';
+  if(r&&y) return 'orange';
+  if(r&&b) return 'purple';
+  return 'green'; // y&b
+}
+const isHoriz = e => (e.edge==='left'||e.edge==='right');
+
+// primaries present at a cell given current emitter placement
+function cellSet(emitters, row, col){
+  const s = new Set();
+  for(const e of emitters){
+    const on = isHoriz(e) ? (e.slot===row) : (e.slot===col);
+    if(on) s.add(e.color);
+  }
+  return s;
+}
+function cellColor(emitters,row,col){ return mix(cellSet(emitters,row,col)); }
+
+function isSolved(emitters, goals){
+  return goals.every(g => cellColor(emitters,g.row,g.col)===g.target);
+}
+
+/* ---------------- LEVELS (brute-force verified) ----------------
+   slot = starting position. Each level confirmed solvable and
+   (L1) not solved at start. */
+const LEVELS = [
+  { // L1 teach: red row already on goal; slide yellow column onto it -> orange
+    name:'Crossing makes color',
+    N:5,
+    emitters:[
+      {edge:'left', color:'R', slot:2},
+      {edge:'top',  color:'Y', slot:1},
+    ],
+    goals:[ {row:2,col:2,target:'orange'} ],
+    note:'Red already runs through the ring. Slide the yellow emitter one column over so the beams cross there.'
+  },
+  { // L2: two goals, two secondaries
+    name:'Two targets',
+    N:5,
+    emitters:[
+      {edge:'left', color:'R', slot:0},
+      {edge:'left', color:'Y', slot:4},
+      {edge:'top',  color:'Y', slot:0},
+      {edge:'top',  color:'B', slot:4},
+    ],
+    goals:[
+      {row:1,col:1,target:'orange'},
+      {row:3,col:3,target:'green'},
+    ],
+    note:'Each ring wants a different mix. Position both crossings.'
+  },
+  { // L3: one yellow row threads BOTH goals
+    name:'One beam, two jobs',
+    N:5,
+    emitters:[
+      {edge:'left', color:'Y', slot:0},
+      {edge:'top',  color:'R', slot:0},
+      {edge:'top',  color:'B', slot:4},
+    ],
+    goals:[
+      {row:2,col:1,target:'orange'},
+      {row:2,col:3,target:'green'},
+    ],
+    note:'A single yellow row must pass through both rings -- one crosses red, one crosses blue.'
+  },
+  { // L4: CONFLICT
+    name:'Conflict',
+    N:5,
+    emitters:[
+      {edge:'left', color:'R', slot:0},
+      {edge:'top',  color:'Y', slot:0},
+      {edge:'top',  color:'B', slot:1},
+    ],
+    goals:[
+      {row:2,col:1,target:'orange'},
+      {row:2,col:3,target:'purple'},
+      {row:0,col:1,target:'Y'},
+    ],
+    note:'Yellow has to serve two rings at once and red must hit both crossings. Moving one beam to fix a ring tends to break another.'
+  },
+  { // L5: capstone with WHITE (left R + right Y on a row + top B on a col)
+    name:'White light',
+    N:5,
+    emitters:[
+      {edge:'left',  color:'R', slot:0},
+      {edge:'right', color:'Y', slot:1},
+      {edge:'top',   color:'B', slot:0},
+      {edge:'top',   color:'Y', slot:1},
+    ],
+    goals:[
+      {row:2,col:2,target:'white'},
+      {row:2,col:1,target:'orange'},
+      {row:0,col:2,target:'B'},
+    ],
+    note:'White needs all three primaries on one cell -- red and yellow share a row, blue arrives down its column.'
+  },
+];
+
+/* ---------------- geometry / layout ---------------- */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let DPR = Math.max(1, window.devicePixelRatio||1);
+
+let GUT;        // gutter (edge) thickness in css px
+let CELL;       // cell size in css px
+let N;          // grid size
+let ORIGIN;     // px offset to grid top-left (= GUT)
+let SIZEpx;     // full css size
+
+function layout(){
+  const maxW = Math.min(window.innerWidth-28, 560);
+  // total drawable square; reserve gutters on all 4 sides
+  SIZEpx = Math.max(280, Math.min(maxW, 560));
+  GUT = Math.round(SIZEpx*0.11);
+  const inner = SIZEpx - GUT*2;
+  CELL = Math.floor(inner / N);
+  // recompute exact size so cells are integer
+  SIZEpx = CELL*N + GUT*2;
+  ORIGIN = GUT;
+  cv.style.width = SIZEpx+'px';
+  cv.style.height = SIZEpx+'px';
+  cv.width = Math.round(SIZEpx*DPR);
+  cv.height = Math.round(SIZEpx*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+
+// chip center (css px) for an emitter at its current slot
+function chipPos(e){
+  const half = CELL/2;
+  if(e.edge==='left')  return {x:GUT*0.5,            y:ORIGIN + e.slot*CELL + half};
+  if(e.edge==='right') return {x:ORIGIN+N*CELL+GUT*0.5, y:ORIGIN + e.slot*CELL + half};
+  if(e.edge==='top')   return {x:ORIGIN + e.slot*CELL + half, y:GUT*0.5};
+  /*bottom*/           return {x:ORIGIN + e.slot*CELL + half, y:ORIGIN+N*CELL+GUT*0.5};
+}
+const CHIP_R = ()=> Math.min(GUT*0.42, CELL*0.42);
+
+/* ---------------- state ---------------- */
+let lvlIndex = 0;
+let emitters = [];   // deep copy of current level emitters
+let goals = [];
+let solvedFlag = false;
+
+function loadLevel(i){
+  lvlIndex = (i+LEVELS.length)%LEVELS.length;
+  const L = LEVELS[lvlIndex];
+  N = L.N;
+  emitters = L.emitters.map(e=>({...e}));
+  goals = L.goals.map(g=>({...g}));
+  solvedFlag = false;
+  document.getElementById('lvlName').textContent = `Level ${lvlIndex+1}/5 -- ${L.name}`;
+  document.getElementById('banner').classList.remove('show');
+  document.getElementById('prev').disabled = lvlIndex===0;
+  layout();
+  draw();
+}
+
+/* ---------------- rendering ---------------- */
+function withAlpha(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  const r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function draw(){
+  ctx.clearRect(0,0,SIZEpx,SIZEpx);
+
+  // grid backdrop
+  ctx.fillStyle = '#0f1016';
+  roundRect(ORIGIN,ORIGIN,N*CELL,N*CELL,10); ctx.fill();
+
+  // --- translucent beam bands ---
+  for(const e of emitters){
+    ctx.fillStyle = withAlpha(COLORS[e.color], 0.28);
+    if(isHoriz(e)){
+      const y = ORIGIN + e.slot*CELL;
+      ctx.fillRect(ORIGIN, y, N*CELL, CELL);
+    }else{
+      const x = ORIGIN + e.slot*CELL;
+      ctx.fillRect(x, ORIGIN, CELL, N*CELL);
+    }
+  }
+
+  // --- brighter mixed node where two or more beams cross ---
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      const s = cellSet(emitters,r,c);
+      if(s.size>=2){
+        const m = mix(s);
+        const cx = ORIGIN + c*CELL + CELL/2;
+        const cy = ORIGIN + r*CELL + CELL/2;
+        const rad = CELL*0.40;
+        // glow
+        const g = ctx.createRadialGradient(cx,cy,rad*0.15,cx,cy,rad);
+        g.addColorStop(0, withAlpha(COLORS[m], 0.98));
+        g.addColorStop(1, withAlpha(COLORS[m], 0.25));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(cx,cy,rad,0,Math.PI*2); ctx.fill();
+      }
+    }
+  }
+
+  // --- grid lines ---
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  for(let i=0;i<=N;i++){
+    const p = ORIGIN + i*CELL + 0.5;
+    ctx.beginPath(); ctx.moveTo(ORIGIN,p); ctx.lineTo(ORIGIN+N*CELL,p); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p,ORIGIN); ctx.lineTo(p,ORIGIN+N*CELL); ctx.stroke();
+  }
+
+  // --- goal rings ---
+  for(const gl of goals){
+    const cx = ORIGIN + gl.col*CELL + CELL/2;
+    const cy = ORIGIN + gl.row*CELL + CELL/2;
+    const cur = cellColor(emitters,gl.row,gl.col);
+    const ok = cur===gl.target;
+    // faint target swatch
+    ctx.fillStyle = withAlpha(COLORS[gl.target], 0.16);
+    roundRect(ORIGIN+gl.col*CELL+3, ORIGIN+gl.row*CELL+3, CELL-6, CELL-6, 8); ctx.fill();
+    // ring
+    ctx.lineWidth = Math.max(3, CELL*0.10);
+    ctx.strokeStyle = COLORS[gl.target];
+    ctx.beginPath(); ctx.arc(cx,cy,CELL*0.34,0,Math.PI*2); ctx.stroke();
+    // check / target dot
+    if(ok){
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.round(CELL*0.34)}px sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✓', cx, cy+1);
+    }else{
+      // small label of wanted color initial under ring
+      ctx.fillStyle = withAlpha(COLORS[gl.target],0.9);
+      ctx.beginPath(); ctx.arc(cx,cy,CELL*0.10,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  // --- emitter chips ---
+  for(const e of emitters){
+    const p = chipPos(e);
+    const R = CHIP_R();
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath(); ctx.arc(p.x, p.y+2, R, 0, Math.PI*2); ctx.fill();
+    // body
+    ctx.fillStyle = COLORS[e.color];
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI*2); ctx.fill();
+    // ring to read as draggable
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = (e===dragging) ? '#fff' : 'rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI*2); ctx.stroke();
+    // direction nub pointing into grid
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    const nub=R*0.32, off=R*0.55;
+    let nx=p.x, ny=p.y;
+    if(e.edge==='left')  nx=p.x+off; if(e.edge==='right') nx=p.x-off;
+    if(e.edge==='top')   ny=p.y+off; if(e.edge==='bottom')ny=p.y-off;
+    ctx.beginPath(); ctx.arc(nx,ny,nub,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+/* ---------------- interaction (pointer events) ---------------- */
+let dragging = null;
+let pointerId = null;
+
+function localPt(ev){
+  const rect = cv.getBoundingClientRect();
+  return { x:(ev.clientX-rect.left), y:(ev.clientY-rect.top) };
+}
+
+function hitChip(pt){
+  const R = CHIP_R()*1.5; // generous touch target
+  for(const e of emitters){
+    const p = chipPos(e);
+    const dx=pt.x-p.x, dy=pt.y-p.y;
+    if(dx*dx+dy*dy <= R*R) return e;
+  }
+  return null;
+}
+
+// given a drag point, compute the slot the chip would snap to,
+// clamped to 0..N-1 and avoiding another emitter on the same edge
+function slotFor(e, pt){
+  let raw;
+  if(isHoriz(e)) raw = Math.floor((pt.y-ORIGIN)/CELL);
+  else           raw = Math.floor((pt.x-ORIGIN)/CELL);
+  raw = Math.max(0, Math.min(N-1, raw));
+  // occupancy: another emitter on SAME edge at that slot blocks it
+  const taken = s => emitters.some(o=>o!==e && o.edge===e.edge && o.slot===s);
+  if(!taken(raw)) return raw;
+  // search nearest free slot
+  for(let d=1; d<N; d++){
+    if(raw-d>=0 && !taken(raw-d)) return raw-d;
+    if(raw+d<N  && !taken(raw+d)) return raw+d;
+  }
+  return e.slot;
+}
+
+cv.addEventListener('pointerdown', ev=>{
+  if(solvedFlag) return;
+  const pt = localPt(ev);
+  const e = hitChip(pt);
+  if(e){
+    dragging = e; pointerId = ev.pointerId;
+    cv.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+    draw();
+  }
+});
+cv.addEventListener('pointermove', ev=>{
+  if(!dragging || ev.pointerId!==pointerId) return;
+  ev.preventDefault();
+  const pt = localPt(ev);
+  const s = slotFor(dragging, pt);
+  if(s!==dragging.slot){ dragging.slot = s; draw(); }
+});
+function endDrag(ev){
+  if(!dragging) return;
+  dragging = null; pointerId=null;
+  try{ cv.releasePointerCapture(ev.pointerId);}catch(_){}
+  draw();
+  checkWin();
+}
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+
+function checkWin(){
+  if(isSolved(emitters,goals) && !solvedFlag){
+    solvedFlag = true;
+    const last = lvlIndex===LEVELS.length-1;
+    document.getElementById('bannerSub').textContent =
+      last ? 'You finished all five.' : 'Every ring matches its target.';
+    document.getElementById('nextLevel').textContent = last ? 'Replay level 1' : 'Next level →';
+    document.getElementById('banner').classList.add('show');
+    draw();
+  }
+}
+
+/* ---------------- controls ---------------- */
+document.getElementById('prev').onclick = ()=> loadLevel(lvlIndex-1);
+document.getElementById('next').onclick = ()=> loadLevel(lvlIndex+1);
+document.getElementById('reset').onclick = ()=> loadLevel(lvlIndex);
+document.getElementById('nextLevel').onclick = ()=> loadLevel(lvlIndex+1);
+
+window.addEventListener('resize', ()=>{ DPR=Math.max(1,window.devicePixelRatio||1); layout(); draw(); });
+
+loadLevel(0);
+</script>
+</body>
+</html>
