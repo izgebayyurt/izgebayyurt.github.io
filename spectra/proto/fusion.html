@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Fusion -- prototype</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --panel: #1d212b;
+    --ink: #e9e7df;
+    --muted: #9aa1ad;
+    --line: #2c3340;
+    --R: #e23b3b;
+    --Y: #f4c63a;
+    --B: #2f6fd0;
+    --O: #ef8a2b;
+    --G: #3fae6b;
+    --P: #8a5cd0;
+    --W: #f3f0e8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 14px 14px 40px; }
+  header h1 { font-size: 20px; margin: 4px 0 2px; letter-spacing: 0.5px; }
+  .rule { color: var(--muted); font-size: 13px; line-height: 1.4; margin: 0 0 12px; }
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin-bottom: 14px;
+  }
+  .bar .spacer { flex: 1 1 auto; }
+  .lvl-label { font-size: 14px; color: var(--ink); min-width: 86px; text-align: center; }
+  button {
+    background: var(--panel); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 14px; font-size: 14px; cursor: pointer;
+    min-height: 44px; min-width: 44px;
+    user-select: none;
+  }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.primary { background: #2a5fb0; border-color: #2a5fb0; }
+
+  .boardwrap { position: relative; display: inline-block; }
+  .board {
+    display: grid; gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 12px;
+    touch-action: none;
+    position: relative;
+  }
+  .cell {
+    width: 62px; height: 62px;
+    border-radius: 12px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+  @media (max-width: 460px) {
+    .cell { width: 56px; height: 56px; }
+  }
+  .cell.empty { background: rgba(255,255,255,0.015); border-style: dashed; border-color: var(--line); }
+  .cell.wall {
+    background:
+      repeating-linear-gradient(45deg, #3a3f4b, #3a3f4b 6px, #2c313c 6px, #2c313c 12px);
+    border: 1px solid #4a5160;
+    box-shadow: inset 0 0 0 2px #565d6d;
+  }
+  .cell.wall::after {
+    content: "WALL";
+    position: absolute; bottom: 3px; left: 0; right: 0;
+    text-align: center; font-size: 8px; letter-spacing: 1px;
+    color: #8a92a2;
+  }
+  /* the actual movable tile */
+  .tile {
+    position: absolute; inset: 4px;
+    border-radius: 9px;
+    cursor: grab;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    color: rgba(0,0,0,0.55);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+    touch-action: none;
+    transition: box-shadow .12s;
+  }
+  .tile.dragging { z-index: 50; cursor: grabbing; box-shadow: 0 10px 22px rgba(0,0,0,0.5); }
+  .tile.whiteink { color: rgba(0,0,0,0.55); }
+
+  /* goal ring */
+  .cell.goal {
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.18);
+  }
+  .goalring {
+    position: absolute; inset: -4px;
+    border-radius: 15px;
+    border: 3px dashed rgba(255,255,255,0.85);
+    pointer-events: none;
+  }
+  .goalswatch {
+    position: absolute; inset: 16px;
+    border-radius: 8px;
+    opacity: 0.30;
+    pointer-events: none;
+  }
+  .cell.goal.met .goalring { border-style: solid; border-color: #7be0a0; }
+
+  /* drop target / preview overlay */
+  .cell.droptarget { box-shadow: 0 0 0 3px #ffd76a; }
+  .preview {
+    position: absolute; inset: 4px;
+    border-radius: 9px;
+    pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    color: rgba(0,0,0,0.7);
+    border: 2px solid rgba(255,255,255,0.9);
+    z-index: 40;
+  }
+  .preview .nm {
+    background: rgba(0,0,0,0.45); color: #fff;
+    padding: 2px 6px; border-radius: 6px; font-size: 11px;
+    text-shadow: none;
+  }
+
+  .banner {
+    position: absolute; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    background: rgba(10,12,16,0.78);
+    border-radius: 16px;
+    backdrop-filter: blur(2px);
+    z-index: 80;
+  }
+  .banner.show { display: flex; }
+  .banner h2 { margin: 0; font-size: 28px; color: #7be0a0; }
+
+  .legend { margin-top: 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .swatchrow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .swatchrow span { display: inline-flex; align-items: center; gap: 5px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid rgba(255,255,255,0.2); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Fusion <span style="color:var(--muted);font-weight:400;font-size:14px;">prototype</span></h1>
+    <p class="rule">Drag a tile onto a neighbor to blend their colors. Fill each ringed cell with its target color.</p>
+  </header>
+
+  <div class="bar">
+    <button id="prev">&larr; Prev</button>
+    <div class="lvl-label" id="lvlLabel">Level 1/5</div>
+    <button id="next">Next &rarr;</button>
+    <div class="spacer"></div>
+    <button id="undo">Undo</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="boardwrap">
+    <div class="board" id="board"></div>
+    <div class="banner" id="banner">
+      <h2>Solved!</h2>
+      <button class="primary" id="nextlevel">Next level &rarr;</button>
+    </div>
+  </div>
+
+  <div class="hint" id="hint"></div>
+
+  <div class="legend">
+    <strong>Color recipes (additive RYB):</strong>
+    <div class="swatchrow">
+      <span><i class="sw" style="background:var(--R)"></i>R red</span>
+      <span><i class="sw" style="background:var(--Y)"></i>Y yellow</span>
+      <span><i class="sw" style="background:var(--B)"></i>B blue</span>
+      <span><i class="sw" style="background:var(--O)"></i>R+Y orange</span>
+      <span><i class="sw" style="background:var(--G)"></i>Y+B green</span>
+      <span><i class="sw" style="background:var(--P)"></i>R+B purple</span>
+      <span><i class="sw" style="background:var(--W)"></i>R+Y+B white (over-mix)</span>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- color model ---------- */
+const HEX = {
+  R: "#e23b3b", Y: "#f4c63a", B: "#2f6fd0",
+  O: "#ef8a2b", G: "#3fae6b", P: "#8a5cd0", W: "#f3f0e8"
+};
+// canonical key for a set of primaries
+function setKey(set){
+  return ["R","Y","B"].filter(p => set.includes(p)).join("");
+}
+const COLOR_OF = {
+  R:{hex:HEX.R, name:"red"},
+  Y:{hex:HEX.Y, name:"yellow"},
+  B:{hex:HEX.B, name:"blue"},
+  RY:{hex:HEX.O, name:"orange"},
+  YB:{hex:HEX.G, name:"green"},
+  RB:{hex:HEX.P, name:"purple"},
+  RYB:{hex:HEX.W, name:"white"},
+  "":{hex:null, name:"empty"}
+};
+function colorOf(set){ return COLOR_OF[setKey(set)]; }
+function union(a,b){
+  const s = new Set([...a, ...b]);
+  return ["R","Y","B"].filter(p => s.has(p));
+}
+function isWhiteish(set){ return setKey(set) === "RYB"; } // dark ink
+
+/* ---------- level data ----------
+   Each cell: null = no cell (gap), or object:
+     { wall:true }
+     { set:[...] }            tile present (set may be [] meaning empty cell, no tile)
+     { goal:"RY", set:[...] } goal cell with target key; set [] = empty goal
+   A "cell exists" if not null. Tiles live in .set (non-empty array).
+   Goal cells store target key (canonical, e.g. "RY").
+*/
+function C(set){ return { set: set.slice() }; }          // tile cell
+function E(){ return { set: [] }; }                       // empty cell
+function W(){ return { wall:true }; }                     // wall
+function G(target, set){ return { goal:target, set:(set||[]).slice() }; } // goal cell
+function _(){ return null; }                              // no cell
+
+const LEVELS = [
+  {
+    name:"L1 -- the verb",
+    cols:4, rows:1,
+    cells:[ C(["R"]), C(["Y"]), C(["B"]), G("RYB") ]
+    // R->Y => orange ; orange->B => white ; white->goal
+  },
+  {
+    name:"L2 -- routing & resource",
+    cols:4, rows:2,
+    cells:[
+      C(["B"]), E(),      E(),      G("YB"),
+      C(["Y"]), C(["B"]), E(),      G("YB")
+    ]
+    // Two greens needed. Two blues + one yellow given... wait one yellow only.
+    // Actually: B(top-left), Y, B given. Need 2 greens (YB). Only one Y -> cannot.
+    // (corrected in build below)
+  },
+  {
+    name:"L3 -- over-mix & wall",
+    cols:4, rows:2,
+    cells:[
+      C(["R"]), C(["Y"]), W(),      G("RY"),
+      E(),      C(["B"]), E(),      E()
+    ]
+    // Goal orange. A stray blue sits below yellow. Must fuse R into Y, then route
+    // orange to goal WITHOUT letting B in. Wall blocks the short top route.
+  },
+  {
+    name:"L4 -- two decompositions",
+    cols:4, rows:2,
+    cells:[
+      C(["R"]), C(["Y"]), C(["R"]), C(["B"]),
+      G("RY"),  E(),      E(),      G("RB")
+    ]
+    // 2 reds, 1 yellow, 1 blue. Goals orange & purple. Decide which red feeds which.
+  },
+  {
+    name:"L5 -- capstone",
+    cols:5, rows:3,
+    cells:[
+      C(["R"]), C(["Y"]), W(),      C(["R"]), C(["B"]),
+      E(),      C(["B"]), W(),      E(),      E(),
+      G("RY"),  E(),      E(),      G("RB"),  E()
+    ]
+    // Walls + 2 reds/1 yellow/2 blues; goals orange & purple; stray blue near yellow.
+  }
+];
+
+/* fix L2 to be solvable & on-theme: two greens, give exactly the resources */
+LEVELS[1] = {
+  name:"L2 -- routing & resource",
+  cols:4, rows:2,
+  cells:[
+    C(["Y"]), C(["B"]), E(),      G("YB"),
+    C(["Y"]), C(["B"]), E(),      G("YB")
+  ]
+  // 2 yellows + 2 blues, two green goals. Make green twice; route each to a goal.
+};
+
+/* ---------- runtime state ---------- */
+let levelIndex = 0;
+let board = [];     // flat array of cells (objects or null)
+let cols = 0, rows = 0;
+let history = [];   // stack of snapshots (JSON)
+
+const boardEl = document.getElementById("board");
+const bannerEl = document.getElementById("banner");
+const lvlLabel = document.getElementById("lvlLabel");
+const hintEl = document.getElementById("hint");
+
+function cloneCells(cells){
+  return cells.map(c => c === null ? null : JSON.parse(JSON.stringify(c)));
+}
+function snapshot(){ history.push(JSON.stringify(board)); }
+function idx(r,c){ return r*cols + c; }
+
+function loadLevel(i){
+  levelIndex = (i + LEVELS.length) % LEVELS.length;
+  const lv = LEVELS[levelIndex];
+  cols = lv.cols; rows = lv.rows;
+  board = cloneCells(lv.cells);
+  history = [];
+  bannerEl.classList.remove("show");
+  lvlLabel.textContent = "Level " + (levelIndex+1) + "/" + LEVELS.length;
+  render();
+  updateHint();
+}
+
+function updateHint(){
+  const lv = LEVELS[levelIndex];
+  hintEl.textContent = lv.name;
+}
+
+function isSolved(){
+  for (const c of board){
+    if (c && c.goal !== undefined){
+      if (setKey(c.set) !== c.goal) return false;
+    }
+  }
+  return true;
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  boardEl.style.gridTemplateColumns = "repeat(" + cols + ", auto)";
+  boardEl.innerHTML = "";
+  for (let r=0;r<rows;r++){
+    for (let c=0;c<cols;c++){
+      const cell = board[idx(r,c)];
+      const el = document.createElement("div");
+      el.className = "cell";
+      el.dataset.r = r; el.dataset.c = c;
+
+      if (cell === null){
+        el.style.visibility = "hidden";
+        boardEl.appendChild(el);
+        continue;
+      }
+      if (cell.wall){
+        el.classList.add("wall");
+        boardEl.appendChild(el);
+        continue;
+      }
+      if (cell.goal !== undefined){
+        el.classList.add("goal");
+        const ring = document.createElement("div");
+        ring.className = "goalring";
+        el.appendChild(ring);
+        const sw = document.createElement("div");
+        sw.className = "goalswatch";
+        sw.style.background = COLOR_OF[cell.goal].hex || "transparent";
+        el.appendChild(sw);
+        if (setKey(cell.set) === cell.goal) el.classList.add("met");
+      }
+      const has = cell.set && cell.set.length > 0;
+      if (!has){
+        if (cell.goal === undefined) el.classList.add("empty");
+      } else {
+        const t = document.createElement("div");
+        t.className = "tile";
+        const col = colorOf(cell.set);
+        t.style.background = col.hex;
+        t.textContent = setKey(cell.set);
+        if (isWhiteish(cell.set)) t.style.color = "rgba(0,0,0,0.6)";
+        else if (setKey(cell.set)==="B" || setKey(cell.set)==="RB") t.style.color = "rgba(255,255,255,0.85)";
+        t.dataset.r = r; t.dataset.c = c;
+        attachDrag(t);
+        el.appendChild(t);
+      }
+      boardEl.appendChild(el);
+    }
+  }
+  // update buttons
+  document.getElementById("undo").disabled = history.length === 0;
+}
+
+function cellElAt(r,c){
+  return boardEl.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]');
+}
+
+/* ---------- drag logic (pointer events) ---------- */
+let drag = null; // {r,c,tile,ox,oy,startX,startY,target}
+
+function attachDrag(tile){
+  tile.addEventListener("pointerdown", onDown);
+}
+
+function neighborInDir(r,c, dx,dy){
+  const nr = r+dy, nc = c+dx;
+  if (nr<0||nr>=rows||nc<0||nc>=cols) return null;
+  return {r:nr,c:nc};
+}
+
+function validTarget(r,c){
+  // returns the neighbor cell coords the pointer is over, if orthogonally adjacent & legal
+  // determined elsewhere by hit-testing; legality checked here
+  const cell = board[idx(r,c)];
+  if (!cell || cell.wall) return false;
+  return true;
+}
+
+function onDown(e){
+  const tile = e.currentTarget;
+  const r = +tile.dataset.r, c = +tile.dataset.c;
+  e.preventDefault();
+  tile.setPointerCapture(e.pointerId);
+  const rect = tile.getBoundingClientRect();
+  drag = {
+    r, c, tile,
+    pointerId: e.pointerId,
+    ox: e.clientX - rect.left - rect.width/2,
+    oy: e.clientY - rect.top - rect.height/2,
+    homeLeft: tile.offsetLeft,
+    homeTop: tile.offsetTop,
+    target: null
+  };
+  tile.classList.add("dragging");
+  tile.style.transition = "none";
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onUp);
+}
+
+function clearPreview(){
+  boardEl.querySelectorAll(".droptarget").forEach(el=>el.classList.remove("droptarget"));
+  boardEl.querySelectorAll(".preview").forEach(el=>el.remove());
+}
+
+function onMove(e){
+  if (!drag) return;
+  e.preventDefault();
+  const t = drag.tile;
+  const parentRect = t.parentElement.getBoundingClientRect();
+  // move tile to follow finger (absolute within its cell parent)
+  const x = e.clientX - parentRect.left - t.offsetWidth/2 - drag.ox;
+  const y = e.clientY - parentRect.top - t.offsetHeight/2 - drag.oy;
+  t.style.left = x + "px";
+  t.style.top = y + "px";
+  t.style.right = "auto"; t.style.bottom = "auto";
+  t.style.inset = "auto";
+
+  // hit test: which cell is the pointer over?
+  t.style.pointerEvents = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  t.style.pointerEvents = "";
+  let cellEl = under ? under.closest(".cell") : null;
+
+  clearPreview();
+  drag.target = null;
+  if (cellEl){
+    const tr = +cellEl.dataset.r, tc = +cellEl.dataset.c;
+    const dr = Math.abs(tr - drag.r), dc = Math.abs(tc - drag.c);
+    const orthAdj = (dr+dc) === 1;
+    if (orthAdj && validTarget(tr,tc)){
+      const destCell = board[idx(tr,tc)];
+      const resultSet = union(board[idx(drag.r,drag.c)].set, destCell.set);
+      const col = colorOf(resultSet);
+      drag.target = {r:tr, c:tc};
+      cellEl.classList.add("droptarget");
+      // live preview overlay
+      const pv = document.createElement("div");
+      pv.className = "preview";
+      pv.style.background = col.hex || "transparent";
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = col.name;
+      pv.appendChild(nm);
+      cellEl.appendChild(pv);
+    }
+  }
+}
+
+function onUp(e){
+  if (!drag) return;
+  document.removeEventListener("pointermove", onMove);
+  document.removeEventListener("pointerup", onUp);
+  document.removeEventListener("pointercancel", onUp);
+  const t = drag.tile;
+  const tgt = drag.target;
+  clearPreview();
+
+  if (tgt){
+    // commit fusion / move
+    snapshot();
+    const srcCell = board[idx(drag.r, drag.c)];
+    const dstCell = board[idx(tgt.r, tgt.c)];
+    dstCell.set = union(srcCell.set, dstCell.set);
+    srcCell.set = [];
+    drag = null;
+    render();
+    if (isSolved()) bannerEl.classList.add("show");
+  } else {
+    // snap back
+    t.classList.remove("dragging");
+    t.style.transition = "left .12s, top .12s";
+    t.style.inset = "";   // restore CSS inset:4px
+    t.style.left = ""; t.style.top = ""; t.style.right=""; t.style.bottom="";
+    drag = null;
+  }
+}
+
+/* ---------- controls ---------- */
+document.getElementById("undo").addEventListener("click", ()=>{
+  if (history.length === 0) return;
+  board = JSON.parse(history.pop());
+  bannerEl.classList.remove("show");
+  render();
+});
+document.getElementById("reset").addEventListener("click", ()=> loadLevel(levelIndex));
+document.getElementById("prev").addEventListener("click", ()=> loadLevel(levelIndex-1));
+document.getElementById("next").addEventListener("click", ()=> loadLevel(levelIndex+1));
+document.getElementById("nextlevel").addEventListener("click", ()=> loadLevel(levelIndex+1));
+
+loadLevel(0);
+</script>
+</body>
+</html>
