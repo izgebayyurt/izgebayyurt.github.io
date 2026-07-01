@@ -23,48 +23,119 @@ function needMap(s) {
   return m;
 }
 
-/* greedy 1-ply policy over the merge-only action space (mix or manual clear):
-   value a clear by how many needed-colour tiles it banks (capped at what's
-   still owed; overflow past the cap is just low-value decluttering); value a
-   mix by whether it manufactures a still-needed secondary, weighted by how
-   big the resulting cluster becomes (a mix that lands next to a matching
-   secondary is worth more than one that creates an isolated tile). Every
-   legal action changes the board, so — unlike the old swap-based policy —
-   there's no risk of a non-progressing cycle; epsilon here is purely to
-   avoid an unrealistically optimal "solve", not to escape stalls. */
-const EPSILON = 0.06;
+const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+function neighborsOf(r, c) { return NB.map(([dr, dc]) => ({ r: r + dr, c: c + dc })); }
 
-export function pickMove(s, rng) {
-  const r = rng || Math.random;
-  const legal = HM.legalActions(s);
-  if (!legal.length) return null;
-  if (r() < EPSILON) return legal[(r() * legal.length) | 0];
+/* Simulates one full chain-drag gesture directly on the real state (this is
+   what one "move" now buys): greedily eats same-colour neighbours to extend
+   the running combo for free; when none exists, diverts into a mix ONLY if
+   the blend is still needed (mirrors a player who wouldn't bother mixing
+   toward a colour they don't need); otherwise stops and banks whatever's
+   accumulated. Mirrors the exact engine primitives the browser uses
+   (applyEat / applyMix / bankVirtualClear), so a single simulated move can
+   legitimately bank far more than the old mix-or-clear economy allowed. */
+export function simulateChain(s, seed, rng) {
   const need = needMap(s);
-  const g = s.grid;
-  let best = null, bestScore = -Infinity;
-  for (const act of legal) {
-    let score;
-    if (act.type === "clear") {
-      const col = g[act.r][act.c];
-      const rem = need[col] || 0;
-      const creditable = Math.min(rem, act.size);
-      score = creditable > 0 ? creditable * 3 + (act.size - creditable) * 0.08 : act.size * 0.05;
-    } else {
-      const a = g[act.from.r][act.from.c], b = g[act.to.r][act.to.c];
-      const blend = HM.mix(a, b);
-      if (need[blend]) {
-        g[act.to.r][act.to.c] = blend; g[act.from.r][act.from.c] = null;   // simulate the placement
-        const resultSize = HM.groupAt(s, act.to.r, act.to.c).length;
-        g[act.from.r][act.from.c] = a; g[act.to.r][act.to.c] = b;          // undo
-        score = 0.6 + resultSize * 0.35;
-      } else {
-        score = 0.05;
+  let anchor = { r: seed.r, c: seed.c };
+  let comboColor = s.grid[anchor.r][anchor.c];
+  let comboCount = 1;
+  let guard = 0;
+  while (guard++ < 60) {
+    const nbs = neighborsOf(anchor.r, anchor.c);
+    let ate = false;
+    for (const d of nbs) {
+      if (HM.playable(s, d.r, d.c) && s.grid[d.r][d.c] === comboColor) {
+        HM.applyEat(s, anchor, d); HM.gravity(s, rng);
+        anchor = d; comboCount++; ate = true; break;
       }
     }
-    score += r() * 0.01;   // tie-break jitter
-    if (score > bestScore) { bestScore = score; best = act; }
+    if (ate) continue;
+    if (HM.isPrim(comboColor)) {
+      let divert = null;
+      for (const d of nbs) {
+        if (HM.playable(s, d.r, d.c) && HM.isPrim(s.grid[d.r][d.c]) && s.grid[d.r][d.c] !== comboColor) {
+          if (need[HM.mix(comboColor, s.grid[d.r][d.c])]) { divert = d; break; }
+        }
+      }
+      if (divert) {
+        const bankCount = comboCount - 1;
+        if (bankCount > 0) s.score += HM.bankVirtualClear(s, comboColor, bankCount).gain;
+        const blend = HM.applyMix(s, anchor, divert);
+        HM.gravity(s, rng);
+        anchor = divert; comboColor = blend; comboCount = 1;
+        continue;
+      }
+    }
+    break;
   }
-  return best;
+  if (comboCount > 1) s.score += HM.bankVirtualClear(s, comboColor, comboCount).gain;
+}
+
+/* Every turn, weighs the best CHAIN-drag start against the best DOUBLE-TAP
+   clear (any connected group, any size >=1 — mirroring the game's other
+   input) and commits whichever is more valuable. This matters because a
+   primary objective (e.g. "collect red") can only ever be replenished by
+   fresh random draws from gravity, and an isolated needed tile with no
+   same-colour neighbour can't be chained at all — a real player would just
+   double-tap it rather than wander off chaining something unrelated. */
+const EPSILON = 0.06;   // fraction of moves that are pure random exploration — realism, not stall-avoidance (every action here changes the board)
+
+function pickChainSeed(s, need, rng) {
+  let best = null, bestScore = -1;
+  for (let r = 0; r < s.H; r++) for (let c = 0; c < s.W; c++) {
+    if (!HM.playable(s, r, c) || !s.grid[r][c]) continue;
+    const col = s.grid[r][c];
+    const clusterSize = HM.groupAt(s, r, c).length;   // >=2 guarantees a same-colour neighbour actually exists (a real eat, not a no-op)
+    let hasNeededDivert = false;
+    if (HM.isPrim(col)) {
+      for (const d of neighborsOf(r, c)) {
+        if (HM.playable(s, d.r, d.c) && HM.isPrim(s.grid[d.r][d.c]) && s.grid[d.r][d.c] !== col && need[HM.mix(col, s.grid[d.r][d.c])]) { hasNeededDivert = true; break; }
+      }
+    }
+    if (clusterSize < 2 && !hasNeededDivert) continue;   // a dead-end seed — chaining from here would do nothing at all, don't even consider it
+    let score;
+    if (clusterSize >= 2 && need[col]) score = clusterSize * 10;          // a real chain that directly banks a needed colour
+    else if (hasNeededDivert) score = 5 + (need[col] ? 2 : 0);            // can manufacture a needed blend
+    else score = clusterSize * 0.5;                                      // a real chain, just not toward a current need — still useful decluttering
+    score += rng() * 0.01;
+    if (score > bestScore) { bestScore = score; best = { r, c }; }
+  }
+  return { seed: best, score: bestScore };
+}
+
+function pickClearComp(s, need, rng) {
+  const comps = HM.allComponents(s);
+  let best = null, bestScore = -1;
+  for (const comp of comps) {
+    const [r, c] = comp[0].split(",").map(Number);
+    const col = s.grid[r][c];
+    const rem = need[col] || 0;
+    const creditable = Math.min(rem, comp.length);
+    let score = creditable > 0 ? creditable * 3 + (comp.length - creditable) * 0.08 : comp.length * 0.05;
+    score += rng() * 0.01;
+    if (score > bestScore) { bestScore = score; best = { r, c }; }
+  }
+  return { seed: best, score: bestScore };
+}
+
+export function playChainMove(s, rng) {
+  const r = rng || Math.random;
+  if (r() < EPSILON) {
+    const cands = [];
+    for (let rr = 0; rr < s.H; rr++) for (let cc = 0; cc < s.W; cc++) if (HM.playable(s, rr, cc) && s.grid[rr][cc]) cands.push({ r: rr, c: cc });
+    if (!cands.length) return false;
+    const seed = cands[(r() * cands.length) | 0];
+    if (r() < 0.5 && HM.groupAt(s, seed.r, seed.c).length >= 2) simulateChain(s, seed, rng);
+    else { HM.clearGroup(s, seed.r, seed.c); HM.gravity(s, rng); }
+    return true;
+  }
+  const need = needMap(s);
+  const chain = pickChainSeed(s, need, r);
+  const clear = pickClearComp(s, need, r);
+  if (!chain.seed && !clear.seed) return false;
+  if (chain.seed && chain.score >= clear.score) simulateChain(s, chain.seed, rng);
+  else { HM.clearGroup(s, clear.seed.r, clear.seed.c); HM.gravity(s, rng); }
+  return true;
 }
 
 /* one playthrough. movesCap guards infinite loops. Returns moves used + win. */
@@ -74,9 +145,8 @@ export function playout(level, rng, movesCap) {
   HM.fill(s, rng);
   let used = 0;
   while (!s.won && !s.lost && used < 9999) {
-    const act = pickMove(s, rng);
-    if (!act) break;
-    HM.applyAction(s, act, rng);
+    const did = playChainMove(s, rng);
+    if (!did) break;
     used++; s.movesLeft--;
     HM.checkEnd(s);
     if (movesCap != null && used >= movesCap) break;

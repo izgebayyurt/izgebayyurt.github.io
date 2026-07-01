@@ -142,36 +142,39 @@
     }
   }
 
+  /* "eat": dragging onto a SAME-coloured neighbour — the neighbour's identity
+     doesn't change, but it's the chain-drag's bread and butter (see applyEat).
+     Anything else that isn't a same-colour pair or a different-primary pair
+     (e.g. primary+secondary, or two different secondaries) is just not a
+     valid direction to move in — "illegal", full stop. */
   function classify(s, from, to) {
     if (!playable(s, from.r, from.c) || !playable(s, to.r, to.c)) return "illegal";
     if (Math.abs(from.r - to.r) + Math.abs(from.c - to.c) !== 1) return "illegal";
     var a = s.grid[from.r][from.c], b = s.grid[to.r][to.c];
     if (!a || !b) return "illegal";
     if (isPrim(a) && isPrim(b) && a !== b) return "mix";
-    if (a === b) return "noop";
-    return "swap";
+    if (a === b) return "eat";
+    return "illegal";
   }
 
-  function doMove(s, from, to) {
-    var t = classify(s, from, to);
-    if (t === "mix") {
-      s.grid[to.r][to.c] = mix(s.grid[from.r][from.c], s.grid[to.r][to.c]);
-      s.grid[from.r][from.c] = null;
-      return { type: "mix", emptied: from, target: to };
-    }
-    if (t === "swap") {
-      var a = s.grid[from.r][from.c];
-      s.grid[from.r][from.c] = s.grid[to.r][to.c];
-      s.grid[to.r][to.c] = a;
-      return { type: "swap" };
-    }
-    return { type: t };
-  }
-
-  /* unconditional applies for the browser's intent-driven input (a forced swap of
-     two primaries must NOT mix; a forced mix skips classification). */
-  function applySwap(s, a, b) { var t = s.grid[a.r][a.c]; s.grid[a.r][a.c] = s.grid[b.r][b.c]; s.grid[b.r][b.c] = t; }
   function applyMix(s, a, b) { var m = mix(s.grid[a.r][a.c], s.grid[b.r][b.c]); s.grid[b.r][b.c] = m; s.grid[a.r][a.c] = null; return m; }
+  /* chain-drag step: `to` is same colour as `from`, so it's absorbed — `from`
+     empties (the caller owes a gravity() pass), `to` is left untouched and is
+     the new anchor for continuing the chain. The running count/colour being
+     chained is gesture-side state, not stored on the grid. */
+  function applyEat(s, from, to) { s.grid[from.r][from.c] = null; }
+
+  /* banks a virtual (already-consumed) same-colour chain of `count` tiles —
+     used when a chain-drag ends (release, or diverts into a mix) — crediting
+     objectives and scoring exactly as clearGroup would for a real spatial
+     group, without needing one (the tiles are already gone from the board,
+     eaten one at a time as the chain progressed). */
+  function bankVirtualClear(s, color, count) {
+    if (count <= 0) return { cleared: 0, gain: 0 };
+    for (var i = 0; i < count; i++) creditObjectives(s, color);
+    var over = Math.max(0, count - POP_MIN);
+    return { cleared: count, gain: count * 12 + over * over * 16 };
+  }
 
   /* flood-fill the connected same-colour group seeded at one cell, ANY size >=1
      (unlike findPops, this is not gated by POP_MIN — it's used for player-driven
@@ -272,51 +275,8 @@
     checkEnd(s);
   }
 
-  function legalMoves(s) {
-    var res = [], r, c;
-    for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) {
-      if (!playable(s, r, c) || !s.grid[r][c]) continue;
-      var nb = [[r, c + 1], [r + 1, c], [r, c - 1], [r - 1, c]];
-      for (var i = 0; i < 4; i++) {
-        var nr = nb[i][0], nc = nb[i][1];
-        if (!playable(s, nr, nc) || !s.grid[nr][nc]) continue;
-        var t = classify(s, { r: r, c: c }, { r: nr, c: nc });
-        if (t === "mix" || t === "swap") res.push({ from: { r: r, c: c }, to: { r: nr, c: nc }, type: t });
-      }
-    }
-    return res;
-  }
-
   function objectivesMet(s) { for (var i = 0; i < s.obj.length; i++) if (s.obj[i].have < s.obj[i].need) return false; return true; }
   function checkEnd(s) { if (objectivesMet(s)) s.won = true; else if (s.movesLeft <= 0) s.lost = true; return s; }
-
-  /* full synchronous cascade (used by the simulator; the browser drives the
-     same primitives step-by-step so it can animate between waves). */
-  function cascade(s, rng) {
-    var combo = 0, total = 0;
-    while (true) {
-      var comps = findPops(s);
-      if (!comps.length) break;
-      combo++;
-      var r = clearComps(s, comps);
-      var g = Math.round(r.gain * combo);
-      total += g; s.score += g;
-      gravity(s, rng);
-    }
-    return total;
-  }
-
-  /* commit one player move + resolve. Returns false if the move was illegal/noop
-     (no move charged). */
-  function step(s, from, to, rng) {
-    var t = classify(s, from, to);
-    if (t !== "mix" && t !== "swap") return false;
-    doMove(s, from, to);
-    s.movesLeft--;
-    cascade(s, rng);
-    checkEnd(s);
-    return true;
-  }
 
   return {
     PRIM: PRIM, SEC: SEC, COLORS: COLORS, HEX: HEX, NAME: NAME, POP_MIN: POP_MIN,
@@ -327,7 +287,7 @@
     findPops: findPops, gravity: gravity, clearComps: clearComps,
     groupAt: groupAt, allComponents: allComponents, clearGroup: clearGroup,
     legalActions: legalActions, applyAction: applyAction, stepAction: stepAction,
-    classify: classify, doMove: doMove, applySwap: applySwap, applyMix: applyMix, legalMoves: legalMoves,
-    objectivesMet: objectivesMet, checkEnd: checkEnd, cascade: cascade, step: step
+    classify: classify, applyMix: applyMix, applyEat: applyEat, bankVirtualClear: bankVirtualClear,
+    objectivesMet: objectivesMet, checkEnd: checkEnd
   };
 });

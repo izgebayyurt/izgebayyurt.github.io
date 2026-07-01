@@ -122,6 +122,7 @@ h1{ font-size:30px; line-height:1; }
 .tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
 .tile.new{ animation:hmDrop .22s var(--pop); }
 .tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
+.tile.eatpulse{ animation:hmEatPulse .18s var(--pop); z-index:4; }
 .tile.press{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 1.5px 2px 0 rgba(44,39,51,.28); z-index:5; }
 .mixfx{ position:absolute; display:none; pointer-events:none; z-index:6; overflow:visible; }
 
@@ -131,6 +132,14 @@ h1{ font-size:30px; line-height:1; }
   background:#ffd15c; border:2.5px solid var(--line); border-radius:999px; padding:6px 15px;
   box-shadow:0 3px 0 var(--shadow); opacity:0; pointer-events:none; z-index:8;
 }
+.combo-badge{
+  position:absolute; display:none; align-items:center; justify-content:center;
+  min-width:24px; height:24px; padding:0 7px; transform:translate(-50%,-135%);
+  font-family:var(--font-d); font-weight:700; font-size:14px; color:#fff;
+  background:var(--ink); border-radius:999px; box-shadow:0 2px 0 rgba(0,0,0,.35);
+  pointer-events:none; z-index:7;
+}
+.combo-badge.show{ display:flex; }
 .over{
   position:absolute; inset:0; z-index:9; display:none; align-items:center; justify-content:center; padding:18px;
   background:rgba(240,230,207,.72); border-radius:20px;
@@ -150,6 +159,7 @@ h1{ font-size:30px; line-height:1; }
 @keyframes hmPop{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 42%{transform:rotate(var(--rot,0deg)) scale(1.16)} 100%{transform:rotate(var(--rot,0deg)) scale(.05); opacity:0} }
 @keyframes hmDrop{ from{transform:translateY(-15px) rotate(var(--rot,0deg)); opacity:.2} to{transform:translateY(0) rotate(var(--rot,0deg)); opacity:1} }
 @keyframes hmMix{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 45%{transform:rotate(0deg) scale(1.25)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmEatPulse{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 40%{transform:rotate(var(--rot,0deg)) scale(1.18)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
 @keyframes hmToast{ 0%{transform:translateX(-50%) translateY(6px) scale(.85); opacity:0} 18%{transform:translateX(-50%) translateY(0) scale(1); opacity:1} 76%{opacity:1} 100%{transform:translateX(-50%) translateY(-12px); opacity:0} }
 @media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; } }
 </style>
@@ -195,6 +205,7 @@ h1{ font-size:30px; line-height:1; }
         <g filter="url(#goo)"><rect id="cTgt"/><rect id="cSrc"/></g>
       </svg>
       <div class="toast" id="toast"></div>
+      <div class="combo-badge" id="comboBadge"></div>
       <div class="over" id="over">
         <div class="panel">
           <h2 id="overTitle">Cleared!</h2>
@@ -204,7 +215,7 @@ h1{ font-size:30px; line-height:1; }
         </div>
       </div>
     </div>
-    <p class="ghint">Drag two paints together and <b>hold</b> to blend &middot; <b>double-tap</b> a group to clear it</p>
+    <p class="ghint">Drag through <b>same colours to chain</b> them &middot; swipe into a <b>different</b> paint to blend &middot; let go to bank the chain</p>
   </section>
 
 </div>
@@ -217,7 +228,7 @@ h1{ font-size:30px; line-height:1; }
   var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
   var HEX=HM.HEX, NAME=HM.NAME;
   var state=null, curLevel=null, curIndex=0, busy=false;
-  var clearing=new Set(), fresh={}, mixed=new Set();
+  var clearing=new Set(), fresh={}, mixed=new Set(), pulsing=new Set();
   var aid=false, muted=false;
 
   var board=document.getElementById("board");
@@ -242,6 +253,7 @@ h1{ font-size:30px; line-height:1; }
   function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
   function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
   function sfxMix(){ beep(430,0.08,"triangle",0.05); setTimeout(function(){ beep(650,0.1,"triangle",0.045); },70); }
+  function sfxEat(n){ beep(520+Math.min(n,14)*22, 0.06, "sine", 0.045); }   // pitch climbs with the chain -> ascending combo chime
   function sfxPop(n){ var b=360+Math.min(n,10)*14; beep(b,0.12,"sine",0.06); beep(b*1.5,0.14,"sine",0.03); }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
 
@@ -257,6 +269,7 @@ h1{ font-size:30px; line-height:1; }
       if(clearing.has(key)) cls+=" clr";
       if(fresh[key]) cls+=" new";
       if(mixed.has(key)) cls+=" mixed";
+      if(pulsing.has(key)) cls+=" eatpulse";
       var rot=tileRot(r,c);
       h+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="'+cls+'" style="--pc:'+HEX[v]+';--rot:'+rot+'deg">'+
          (aid?'<span class="sym">'+v+'</span>':'')+'<span class="streak"></span></div></div>';
@@ -283,21 +296,8 @@ h1{ font-size:30px; line-height:1; }
   function updateMoves(){ movesN.textContent=state.movesLeft; }
   function toast(t){ toastEl.textContent=t; toastEl.style.animation="none"; void toastEl.offsetWidth; toastEl.style.animation="hmToast 1.15s var(--pop) forwards"; }
 
-  /* ---------- turn resolution: mix (drag+hold) or clear (double-tap) ---------- */
-  async function commitMove(from,to){
-    if(busy) return;
-    busy=true;
-    state.movesLeft--; updateMoves();
-    HM.applyMix(state, from, to);
-    mixed=new Set([to.r+","+to.c]); render(); sfxMix(); await sleep(160);
-    mixed=new Set(); fresh=HM.gravity(state, Math.random); render(); await sleep(150); fresh={};
-    HM.checkEnd(state);
-    busy=false;
-    if(state.won){ render(); showEnd(true); }
-    else if(state.lost){ render(); showEnd(false); }
-    else render();
-  }
-
+  /* ---------- turn resolution: chain-drag (eat same colour / mix different
+     primaries, both mid-drag) or double-tap (instant clear shortcut) ---------- */
   async function commitClear(r,c){
     if(busy) return;
     var comp=HM.groupAt(state,r,c);
@@ -320,11 +320,12 @@ h1{ font-size:30px; line-height:1; }
     else render();
   }
 
-  /* ---------- input: quick swipe swaps, drag-and-hold fuses (mix) ---------- */
+  /* ---------- input: chain-drag ---------- */
   var mixfx=document.getElementById("mixfx"), gooBlur=document.getElementById("gooBlur");
   var cSrc=document.getElementById("cSrc"), cTgt=document.getElementById("cTgt");
   var cSrcInk=document.getElementById("cSrcInk"), cTgtInk=document.getElementById("cTgtInk");
-  var ANIM_MS=700, REVERSE_MS=100, ARM_T=0.4, MOVE_MIN=6, gest=null;
+  var comboBadge=document.getElementById("comboBadge");
+  var ANIM_MS=700, REVERSE_MS=100, ARM_T=0.4, gest=null;
 
   function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
   function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
@@ -333,8 +334,10 @@ h1{ font-size:30px; line-height:1; }
   function centerOf(r,c){ var el=cellEl(r,c); if(!el) return null; var br=board.getBoundingClientRect(), cr=el.getBoundingClientRect(); return { x:cr.left-br.left+cr.width/2, y:cr.top-br.top+cr.height/2, s:cr.width }; }
   function tileFromPoint(x,y){ var el=document.elementFromPoint(x,y); if(!el) return null; var cell=el.closest(".cell"); if(!cell||!board.contains(cell)||cell.dataset.r===undefined) return null; return { r:+cell.dataset.r, c:+cell.dataset.c }; }
 
+  /* recomputes gest.target/targetType/t relative to the CURRENT anchor (which
+     moves as the chain progresses) — pure examination, no commits here. */
   function updateTarget(px,py){
-    var A=gest.A, ac=centerOf(A.r,A.c); if(!ac){ gest.B=null; gest.t=0; gest.mixable=false; return; }
+    var A=gest.anchor, ac=centerOf(A.r,A.c); if(!ac){ gest.target=null; gest.t=0; gest.targetType=null; return; }
     var best=null, bestProj=0.18, nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}];
     for(var i=0;i<4;i++){ var B=nb[i];
       if(!HM.playable(state,B.r,B.c) || !state.grid[B.r][B.c]) continue;
@@ -344,15 +347,19 @@ h1{ font-size:30px; line-height:1; }
       var perp=Math.abs((px-ac.x)*vy-(py-ac.y)*vx)/Math.sqrt(len2);
       if(proj>bestProj && perp<ac.s*0.55){ best=B; bestProj=proj; }
     }
-    gest.B=best; gest.t=best?Math.min(1,bestProj):0;
-    gest.mixable = best ? (HM.classify(state,A,best)==="mix") : false;
-    gest.sec = gest.mixable ? HM.mix(state.grid[A.r][A.c], state.grid[best.r][best.c]) : null;
+    gest.target=best; gest.t=best?Math.min(1,bestProj):0;
+    var ct=best?HM.classify(state,A,best):"illegal";
+    gest.targetType=(ct==="eat"||ct==="mix")?ct:null;
+    gest.sec=(gest.targetType==="mix")?HM.mix(state.grid[A.r][A.c], state.grid[best.r][best.c]):null;
   }
   function clearHidden(){ if(gest&&gest.hidden){ gest.hidden.forEach(function(k){ var p=k.split(","), t=tileElAt(+p[0],+p[1]); if(t) t.style.opacity=""; }); gest.hidden=[]; } }
   function hideFx(){ mixfx.style.display="none"; clearHidden(); }
+  /* the goo-morph overlay only ever represents the COLD-START mix hold (the
+     one case that still needs a held timer); everything past that first
+     commit is instant and uses the tile's own pulse/mixed animation instead. */
   function drawFx(){
-    if(!gest || !gest.mixable){ if(mixfx.style.display!=="none"){ mixfx.style.display="none"; clearHidden(); } return; }
-    var A=gest.A, B=gest.B, ac=centerOf(A.r,A.c), bc=centerOf(B.r,B.c); if(!ac||!bc){ hideFx(); return; }
+    if(!gest || gest.targetType!=="mix" || gest.hasChained){ if(mixfx.style.display!=="none") hideFx(); return; }
+    var A=gest.anchor, B=gest.target, ac=centerOf(A.r,A.c), bc=centerOf(B.r,B.c); if(!ac||!bc){ hideFx(); return; }
     mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
     mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
     mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
@@ -377,15 +384,69 @@ h1{ font-size:30px; line-height:1; }
     clearHidden();
     [A,B].forEach(function(P){ var t=tileElAt(P.r,P.c); if(t){ t.style.opacity="0"; gest.hidden.push(P.r+","+P.c); } });
   }
+  function updateComboLabel(){
+    if(!gest || gest.comboCount<2){ comboBadge.classList.remove("show"); return; }
+    var c=centerOf(gest.anchor.r, gest.anchor.c); if(!c){ comboBadge.classList.remove("show"); return; }
+    comboBadge.style.left=(board.offsetLeft+c.x)+"px";
+    comboBadge.style.top=(board.offsetTop+c.y)+"px";
+    comboBadge.textContent=gest.comboCount;
+    comboBadge.classList.add("show");
+  }
+  function pressAnchor(){ var t=tileElAt(gest.anchor.r,gest.anchor.c); if(t) t.classList.add("press"); }
+
+  /* instant same-colour absorb: the eaten cell empties+refills; the anchor
+     moves to the (unchanged-colour) target so the chain can keep extending. */
+  function commitEatStep(){
+    var from=gest.anchor, to=gest.target;
+    hideFx();
+    HM.applyEat(state, from, to);
+    fresh=HM.gravity(state, Math.random);
+    pulsing=new Set([to.r+","+to.c]);
+    render();
+    pulsing=new Set(); fresh={};
+    gest.comboCount++;
+    gest.hasChained=true;
+    gest.anchor=to; gest.target=null; gest.t=0; gest.fuse=0;
+    pressAnchor();
+    sfxEat(gest.comboCount);
+    updateComboLabel();
+  }
+  /* mix-divert: exactly 1 unit of the running combo is spent on the mix (same
+     1-for-1 rule as any standalone mix); whatever was accumulated before that
+     (comboCount-1) banks immediately as a completed chain; the gesture then
+     continues fresh from the new blend. Used for BOTH the timed cold-start
+     hold and the instant mid-combo divert — only the caller's timing differs. */
+  function commitMixStep(){
+    var from=gest.anchor, to=gest.target;
+    hideFx();
+    var bankCount=gest.comboCount-1;
+    if(bankCount>0){
+      var bank=HM.bankVirtualClear(state, gest.comboColor, bankCount);
+      state.score+=bank.gain;
+      updateGoals();
+      if(bank.cleared>=HM.POP_MIN) toast("+"+bank.gain);
+    }
+    var blend=HM.applyMix(state, from, to);
+    fresh=HM.gravity(state, Math.random);
+    mixed=new Set([to.r+","+to.c]);
+    render();
+    mixed=new Set(); fresh={};
+    gest.anchor=to; gest.comboColor=blend; gest.comboCount=1; gest.hasChained=true;
+    gest.target=null; gest.t=0; gest.fuse=0;
+    pressAnchor();
+    sfxMix();
+    updateComboLabel();
+  }
+  /* only the cold-start mix hold needs a per-frame timer; once anything has
+     committed, subsequent eats/mixes fire instantly from pointermove itself
+     (see below), so this loop naturally stops rescheduling after that. */
   function tick(now){
-    if(!gest) return;
+    if(!gest || gest.hasChained) return;
     var dt=now-(gest.last||now); gest.last=now;
-    var arming = gest.mixable && gest.t>ARM_T;
-    // forward: fuses over ANIM_MS the moment the swipe crosses into the neighbour.
-    // pulled back (arming false): snaps back over the much shorter REVERSE_MS.
-    gest.fuse = Math.max(0, Math.min(1, gest.fuse + (arming ? dt/ANIM_MS : -dt/REVERSE_MS)));
+    var arming=gest.targetType==="mix" && gest.t>ARM_T;
+    gest.fuse=Math.max(0, Math.min(1, gest.fuse + (arming ? dt/ANIM_MS : -dt/REVERSE_MS)));
     drawFx();
-    if(arming && gest.fuse>=1){ var A=gest.A, B=gest.B; finalizeGesture(); if(!busy) commitMove(A,B); return; }  // animation ran its course -> auto-meld
+    if(arming && gest.fuse>=1){ commitMixStep(); return; }   // held through -> mix, then keep the gesture going
     gest.raf=requestAnimationFrame(tick);
   }
   var DTAP_MS=340, lastTap=null;
@@ -396,32 +457,59 @@ h1{ font-size:30px; line-height:1; }
   function finalizeGesture(){
     if(!gest) return;
     cancelAnimationFrame(gest.raf);
-    var pt=tileElAt(gest.A.r,gest.A.c); if(pt) pt.classList.remove("press");
-    hideFx(); gest=null;
+    var pt=tileElAt(gest.anchor.r,gest.anchor.c); if(pt) pt.classList.remove("press");
+    hideFx(); comboBadge.classList.remove("show"); gest=null;
   }
-  function endGesture(){
+  /* release (or cancel): bank whatever's currently held. Nothing committed
+     this gesture -> treat as a plain tap (maybe a double-tap-clear). Anything
+     eaten/mixed already changed the board, so this always consumes exactly
+     one move for the whole gesture, however long the chain ran. */
+  async function finishGesture(){
     if(!gest) return;
-    var A=gest.A, moved=gest.moved;
+    var g=gest;
     finalizeGesture();
     if(busy) return;
-    if(!moved) maybeDoubleTap(A, performance.now());   // dragged but no completed mix -> just cancels, no move spent
+    if(!g.hasChained){ maybeDoubleTap(g.anchor, performance.now()); return; }
+    busy=true;
+    state.movesLeft--; updateMoves();
+    if(g.comboCount>1){
+      var bank=HM.bankVirtualClear(state, g.comboColor, g.comboCount);
+      state.score+=bank.gain;
+      clearing=new Set([g.anchor.r+","+g.anchor.c]);
+      render(); sfxPop(bank.cleared);
+      if(bank.cleared>=HM.POP_MIN) toast("+"+bank.gain);
+      await sleep(220);
+      state.grid[g.anchor.r][g.anchor.c]=null;
+      clearing=new Set(); render(); await sleep(55);
+      fresh=HM.gravity(state, Math.random); render(); await sleep(150); fresh={};
+      updateGoals();
+    }
+    HM.checkEnd(state);
+    busy=false;
+    if(state.won){ render(); showEnd(true); }
+    else if(state.lost){ render(); showEnd(false); }
+    else render();
   }
   board.addEventListener("pointerdown",function(e){
     if(!e.isPrimary || busy) return; ensureAudio();
     var tp=tileFromPoint(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
-    gest={ A:tp, B:null, t:0, fuse:0, sec:null, hidden:[], last:performance.now(), sx:e.clientX, sy:e.clientY, moved:false };
-    var t=tileElAt(tp.r,tp.c); if(t) t.classList.add("press");
+    gest={ anchor:tp, comboColor:state.grid[tp.r][tp.c], comboCount:1, hasChained:false,
+           target:null, targetType:null, t:0, fuse:0, sec:null, hidden:[],
+           last:performance.now(), sx:e.clientX, sy:e.clientY };
+    pressAnchor();
     gest.raf=requestAnimationFrame(tick);
   });
   board.addEventListener("pointermove",function(e){
     if(!gest || !e.isPrimary) return;
-    if(Math.abs(e.clientX-gest.sx)+Math.abs(e.clientY-gest.sy)>MOVE_MIN) gest.moved=true;
-    var br=board.getBoundingClientRect(); updateTarget(e.clientX-br.left, e.clientY-br.top);
+    var br=board.getBoundingClientRect();
+    updateTarget(e.clientX-br.left, e.clientY-br.top);
+    if(gest.targetType==="eat" && gest.t>ARM_T) commitEatStep();
+    else if(gest.targetType==="mix" && gest.hasChained && gest.t>ARM_T) commitMixStep();
   });
-  board.addEventListener("pointerup",function(e){ if(!e.isPrimary) return; endGesture(); });
-  board.addEventListener("pointercancel",function(){ finalizeGesture(); });
+  board.addEventListener("pointerup",function(e){ if(!e.isPrimary) return; finishGesture(); });
+  board.addEventListener("pointercancel",function(){ finishGesture(); });
   board.addEventListener("contextmenu",function(e){ e.preventDefault(); });
 
   /* ---------- screens ---------- */
@@ -448,7 +536,7 @@ h1{ font-size:30px; line-height:1; }
   function startLevel(i){
     curIndex=i; curLevel=LEVELS[i];
     state=HM.newState(curLevel); HM.fill(state, Math.random);
-    clearing=new Set(); fresh={}; mixed=new Set(); busy=false; lastTap=null;
+    clearing=new Set(); fresh={}; mixed=new Set(); pulsing=new Set(); busy=false; lastTap=null; gest=null;
     over.classList.remove("show");
     document.getElementById("gName").textContent="Level "+curLevel.id+" · "+curLevel.name;
     document.getElementById("gSub").textContent=goalSub(curLevel);
