@@ -110,7 +110,7 @@ h1{ font-size:30px; line-height:1; }
 .tile{
   position:absolute; inset:7%;
   background:var(--pc); border:3px solid var(--line);
-  border-radius:44% 56% 52% 48% / 54% 46% 56% 46%;
+  border-radius:22% 28% 24% 30% / 26% 22% 30% 24%;
   box-shadow:1.5px 2px 0 rgba(44,39,51,.28);
   transform:rotate(var(--rot,0deg));
   display:flex; align-items:center; justify-content:center;
@@ -119,7 +119,6 @@ h1{ font-size:30px; line-height:1; }
 .tile.sec{ border-radius:50%; }
 .tile .streak{ position:absolute; top:15%; left:17%; width:32%; height:20%; border-radius:50%; background:rgba(255,255,255,.4); pointer-events:none; }
 .tile .sym{ position:relative; z-index:2; font-family:var(--font-d); font-weight:700; font-size:clamp(11px,3.2vw,16px); color:#fff; -webkit-text-stroke:.8px var(--line); }
-.tile.sel{ transform:rotate(var(--rot,0deg)) scale(1.09); z-index:5; box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 1.5px 2px 0 rgba(44,39,51,.28); }
 .tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
 .tile.new{ animation:hmDrop .22s var(--pop); }
 .tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
@@ -205,7 +204,7 @@ h1{ font-size:30px; line-height:1; }
         </div>
       </div>
     </div>
-    <p class="ghint">Let go quick to <b>swap</b> &middot; keep pushing into a neighbour to <b>blend</b> &middot; pull back to cancel</p>
+    <p class="ghint">Drag two paints together and <b>hold</b> to blend &middot; <b>double-tap</b> a group to clear it</p>
   </section>
 
 </div>
@@ -217,7 +216,7 @@ h1{ font-size:30px; line-height:1; }
   "use strict";
   var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
   var HEX=HM.HEX, NAME=HM.NAME;
-  var state=null, curLevel=null, curIndex=0, sel=null, busy=false;
+  var state=null, curLevel=null, curIndex=0, busy=false;
   var clearing=new Set(), fresh={}, mixed=new Set();
   var aid=false, muted=false;
 
@@ -242,9 +241,8 @@ h1{ font-size:30px; line-height:1; }
   var actx=null;
   function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
   function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
-  function sfxSwap(){ beep(300,0.09,"triangle",0.035); }
   function sfxMix(){ beep(430,0.08,"triangle",0.05); setTimeout(function(){ beep(650,0.1,"triangle",0.045); },70); }
-  function sfxPop(combo){ var b=360+combo*95; beep(b,0.12,"sine",0.06); beep(b*1.5,0.14,"sine",0.03); }
+  function sfxPop(n){ var b=360+Math.min(n,10)*14; beep(b,0.12,"sine",0.06); beep(b*1.5,0.14,"sine",0.03); }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
 
   /* ---------- rendering ---------- */
@@ -255,7 +253,6 @@ h1{ font-size:30px; line-height:1; }
       var v=state.grid[r][c], key=r+","+c;
       if(!v){ h+='<div class="cell slot" data-r="'+r+'" data-c="'+c+'"></div>'; continue; }
       var cls="tile"+(HM.isPrim(v)?"":" sec");
-      if(sel&&sel.r===r&&sel.c===c) cls+=" sel";
       if(clearing.has(key)) cls+=" clr";
       if(fresh[key]) cls+=" new";
       if(mixed.has(key)) cls+=" mixed";
@@ -285,41 +282,36 @@ h1{ font-size:30px; line-height:1; }
   function updateMoves(){ movesN.textContent=state.movesLeft; }
   function toast(t){ toastEl.textContent=t; toastEl.style.animation="none"; void toastEl.offsetWidth; toastEl.style.animation="hmToast 1.15s var(--pop) forwards"; }
 
-  /* ---------- turn resolution ---------- */
-  function adjacent(a,b){ return Math.abs(a.r-b.r)+Math.abs(a.c-b.c)===1; }
-
-  async function resolve(){
-    var combo=0;
-    while(true){
-      var comps=HM.findPops(state);
-      if(!comps.length) break;
-      combo++;
-      clearing=new Set();
-      for(var i=0;i<comps.length;i++) for(var j=0;j<comps[i].length;j++) clearing.add(comps[i][j]);
-      render(); sfxPop(combo);
-      if(combo>=2) toast(combo+"× combo!");
-      await sleep(215);
-      var res=HM.clearComps(state, comps);
-      state.score += Math.round(res.gain*combo);
-      updateGoals();
-      clearing=new Set(); render(); await sleep(55);
-      fresh=HM.gravity(state, Math.random); render(); await sleep(160); fresh={};
-    }
+  /* ---------- turn resolution: mix (drag+hold) or clear (double-tap) ---------- */
+  async function commitMove(from,to){
+    if(busy) return;
+    busy=true;
+    state.movesLeft--; updateMoves();
+    HM.applyMix(state, from, to);
+    mixed=new Set([to.r+","+to.c]); render(); sfxMix(); await sleep(160);
+    mixed=new Set(); fresh=HM.gravity(state, Math.random); render(); await sleep(150); fresh={};
+    HM.checkEnd(state);
+    busy=false;
+    if(state.won){ render(); showEnd(true); }
+    else if(state.lost){ render(); showEnd(false); }
+    else render();
   }
 
-  async function commitMove(from,to,type){
+  async function commitClear(r,c){
     if(busy) return;
-    if(type==="swap" && state.grid[from.r][from.c]===state.grid[to.r][to.c]) return;   // no-op swap
-    busy=true; sel=null;
+    var comp=HM.groupAt(state,r,c);
+    if(!comp.length) return;
+    busy=true;
     state.movesLeft--; updateMoves();
-    if(type==="mix"){
-      HM.applyMix(state, from, to);
-      mixed=new Set([to.r+","+to.c]); render(); sfxMix(); await sleep(160);
-      mixed=new Set(); fresh=HM.gravity(state, Math.random); render(); await sleep(150); fresh={};
-    } else {
-      HM.applySwap(state, from, to); render(); sfxSwap(); await sleep(130);
-    }
-    await resolve();
+    clearing=new Set(comp);
+    render(); sfxPop(comp.length);
+    await sleep(230);
+    var res=HM.clearGroup(state,r,c);
+    state.score+=res.gain;
+    updateGoals();
+    if(res.cleared>=HM.POP_MIN) toast("+"+res.gain);
+    clearing=new Set(); render(); await sleep(55);
+    fresh=HM.gravity(state, Math.random); render(); await sleep(160); fresh={};
     HM.checkEnd(state);
     busy=false;
     if(state.won){ render(); showEnd(true); }
@@ -384,15 +376,13 @@ h1{ font-size:30px; line-height:1; }
     // pulled back (arming false): snaps back over the much shorter REVERSE_MS.
     gest.fuse = Math.max(0, Math.min(1, gest.fuse + (arming ? dt/ANIM_MS : -dt/REVERSE_MS)));
     drawFx();
-    if(arming && gest.fuse>=1){ var A=gest.A, B=gest.B; finalizeGesture(); if(!busy) commitMove(A,B,"mix"); return; }  // animation ran its course -> auto-meld
+    if(arming && gest.fuse>=1){ var A=gest.A, B=gest.B; finalizeGesture(); if(!busy) commitMove(A,B); return; }  // animation ran its course -> auto-meld
     gest.raf=requestAnimationFrame(tick);
   }
-  function handleTap(tile){
-    if(!state.grid[tile.r][tile.c]){ sel=null; render(); return; }
-    if(!sel){ sel=tile; render(); return; }
-    if(sel.r===tile.r&&sel.c===tile.c){ sel=null; render(); return; }
-    if(adjacent(sel,tile)){ var s=sel; sel=null; commitMove(s,tile,"swap"); return; }
-    sel=tile; render();
+  var DTAP_MS=340, lastTap=null;
+  function maybeDoubleTap(tile,now){
+    if(lastTap && lastTap.r===tile.r && lastTap.c===tile.c && (now-lastTap.t)<DTAP_MS){ lastTap=null; commitClear(tile.r,tile.c); return; }
+    lastTap={ r:tile.r, c:tile.c, t:now };
   }
   function finalizeGesture(){
     if(!gest) return;
@@ -402,16 +392,15 @@ h1{ font-size:30px; line-height:1; }
   }
   function endGesture(){
     if(!gest) return;
-    var A=gest.A, B=gest.B, t=gest.t;
+    var A=gest.A, moved=gest.moved;
     finalizeGesture();
-    if(busy){ sel=null; return; }
-    if(B && t>=0.5){ commitMove(A,B,"swap"); return; }   // let go before the fuse animation finishes -> plain swap
-    handleTap(A);
+    if(busy) return;
+    if(!moved) maybeDoubleTap(A, performance.now());   // dragged but no completed mix -> just cancels, no move spent
   }
   board.addEventListener("pointerdown",function(e){
     if(!e.isPrimary || busy) return; ensureAudio();
     var tp=tileFromPoint(e.clientX,e.clientY);
-    if(!tp || !state.grid[tp.r][tp.c]){ if(sel){ sel=null; render(); } return; }
+    if(!tp || !state.grid[tp.r][tp.c]) return;
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
     gest={ A:tp, B:null, t:0, fuse:0, sec:null, hidden:[], last:performance.now(), sx:e.clientX, sy:e.clientY, moved:false };
     var t=tileElAt(tp.r,tp.c); if(t) t.classList.add("press");
@@ -450,7 +439,7 @@ h1{ font-size:30px; line-height:1; }
   function startLevel(i){
     curIndex=i; curLevel=LEVELS[i];
     state=HM.newState(curLevel); HM.fill(state, Math.random);
-    sel=null; clearing=new Set(); fresh={}; mixed=new Set(); busy=false;
+    clearing=new Set(); fresh={}; mixed=new Set(); busy=false; lastTap=null;
     over.classList.remove("show");
     document.getElementById("gName").textContent="Level "+curLevel.id+" · "+curLevel.name;
     document.getElementById("gSub").textContent=goalSub(curLevel);
@@ -497,7 +486,7 @@ h1{ font-size:30px; line-height:1; }
     muted=!muted; ensureAudio();
     e.currentTarget.setAttribute("aria-pressed",muted?"false":"true");
     e.currentTarget.style.opacity=muted?"0.45":"1";
-    lsSet("hm_mute",muted?"1":"0"); if(!muted) sfxSwap();
+    lsSet("hm_mute",muted?"1":"0"); if(!muted) sfxMix();
   });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&screenGame.style.display!=="none"&&!over.classList.contains("show")) showLevels(); });
 

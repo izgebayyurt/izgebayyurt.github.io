@@ -23,56 +23,46 @@ function needMap(s) {
   return m;
 }
 
-/* size of the connected same-colour group containing (r,c) — how close to a pop */
-function groupSize(s, r, c) {
-  const v = s.grid[r][c]; if (!v) return 0;
-  const seen = {}, st = [[r, c]]; seen[r + "," + c] = 1; let n = 0;
-  while (st.length) {
-    const cur = st.pop(), y = cur[0], x = cur[1]; n++;
-    const nb = [[y + 1, x], [y - 1, x], [y, x + 1], [y, x - 1]];
-    for (const [ny, nx] of nb) {
-      const k = ny + "," + nx;
-      if (!HM.playable(s, ny, nx) || seen[k] || s.grid[ny][nx] !== v) continue;
-      seen[k] = 1; st.push([ny, nx]);
-    }
-  }
-  return n;
-}
-
-/* greedy 1-ply policy: prefer moves whose immediate pops clear needed colours;
-   otherwise value mixes that manufacture a needed secondary and moves that
-   cluster same colours. Approximates a decent (not perfect) human. */
-const EPSILON = 0.05;   // exploration rate — enough to avoid stalls, low enough to play competently
+/* greedy 1-ply policy over the merge-only action space (mix or manual clear):
+   value a clear by how many needed-colour tiles it banks (capped at what's
+   still owed; overflow past the cap is just low-value decluttering); value a
+   mix by whether it manufactures a still-needed secondary, weighted by how
+   big the resulting cluster becomes (a mix that lands next to a matching
+   secondary is worth more than one that creates an isolated tile). Every
+   legal action changes the board, so — unlike the old swap-based policy —
+   there's no risk of a non-progressing cycle; epsilon here is purely to
+   avoid an unrealistically optimal "solve", not to escape stalls. */
+const EPSILON = 0.06;
 
 export function pickMove(s, rng) {
   const r = rng || Math.random;
-  const legal = HM.legalMoves(s);
+  const legal = HM.legalActions(s);
   if (!legal.length) return null;
-  if (r() < EPSILON) return legal[(r() * legal.length) | 0];   // ε-greedy: perturb out of any stuck pattern
+  if (r() < EPSILON) return legal[(r() * legal.length) | 0];
   const need = needMap(s);
   const g = s.grid;
   let best = null, bestScore = -Infinity;
-  for (const mv of legal) {
-    const fr = mv.from, to = mv.to;
-    const a = g[fr.r][fr.c], b = g[to.r][to.c];
-    let blend = null;
-    if (mv.type === "mix") { blend = HM.mix(a, b); g[to.r][to.c] = blend; g[fr.r][fr.c] = null; }
-    else { g[fr.r][fr.c] = b; g[to.r][to.c] = a; }        // swap in place
-    const comps = HM.findPops(s);
-    let score = 0, popped = 0;
-    for (const comp of comps) for (const k of comp) {
-      const [rr, cc] = k.split(",").map(Number);
-      popped++;
-      score += need[g[rr][cc]] ? 3 : 0.2;                 // clearing a needed colour is the goal
+  for (const act of legal) {
+    let score;
+    if (act.type === "clear") {
+      const col = g[act.r][act.c];
+      const rem = need[col] || 0;
+      const creditable = Math.min(rem, act.size);
+      score = creditable > 0 ? creditable * 3 + (act.size - creditable) * 0.08 : act.size * 0.05;
+    } else {
+      const a = g[act.from.r][act.from.c], b = g[act.to.r][act.to.c];
+      const blend = HM.mix(a, b);
+      if (need[blend]) {
+        g[act.to.r][act.to.c] = blend; g[act.from.r][act.from.c] = null;   // simulate the placement
+        const resultSize = HM.groupAt(s, act.to.r, act.to.c).length;
+        g[act.from.r][act.from.c] = a; g[act.to.r][act.to.c] = b;          // undo
+        score = 0.6 + resultSize * 0.35;
+      } else {
+        score = 0.05;
+      }
     }
-    if (popped === 0) {
-      const col = g[to.r][to.c];                          // colour now on the target cell
-      if (col && need[col]) score += groupSize(s, to.r, to.c) * 0.5;  // grow needed groups toward 4
-      if (mv.type === "mix") score += need[blend] ? 0.4 : 0.05;       // manufacture owed secondaries
-    }
-    g[fr.r][fr.c] = a; g[to.r][to.c] = b;                 // undo
-    score += r() * 0.01;                                  // tie-break jitter
-    if (score > bestScore) { bestScore = score; best = mv; }
+    score += r() * 0.01;   // tie-break jitter
+    if (score > bestScore) { bestScore = score; best = act; }
   }
   return best;
 }
@@ -84,11 +74,10 @@ export function playout(level, rng, movesCap) {
   HM.fill(s, rng);
   let used = 0;
   while (!s.won && !s.lost && used < 9999) {
-    const mv = pickMove(s, rng);
-    if (!mv) break;
-    HM.doMove(s, mv.from, mv.to);
+    const act = pickMove(s, rng);
+    if (!act) break;
+    HM.applyAction(s, act, rng);
     used++; s.movesLeft--;
-    HM.cascade(s, rng);
     HM.checkEnd(s);
     if (movesCap != null && used >= movesCap) break;
   }

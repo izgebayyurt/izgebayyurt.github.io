@@ -173,6 +173,105 @@
   function applySwap(s, a, b) { var t = s.grid[a.r][a.c]; s.grid[a.r][a.c] = s.grid[b.r][b.c]; s.grid[b.r][b.c] = t; }
   function applyMix(s, a, b) { var m = mix(s.grid[a.r][a.c], s.grid[b.r][b.c]); s.grid[b.r][b.c] = m; s.grid[a.r][a.c] = null; return m; }
 
+  /* flood-fill the connected same-colour group seeded at one cell, ANY size >=1
+     (unlike findPops, this is not gated by POP_MIN — it's used for player-driven
+     manual clearing, where even a lone stuck tile is a legal, if inefficient,
+     target). Returns [] if the cell is empty/unplayable. */
+  function groupAt(s, r, c) {
+    if (!playable(s, r, c)) return [];
+    var v = s.grid[r][c];
+    if (!v) return [];
+    var seen = {}, stack = [[r, c]], comp = [];
+    seen[r + "," + c] = 1;
+    while (stack.length) {
+      var cur = stack.pop(), y = cur[0], x = cur[1];
+      comp.push(y + "," + x);
+      var nb = [[y + 1, x], [y - 1, x], [y, x + 1], [y, x - 1]];
+      for (var i = 0; i < 4; i++) {
+        var ny = nb[i][0], nx = nb[i][1];
+        if (!playable(s, ny, nx)) continue;
+        var nk = ny + "," + nx;
+        if (seen[nk] || s.grid[ny][nx] !== v) continue;
+        seen[nk] = 1; stack.push([ny, nx]);
+      }
+    }
+    return comp;
+  }
+
+  /* every connected group on the board, one entry each (dedup by component,
+     not by cell) — used to enumerate distinct clear targets. */
+  function allComponents(s) {
+    var seen = {}, comps = [], r, c;
+    for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) {
+      if (!playable(s, r, c) || !s.grid[r][c]) continue;
+      var key = r + "," + c;
+      if (seen[key]) continue;
+      var comp = groupAt(s, r, c);
+      for (var i = 0; i < comp.length; i++) seen[comp[i]] = 1;
+      comps.push(comp);
+    }
+    return comps;
+  }
+
+  /* player-driven manual clear (the "double-tap" action): pops the WHOLE
+     connected group at (r,c), any size, crediting objectives per tile.
+     POP_MIN is now purely a scoring bonus threshold, not a mechanical gate —
+     the caller still owes a gravity() pass to refill. */
+  function clearGroup(s, r, c) {
+    var comp = groupAt(s, r, c);
+    if (!comp.length) return { cleared: 0, gain: 0, comp: comp };
+    var n = comp.length, i;
+    for (i = 0; i < comp.length; i++) {
+      var p = split(comp[i]), col = s.grid[p[0]][p[1]];
+      s.grid[p[0]][p[1]] = null;
+      creditObjectives(s, col);
+    }
+    var over = Math.max(0, n - POP_MIN);
+    return { cleared: n, gain: n * 12 + over * over * 16, comp: comp };
+  }
+
+  /* legal actions in the merge-only design: mix (drag two adjacent different
+     primaries) or clear (tap any populated cell — one action per distinct
+     connected component, since every cell in a component yields the same
+     outcome). There is always at least one clear action available on any
+     board with a playable cell, so this list is never empty. */
+  function legalActions(s) {
+    var res = [], r, c, i;
+    for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) {
+      if (!playable(s, r, c) || !s.grid[r][c]) continue;
+      var nb = [[r, c + 1], [r + 1, c], [r, c - 1], [r - 1, c]];
+      for (i = 0; i < 4; i++) {
+        var nr = nb[i][0], nc = nb[i][1];
+        if (!playable(s, nr, nc) || !s.grid[nr][nc]) continue;
+        if (classify(s, { r: r, c: c }, { r: nr, c: nc }) === "mix") {
+          res.push({ type: "mix", from: { r: r, c: c }, to: { r: nr, c: nc } });
+        }
+      }
+    }
+    var comps = allComponents(s);
+    for (i = 0; i < comps.length; i++) {
+      var p = split(comps[i][0]);
+      res.push({ type: "clear", r: p[0], c: p[1], size: comps[i].length });
+    }
+    return res;
+  }
+
+  /* apply one legal action in place: mix refills only the emptied source cell;
+     clear refills the whole popped group. Both end with a full board. */
+  function applyAction(s, action, rng) {
+    if (action.type === "mix") { applyMix(s, action.from, action.to); gravity(s, rng); return 0; }
+    var res = clearGroup(s, action.r, action.c);
+    gravity(s, rng);
+    s.score += res.gain;
+    return res.gain;
+  }
+
+  function stepAction(s, action, rng) {
+    applyAction(s, action, rng);
+    s.movesLeft--;
+    checkEnd(s);
+  }
+
   function legalMoves(s) {
     var res = [], r, c;
     for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) {
@@ -226,6 +325,8 @@
     colRows: colRows, playableCount: playableCount,
     newState: newState, clone: clone, fill: fill,
     findPops: findPops, gravity: gravity, clearComps: clearComps,
+    groupAt: groupAt, allComponents: allComponents, clearGroup: clearGroup,
+    legalActions: legalActions, applyAction: applyAction, stepAction: stepAction,
     classify: classify, doMove: doMove, applySwap: applySwap, applyMix: applyMix, legalMoves: legalMoves,
     objectivesMet: objectivesMet, checkEnd: checkEnd, cascade: cascade, step: step
   };
