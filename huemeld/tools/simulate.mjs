@@ -26,81 +26,97 @@ function needMap(s) {
 const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 function neighborsOf(r, c) { return NB.map(([dr, dc]) => ({ r: r + dr, c: c + dc })); }
 
-/* Simulates one full chain-drag gesture directly on the real state (this is
-   what one "move" now buys): greedily eats same-colour neighbours to extend
-   the running combo for free; when none exists, diverts into a mix ONLY if
-   the blend is still needed (mirrors a player who wouldn't bother mixing
-   toward a colour they don't need); otherwise stops and banks whatever's
-   accumulated. Mirrors the exact engine primitives the browser uses
-   (applyEat / applyMix / bankVirtualClear), so a single simulated move can
-   legitimately bank far more than the old mix-or-clear economy allowed. */
-export function simulateChain(s, seed, rng) {
-  const need = needMap(s);
-  let anchor = { r: seed.r, c: seed.c };
-  let comboColor = s.grid[anchor.r][anchor.c];
-  let comboCount = 1;
+/* Walks one full chain-drag gesture, mirroring the real (frozen-board)
+   mechanic exactly: eats same-colour neighbours (or, once a different
+   primary is touched, either of the two locked "recipe" ingredients — the
+   third primary is never a valid direction); NO gravity happens mid-walk,
+   matching the real game's frozen board. `preferRecipeWith`, if set, makes
+   the walk lock toward that specific blend the first chance it gets (used
+   to evaluate "what if I aimed this chain at colour X" candidates); left
+   unset, the walk only auto-locks into a blend that's still needed. Once
+   stuck, banks min(ingredient tallies) of the blend (or the raw tally if no
+   recipe was ever locked) exactly as bankVirtualClear + the real UI does,
+   discarding any unpaired leftovers. Fully deterministic (no rng at all —
+   nothing random happens without gravity), so evaluating many candidate
+   seeds via clone-and-replay is safe and reproducible, unlike a design where
+   mid-chain gravity draws would make preview and commit diverge. */
+function walkChain(s, seedR, seedC, preferRecipeWith, need) {
+  const seedColor = s.grid[seedR][seedC];
+  let anchor = { r: seedR, c: seedC };
+  let recipeColor = null;
+  const tally = {}; tally[seedColor] = 1;
   let guard = 0;
-  while (guard++ < 60) {
-    const nbs = neighborsOf(anchor.r, anchor.c);
-    let ate = false;
-    for (const d of nbs) {
-      if (HM.playable(s, d.r, d.c) && s.grid[d.r][d.c] === comboColor) {
-        HM.applyEat(s, anchor, d); HM.gravity(s, rng);
-        anchor = d; comboCount++; ate = true; break;
-      }
+  while (guard++ < 300) {
+    const nbs = neighborsOf(anchor.r, anchor.c).filter(d => HM.playable(s, d.r, d.c) && s.grid[d.r][d.c]);
+    const candidates = nbs.filter(d => {
+      const col = s.grid[d.r][d.c];
+      if (col === seedColor) return true;
+      if (recipeColor) return col === recipeColor;
+      if (!HM.isPrim(seedColor) || !HM.isPrim(col) || col === seedColor) return false;
+      return preferRecipeWith ? col === preferRecipeWith : !!need[HM.mix(seedColor, col)];
+    });
+    if (!candidates.length) break;
+    let pick;
+    if (recipeColor) {
+      const scarce = (tally[seedColor] || 0) <= (tally[recipeColor] || 0) ? seedColor : recipeColor;   // keep the pair balanced, minimise waste
+      pick = candidates.find(d => s.grid[d.r][d.c] === scarce) || candidates[0];
+    } else if (preferRecipeWith) {
+      pick = candidates.find(d => s.grid[d.r][d.c] === preferRecipeWith) || candidates.find(d => s.grid[d.r][d.c] === seedColor) || candidates[0];
+    } else {
+      pick = candidates.find(d => s.grid[d.r][d.c] === seedColor) || candidates[0];
     }
-    if (ate) continue;
-    if (HM.isPrim(comboColor)) {
-      let divert = null;
-      for (const d of nbs) {
-        if (HM.playable(s, d.r, d.c) && HM.isPrim(s.grid[d.r][d.c]) && s.grid[d.r][d.c] !== comboColor) {
-          if (need[HM.mix(comboColor, s.grid[d.r][d.c])]) { divert = d; break; }
-        }
-      }
-      if (divert) {
-        const bankCount = comboCount - 1;
-        if (bankCount > 0) s.score += HM.bankVirtualClear(s, comboColor, bankCount).gain;
-        const blend = HM.applyMix(s, anchor, divert);
-        HM.gravity(s, rng);
-        anchor = divert; comboColor = blend; comboCount = 1;
-        continue;
-      }
-    }
-    break;
+    const col = s.grid[pick.r][pick.c];
+    if (!recipeColor && col !== seedColor) { recipeColor = col; tally[col] = 0; }
+    HM.applyEat(s, anchor, pick);
+    tally[col] = (tally[col] || 0) + 1;
+    anchor = pick;
   }
-  if (comboCount > 1) s.score += HM.bankVirtualClear(s, comboColor, comboCount).gain;
+  let bankColor, bankCount;
+  if (recipeColor) { bankColor = HM.mix(seedColor, recipeColor); bankCount = Math.min(tally[seedColor] || 0, tally[recipeColor] || 0); }
+  else { bankColor = seedColor; bankCount = tally[seedColor] || 0; }
+  s.grid[anchor.r][anchor.c] = null;   // the final anchor tile is also consumed, matching the real release
+  const gain = bankCount > 0 ? HM.bankVirtualClear(s, bankColor, bankCount).gain : 0;
+  s.score += gain;
+  const needCredit = bankCount > 0 ? Math.min(bankCount, need[bankColor] || 0) : 0;
+  return { bankColor, bankCount, gain, needCredit };
 }
 
-/* Every turn, weighs the best CHAIN-drag start against the best DOUBLE-TAP
-   clear (any connected group, any size >=1 — mirroring the game's other
-   input) and commits whichever is more valuable. This matters because a
-   primary objective (e.g. "collect red") can only ever be replenished by
-   fresh random draws from gravity, and an isolated needed tile with no
-   same-colour neighbour can't be chained at all — a real player would just
-   double-tap it rather than wander off chaining something unrelated. */
+/* Every turn, weighs the best CHAIN-drag start (tried across every plausible
+   seed+target combination via clone-and-replay, safe since walkChain is
+   deterministic) against the best DOUBLE-TAP clear (any connected group, any
+   size >=1) and commits whichever is more valuable. An isolated needed tile
+   with no same-colour neighbour can't be chained at all — a real player
+   would just double-tap it rather than wander off chaining something
+   unrelated — so the clear option always stays in the running. */
 const EPSILON = 0.06;   // fraction of moves that are pure random exploration — realism, not stall-avoidance (every action here changes the board)
 
-function pickChainSeed(s, need, rng) {
-  let best = null, bestScore = -1;
+function enumerateChainCandidates(s, need) {
+  const cands = [];
   for (let r = 0; r < s.H; r++) for (let c = 0; c < s.W; c++) {
     if (!HM.playable(s, r, c) || !s.grid[r][c]) continue;
     const col = s.grid[r][c];
-    const clusterSize = HM.groupAt(s, r, c).length;   // >=2 guarantees a same-colour neighbour actually exists (a real eat, not a no-op)
-    let hasNeededDivert = false;
+    if (HM.groupAt(s, r, c).length >= 2) cands.push({ r, c, preferRecipeWith: null });   // a real same-colour chain start (opportunistic — may still auto-lock if useful)
     if (HM.isPrim(col)) {
       for (const d of neighborsOf(r, c)) {
-        if (HM.playable(s, d.r, d.c) && HM.isPrim(s.grid[d.r][d.c]) && s.grid[d.r][d.c] !== col && need[HM.mix(col, s.grid[d.r][d.c])]) { hasNeededDivert = true; break; }
+        if (HM.playable(s, d.r, d.c) && HM.isPrim(s.grid[d.r][d.c]) && s.grid[d.r][d.c] !== col && need[HM.mix(col, s.grid[d.r][d.c])]) {
+          cands.push({ r, c, preferRecipeWith: s.grid[d.r][d.c] });   // explicitly aim this chain at a still-needed blend
+        }
       }
     }
-    if (clusterSize < 2 && !hasNeededDivert) continue;   // a dead-end seed — chaining from here would do nothing at all, don't even consider it
-    let score;
-    if (clusterSize >= 2 && need[col]) score = clusterSize * 10;          // a real chain that directly banks a needed colour
-    else if (hasNeededDivert) score = 5 + (need[col] ? 2 : 0);            // can manufacture a needed blend
-    else score = clusterSize * 0.5;                                      // a real chain, just not toward a current need — still useful decluttering
-    score += rng() * 0.01;
-    if (score > bestScore) { bestScore = score; best = { r, c }; }
   }
-  return { seed: best, score: bestScore };
+  return cands;
+}
+
+function pickBestChain(s, need, rng) {
+  const cands = enumerateChainCandidates(s, need);
+  let best = null, bestScore = -1;
+  for (const cand of cands) {
+    const clone = HM.clone(s);
+    const res = walkChain(clone, cand.r, cand.c, cand.preferRecipeWith, need);
+    const score = res.needCredit * 3 + res.gain * 0.01 + rng() * 0.001;
+    if (score > bestScore) { bestScore = score; best = cand; }
+  }
+  return { cand: best, score: bestScore };
 }
 
 function pickClearComp(s, need, rng) {
@@ -120,21 +136,23 @@ function pickClearComp(s, need, rng) {
 
 export function playChainMove(s, rng) {
   const r = rng || Math.random;
+  const need = needMap(s);
   if (r() < EPSILON) {
     const cands = [];
     for (let rr = 0; rr < s.H; rr++) for (let cc = 0; cc < s.W; cc++) if (HM.playable(s, rr, cc) && s.grid[rr][cc]) cands.push({ r: rr, c: cc });
     if (!cands.length) return false;
     const seed = cands[(r() * cands.length) | 0];
-    if (r() < 0.5 && HM.groupAt(s, seed.r, seed.c).length >= 2) simulateChain(s, seed, rng);
-    else { HM.clearGroup(s, seed.r, seed.c); HM.gravity(s, rng); }
+    if (r() < 0.5 && HM.groupAt(s, seed.r, seed.c).length >= 2) walkChain(s, seed.r, seed.c, null, need);
+    else HM.clearGroup(s, seed.r, seed.c);
+    HM.gravity(s, r);   // one resolve for the whole simulated move, exactly like a real release
     return true;
   }
-  const need = needMap(s);
-  const chain = pickChainSeed(s, need, r);
+  const chain = pickBestChain(s, need, r);
   const clear = pickClearComp(s, need, r);
-  if (!chain.seed && !clear.seed) return false;
-  if (chain.seed && chain.score >= clear.score) simulateChain(s, chain.seed, rng);
-  else { HM.clearGroup(s, clear.seed.r, clear.seed.c); HM.gravity(s, rng); }
+  if (!chain.cand && !clear.seed) return false;
+  if (chain.cand && chain.score >= clear.score) walkChain(s, chain.cand.r, chain.cand.c, chain.cand.preferRecipeWith, need);
+  else HM.clearGroup(s, clear.seed.r, clear.seed.c);
+  HM.gravity(s, r);
   return true;
 }
 

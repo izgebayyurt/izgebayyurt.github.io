@@ -43,7 +43,7 @@ const SPECS = [
   { name: "Prism finale", shape: S.octagon, spawn: W, objectives: [{ color: "O", count: 6 }, { color: "G", count: 6 }, { color: "P", count: 6 }] }
 ];
 
-const FLOOR = 6;
+const FLOOR = 3;   // a genuine safety net for degenerate cases only — the recipe-pairing chain mechanic can legitimately need very few moves (e.g. a pure secondary objective), so this must not dominate real budgets the way FLOOR=6 did
 const TARGET_WIN = 0.72;   // the *imperfect, ε-random* sim player should clear this often — a careful human does better
 
 /* In the merge-only design every legal action progresses the board (no dead
