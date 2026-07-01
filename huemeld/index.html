@@ -191,8 +191,8 @@ h1{ font-size:30px; line-height:1; }
         <defs>
           <filter id="goo"><feGaussianBlur id="gooBlur" in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11"/></filter>
         </defs>
-        <g filter="url(#goo)"><circle id="cTgtInk" fill="#2c2733"/><circle id="cSrcInk" fill="#2c2733"/></g>
-        <g filter="url(#goo)"><circle id="cTgt"/><circle id="cSrc"/></g>
+        <g filter="url(#goo)"><rect id="cTgtInk" fill="#2c2733"/><rect id="cSrcInk" fill="#2c2733"/></g>
+        <g filter="url(#goo)"><rect id="cTgt"/><rect id="cSrc"/></g>
       </svg>
       <div class="toast" id="toast"></div>
       <div class="over" id="over">
@@ -246,6 +246,7 @@ h1{ font-size:30px; line-height:1; }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
 
   /* ---------- rendering ---------- */
+  function tileRot(r,c){ return ((r*7+c*13)%5)-2; }   // shared with the mix-fuse overlay, so shapes never visibly "pop" between DOM tile and SVG
   function render(){
     var h="", r, c;
     for(r=0;r<state.H;r++) for(c=0;c<state.W;c++){
@@ -256,7 +257,7 @@ h1{ font-size:30px; line-height:1; }
       if(clearing.has(key)) cls+=" clr";
       if(fresh[key]) cls+=" new";
       if(mixed.has(key)) cls+=" mixed";
-      var rot=((r*7+c*13)%5)-2;
+      var rot=tileRot(r,c);
       h+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="'+cls+'" style="--pc:'+HEX[v]+';--rot:'+rot+'deg">'+
          (aid?'<span class="sym">'+v+'</span>':'')+'<span class="streak"></span></div></div>';
     }
@@ -361,10 +362,18 @@ h1{ font-size:30px; line-height:1; }
     var posFrac=Math.min(1, Math.max(gest.t, f));                           // follows finger, then fuse pulls them fully together
     var sx=ac.x+(bc.x-ac.x)*posFrac, sy=ac.y+(bc.y-ac.y)*posFrac;
     var colS=lerpHex(HEX[state.grid[A.r][A.c]], HEX[gest.sec], f), colT=lerpHex(HEX[state.grid[B.r][B.c]], HEX[gest.sec], f);
-    cTgtInk.setAttribute("cx",bc.x); cTgtInk.setAttribute("cy",bc.y); cTgtInk.setAttribute("r",ir);
-    cSrcInk.setAttribute("cx",sx); cSrcInk.setAttribute("cy",sy); cSrcInk.setAttribute("r",ir);
-    cTgt.setAttribute("cx",bc.x); cTgt.setAttribute("cy",bc.y); cTgt.setAttribute("r",rr); cTgt.setAttribute("fill",colT);
-    cSrc.setAttribute("cx",sx); cSrc.setAttribute("cy",sy); cSrc.setAttribute("r",rr); cSrc.setAttribute("fill",colS);
+    // shape morphs square -> circle as the drag gets closer (posFrac), independent of colour blend (fuse alone)
+    var corner=rr*(0.52+0.48*posFrac), cornerI=ir*(0.52+0.48*posFrac);
+    function place(el,cx,cy,half,rad,rotDeg){
+      el.setAttribute("x",cx-half); el.setAttribute("y",cy-half);
+      el.setAttribute("width",half*2); el.setAttribute("height",half*2);
+      el.setAttribute("rx",rad); el.setAttribute("ry",rad);
+      el.setAttribute("transform","rotate("+rotDeg+" "+cx+" "+cy+")");
+    }
+    place(cTgtInk, bc.x, bc.y, ir, cornerI, tileRot(B.r,B.c));
+    place(cSrcInk, sx, sy, ir, cornerI, tileRot(A.r,A.c));
+    place(cTgt, bc.x, bc.y, rr, corner, tileRot(B.r,B.c)); cTgt.setAttribute("fill",colT);
+    place(cSrc, sx, sy, rr, corner, tileRot(A.r,A.c)); cSrc.setAttribute("fill",colS);
     clearHidden();
     [A,B].forEach(function(P){ var t=tileElAt(P.r,P.c); if(t){ t.style.opacity="0"; gest.hidden.push(P.r+","+P.c); } });
   }
