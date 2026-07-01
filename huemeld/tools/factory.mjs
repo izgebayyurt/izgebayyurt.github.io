@@ -43,16 +43,22 @@ const SPECS = [
   { name: "Prism finale", shape: S.octagon, spawn: W, objectives: [{ color: "O", count: 6 }, { color: "G", count: 6 }, { color: "P", count: 6 }] }
 ];
 
-const FLOOR = 8;
+const FLOOR = 6;
+const TARGET_WIN = 0.72;   // the *imperfect, ε-random* sim player should clear this often — a careful human does better
 
-/* Budget = median moves-to-win with headroom. The ε-random sim has a heavy tail
-   (occasional flailing runs) that a human never has, so we cap the tail's
-   influence at ~2.2x the median rather than chasing the sim's own win-rate. */
+/* In the merge-only design every legal action progresses the board (no dead
+   swaps, no cycling), so p50/p80 sit close together — unlike the old
+   swap-based sim, there's no heavy tail to guard against here. Start the
+   budget just above the median and escalate in small steps until the
+   (deliberately imperfect) sim player wins TARGET_WIN of the time, so the
+   move count is a real constraint rather than pure headroom. */
 function tune(spec) {
   const est = estimate(spec, 200, 11);
   const p50 = isFinite(est.p50) ? est.p50 : est.mean;
-  const budget = Math.max(FLOOR, Math.round(p50 * 2));   // ~2x median competent solve: generous, feasible
-  const wr = winRate(spec, budget, 150, 7001);           // reported as a (pessimistic) sanity check
+  let budget = Math.max(FLOOR, Math.ceil(p50 * 1.05));
+  const bump = Math.max(1, Math.round(p50 * 0.08));
+  let wr = winRate(spec, budget, 150, 7001), guard = 0;
+  while (wr < TARGET_WIN && guard++ < 10) { budget += bump; wr = winRate(spec, budget, 150, 7001); }
   return { est, budget, winRate: wr };
 }
 
