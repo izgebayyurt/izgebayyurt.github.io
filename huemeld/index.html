@@ -66,7 +66,6 @@ h1{ font-size:30px; line-height:1; }
 .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:13px; margin-top:16px; }
 .lvl-card{ text-align:left; padding:13px 14px; display:flex; flex-direction:column; gap:6px; min-height:104px; position:relative; }
 .lvl-card .num{ font-family:var(--font-d); font-weight:700; font-size:15px; width:30px; height:30px; border:2.5px solid var(--line); border-radius:9px; display:flex; align-items:center; justify-content:center; background:#ffd15c; box-shadow:0 2px 0 var(--shadow); }
-.lvl-card .lname{ font-family:var(--font-d); font-weight:600; font-size:16px; }
 .lgoals{ display:flex; gap:5px; margin-top:auto; }
 .lgoals .sw{ width:17px; height:17px; border:2px solid var(--line); border-radius:5px; }
 .lgoals .sw.r{ border-radius:50%; }
@@ -124,6 +123,7 @@ h1{ font-size:30px; line-height:1; }
 .tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
 .tile.eatpulse{ animation:hmEatPulse .18s var(--pop); z-index:4; }
 .tile.press{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 1.5px 2px 0 rgba(44,39,51,.28); z-index:5; }
+.mixfx{ position:absolute; display:none; pointer-events:none; z-index:6; overflow:visible; }
 
 .toast{
   position:absolute; left:50%; top:12px; transform:translateX(-50%);
@@ -132,22 +132,13 @@ h1{ font-size:30px; line-height:1; }
   box-shadow:0 3px 0 var(--shadow); opacity:0; pointer-events:none; z-index:8;
 }
 .combo-badge{
-  position:absolute; display:none; flex-direction:column; align-items:center;
-  transform:translate(-50%,-116%); pointer-events:none; z-index:7;
+  position:absolute; display:none; align-items:center; justify-content:center;
+  min-width:28px; height:28px; padding:0 7px; transform:translate(-50%,-130%);
+  font-family:var(--font-d); font-weight:700; font-size:14px; color:#fff; -webkit-text-stroke:.6px rgba(0,0,0,.7);
+  border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 rgba(0,0,0,.35);
+  pointer-events:none; z-index:7;
 }
 .combo-badge.show{ display:flex; }
-.cb-shape{
-  min-width:30px; height:30px; padding:0 6px; display:flex; align-items:center; justify-content:center;
-  border:2.5px solid var(--line); box-shadow:0 2px 0 rgba(0,0,0,.35);
-  font-family:var(--font-d); font-weight:700; font-size:15px; color:#fff; -webkit-text-stroke:.6px rgba(0,0,0,.7);
-}
-.cb-shape.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
-.cb-shape.rd{ border-radius:50%; }
-.cb-sub{
-  margin-top:4px; font-family:var(--font-u); font-weight:800; font-size:10px; letter-spacing:.02em;
-  color:var(--ink); background:var(--card); border:1.5px solid var(--line); border-radius:999px;
-  padding:1px 8px; white-space:nowrap;
-}
 .over{
   position:absolute; inset:0; z-index:9; display:none; align-items:center; justify-content:center; padding:18px;
   background:rgba(240,230,207,.72); border-radius:20px;
@@ -205,11 +196,15 @@ h1{ font-size:30px; line-height:1; }
     <div class="goals" id="goals"></div>
     <div class="stage">
       <div class="board" id="board"></div>
+      <svg class="mixfx" id="mixfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <filter id="goo"><feGaussianBlur id="gooBlur" in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11"/></filter>
+        </defs>
+        <g filter="url(#goo)"><rect id="cTgtInk" fill="#2c2733"/><rect id="cSrcInk" fill="#2c2733"/></g>
+        <g filter="url(#goo)"><rect id="cTgt"/><rect id="cSrc"/></g>
+      </svg>
       <div class="toast" id="toast"></div>
-      <div class="combo-badge" id="comboBadge">
-        <div class="cb-shape" id="cbShape"><span id="cbCount"></span></div>
-        <div class="cb-sub" id="cbSub"></div>
-      </div>
+      <div class="combo-badge" id="comboBadge"><span id="cbCount"></span></div>
       <div class="over" id="over">
         <div class="panel">
           <h2 id="overTitle">Cleared!</h2>
@@ -305,7 +300,7 @@ h1{ font-size:30px; line-height:1; }
   async function commitClear(r,c){
     if(busy) return;
     var comp=HM.groupAt(state,r,c);
-    if(!comp.length) return;
+    if(comp.length<2) return;   // minimum clearable group is 2 — a lone tile just sits there
     busy=true;
     state.movesLeft--; updateMoves();
     clearing=new Set(comp);
@@ -324,41 +319,37 @@ h1{ font-size:30px; line-height:1; }
     else render();
   }
 
-  /* ---------- input: chain-drag ----------
-     Board is FROZEN for the whole gesture — eaten cells stay empty holes, no
-     gravity, until release resolves everything at once. Drag onto the SAME
-     colour to keep collecting it (square badge, raw count). Swipe onto a
-     DIFFERENT primary to lock a recipe (circular badge, coloured as the
-     blend) — from then on only the two ingredient colours are valid; the
-     third primary simply isn't a direction you can go, same as any other
-     illegal pair. The badge shows the live paired count (how many complete
-     blends you could bank right now) plus the raw ingredient breakdown, so
-     nothing about the eventual bank is hidden. Release banks the paired
-     count (or the raw count if no recipe was ever locked) and discards any
-     unpaired leftovers; a lone tap with nothing collected falls back to the
-     double-tap-clear check instead. */
-  var comboBadge=document.getElementById("comboBadge");
-  var cbShape=document.getElementById("cbShape"), cbCount=document.getElementById("cbCount"), cbSub=document.getElementById("cbSub");
-  var ARM_T=0.4, gest=null;
+  /* ---------- input: merge (hold) then combo the resulting secondary ----------
+     Press a primary and drag+hold onto a DIFFERENT adjacent primary for
+     ~0.7s to merge it — the goo-morph blend animation plays as you hold;
+     pulling back before it completes snaps the two tiles apart again (~0.1s).
+     Same-coloured primaries and secondaries are never valid targets from a
+     primary — merging is the ONLY thing a primary can do.
+     Once merged, the gesture locks onto that resulting secondary colour —
+     from here dragging onto an ADJACENT tile of the SAME secondary is
+     instant (no hold) and extends a connected group, refilling by gravity
+     each step, with a running count shown in the combo badge. Starting the
+     gesture directly on an existing secondary skips the merge and begins in
+     this combo phase right away.
+     Release banks the whole group only if it has grown to at least 2 tiles
+     — a lone merge with no combo just sits there uncleared. Any gesture
+     that performed a merge or at least one combo step costs exactly one
+     move; a gesture that touched nothing falls back to a plain tap (maybe a
+     double-tap-clear, which has the same minimum-2 rule). */
+  var mixfx=document.getElementById("mixfx"), gooBlur=document.getElementById("gooBlur");
+  var cSrc=document.getElementById("cSrc"), cTgt=document.getElementById("cTgt");
+  var cSrcInk=document.getElementById("cSrcInk"), cTgtInk=document.getElementById("cTgtInk");
+  var comboBadge=document.getElementById("comboBadge"), cbCount=document.getElementById("cbCount");
+  var ANIM_MS=700, REVERSE_MS=100, ARM_T=0.4, gest=null;
 
+  function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+  function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
   function cellEl(r,c){ return board.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]'); }
   function tileElAt(r,c){ var el=cellEl(r,c); return el?el.querySelector(".tile"):null; }
   function centerOf(r,c){ var el=cellEl(r,c); if(!el) return null; var br=board.getBoundingClientRect(), cr=el.getBoundingClientRect(); return { x:cr.left-br.left+cr.width/2, y:cr.top-br.top+cr.height/2, s:cr.width }; }
   function tileFromPoint(x,y){ var el=document.elementFromPoint(x,y); if(!el) return null; var cell=el.closest(".cell"); if(!cell||!board.contains(cell)||cell.dataset.r===undefined) return null; return { r:+cell.dataset.r, c:+cell.dataset.c }; }
   function pressAnchor(){ var t=tileElAt(gest.anchor.r,gest.anchor.c); if(t) t.classList.add("press"); }
-  function totalTally(){ var s=0; for(var k in gest.tally) s+=gest.tally[k]; return s; }
 
-  /* same colour as what's already being collected -> "eat"; a different
-     primary, before any recipe is locked -> "lock" (only possible when the
-     seed itself is a primary — secondaries never mix further); anything
-     else (a still-different primary once locked, or a mismatched secondary,
-     or a secondary seed touching a primary) -> not a valid direction. */
-  function allowedType(neighborColor){
-    if(neighborColor===gest.seedColor) return "eat";
-    if(gest.recipeColor) return neighborColor===gest.recipeColor ? "eat" : null;
-    if(HM.isPrim(gest.seedColor) && HM.isPrim(neighborColor)) return "lock";
-    return null;
-  }
   function updateTarget(px,py){
     var A=gest.anchor, ac=centerOf(A.r,A.c); if(!ac){ gest.target=null; gest.t=0; gest.targetType=null; return; }
     var best=null, bestProj=0.18, nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}];
@@ -371,45 +362,89 @@ h1{ font-size:30px; line-height:1; }
       if(proj>bestProj && perp<ac.s*0.55){ best=B; bestProj=proj; }
     }
     gest.target=best; gest.t=best?Math.min(1,bestProj):0;
-    gest.targetType=best?allowedType(state.grid[best.r][best.c]):null;
+    if(!best){ gest.targetType=null; gest.sec=null; return; }
+    var tc=state.grid[best.r][best.c];
+    if(gest.phase==="primary"){
+      gest.targetType=(HM.isPrim(gest.color)&&HM.isPrim(tc)&&tc!==gest.color)?"mix":null;
+      gest.sec=gest.targetType==="mix"?HM.mix(gest.color,tc):null;
+    } else {
+      gest.targetType=(tc===gest.color)?"combo":null;
+      gest.sec=null;
+    }
+  }
+  function clearHidden(){
+    if(gest&&gest.hidden){ gest.hidden.forEach(function(k){ var p=k.split(","), t=tileElAt(+p[0],+p[1]); if(t) t.style.opacity=""; }); gest.hidden=[]; }
+  }
+  function hideFx(){ mixfx.style.display="none"; clearHidden(); }
+  function drawFx(){
+    if(!gest || gest.targetType!=="mix"){ if(mixfx.style.display!=="none") hideFx(); return; }
+    var A=gest.anchor, B=gest.target, ac=centerOf(A.r,A.c), bc=centerOf(B.r,B.c); if(!ac||!bc){ hideFx(); return; }
+    mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
+    mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
+    mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
+    mixfx.style.display="block";
+    gooBlur.setAttribute("stdDeviation",(ac.s*0.10).toFixed(2));
+    var f=gest.fuse, sc=1+0.06*f, rr=ac.s*0.40*sc, ir=rr+4;
+    var posFrac=Math.min(1, Math.max(gest.t, f));
+    var sx=ac.x+(bc.x-ac.x)*posFrac, sy=ac.y+(bc.y-ac.y)*posFrac;
+    var colS=lerpHex(HEX[gest.color], HEX[gest.sec], f), colT=lerpHex(HEX[state.grid[B.r][B.c]], HEX[gest.sec], f);
+    var corner=rr*(0.52+0.48*posFrac), cornerI=ir*(0.52+0.48*posFrac);
+    function place(el,cx,cy,half,rad,rotDeg){
+      el.setAttribute("x",cx-half); el.setAttribute("y",cy-half);
+      el.setAttribute("width",half*2); el.setAttribute("height",half*2);
+      el.setAttribute("rx",rad); el.setAttribute("ry",rad);
+      el.setAttribute("transform","rotate("+rotDeg+" "+cx+" "+cy+")");
+    }
+    place(cTgtInk, bc.x, bc.y, ir, cornerI, tileRot(B.r,B.c));
+    place(cSrcInk, sx, sy, ir, cornerI, tileRot(A.r,A.c));
+    place(cTgt, bc.x, bc.y, rr, corner, tileRot(B.r,B.c)); cTgt.setAttribute("fill",colT);
+    place(cSrc, sx, sy, rr, corner, tileRot(A.r,A.c)); cSrc.setAttribute("fill",colS);
+    clearHidden();
+    [A,B].forEach(function(P){ var t=tileElAt(P.r,P.c); if(t){ t.style.opacity="0"; gest.hidden.push(P.r+","+P.c); } });
   }
   function updateComboLabel(){
-    if(!gest){ comboBadge.classList.remove("show"); return; }
-    var seedCount=gest.tally[gest.seedColor]||0;
-    if(!gest.recipeColor && seedCount<2){ comboBadge.classList.remove("show"); return; }
+    if(!gest || gest.phase!=="secondary" || gest.groupCount<2){ comboBadge.classList.remove("show"); return; }
     var c=centerOf(gest.anchor.r, gest.anchor.c); if(!c){ comboBadge.classList.remove("show"); return; }
     comboBadge.style.left=(board.offsetLeft+c.x)+"px";
     comboBadge.style.top=(board.offsetTop+c.y)+"px";
-    if(gest.recipeColor){
-      var blend=HM.mix(gest.seedColor, gest.recipeColor);
-      var a=gest.tally[gest.seedColor]||0, b=gest.tally[gest.recipeColor]||0;
-      cbShape.className="cb-shape rd"; cbShape.style.background=HEX[blend];
-      cbCount.textContent=Math.min(a,b);
-      cbSub.style.display="block"; cbSub.textContent=a+gest.seedColor+" + "+b+gest.recipeColor;
-    } else {
-      cbShape.className="cb-shape sq"; cbShape.style.background=HEX[gest.seedColor];
-      cbCount.textContent=seedCount;
-      cbSub.style.display="none";
-    }
+    comboBadge.style.background=HEX[gest.color];
+    cbCount.textContent=gest.groupCount;
     comboBadge.classList.add("show");
   }
-  /* the only mutation during the drag: empty the source, tally the colour
-     collected. No gravity() call here — the board stays frozen (holes and
-     all) until release resolves the whole gesture in one pass. */
-  function commitStep(){
-    var from=gest.anchor, to=gest.target, color=state.grid[to.r][to.c];
-    var wasLock=gest.targetType==="lock";
-    if(wasLock){ gest.recipeColor=color; gest.tally[color]=0; }
-    HM.applyEat(state, from, to);
-    gest.tally[color]=(gest.tally[color]||0)+1;
-    gest.moved=true;
-    if(wasLock) mixed=new Set([to.r+","+to.c]); else pulsing=new Set([to.r+","+to.c]);
+  function commitMergeStep(){
+    var from=gest.anchor, to=gest.target;
+    hideFx();
+    var blend=HM.applyMix(state, from, to);
+    mixed=new Set([to.r+","+to.c]);
     render();
-    mixed=new Set(); pulsing=new Set();
+    mixed=new Set();
+    gest.phase="secondary"; gest.color=blend; gest.groupCount=1; gest.moved=true;
+    gest.anchor=to; gest.target=null; gest.t=0; gest.fuse=0;
+    pressAnchor();
+    sfxMix();
+    updateComboLabel();
+  }
+  function commitComboStep(){
+    var from=gest.anchor, to=gest.target;
+    HM.applyEat(state, from, to);
+    gest.moved=true;
+    pulsing=new Set([to.r+","+to.c]);
+    render();
+    pulsing=new Set();
+    gest.groupCount++;
     gest.anchor=to; gest.target=null; gest.t=0;
     pressAnchor();
-    if(wasLock) sfxMix(); else sfxEat(totalTally());
+    sfxEat(gest.groupCount);
     updateComboLabel();
+  }
+  function tick(now){
+    if(!gest || gest.phase!=="primary"){ return; }
+    var dt=now-(gest.last||now); gest.last=now;
+    var arming=gest.targetType==="mix" && gest.t>ARM_T;
+    gest.fuse=Math.max(0, Math.min(1, gest.fuse + (arming ? dt/ANIM_MS : -dt/REVERSE_MS)));
+    drawFx();
+    if(arming && gest.fuse>=1){ commitMergeStep(); return; }
+    gest.raf=requestAnimationFrame(tick);
   }
   var DTAP_MS=340, lastTap=null;
   function maybeDoubleTap(tile,now){
@@ -418,38 +453,46 @@ h1{ font-size:30px; line-height:1; }
   }
   function finalizeGesture(){
     if(!gest) return;
+    if(gest.raf) cancelAnimationFrame(gest.raf);
     var pt=tileElAt(gest.anchor.r,gest.anchor.c); if(pt) pt.classList.remove("press");
-    comboBadge.classList.remove("show"); gest=null;
+    hideFx(); comboBadge.classList.remove("show"); gest=null;
   }
-  /* release (or cancel): bank the live paired count shown in the badge (or
-     the raw count if no recipe was ever locked); unpaired leftovers are
-     discarded — exactly what the badge was already showing, nothing hidden.
-     A gesture that never collected anything falls back to a plain tap
-     (maybe a double-tap-clear). Whole gesture costs exactly one move,
-     however long the chain ran, and gravity only resolves now, all at once. */
+  /* release (or cancel): a group of 2+ secondaries banks in full; a lone
+     merged tile with no combo just stays on the board, uncleared. Whichever
+     happens, gravity resolves only now, once, at the end of the gesture. */
   async function finishGesture(){
     if(!gest) return;
     var g=gest;
     finalizeGesture();
     if(busy) return;
+    if(g.phase==="primary" && g.target && g.targetType==="mix"){
+      // released mid-fuse, before the merge completed — a plain swap, same as any other quick swipe
+      busy=true;
+      state.movesLeft--; updateMoves();
+      var tmp=state.grid[g.anchor.r][g.anchor.c];
+      state.grid[g.anchor.r][g.anchor.c]=state.grid[g.target.r][g.target.c];
+      state.grid[g.target.r][g.target.c]=tmp;
+      render(); sfxEat(1);
+      HM.checkEnd(state);
+      busy=false;
+      if(state.lost){ showEnd(false); }
+      return;
+    }
     if(!g.moved){ maybeDoubleTap(g.anchor, performance.now()); return; }
     busy=true;
     state.movesLeft--; updateMoves();
-    var bankColor, bankCount;
-    if(g.recipeColor){ bankColor=HM.mix(g.seedColor,g.recipeColor); bankCount=Math.min(g.tally[g.seedColor]||0, g.tally[g.recipeColor]||0); }
-    else { bankColor=g.seedColor; bankCount=g.tally[g.seedColor]||0; }
-    if(bankCount>0){
-      var bank=HM.bankVirtualClear(state, bankColor, bankCount);
+    if(g.groupCount>=2){
+      var bank=HM.bankVirtualClear(state, g.color, g.groupCount);
       state.score+=bank.gain;
       clearing=new Set([g.anchor.r+","+g.anchor.c]);
       render(); sfxPop(bank.cleared);
       if(bank.cleared>=HM.POP_MIN) toast("+"+bank.gain);
       await sleep(220);
+      state.grid[g.anchor.r][g.anchor.c]=null;
+      clearing=new Set(); render(); await sleep(55);
+      updateGoals();
     }
-    state.grid[g.anchor.r][g.anchor.c]=null;
-    clearing=new Set(); render(); await sleep(55);
     fresh=HM.gravity(state, Math.random); render(); await sleep(150); fresh={};
-    updateGoals();
     HM.checkEnd(state);
     busy=false;
     if(state.won){ render(); showEnd(true); }
@@ -461,17 +504,18 @@ h1{ font-size:30px; line-height:1; }
     var tp=tileFromPoint(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
-    var seed=state.grid[tp.r][tp.c];
-    gest={ anchor:tp, seedColor:seed, recipeColor:null, tally:{}, moved:false,
-           target:null, targetType:null, t:0, sx:e.clientX, sy:e.clientY };
-    gest.tally[seed]=1;
+    var col=state.grid[tp.r][tp.c];
+    gest={ anchor:tp, phase:HM.isPrim(col)?"primary":"secondary", color:col, groupCount:1, moved:false,
+           target:null, targetType:null, t:0, fuse:0, sec:null, hidden:[],
+           last:performance.now(), sx:e.clientX, sy:e.clientY };
     pressAnchor();
+    if(gest.phase==="primary") gest.raf=requestAnimationFrame(tick);
   });
   board.addEventListener("pointermove",function(e){
     if(!gest || !e.isPrimary) return;
     var br=board.getBoundingClientRect();
     updateTarget(e.clientX-br.left, e.clientY-br.top);
-    if((gest.targetType==="eat"||gest.targetType==="lock") && gest.t>ARM_T) commitStep();
+    if(gest.phase==="secondary" && gest.targetType==="combo" && gest.t>ARM_T) commitComboStep();
   });
   board.addEventListener("pointerup",function(e){ if(!e.isPrimary) return; finishGesture(); });
   board.addEventListener("pointercancel",function(){ finishGesture(); });
@@ -485,7 +529,6 @@ h1{ font-size:30px; line-height:1; }
       if(d&&d.done) done++;
       h+='<button class="mk lvl-card'+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
       h+='<div class="num">'+L.id+'</div>';
-      h+='<div class="lname">'+L.name+'</div>';
       h+='<div class="lgoals">';
       for(var j=0;j<L.objectives.length;j++){ var o=L.objectives[j]; h+='<span class="sw'+(HM.isPrim(o.color)?"":" r")+'" style="background:'+HEX[o.color]+'"></span>'; }
       h+='</div>';
@@ -503,7 +546,7 @@ h1{ font-size:30px; line-height:1; }
     state=HM.newState(curLevel); HM.fill(state, Math.random);
     clearing=new Set(); fresh={}; mixed=new Set(); pulsing=new Set(); busy=false; lastTap=null; gest=null;
     over.classList.remove("show");
-    document.getElementById("gName").textContent="Level "+curLevel.id+" · "+curLevel.name;
+    document.getElementById("gName").textContent="Level "+curLevel.id;
     document.getElementById("gSub").textContent=goalSub(curLevel);
     screenLevels.style.display="none"; screenGame.style.display="block";
     renderGoals(); updateGoals(); updateMoves(); render();
