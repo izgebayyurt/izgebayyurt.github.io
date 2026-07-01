@@ -168,6 +168,11 @@
     return { type: t };
   }
 
+  /* unconditional applies for the browser's intent-driven input (a forced swap of
+     two primaries must NOT mix; a forced mix skips classification). */
+  function applySwap(s, a, b) { var t = s.grid[a.r][a.c]; s.grid[a.r][a.c] = s.grid[b.r][b.c]; s.grid[b.r][b.c] = t; }
+  function applyMix(s, a, b) { var m = mix(s.grid[a.r][a.c], s.grid[b.r][b.c]); s.grid[b.r][b.c] = m; s.grid[a.r][a.c] = null; return m; }
+
   function legalMoves(s) {
     var res = [], r, c;
     for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) {
@@ -221,7 +226,7 @@
     colRows: colRows, playableCount: playableCount,
     newState: newState, clone: clone, fill: fill,
     findPops: findPops, gravity: gravity, clearComps: clearComps,
-    classify: classify, doMove: doMove, legalMoves: legalMoves,
+    classify: classify, doMove: doMove, applySwap: applySwap, applyMix: applyMix, legalMoves: legalMoves,
     objectivesMet: objectivesMet, checkEnd: checkEnd, cascade: cascade, step: step
   };
 });
