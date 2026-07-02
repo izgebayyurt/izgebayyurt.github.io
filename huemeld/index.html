@@ -105,6 +105,13 @@ h1{ font-size:30px; line-height:1; }
 @keyframes hmWave{ 0%,100%{transform:translateX(0)} 50%{transform:translateX(9px)} }
 @keyframes hmSplash{ 0%{transform:scaleY(1)} 35%{transform:scaleY(1.12)} 100%{transform:scaleY(1)} }
 
+/* rationed-primary readout: how much of the scarce colour is left to allocate */
+.ration{ display:none; align-items:center; justify-content:center; gap:8px; margin:-2px 0 12px; font-family:var(--font-d); font-weight:600; font-size:14.5px; color:var(--ink); }
+.ration .dot{ width:17px; height:17px; border-radius:50%; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
+.ration b{ font-weight:700; font-size:16px; }
+.ration.low{ color:#c0392b; }
+.ration.low .dot{ animation:hmReady .8s ease-in-out infinite; }
+
 /* powerup bars (charged by chaining primaries; the payoff layer comes later) */
 .pups{ display:flex; gap:8px; margin-bottom:12px; }
 .pup{ flex:1; display:flex; align-items:center; gap:6px; }
@@ -228,6 +235,7 @@ h1{ font-size:30px; line-height:1; }
       <div class="moves"><b id="movesN">0</b><span>moves</span></div>
     </div>
     <div class="goals" id="goals"></div>
+    <div class="ration" id="ration"></div>
     <div class="pups" id="pups"></div>
     <div class="stage">
       <div class="board" id="board"></div>
@@ -268,8 +276,8 @@ h1{ font-size:30px; line-height:1; }
      so it needs no levels.js rebuild and can't disturb the shipped levels. */
   var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:22, goal:"tubes", objectives:[],
-    tubes:{ O:15, G:15, P:15 } };
+    spawn:{ R:4, Y:4, B:4 }, moves:26, goal:"tubes", objectives:[], reserve:{ B:14 },
+    tubes:{ O:8, G:8, P:8 } };   // Blue is RATIONED (14 total) and feeds Green+Purple; Orange=R+Y is the free safety valve — spend Blue wisely
   LEVELS=LEVELS.concat([TUBE_TEST]);
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
@@ -299,6 +307,7 @@ h1{ font-size:30px; line-height:1; }
   var gsrcInk=document.getElementById("gsrcInk"), gtgtInk=document.getElementById("gtgtInk");
   var comboBadges=document.getElementById("comboBadges");
   var burstEl=document.getElementById("burst");
+  var rationEl=document.getElementById("ration");
 
   function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -396,6 +405,17 @@ h1{ font-size:30px; line-height:1; }
       liq.style.height=pct+"%"; tube.classList.toggle("full", t.have>=t.need);
       if(splashColor===c){ tube.classList.remove("splash"); void tube.offsetWidth; tube.classList.add("splash"); }
     }
+  }
+  /* rationed primary: show how much of the scarce colour is left to spend (its
+     finite reserve + the tiles of it still on the board) */
+  function scarceColor(){ if(!state.reserve) return null; for(var k in state.reserve) if(state.reserve.hasOwnProperty(k)) return k; return null; }
+  function renderRation(){ if(!state||!state.reserve){ rationEl.style.display="none"; return; } rationEl.style.display="flex"; updateRation(); }
+  function updateRation(){
+    var sc=scarceColor(); if(!sc){ rationEl.style.display="none"; return; }
+    var n=state.reserve[sc];
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(state.grid[r][c]===sc) n++;
+    rationEl.innerHTML='<span class="dot" style="background:'+HEX[sc]+'"></span><b>'+n+'</b> '+NAME[sc]+' left';
+    rationEl.classList.toggle("low", n<=4);
   }
   function renderBars(){
     var h="";
@@ -597,6 +617,7 @@ h1{ font-size:30px; line-height:1; }
       if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
       paintAll();
       Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      updateRation();
       busy=false;
       finishTurn();
     }, ANIM_MS+30);
@@ -664,7 +685,7 @@ h1{ font-size:30px; line-height:1; }
     Object.keys(res.fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
     if(state.goal==="tubes"){ updateTubes(res.tube?res.tube.color:null); if(res.tube){ sfxFill(n); toast("+"+res.tube.add+" "+NAME[res.tube.color]); } }
     else { updateGoals(); if(res.gain>0 && n>=2) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+" "+NAME[color]); }
-    updateBars();
+    updateBars(); updateRation();
     await sleep(180);
     if(state!==myState){ busy=false; return; }
     busy=false;
@@ -698,7 +719,7 @@ h1{ font-size:30px; line-height:1; }
   });
   function abandonCombo(){   // interrupted mid-swoop: put the tiles we had consumed back, spend nothing, pop nothing
     if(sess){ Object.keys(sess.collected).forEach(function(k){ var p=k.split(","); var r=+p[0],c=+p[1]; if(!state.grid[r][c]) state.grid[r][c]=sess.color; }); }
-    sess=null; clearDim(); paintAll();
+    sess=null; clearDim(); paintAll(); updateRation();
   }
   function endGesture(abandon){
     if(!gest) return;
@@ -744,7 +765,7 @@ h1{ font-size:30px; line-height:1; }
     document.getElementById("gSub").textContent=goalSub(curLevel);
     screenLevels.style.display="none"; screenGame.style.display="block";
     if(curLevel.goal==="tubes") renderTubes(); else { renderGoals(); updateGoals(); }
-    renderBars(); updateBars(); updateMoves(); buildBoard();
+    renderBars(); updateBars(); updateMoves(); buildBoard(); renderRation();
   }
 
   function showEnd(win, spared){

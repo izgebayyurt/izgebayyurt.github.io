@@ -55,9 +55,11 @@
     var obj = (level.objectives || []).map(function (o) { return { color: o.color, need: o.count, have: 0 }; });
     var tubes = null;
     if (level.tubes) { tubes = {}; for (var tk in level.tubes) if (level.tubes.hasOwnProperty(tk)) tubes[tk] = { need: level.tubes[tk], have: 0 }; }
+    var reserve = copyObj(level.reserve), altSpawnFn = null;
+    if (reserve) { var alt = {}, sk; for (sk in level.spawn) if (level.spawn.hasOwnProperty(sk) && reserve[sk] == null) alt[sk] = level.spawn[sk]; altSpawnFn = makeSpawner(alt); }
     return {
       W: p.W, H: p.H, mask: p.mask, grid: grid,
-      spawn: level.spawn, spawnFn: makeSpawner(level.spawn),
+      spawn: level.spawn, spawnFn: makeSpawner(level.spawn), reserve: reserve, altSpawnFn: altSpawnFn,
       obj: obj, goal: level.goal || "collect", tubes: tubes,
       movesLeft: level.moves, moves: level.moves,
       bars: { R: 0, Y: 0, B: 0 }, barMax: BAR_MAX,
@@ -70,12 +72,27 @@
     return {
       W: s.W, H: s.H, mask: s.mask,
       grid: s.grid.map(function (row) { return row.slice(); }),
-      spawn: s.spawn, spawnFn: s.spawnFn,
+      spawn: s.spawn, spawnFn: s.spawnFn, reserve: copyObj(s.reserve), altSpawnFn: s.altSpawnFn,
       obj: s.obj.map(function (o) { return { color: o.color, need: o.need, have: o.have }; }),
       goal: s.goal, tubes: cloneTubes(s.tubes),
       bars: { R: s.bars.R, Y: s.bars.Y, B: s.bars.B }, barMax: s.barMax,
       movesLeft: s.movesLeft, moves: s.moves, score: s.score, won: s.won, lost: s.lost, level: s.level
     };
+  }
+
+  function copyObj(o) { if (!o) return null; var r = {}; for (var k in o) if (o.hasOwnProperty(k)) r[k] = o[k]; return r; }
+
+  /* ration a scarce primary: it draws from a finite per-level reserve; once that
+     reserve hits zero, spawns re-roll to the NON-reserved primaries only. This
+     turns that colour into a resource you must allocate, so a mix stops being
+     interchangeable. Levels with no `reserve` are unaffected. */
+  function spawnTile(s, rng) {
+    var c = s.spawnFn(rng);
+    if (s.reserve && s.reserve[c] != null) {
+      if (s.reserve[c] > 0) { s.reserve[c]--; return c; }
+      return s.altSpawnFn ? s.altSpawnFn(rng) : c;
+    }
+    return c;
   }
 
   /* mask-aware gravity: within each column, tiles fall to the lowest playable
@@ -88,7 +105,7 @@
       var n = rows.length, empty = n - existing.length;
       for (i = 0; i < n; i++) {
         r = rows[i];
-        if (i < empty) { s.grid[r][c] = s.spawnFn(rng); fresh[r + "," + c] = 1; }
+        if (i < empty) { s.grid[r][c] = spawnTile(s, rng); fresh[r + "," + c] = 1; }
         else s.grid[r][c] = existing[i - empty];
       }
     }
@@ -103,7 +120,7 @@
      FEATURE (treasure waiting to be swept by a meld), not pre-popped matches;
      nothing on this board ever pops without a player fusion. */
   function fill(s, rng) {
-    for (var c = 0; c < s.W; c++) { var rows = colRows(s, c); for (var i = 0; i < rows.length; i++) s.grid[rows[i]][c] = s.spawnFn(rng); }
+    for (var c = 0; c < s.W; c++) { var rows = colRows(s, c); for (var i = 0; i < rows.length; i++) s.grid[rows[i]][c] = spawnTile(s, rng); }
   }
 
   /* the fusion: `from` empties, `to` becomes the blend. The newborn lands in
