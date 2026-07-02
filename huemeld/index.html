@@ -431,6 +431,7 @@ h1{ font-size:30px; line-height:1; }
     anim={ from:{r:from.r,c:from.c}, to:{r:to.r,c:to.c}, ax:A.bx, ay:A.by, bx:B.bx, by:B.by, s:A.s,
            colA:colA, colB:colB, blend:blend, sp:sp, tp:tp, p:0, last:performance.now() };
     hideTile(from.r,from.c); hideTile(to.r,to.c);
+    drawAnim();   // draw frame 0 synchronously so the cells never flash empty
     anim.raf=requestAnimationFrame(animTick);
   }
   function animTick(now){
@@ -445,11 +446,11 @@ h1{ font-size:30px; line-height:1; }
     mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
     mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
     mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
-    var p=anim.p, R=anim.s*0.40;
-    gooBlur.setAttribute("stdDeviation",(R*(0.30+0.34*p)).toFixed(1));   // liquid neck grows as they fuse
-    var sx=anim.ax+(anim.bx-anim.ax)*p, sy=anim.ay+(anim.by-anim.ay)*p;
-    var colS=lerpHex(anim.colA, anim.blend, p), colT=lerpHex(anim.colB, anim.blend, p);
-    var srcRad=anim.sp? R*(0.26+0.74*p) : R, tgtRad=anim.tp? R*(0.26+0.74*p) : R;   // primaries morph square->circle
+    var e=0.35+0.65*anim.p, R=anim.s*0.40;   // start already ~1/3 fused — the merge just committed, so never show the two tiles fully apart/unblended
+    gooBlur.setAttribute("stdDeviation",(R*(0.30+0.34*e)).toFixed(1));   // liquid neck grows as they fuse
+    var sx=anim.ax+(anim.bx-anim.ax)*e, sy=anim.ay+(anim.by-anim.ay)*e;
+    var colS=lerpHex(anim.colA, anim.blend, e), colT=lerpHex(anim.colB, anim.blend, e);
+    var srcRad=anim.sp? R*(0.26+0.74*e) : R, tgtRad=anim.tp? R*(0.26+0.74*e) : R;   // primaries morph square->circle
     placeRect(gtgtInk, anim.bx,anim.by, R+3, tgtRad+3, tileRot(anim.to.r,anim.to.c), "#2c2733");
     placeRect(gsrcInk, sx,sy, R+3, srcRad+3, tileRot(anim.from.r,anim.from.c), "#2c2733");
     placeRect(gtgt, anim.bx,anim.by, R, tgtRad, tileRot(anim.to.r,anim.to.c), colT);
