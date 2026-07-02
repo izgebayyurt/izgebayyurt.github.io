@@ -276,8 +276,8 @@ h1{ font-size:30px; line-height:1; }
      so it needs no levels.js rebuild and can't disturb the shipped levels. */
   var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:26, goal:"tubes", objectives:[], reserve:{ B:14 },
-    tubes:{ O:8, G:8, P:8 } };   // Blue is RATIONED (14 total) and feeds Green+Purple; Orange=R+Y is the free safety valve — spend Blue wisely
+    spawn:{ R:4, Y:4, B:4 }, moves:18, goal:"tubes", objectives:[],
+    tubes:{ O:10, G:10, P:10 } };   // tight budget: a swoop of N fills n(n+1)/2, so only BIG swoops are efficient enough to win — small combos can't
   LEVELS=LEVELS.concat([TUBE_TEST]);
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
