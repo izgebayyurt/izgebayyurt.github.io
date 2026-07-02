@@ -17,36 +17,31 @@ const rect7 = ["#######", "#######", "#######", "#######", "#######", "#######",
 const heart = [".##...##.", "#########", "#########", "#########", ".#######.", "..#####..", "...###...", "....#...."];
 const octagon = ["..####..", ".######.", "########", "########", "########", "########", ".######.", "..####.."];
 
-/* juicy circle weights (2, never 3 — deadlock risk) on the colours each
-   board wants you to hunt, so treasure is reliably on the table */
+/* Bigger objective targets so the tuned budget lands at a comfortable size
+   (the designer wants a ~15-move floor, not tiny budgets). Each meld makes
+   roughly one secondary, so a ~14-20 target naturally needs ~15-24 moves.
+   Juicy circle weights (2, never 3 — deadlock risk) put a little treasure on
+   the board for free sweeps. */
 const SPECS = [
-  { shape: rect7, spawn: { R: 4, Y: 4, B: 4, O: 2, G: 1, P: 1 }, objectives: [{ color: "O", count: 6 }] },
-  { shape: heart, spawn: { R: 4, Y: 4, B: 4, O: 1, G: 2, P: 1 }, objectives: [{ color: "G", count: 8 }] },
-  { shape: octagon, spawn: { R: 4, Y: 4, B: 4, O: 2, G: 1, P: 2 }, objectives: [{ color: "O", count: 6 }, { color: "P", count: 6 }] }
+  { shape: rect7, spawn: { R: 4, Y: 4, B: 4, O: 2, G: 1, P: 1 }, objectives: [{ color: "O", count: 14 }] },
+  { shape: heart, spawn: { R: 4, Y: 4, B: 4, O: 1, G: 2, P: 1 }, objectives: [{ color: "G", count: 16 }] },
+  { shape: octagon, spawn: { R: 4, Y: 4, B: 4, O: 2, G: 1, P: 2 }, objectives: [{ color: "O", count: 10 }, { color: "P", count: 10 }] }
 ];
 
-/* Feel-test budgets are deliberately GENEROUS — the goal is to let the
-   player explore the mechanic and reach the win fireworks with room to make
-   sub-optimal moves, not to squeeze them. So we escalate until even the
-   middling "aware" policy (fuses needed recipes but ignores treasure) wins
-   comfortably. The real 50-level factory tunes tight against greedy instead. */
-const TARGET_WIN = 0.9;   // vs the AWARE rail, not greedy
+const FLOOR = 15;         // no tiny budgets — raise the target instead of squeezing moves
+const TARGET_WIN = 0.9;   // generous: the greedy policy should win comfortably so the player can explore
 
 const out = [];
 let id = 1;
-console.log("  feel-test boards (generous budget — aware policy wins >=90%)\n");
+console.log("  feel-test boards (floor " + FLOOR + " moves, greedy win >= " + (TARGET_WIN * 100) + "%)\n");
 for (const spec of SPECS) {
   const est = estimate(spec, 200, 11);
-  let budget = Math.max(6, Math.ceil(est.p80 * 1.4));
-  let wr = winRate(spec, budget, 150, 7001, "aware"), guard = 0;
-  while (wr < TARGET_WIN && guard++ < 30) { budget++; wr = winRate(spec, budget, 150, 7001, "aware"); }
-  const greedy = winRate(spec, budget, 150, 7001, "greedy");
-  const masher = winRate(spec, budget, 150, 9001, "masher");
-  const aware = wr;
+  let budget = Math.max(FLOOR, Math.ceil(est.p80 * 1.35));
+  let wr = winRate(spec, budget, 150, 7001), guard = 0;
+  while (wr < TARGET_WIN && guard++ < 40) { budget++; wr = winRate(spec, budget, 150, 7001); }
   const objStr = spec.objectives.map(o => `${o.count}${o.color}`).join(" + ");
-  console.log("  #" + id + "  " + objStr.padEnd(10) + " p50 " + est.p50 + "  p80 " + est.p80 +
-    "  -> " + budget + " moves   win: greedy " + (greedy * 100).toFixed(0) + "%  aware " +
-    (aware * 100).toFixed(0) + "%  masher " + (masher * 100).toFixed(0) + "%");
+  console.log("  #" + id + "  " + objStr.padEnd(12) + " p50 " + est.p50 + "  p80 " + est.p80 +
+    "  -> " + budget + " moves   greedy win " + (wr * 100).toFixed(0) + "%");
   out.push({ id, shape: spec.shape, spawn: spec.spawn, objectives: spec.objectives, moves: budget });
   id++;
 }

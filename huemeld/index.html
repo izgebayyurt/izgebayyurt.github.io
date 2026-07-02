@@ -124,11 +124,14 @@ h1{ font-size:30px; line-height:1; }
 .tile .sym{ position:relative; z-index:2; font-family:var(--font-d); font-weight:700; font-size:clamp(11px,3.2vw,16px); color:#fff; -webkit-text-stroke:.8px var(--line); }
 .tile.dim{ filter:saturate(.2) brightness(1.08) opacity(.45); }
 .tile.incombo{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 15px 3px rgba(255,255,255,.65); z-index:4; animation:hmBob .7s ease-in-out infinite; }
-.tile.press{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 1.5px 2px 0 rgba(44,39,51,.28); z-index:5; }
 .tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
 .tile.new{ animation:hmDrop .22s var(--pop); }
 .tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
 .tile.squish{ animation:hmSquish .3s var(--pop); }
+/* the carried tile lifts the instant you press and leans toward your finger — merging feels smooth and continuous, not a snap */
+.tile.lift{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(1.14); z-index:6; box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 7px 12px rgba(44,39,51,.32); transition:transform .09s linear; }
+/* square-to-circle + colour-blend morph when a meld lands (and a gentle tint shift when same colours join) */
+.tile.morph{ transition:background .2s var(--calm), border-radius .26s var(--calm); }
 
 .combo-meter{ position:absolute; left:14px; right:14px; top:-3px; height:7px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
 .combo-meter.show{ opacity:1; }
@@ -285,13 +288,23 @@ h1{ font-size:30px; line-height:1; }
   function paintTile(r,c){
     var ref=cells[r]&&cells[r][c]; if(!ref) return;
     var t=ref.tile, v=state.grid[r][c];
-    t.className="tile";   // reset transient state (dim/incombo/clr/mixed/press...)
+    t.className="tile";   // reset transient state (dim/incombo/clr/mixed/lift...)
+    t.style.removeProperty("--dx"); t.style.removeProperty("--dy");
     if(!v){ t.style.visibility="hidden"; return; }
     t.style.visibility="";
     t.style.setProperty("--pc", HEX[v]);
     if(!HM.isPrim(v)) t.classList.add("sec");
     t.querySelector(".sym").textContent = aid ? v : "";
     ref.col=v;
+  }
+  /* update a tile to its new grid colour/shape WITHOUT wiping transient
+     classes — used for the meld target so the .morph transition can play. */
+  function morphTile(r,c){
+    var ref=cells[r]&&cells[r][c]; if(!ref) return; var t=ref.tile, v=state.grid[r][c];
+    t.classList.add("morph"); t.classList.toggle("sec", !HM.isPrim(v));
+    t.style.setProperty("--pc", HEX[v]);
+    t.querySelector(".sym").textContent = aid ? v : ""; ref.col=v;
+    setTimeout(function(){ t.classList.remove("morph"); }, 320);
   }
   function paintAll(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(cells[r]&&cells[r][c]) paintTile(r,c); }
   function setAnim(t, cls, ms){ if(!t) return; t.classList.remove(cls); void t.offsetWidth; t.classList.add(cls); setTimeout(function(){ t.classList.remove(cls); }, ms); }
@@ -360,23 +373,31 @@ h1{ font-size:30px; line-height:1; }
     board.classList.toggle("suspended", !!live);
   }
   function clearDim(){
-    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo"); } }
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","press","lift"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
     board.classList.remove("suspended");
   }
-  function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.add("incombo"); }
-  function setPress(p,on){ var ref=p&&cells[p.r]&&cells[p.r][p.c]; if(ref) ref.tile.classList.toggle("press", on); }
+  function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("lift"); ref.tile.classList.add("incombo"); } }
+  function geomOf(r,c){ if(!geom) return null; for(var i=0;i<geom.length;i++) if(geom[i].r===r&&geom[i].c===c) return geom[i]; return null; }
+  function setLift(p,on){ var ref=p&&cells[p.r]&&cells[p.r][p.c]; if(!ref) return; var t=ref.tile;
+    t.style.removeProperty("--dx"); t.style.removeProperty("--dy");   // start centred either way
+    if(on){ t.classList.remove("incombo"); t.classList.add("lift"); }
+    else { t.classList.remove("lift"); }
+  }
+  /* hand the carried tile off to the newly-acted cell: old anchor settles into
+     the combo (bob), new anchor lifts to keep following the finger. */
+  function moveAnchorTo(to){ setLift(gest.anchor,false); gest.anchor=to; setLift(to,true); }
 
   function landMove(){ if(!gest.counted){ gest.counted=true; sess.moves++; state.movesLeft--; updateMoves(); } }
 
   function doMerge(from,to){
-    HM.sessionMerge(state, sess, from, to);
+    HM.sessionMerge(state, sess, from, to);   // engine: from -> hole, to -> blend
     gest.carry=sess.color;
     landMove();
-    paintTile(from.r,from.c);            // source is now a hole
-    paintTile(to.r,to.c);                // destination is now the blend
+    paintTile(from.r,from.c);            // source is now a hole (the lean toward `to` sold the motion)
+    morphTile(to.r,to.c);                // destination morphs square->circle + colour blend
     setAnim(cells[to.r][to.c].tile, "mixed", 300);
     applyDim(); markCollected(to.r,to.c);
-    gest.anchor=to; sfxMix(sess.count);
+    moveAnchorTo(to); sfxMix(sess.count);
   }
   function doCollect(from,to,firstAnchor){
     if(firstAnchor) HM.sessionCollect(state, sess, from.r, from.c);
@@ -386,8 +407,8 @@ h1{ font-size:30px; line-height:1; }
     applyDim();
     if(firstAnchor) markCollected(from.r,from.c);
     markCollected(to.r,to.c);
-    setAnim(cells[to.r][to.c].tile, "mixed", 280);
-    gest.anchor=to; sfxEat(sess.count);
+    setAnim(cells[to.r][to.c].tile, "mixed", 280);   // same-colour join still pops satisfyingly
+    moveAnchorTo(to); sfxEat(sess.count);
   }
 
   function tryStep(from,to){
@@ -415,13 +436,16 @@ h1{ font-size:30px; line-height:1; }
 
   async function resolveNow(){
     if(!sess||busy) return;
+    var mySess=sess, myState=state;   // pin what we're resolving — a mid-await level change must not corrupt a fresh board
     busy=true; stopMeter();
-    var keys=Object.keys(sess.collected), n=sess.count;
-    var color=sess.color, hadMerge=sess.hadMerge;
+    var keys=Object.keys(mySess.collected), n=mySess.count;
+    var color=mySess.color, hadMerge=mySess.hadMerge;
     keys.forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) ref.tile.classList.add("clr"); });
     sfxPop(n);
     await sleep(250);
-    var res=HM.resolveSession(state, sess, Math.random);   // pops collected, credits, scores, gravity+fill (one RNG draw)
+    if(sess!==mySess || state!==myState){ busy=false; return; }   // level left/restarted during the pop
+    var res=HM.resolveSession(state, mySess, Math.random);   // pops collected, credits, scores, gravity+fill (one RNG draw)
+    if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);   // keep the always-playable invariant after refill
     sess=null;
     clearDim(); paintAll();
     // fresh-drop animation on refilled cells
@@ -429,6 +453,7 @@ h1{ font-size:30px; line-height:1; }
     updateGoals(); updateBars();
     if(res.gain>0 && (hadMerge ? n>=2 : n>=4)) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+(hadMerge?" "+NAME[color]:""));
     await sleep(180);
+    if(state!==myState){ busy=false; return; }
     HM.checkEnd(state);
     var spared=state.movesLeft;
     busy=false;
@@ -449,7 +474,7 @@ h1{ font-size:30px; line-height:1; }
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
     if(!sess){ sess=HM.newSession(null,null); sess.moves=0; }
     gest={ anchor:tp, carry:col, counted:false };
-    setPress(tp,true);
+    setLift(tp,true);   // grab: the tile lifts instantly
   });
   function primedPair(tp,col){
     return (HM.playable(state,tp.r+1,tp.c)&&state.grid[tp.r+1][tp.c]===col)||(HM.playable(state,tp.r-1,tp.c)&&state.grid[tp.r-1][tp.c]===col)||
@@ -457,15 +482,21 @@ h1{ font-size:30px; line-height:1; }
   }
   board.addEventListener("pointermove", function(e){
     if(!gest || !e.isPrimary) return;
+    // lean the carried tile toward the finger — smooth, continuous, starts the instant you move
+    var ga=geomOf(gest.anchor.r,gest.anchor.c), at=cells[gest.anchor.r]&&cells[gest.anchor.r][gest.anchor.c];
+    if(ga && at){ var lim=ga.s*0.9;
+      at.tile.style.setProperty("--dx", Math.max(-lim,Math.min(lim, e.clientX-ga.cx)).toFixed(1)+"px");
+      at.tile.style.setProperty("--dy", Math.max(-lim,Math.min(lim, e.clientY-ga.cy)).toFixed(1)+"px");
+    }
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || (tp.r===gest.anchor.r && tp.c===gest.anchor.c)) return;
     var adj=Math.abs(tp.r-gest.anchor.r)+Math.abs(tp.c-gest.anchor.c)===1;
     if(adj) tryStep(gest.anchor, tp);
-    else gest.anchor=tp;   // fast jump: re-anchor without acting
+    else { setLift(gest.anchor,false); gest.anchor=tp; gest.carry=state.grid[tp.r][tp.c]; setLift(tp,true); }   // fast jump: re-anchor to the cell under the finger, refresh carry + lift
   });
   function endGesture(){
     if(!gest) return;
-    setPress(gest.anchor,false);
+    setLift(gest.anchor,false);
     var acted=gest.counted;
     gest=null;
     if(sess && sess.count>0){ armMeter(); }        // relaxed cash-out; a new press cancels it
@@ -536,7 +567,7 @@ h1{ font-size:30px; line-height:1; }
     var card=e.target.closest(".lvl-card"); if(!card||card.classList.contains("lock")) return;
     ensureAudio(); startLevel(+card.dataset.i);
   });
-  document.getElementById("btnBack").addEventListener("click",showLevels);
+  document.getElementById("btnBack").addEventListener("click",function(){ if(!busy) showLevels(); });
   document.getElementById("btnRestart").addEventListener("click",function(){ if(!busy) startLevel(curIndex); });
   document.getElementById("btnAid").addEventListener("click",function(e){
     aid=!aid; e.currentTarget.classList.toggle("on",aid); e.currentTarget.setAttribute("aria-pressed",aid?"true":"false");
@@ -546,7 +577,7 @@ h1{ font-size:30px; line-height:1; }
     muted=!muted; ensureAudio(); e.currentTarget.setAttribute("aria-pressed",muted?"false":"true");
     e.currentTarget.style.opacity=muted?"0.45":"1"; lsSet("hm_mute",muted?"1":"0"); if(!muted) sfxMix(2);
   });
-  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&screenGame.style.display!=="none"&&!over.classList.contains("show")) showLevels(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&!busy&&screenGame.style.display!=="none"&&!over.classList.contains("show")) showLevels(); });
 
   /* ---------- init ---------- */
   aid=lsGet("hm_aid")==="1"; muted=lsGet("hm_mute")==="1";

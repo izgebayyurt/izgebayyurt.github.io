@@ -25,10 +25,10 @@
     "objectives": [
       {
         "color": "O",
-        "count": 6
+        "count": 14
       }
     ],
-    "moves": 6
+    "moves": 15
   },
   {
     "id": 2,
@@ -53,10 +53,10 @@
     "objectives": [
       {
         "color": "G",
-        "count": 8
+        "count": 16
       }
     ],
-    "moves": 7
+    "moves": 18
   },
   {
     "id": 3,
@@ -81,13 +81,13 @@
     "objectives": [
       {
         "color": "O",
-        "count": 6
+        "count": 10
       },
       {
         "color": "P",
-        "count": 6
+        "count": 10
       }
     ],
-    "moves": 9
+    "moves": 15
   }
 ]);
