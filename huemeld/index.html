@@ -268,7 +268,7 @@ h1{ font-size:30px; line-height:1; }
      so it needs no levels.js rebuild and can't disturb the shipped levels. */
   var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:30, goal:"tubes", objectives:[],
+    spawn:{ R:4, Y:4, B:4 }, moves:40, goal:"tubes", objectives:[],
     tubes:{ O:8, G:8, P:8 } };
   LEVELS=LEVELS.concat([TUBE_TEST]);
   var HEX=HM.HEX, NAME=HM.NAME;
@@ -576,10 +576,10 @@ h1{ font-size:30px; line-height:1; }
     }
     return false;
   }
-  function finishTurn(){   // win when the goal is met; lose only when out of moves AND no free combo remains
+  function finishTurn(){   // win when the goal is met; lose when out of moves (both a mix and a combo cost one)
     HM.checkEnd(state);
     if(state.won){ showEnd(true, state.movesLeft); return; }
-    if(state.movesLeft<=0 && !hasComboPair()){ showEnd(false, 0); }
+    if(state.movesLeft<=0){ showEnd(false, 0); }
   }
   /* MIX (spends a move): two different primaries fuse into their blend secondary,
      which STAYS on the board; then gravity drops everything once. One at a time. */
@@ -644,10 +644,11 @@ h1{ font-size:30px; line-height:1; }
     setTimeout(function(){ board.classList.remove("shake"); }, 460);
   }
 
-  async function resolveCombo(){   // the swoop: pop everything collected, free (no move), fires the juice
+  async function resolveCombo(){   // the swoop: pop everything collected; the whole combo costs ONE move total, fires the juice
     if(!sess||busy) return;
     var mySess=sess, myState=state;   // pin what we're resolving — a mid-await level change must not corrupt a fresh board
     busy=true; finishAnim();
+    spendMove();   // one move for the entire swoop, no matter how many tiles it pops
     var keys=Object.keys(mySess.collected), n=mySess.count;
     var color=mySess.color;
     var tier=comboTier(n);
@@ -682,8 +683,8 @@ h1{ font-size:30px; line-height:1; }
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
     var col=state.grid[tp.r][tp.c];
+    if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // out of moves — a mix AND a combo each cost one
     if(HM.isPrim(col)){
-      if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // no moves left to mix
       if(!adjDiffPrim(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }  // nothing to mix into
     } else {
       if(!primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // lone secondary = squish toy
