@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#f3ead6" />
 <title>Huemeld · İzge Bayyurt</title>
-<meta name="description" content="Mix primaries, connect four, clear the level. A hand-drawn colour-melding puzzle." />
+<meta name="description" content="Meld primary paints into a suspended combo, then detonate it. A hand-drawn colour puzzle." />
 <meta property="og:title" content="Huemeld" />
-<meta property="og:description" content="Mix primaries, connect four, clear the level. A hand-drawn colour-melding puzzle." />
+<meta property="og:description" content="Meld primary paints into a suspended combo, then detonate it. A hand-drawn colour puzzle." />
 <meta property="og:type" content="website" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f3ead6'/%3E%3Crect x='4' y='4' width='11' height='11' rx='3' fill='%23ef4a5a' stroke='%232c2733' stroke-width='2'/%3E%3Crect x='17' y='6' width='10' height='10' rx='3' fill='%233d8bdf' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='16' cy='23' r='6' fill='%2357c268' stroke='%232c2733' stroke-width='2'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -21,6 +21,7 @@
   --font-d:"Fredoka", system-ui, sans-serif;
   --font-u:"Nunito", system-ui, sans-serif;
   --pop:cubic-bezier(.34,1.7,.6,1); --calm:cubic-bezier(.4,0,.2,1);
+  --ripen:900ms;
 }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body{ margin:0; padding:0; }
@@ -37,7 +38,6 @@ body{
 ::selection{ background:rgba(155,98,214,.25); }
 h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; letter-spacing:.2px; }
 
-/* generic marker button */
 .mk{
   font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
   background:var(--card); border:2.5px solid var(--line); border-radius:14px;
@@ -47,11 +47,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; letter-spacing:.
 .mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .mk.big{ height:54px; font-size:19px; border-radius:16px; padding:0 22px; }
 .mk.accent{ background:#ffd15c; }
-.mk.grape{ background:#c8a6ef; }
-.icobtn{
-  width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center;
-  font-size:18px; padding:0;
-}
+.icobtn{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; padding:0; }
 
 /* ---------- level select ---------- */
 #screen-levels .top{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:4px; }
@@ -87,7 +83,7 @@ h1{ font-size:30px; line-height:1; }
 .moves{ display:flex; flex-direction:column; align-items:center; justify-content:center; width:60px; height:52px; border:2.5px solid var(--line); border-radius:14px; background:#ffd15c; box-shadow:0 3px 0 var(--shadow); flex:none; }
 .moves b{ font-family:var(--font-d); font-weight:700; font-size:23px; line-height:1; }
 .moves span{ font-family:var(--font-u); font-weight:800; font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink); opacity:.7; }
-.goals{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.goals{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
 .goal{ display:flex; align-items:center; gap:7px; background:var(--paper2); border:2.5px solid var(--line); border-radius:12px; padding:5px 11px 5px 8px; box-shadow:0 3px 0 var(--shadow); }
 .goal .swatch{ width:21px; height:21px; border:2px solid var(--line); border-radius:6px; }
 .goal .swatch.round{ border-radius:50%; }
@@ -95,17 +91,25 @@ h1{ font-size:30px; line-height:1; }
 .goal.done{ background:#d7f0d0; }
 .goal.done b{ color:#2f7d3a; }
 
-.ghint{ text-align:center; font-size:12px; color:var(--ink-soft); margin:11px 2px 0; line-height:1.4; }
-.ghint b{ font-weight:700; color:var(--ink); }
+/* powerup bars (charged by chaining primaries; the payoff layer comes later) */
+.pups{ display:flex; gap:8px; margin-bottom:12px; }
+.pup{ flex:1; display:flex; align-items:center; gap:6px; }
+.pup .dot{ width:14px; height:14px; border-radius:50%; border:2px solid var(--line); flex:none; }
+.pup .track{ flex:1; height:10px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; box-shadow:0 2px 0 var(--shadow); }
+.pup .fill{ height:100%; width:0; border-radius:999px; transition:width .28s var(--pop); }
+.pup.ready{ animation:hmReady .9s ease-in-out infinite; }
+.pup.ready .track{ border-color:#f0a92c; }
+
 .stage{ position:relative; }
 .board{
   display:grid; grid-template-columns:repeat(var(--cols,7),1fr); gap:2px;
   padding:12px; border-radius:20px; background:var(--paper2);
   border:3px solid var(--line); box-shadow:0 5px 0 var(--shadow);
   touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  transition:box-shadow .18s var(--calm);
 }
+.board.suspended{ box-shadow:0 5px 0 var(--shadow), 0 0 0 3px #ffd15c, 0 0 24px 5px rgba(255,209,92,.55); }
 .cell{ position:relative; aspect-ratio:1; }
-.cell.slot::after{ content:""; position:absolute; inset:20%; border:2px dashed rgba(44,39,51,.16); border-radius:40%; }
 .tile{
   position:absolute; inset:7%;
   background:var(--pc); border:3px solid var(--line);
@@ -113,41 +117,33 @@ h1{ font-size:30px; line-height:1; }
   box-shadow:1.5px 2px 0 rgba(44,39,51,.28);
   transform:rotate(var(--rot,0deg));
   display:flex; align-items:center; justify-content:center;
-  cursor:pointer; will-change:transform;
+  cursor:pointer; will-change:transform, filter;
 }
 .tile.sec{ border-radius:50%; }
 .tile .streak{ position:absolute; top:15%; left:17%; width:32%; height:20%; border-radius:50%; background:rgba(255,255,255,.4); pointer-events:none; }
 .tile .sym{ position:relative; z-index:2; font-family:var(--font-d); font-weight:700; font-size:clamp(11px,3.2vw,16px); color:#fff; -webkit-text-stroke:.8px var(--line); }
+.tile.dim{ filter:saturate(.2) brightness(1.08) opacity(.45); }
+.tile.incombo{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 15px 3px rgba(255,255,255,.65); z-index:4; animation:hmBob .7s ease-in-out infinite; }
+.tile.press{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 1.5px 2px 0 rgba(44,39,51,.28); z-index:5; }
 .tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
 .tile.new{ animation:hmDrop .22s var(--pop); }
 .tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
-.tile.eatpulse{ animation:hmEatPulse .18s var(--pop); z-index:4; }
-.tile.press{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 1.5px 2px 0 rgba(44,39,51,.28); z-index:5; }
-.mixfx{ position:absolute; display:none; pointer-events:none; z-index:6; overflow:visible; }
+.tile.squish{ animation:hmSquish .3s var(--pop); }
+
+.combo-meter{ position:absolute; left:14px; right:14px; top:-3px; height:7px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
+.combo-meter.show{ opacity:1; }
+.combo-meter .fill{ height:100%; width:0; background:#ffd15c; }
+.combo-meter.run .fill{ width:100%; transition:width var(--ripen) linear; }
 
 .toast{
   position:absolute; left:50%; top:12px; transform:translateX(-50%);
   font-family:var(--font-d); font-weight:600; font-size:15px; white-space:nowrap;
   background:#ffd15c; border:2.5px solid var(--line); border-radius:999px; padding:6px 15px;
-  box-shadow:0 3px 0 var(--shadow); opacity:0; pointer-events:none; z-index:8;
+  box-shadow:0 3px 0 var(--shadow); opacity:0; pointer-events:none; z-index:9;
 }
-.combo-badge{
-  position:absolute; display:none; align-items:center; justify-content:center;
-  min-width:28px; height:28px; padding:0 7px; transform:translate(-50%,-130%);
-  font-family:var(--font-d); font-weight:700; font-size:14px; color:#fff; -webkit-text-stroke:.6px rgba(0,0,0,.7);
-  border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 rgba(0,0,0,.35);
-  pointer-events:none; z-index:7;
-}
-.combo-badge.show{ display:flex; }
-.over{
-  position:absolute; inset:0; z-index:9; display:none; align-items:center; justify-content:center; padding:18px;
-  background:rgba(240,230,207,.72); border-radius:20px;
-}
+.over{ position:absolute; inset:0; z-index:10; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(240,230,207,.72); border-radius:20px; }
 .over.show{ display:flex; }
-.panel{
-  width:100%; max-width:300px; text-align:center; padding:22px 22px 20px;
-  background:var(--card); border:3px solid var(--line); border-radius:22px; box-shadow:0 6px 0 var(--shadow);
-}
+.panel{ width:100%; max-width:300px; text-align:center; padding:22px 22px 20px; background:var(--card); border:3px solid var(--line); border-radius:22px; box-shadow:0 6px 0 var(--shadow); }
 .panel h2{ font-size:27px; }
 .panel p{ font-family:var(--font-u); font-weight:700; color:var(--ink-soft); font-size:13.5px; margin:6px 0 14px; }
 .stars{ font-size:34px; letter-spacing:4px; color:#f0a92c; margin:2px 0 6px; }
@@ -155,12 +151,17 @@ h1{ font-size:30px; line-height:1; }
 .panel .row{ display:flex; gap:9px; margin-top:12px; }
 .panel .row .mk{ flex:1; height:46px; font-size:15px; border-radius:13px; }
 
-@keyframes hmPop{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 42%{transform:rotate(var(--rot,0deg)) scale(1.16)} 100%{transform:rotate(var(--rot,0deg)) scale(.05); opacity:0} }
+.ghint{ text-align:center; font-size:12px; color:var(--ink-soft); margin:11px 2px 0; line-height:1.4; }
+.ghint b{ font-weight:700; color:var(--ink); }
+
+@keyframes hmPop{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 42%{transform:rotate(var(--rot,0deg)) scale(1.18)} 100%{transform:rotate(var(--rot,0deg)) scale(.05); opacity:0} }
 @keyframes hmDrop{ from{transform:translateY(-15px) rotate(var(--rot,0deg)); opacity:.2} to{transform:translateY(0) rotate(var(--rot,0deg)); opacity:1} }
-@keyframes hmMix{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 45%{transform:rotate(0deg) scale(1.25)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
-@keyframes hmEatPulse{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 40%{transform:rotate(var(--rot,0deg)) scale(1.18)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmMix{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 45%{transform:rotate(0deg) scale(1.28)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmBob{ 0%,100%{transform:rotate(var(--rot,0deg)) scale(1.02)} 50%{transform:rotate(var(--rot,0deg)) scale(1.1)} }
+@keyframes hmSquish{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 40%{transform:rotate(var(--rot,0deg)) scaleX(1.25) scaleY(.72)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmReady{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
 @keyframes hmToast{ 0%{transform:translateX(-50%) translateY(6px) scale(.85); opacity:0} 18%{transform:translateX(-50%) translateY(0) scale(1); opacity:1} 76%{opacity:1} 100%{transform:translateX(-50%) translateY(-12px); opacity:0} }
-@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; } }
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; } .tile.incombo{ animation:none; } }
 </style>
 </head>
 <body>
@@ -172,7 +173,7 @@ h1{ font-size:30px; line-height:1; }
         <div class="logo" aria-hidden="true"><i></i><i></i><i></i></div>
         <div>
           <h1>Huemeld</h1>
-          <div class="tagline">Mix · connect four · clear</div>
+          <div class="tagline">Meld paints · build a combo · detonate</div>
         </div>
       </div>
       <div class="progress" id="progress">0 / 0</div>
@@ -194,17 +195,11 @@ h1{ font-size:30px; line-height:1; }
       <div class="moves"><b id="movesN">0</b><span>moves</span></div>
     </div>
     <div class="goals" id="goals"></div>
+    <div class="pups" id="pups"></div>
     <div class="stage">
       <div class="board" id="board"></div>
-      <svg class="mixfx" id="mixfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <filter id="goo"><feGaussianBlur id="gooBlur" in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11"/></filter>
-        </defs>
-        <g filter="url(#goo)"><rect id="cTgtInk" fill="#2c2733"/><rect id="cSrcInk" fill="#2c2733"/></g>
-        <g filter="url(#goo)"><rect id="cTgt"/><rect id="cSrc"/></g>
-      </svg>
+      <div class="combo-meter" id="meter"><div class="fill"></div></div>
       <div class="toast" id="toast"></div>
-      <div class="combo-badge" id="comboBadge"><span id="cbCount"></span></div>
       <div class="over" id="over">
         <div class="panel">
           <h2 id="overTitle">Cleared!</h2>
@@ -214,7 +209,7 @@ h1{ font-size:30px; line-height:1; }
         </div>
       </div>
     </div>
-    <p class="ghint">Drag through matching paints to <b>collect</b> them &middot; swipe a <b>different</b> paint to start mixing &middot; let go to <b>bank</b> the pairs you've matched</p>
+    <p class="ghint">Drag one paint onto a <b>different</b> one to meld · keep melding the same colour to grow a combo · lift and it <b>detonates</b></p>
   </section>
 
 </div>
@@ -226,12 +221,22 @@ h1{ font-size:30px; line-height:1; }
   "use strict";
   var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
   var HEX=HM.HEX, NAME=HM.NAME;
+  var PRIMS=["R","Y","B"];
+  var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
+  var RIPEN_MS=900;
+
   var state=null, curLevel=null, curIndex=0, busy=false;
-  var clearing=new Set(), fresh={}, mixed=new Set(), pulsing=new Set();
   var aid=false, muted=false;
+  var cells=[];          // persistent DOM: cells[r][c] = {cell, tile} (built once per level)
+  var geom=null;         // cached cell centres for index-math hit-testing (per gesture)
+  var sess=null;         // engine combo session, persists across gestures until it ripens
+  var gest=null;         // the current finger drag
+  var resolveTid=0;
 
   var board=document.getElementById("board");
   var goalsEl=document.getElementById("goals");
+  var pupsEl=document.getElementById("pups");
+  var meterEl=document.getElementById("meter");
   var movesN=document.getElementById("movesN");
   var toastEl=document.getElementById("toast");
   var over=document.getElementById("over");
@@ -251,275 +256,224 @@ h1{ font-size:30px; line-height:1; }
   var actx=null;
   function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
   function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
-  function sfxMix(){ beep(430,0.08,"triangle",0.05); setTimeout(function(){ beep(650,0.1,"triangle",0.045); },70); }
-  function sfxEat(n){ beep(520+Math.min(n,14)*22, 0.06, "sine", 0.045); }   // pitch climbs with the chain -> ascending combo chime
-  function sfxPop(n){ var b=360+Math.min(n,10)*14; beep(b,0.12,"sine",0.06); beep(b*1.5,0.14,"sine",0.03); }
+  function sfxMix(n){ var b=430+Math.min(n||0,12)*30; beep(b,0.07,"triangle",0.05); setTimeout(function(){ beep(b*1.5,0.09,"triangle",0.04); },55); }
+  function sfxEat(n){ beep(520+Math.min(n,14)*24, 0.06, "sine", 0.045); }
+  function sfxPop(n){ var b=340+Math.min(n,12)*16; beep(b,0.13,"sine",0.06); beep(b*1.5,0.15,"sine",0.03); }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
 
-  /* ---------- rendering ---------- */
-  function tileRot(r,c){ return ((r*7+c*13)%5)-2; }   // shared with the mix-fuse overlay, so shapes never visibly "pop" between DOM tile and SVG
-  function render(){
-    var h="", r, c;
-    for(r=0;r<state.H;r++) for(c=0;c<state.W;c++){
-      if(!state.mask[r][c]){ h+='<div class="cell wall"></div>'; continue; }
-      var v=state.grid[r][c], key=r+","+c;
-      if(!v){ h+='<div class="cell slot" data-r="'+r+'" data-c="'+c+'"></div>'; continue; }
-      var cls="tile"+(HM.isPrim(v)?"":" sec");
-      if(clearing.has(key)) cls+=" clr";
-      if(fresh[key]) cls+=" new";
-      if(mixed.has(key)) cls+=" mixed";
-      if(pulsing.has(key)) cls+=" eatpulse";
-      var rot=tileRot(r,c);
-      h+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="'+cls+'" style="--pc:'+HEX[v]+';--rot:'+rot+'deg">'+
-         (aid?'<span class="sym">'+v+'</span>':'')+'<span class="streak"></span></div></div>';
-    }
+  /* ---------- persistent-DOM board ----------
+     Built ONCE per level; every later change mutates existing nodes (class/
+     style), never innerHTML. This is the fix for the v2 fast-drag bug: the
+     node under the finger is never destroyed mid-gesture. */
+  function tileRot(r,c){ return ((r*7+c*13)%5)-2; }
+  function buildBoard(){
     board.style.setProperty("--cols", state.W);
-    board.innerHTML=h;
+    board.classList.remove("suspended");
+    var html="";
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){
+      if(!state.mask[r][c]){ html+='<div class="cell wall"></div>'; continue; }
+      html+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="tile" style="--rot:'+tileRot(r,c)+'deg"><span class="streak"></span><span class="sym"></span></div></div>';
+    }
+    board.innerHTML=html;   // the ONLY innerHTML write; never called mid-session
+    cells=[];
+    for(var r2=0;r2<state.H;r2++){ cells[r2]=[]; for(var c2=0;c2<state.W;c2++){
+      var cell=board.querySelector('.cell[data-r="'+r2+'"][data-c="'+c2+'"]');
+      cells[r2][c2]=cell?{cell:cell, tile:cell.querySelector(".tile")}:null;
+    }}
+    paintAll();
   }
+  function paintTile(r,c){
+    var ref=cells[r]&&cells[r][c]; if(!ref) return;
+    var t=ref.tile, v=state.grid[r][c];
+    t.className="tile";   // reset transient state (dim/incombo/clr/mixed/press...)
+    if(!v){ t.style.visibility="hidden"; return; }
+    t.style.visibility="";
+    t.style.setProperty("--pc", HEX[v]);
+    if(!HM.isPrim(v)) t.classList.add("sec");
+    t.querySelector(".sym").textContent = aid ? v : "";
+    ref.col=v;
+  }
+  function paintAll(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(cells[r]&&cells[r][c]) paintTile(r,c); }
+  function setAnim(t, cls, ms){ if(!t) return; t.classList.remove(cls); void t.offsetWidth; t.classList.add(cls); setTimeout(function(){ t.classList.remove(cls); }, ms); }
+
   function renderGoals(){
     var h="";
-    for(var i=0;i<state.obj.length;i++){
-      var o=state.obj[i];
+    for(var i=0;i<state.obj.length;i++){ var o=state.obj[i];
       h+='<div class="goal"><span class="swatch'+(HM.isPrim(o.color)?"":" round")+'" style="background:'+HEX[o.color]+'"></span><b>'+o.need+'</b></div>';
     }
     goalsEl.innerHTML=h;
   }
   function updateGoals(){
     var chips=goalsEl.children;
-    for(var i=0;i<state.obj.length;i++){
-      var o=state.obj[i], rem=Math.max(0,o.need-o.have), chip=chips[i];
-      chip.querySelector("b").textContent = rem>0 ? rem : "✓";
-      chip.classList.toggle("done", rem===0);
+    for(var i=0;i<state.obj.length;i++){ var o=state.obj[i], rem=Math.max(0,o.need-o.have), chip=chips[i];
+      chip.querySelector("b").textContent = rem>0 ? rem : "✓"; chip.classList.toggle("done", rem===0);
     }
   }
-  function updateMoves(){ movesN.textContent=state.movesLeft; }
-  function toast(t){ toastEl.textContent=t; toastEl.style.animation="none"; void toastEl.offsetWidth; toastEl.style.animation="hmToast 1.15s var(--pop) forwards"; }
+  function renderBars(){
+    var h="";
+    for(var i=0;i<PRIMS.length;i++){ var c=PRIMS[i];
+      h+='<div class="pup" data-c="'+c+'"><span class="dot" style="background:'+HEX[c]+'"></span><span class="track"><span class="fill" style="background:'+HEX[c]+'"></span></span></div>';
+    }
+    pupsEl.innerHTML=h;
+  }
+  function updateBars(){
+    var kids=pupsEl.children;
+    for(var i=0;i<PRIMS.length;i++){ var c=PRIMS[i], pct=Math.min(1, state.bars[c]/state.barMax);
+      kids[i].querySelector(".fill").style.width=(pct*100)+"%";
+      kids[i].classList.toggle("ready", state.bars[c]>=state.barMax);
+    }
+  }
+  function updateMoves(){ movesN.textContent=Math.max(0,state.movesLeft); }
+  function toast(t){ toastEl.textContent=t; toastEl.style.animation="none"; void toastEl.offsetWidth; toastEl.style.animation="hmToast 1.2s var(--pop) forwards"; }
 
-  /* ---------- turn resolution: chain-drag (eat same colour / mix different
-     primaries, both mid-drag) or double-tap (instant clear shortcut) ---------- */
-  async function commitClear(r,c){
-    if(busy) return;
-    var comp=HM.groupAt(state,r,c);
-    if(comp.length<2) return;   // minimum clearable group is 2 — a lone tile just sits there
-    busy=true;
-    state.movesLeft--; updateMoves();
-    clearing=new Set(comp);
-    render(); sfxPop(comp.length);
-    await sleep(230);
-    var res=HM.clearGroup(state,r,c);
-    state.score+=res.gain;
-    updateGoals();
-    if(res.cleared>=HM.POP_MIN) toast("+"+res.gain);
-    clearing=new Set(); render(); await sleep(55);
-    fresh=HM.gravity(state, Math.random); render(); await sleep(160); fresh={};
+  /* ---------- hit-testing: index math from cached geometry (no elementFromPoint,
+     no per-move getBoundingClientRect). Geometry is cached once per gesture at
+     pointerdown — the board never relayouts during a suspended session. */
+  function cacheGeom(){
+    geom=[];
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(!ref) continue;
+      var cr=ref.cell.getBoundingClientRect();
+      geom.push({ r:r, c:c, cx:cr.left+cr.width/2, cy:cr.top+cr.height/2, s:cr.width });
+    }
+  }
+  function cellAt(x,y){
+    if(!geom) return null;
+    var best=null, bd=1e9;
+    for(var i=0;i<geom.length;i++){ var g=geom[i], dx=x-g.cx, dy=y-g.cy, d=dx*dx+dy*dy;
+      if(d<bd && Math.abs(dx)<g.s*0.62 && Math.abs(dy)<g.s*0.62){ bd=d; best=g; }
+    }
+    return best?{r:best.r,c:best.c}:null;
+  }
+
+  /* ---------- combo session ---------- */
+  function liveSet(){
+    if(!sess||sess.color==null) return null;
+    if(sess.hadMerge){ var s={}; s[sess.color]=1; (ING[sess.color]||[]).forEach(function(p){ s[p]=1; }); return s; }
+    var o={}; o[sess.color]=1; return o;   // chain: only its own colour
+  }
+  function applyDim(){
+    var live=liveSet();
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(!ref) continue;
+      var v=state.grid[r][c], dim = live && v && !live[v] && !sess.collected[r+","+c];
+      ref.tile.classList.toggle("dim", !!dim);
+    }
+    board.classList.toggle("suspended", !!live);
+  }
+  function clearDim(){
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo"); } }
+    board.classList.remove("suspended");
+  }
+  function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.add("incombo"); }
+  function setPress(p,on){ var ref=p&&cells[p.r]&&cells[p.r][p.c]; if(ref) ref.tile.classList.toggle("press", on); }
+
+  function landMove(){ if(!gest.counted){ gest.counted=true; sess.moves++; state.movesLeft--; updateMoves(); } }
+
+  function doMerge(from,to){
+    HM.sessionMerge(state, sess, from, to);
+    gest.carry=sess.color;
+    landMove();
+    paintTile(from.r,from.c);            // source is now a hole
+    paintTile(to.r,to.c);                // destination is now the blend
+    setAnim(cells[to.r][to.c].tile, "mixed", 300);
+    applyDim(); markCollected(to.r,to.c);
+    gest.anchor=to; sfxMix(sess.count);
+  }
+  function doCollect(from,to,firstAnchor){
+    if(firstAnchor) HM.sessionCollect(state, sess, from.r, from.c);
+    HM.sessionCollect(state, sess, to.r, to.c);
+    gest.carry=sess.color;
+    landMove();
+    applyDim();
+    if(firstAnchor) markCollected(from.r,from.c);
+    markCollected(to.r,to.c);
+    setAnim(cells[to.r][to.c].tile, "mixed", 280);
+    gest.anchor=to; sfxEat(sess.count);
+  }
+
+  function tryStep(from,to){
+    var B=state.grid[to.r][to.c];
+    if(!B){ gest.anchor=to; return; }                 // over a hole: reposition, no action
+    var lock=sess.color, carry=gest.carry;
+    // MERGE: carrying a primary, target a different primary, blend matches the lock (or lock unset)
+    if(HM.isPrim(carry) && HM.isPrim(B) && B!==carry){
+      var blend=HM.mix(carry,B);
+      if(lock==null || (sess.hadMerge && blend===lock)){ doMerge(from,to); return; }
+      return;   // inert: would make a different colour
+    }
+    // CHAIN / SWEEP: target is the carried colour
+    if(B===carry && (lock==null || B===lock)){ doCollect(from,to, lock==null); return; }
+    // else inert (session continues)
+  }
+
+  function stopMeter(){ if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; } meterEl.classList.remove("run","show"); }
+  function armMeter(){
+    if(resolveTid) clearTimeout(resolveTid);
+    meterEl.classList.add("show");
+    meterEl.classList.remove("run"); void meterEl.offsetWidth; meterEl.classList.add("run");
+    resolveTid=setTimeout(resolveNow, RIPEN_MS);
+  }
+
+  async function resolveNow(){
+    if(!sess||busy) return;
+    busy=true; stopMeter();
+    var keys=Object.keys(sess.collected), n=sess.count;
+    var color=sess.color, hadMerge=sess.hadMerge;
+    keys.forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) ref.tile.classList.add("clr"); });
+    sfxPop(n);
+    await sleep(250);
+    var res=HM.resolveSession(state, sess, Math.random);   // pops collected, credits, scores, gravity+fill (one RNG draw)
+    sess=null;
+    clearDim(); paintAll();
+    // fresh-drop animation on refilled cells
+    Object.keys(res.fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+    updateGoals(); updateBars();
+    if(res.gain>0 && (hadMerge ? n>=2 : n>=4)) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+(hadMerge?" "+NAME[color]:""));
+    await sleep(180);
     HM.checkEnd(state);
+    var spared=state.movesLeft;
     busy=false;
-    if(state.won){ render(); showEnd(true); }
-    else if(state.lost){ render(); showEnd(false); }
-    else render();
+    if(state.won){ showEnd(true, spared); }
+    else if(state.lost){ showEnd(false, 0); }
   }
 
-  /* ---------- input: merge (hold) then combo the resulting secondary ----------
-     Press a primary and drag+hold onto a DIFFERENT adjacent primary for
-     ~0.7s to merge it — the goo-morph blend animation plays as you hold;
-     pulling back before it completes snaps the two tiles apart again (~0.1s).
-     Same-coloured primaries and secondaries are never valid targets from a
-     primary — merging is the ONLY thing a primary can do.
-     Once merged, the gesture locks onto that resulting secondary colour —
-     from here dragging onto an ADJACENT tile of the SAME secondary is
-     instant (no hold) and extends a connected group, refilling by gravity
-     each step, with a running count shown in the combo badge. Starting the
-     gesture directly on an existing secondary skips the merge and begins in
-     this combo phase right away.
-     Release banks the whole group only if it has grown to at least 2 tiles
-     — a lone merge with no combo just sits there uncleared. Any gesture
-     that performed a merge or at least one combo step costs exactly one
-     move; a gesture that touched nothing falls back to a plain tap (maybe a
-     double-tap-clear, which has the same minimum-2 rule). */
-  var mixfx=document.getElementById("mixfx"), gooBlur=document.getElementById("gooBlur");
-  var cSrc=document.getElementById("cSrc"), cTgt=document.getElementById("cTgt");
-  var cSrcInk=document.getElementById("cSrcInk"), cTgtInk=document.getElementById("cTgtInk");
-  var comboBadge=document.getElementById("comboBadge"), cbCount=document.getElementById("cbCount");
-  var ANIM_MS=700, REVERSE_MS=100, ARM_T=0.4, gest=null;
-
-  function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
-  function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
-  function cellEl(r,c){ return board.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]'); }
-  function tileElAt(r,c){ var el=cellEl(r,c); return el?el.querySelector(".tile"):null; }
-  function centerOf(r,c){ var el=cellEl(r,c); if(!el) return null; var br=board.getBoundingClientRect(), cr=el.getBoundingClientRect(); return { x:cr.left-br.left+cr.width/2, y:cr.top-br.top+cr.height/2, s:cr.width }; }
-  function tileFromPoint(x,y){ var el=document.elementFromPoint(x,y); if(!el) return null; var cell=el.closest(".cell"); if(!cell||!board.contains(cell)||cell.dataset.r===undefined) return null; return { r:+cell.dataset.r, c:+cell.dataset.c }; }
-  function pressAnchor(){ var t=tileElAt(gest.anchor.r,gest.anchor.c); if(t) t.classList.add("press"); }
-
-  function updateTarget(px,py){
-    var A=gest.anchor, ac=centerOf(A.r,A.c); if(!ac){ gest.target=null; gest.t=0; gest.targetType=null; return; }
-    var best=null, bestProj=0.18, nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}];
-    for(var i=0;i<4;i++){ var B=nb[i];
-      if(!HM.playable(state,B.r,B.c) || !state.grid[B.r][B.c]) continue;
-      var bc=centerOf(B.r,B.c); if(!bc) continue;
-      var vx=bc.x-ac.x, vy=bc.y-ac.y, len2=vx*vx+vy*vy;
-      var proj=((px-ac.x)*vx+(py-ac.y)*vy)/len2;
-      var perp=Math.abs((px-ac.x)*vy-(py-ac.y)*vx)/Math.sqrt(len2);
-      if(proj>bestProj && perp<ac.s*0.55){ best=B; bestProj=proj; }
-    }
-    gest.target=best; gest.t=best?Math.min(1,bestProj):0;
-    if(!best){ gest.targetType=null; gest.sec=null; return; }
-    var tc=state.grid[best.r][best.c];
-    if(gest.phase==="primary"){
-      gest.targetType=(HM.isPrim(gest.color)&&HM.isPrim(tc)&&tc!==gest.color)?"mix":null;
-      gest.sec=gest.targetType==="mix"?HM.mix(gest.color,tc):null;
-    } else {
-      gest.targetType=(tc===gest.color)?"combo":null;
-      gest.sec=null;
-    }
-  }
-  function clearHidden(){
-    if(gest&&gest.hidden){ gest.hidden.forEach(function(k){ var p=k.split(","), t=tileElAt(+p[0],+p[1]); if(t) t.style.opacity=""; }); gest.hidden=[]; }
-  }
-  function hideFx(){ mixfx.style.display="none"; clearHidden(); }
-  function drawFx(){
-    if(!gest || gest.targetType!=="mix"){ if(mixfx.style.display!=="none") hideFx(); return; }
-    var A=gest.anchor, B=gest.target, ac=centerOf(A.r,A.c), bc=centerOf(B.r,B.c); if(!ac||!bc){ hideFx(); return; }
-    mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
-    mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
-    mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
-    mixfx.style.display="block";
-    gooBlur.setAttribute("stdDeviation",(ac.s*0.10).toFixed(2));
-    var f=gest.fuse, sc=1+0.06*f, rr=ac.s*0.40*sc, ir=rr+4;
-    var posFrac=Math.min(1, Math.max(gest.t, f));
-    var sx=ac.x+(bc.x-ac.x)*posFrac, sy=ac.y+(bc.y-ac.y)*posFrac;
-    var colS=lerpHex(HEX[gest.color], HEX[gest.sec], f), colT=lerpHex(HEX[state.grid[B.r][B.c]], HEX[gest.sec], f);
-    var corner=rr*(0.52+0.48*posFrac), cornerI=ir*(0.52+0.48*posFrac);
-    function place(el,cx,cy,half,rad,rotDeg){
-      el.setAttribute("x",cx-half); el.setAttribute("y",cy-half);
-      el.setAttribute("width",half*2); el.setAttribute("height",half*2);
-      el.setAttribute("rx",rad); el.setAttribute("ry",rad);
-      el.setAttribute("transform","rotate("+rotDeg+" "+cx+" "+cy+")");
-    }
-    place(cTgtInk, bc.x, bc.y, ir, cornerI, tileRot(B.r,B.c));
-    place(cSrcInk, sx, sy, ir, cornerI, tileRot(A.r,A.c));
-    place(cTgt, bc.x, bc.y, rr, corner, tileRot(B.r,B.c)); cTgt.setAttribute("fill",colT);
-    place(cSrc, sx, sy, rr, corner, tileRot(A.r,A.c)); cSrc.setAttribute("fill",colS);
-    clearHidden();
-    [A,B].forEach(function(P){ var t=tileElAt(P.r,P.c); if(t){ t.style.opacity="0"; gest.hidden.push(P.r+","+P.c); } });
-  }
-  function updateComboLabel(){
-    if(!gest || gest.phase!=="secondary" || gest.groupCount<2){ comboBadge.classList.remove("show"); return; }
-    var c=centerOf(gest.anchor.r, gest.anchor.c); if(!c){ comboBadge.classList.remove("show"); return; }
-    comboBadge.style.left=(board.offsetLeft+c.x)+"px";
-    comboBadge.style.top=(board.offsetTop+c.y)+"px";
-    comboBadge.style.background=HEX[gest.color];
-    cbCount.textContent=gest.groupCount;
-    comboBadge.classList.add("show");
-  }
-  function commitMergeStep(){
-    var from=gest.anchor, to=gest.target;
-    hideFx();
-    var blend=HM.applyMix(state, from, to);
-    mixed=new Set([to.r+","+to.c]);
-    render();
-    mixed=new Set();
-    gest.phase="secondary"; gest.color=blend; gest.groupCount=1; gest.moved=true;
-    gest.anchor=to; gest.target=null; gest.t=0; gest.fuse=0;
-    pressAnchor();
-    sfxMix();
-    updateComboLabel();
-  }
-  function commitComboStep(){
-    var from=gest.anchor, to=gest.target;
-    HM.applyEat(state, from, to);
-    gest.moved=true;
-    pulsing=new Set([to.r+","+to.c]);
-    render();
-    pulsing=new Set();
-    gest.groupCount++;
-    gest.anchor=to; gest.target=null; gest.t=0;
-    pressAnchor();
-    sfxEat(gest.groupCount);
-    updateComboLabel();
-  }
-  function tick(now){
-    if(!gest || gest.phase!=="primary"){ return; }
-    var dt=now-(gest.last||now); gest.last=now;
-    var arming=gest.targetType==="mix" && gest.t>ARM_T;
-    gest.fuse=Math.max(0, Math.min(1, gest.fuse + (arming ? dt/ANIM_MS : -dt/REVERSE_MS)));
-    drawFx();
-    if(arming && gest.fuse>=1){ commitMergeStep(); return; }
-    gest.raf=requestAnimationFrame(tick);
-  }
-  var DTAP_MS=340, lastTap=null;
-  function maybeDoubleTap(tile,now){
-    if(lastTap && lastTap.r===tile.r && lastTap.c===tile.c && (now-lastTap.t)<DTAP_MS){ lastTap=null; commitClear(tile.r,tile.c); return; }
-    lastTap={ r:tile.r, c:tile.c, t:now };
-  }
-  function finalizeGesture(){
-    if(!gest) return;
-    if(gest.raf) cancelAnimationFrame(gest.raf);
-    var pt=tileElAt(gest.anchor.r,gest.anchor.c); if(pt) pt.classList.remove("press");
-    hideFx(); comboBadge.classList.remove("show"); gest=null;
-  }
-  /* release (or cancel): a group of 2+ secondaries banks in full; a lone
-     merged tile with no combo just stays on the board, uncleared. Whichever
-     happens, gravity resolves only now, once, at the end of the gesture. */
-  async function finishGesture(){
-    if(!gest) return;
-    var g=gest;
-    finalizeGesture();
-    if(busy) return;
-    if(g.phase==="primary" && g.target && g.targetType==="mix"){
-      // released mid-fuse, before the merge completed — a plain swap, same as any other quick swipe
-      busy=true;
-      state.movesLeft--; updateMoves();
-      var tmp=state.grid[g.anchor.r][g.anchor.c];
-      state.grid[g.anchor.r][g.anchor.c]=state.grid[g.target.r][g.target.c];
-      state.grid[g.target.r][g.target.c]=tmp;
-      render(); sfxEat(1);
-      HM.checkEnd(state);
-      busy=false;
-      if(state.lost){ showEnd(false); }
-      return;
-    }
-    if(!g.moved){ maybeDoubleTap(g.anchor, performance.now()); return; }
-    busy=true;
-    state.movesLeft--; updateMoves();
-    if(g.groupCount>=2){
-      var bank=HM.bankVirtualClear(state, g.color, g.groupCount);
-      state.score+=bank.gain;
-      clearing=new Set([g.anchor.r+","+g.anchor.c]);
-      render(); sfxPop(bank.cleared);
-      if(bank.cleared>=HM.POP_MIN) toast("+"+bank.gain);
-      await sleep(220);
-      state.grid[g.anchor.r][g.anchor.c]=null;
-      clearing=new Set(); render(); await sleep(55);
-      updateGoals();
-    }
-    fresh=HM.gravity(state, Math.random); render(); await sleep(150); fresh={};
-    HM.checkEnd(state);
-    busy=false;
-    if(state.won){ render(); showEnd(true); }
-    else if(state.lost){ render(); showEnd(false); }
-    else render();
-  }
-  board.addEventListener("pointerdown",function(e){
-    if(!e.isPrimary || busy) return; ensureAudio();
-    var tp=tileFromPoint(e.clientX,e.clientY);
+  board.addEventListener("pointerdown", function(e){
+    if(!e.isPrimary || busy || !state || state.movesLeft<=0) return; ensureAudio();
+    cacheGeom();
+    var tp=cellAt(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
-    try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+    if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; }   // finger down pauses the ripen
+    meterEl.classList.remove("run");
     var col=state.grid[tp.r][tp.c];
-    gest={ anchor:tp, phase:HM.isPrim(col)?"primary":"secondary", color:col, groupCount:1, moved:false,
-           target:null, targetType:null, t:0, fuse:0, sec:null, hidden:[],
-           last:performance.now(), sx:e.clientX, sy:e.clientY };
-    pressAnchor();
-    if(gest.phase==="primary") gest.raf=requestAnimationFrame(tick);
+    // pressing a lone secondary with no session going = free squish toy
+    if(!sess && !HM.isPrim(col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }
+    try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+    if(!sess){ sess=HM.newSession(null,null); sess.moves=0; }
+    gest={ anchor:tp, carry:col, counted:false };
+    setPress(tp,true);
   });
-  board.addEventListener("pointermove",function(e){
+  function primedPair(tp,col){
+    return (HM.playable(state,tp.r+1,tp.c)&&state.grid[tp.r+1][tp.c]===col)||(HM.playable(state,tp.r-1,tp.c)&&state.grid[tp.r-1][tp.c]===col)||
+           (HM.playable(state,tp.r,tp.c+1)&&state.grid[tp.r][tp.c+1]===col)||(HM.playable(state,tp.r,tp.c-1)&&state.grid[tp.r][tp.c-1]===col);
+  }
+  board.addEventListener("pointermove", function(e){
     if(!gest || !e.isPrimary) return;
-    var br=board.getBoundingClientRect();
-    updateTarget(e.clientX-br.left, e.clientY-br.top);
-    if(gest.phase==="secondary" && gest.targetType==="combo" && gest.t>ARM_T) commitComboStep();
+    var tp=cellAt(e.clientX,e.clientY);
+    if(!tp || (tp.r===gest.anchor.r && tp.c===gest.anchor.c)) return;
+    var adj=Math.abs(tp.r-gest.anchor.r)+Math.abs(tp.c-gest.anchor.c)===1;
+    if(adj) tryStep(gest.anchor, tp);
+    else gest.anchor=tp;   // fast jump: re-anchor without acting
   });
-  board.addEventListener("pointerup",function(e){ if(!e.isPrimary) return; finishGesture(); });
-  board.addEventListener("pointercancel",function(){ finishGesture(); });
-  board.addEventListener("contextmenu",function(e){ e.preventDefault(); });
+  function endGesture(){
+    if(!gest) return;
+    setPress(gest.anchor,false);
+    var acted=gest.counted;
+    gest=null;
+    if(sess && sess.count>0){ armMeter(); }        // relaxed cash-out; a new press cancels it
+    else if(sess && !acted){ sess=null; clearDim(); }
+  }
+  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; endGesture(); });
+  board.addEventListener("pointercancel", function(){ endGesture(); });
+  board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
   /* ---------- screens ---------- */
   function renderLevelSelect(){
@@ -538,26 +492,28 @@ h1{ font-size:30px; line-height:1; }
     document.getElementById("levelGrid").innerHTML=h;
     document.getElementById("progress").textContent=done+" / "+LEVELS.length;
   }
-  function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; renderLevelSelect(); }
-  function goalSub(L){ return L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" · "); }
+  function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
+  function goalSub(L){ return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
 
   function startLevel(i){
     curIndex=i; curLevel=LEVELS[i];
     state=HM.newState(curLevel); HM.fill(state, Math.random);
-    clearing=new Set(); fresh={}; mixed=new Set(); pulsing=new Set(); busy=false; lastTap=null; gest=null;
+    if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+    busy=false; sess=null; gest=null; geom=null; stopMeter();
     over.classList.remove("show");
     document.getElementById("gName").textContent="Level "+curLevel.id;
     document.getElementById("gSub").textContent=goalSub(curLevel);
     screenLevels.style.display="none"; screenGame.style.display="block";
-    renderGoals(); updateGoals(); updateMoves(); render();
+    renderGoals(); updateGoals(); renderBars(); updateBars(); updateMoves(); buildBoard();
   }
 
-  function showEnd(win){
+  function showEnd(win, spared){
+    if(spared==null) spared=state.movesLeft;
     document.getElementById("overTitle").textContent = win ? "Cleared!" : "Out of moves";
-    var stars = win ? starsFor(curLevel, state.movesLeft) : 0;
+    var stars = win ? starsFor(curLevel, spared) : 0;
     document.getElementById("overStars").innerHTML = win ? starStr(stars) : "";
     document.getElementById("overMsg").textContent = win
-      ? (state.movesLeft+" move"+(state.movesLeft===1?"":"s")+" to spare")
+      ? (spared+" move"+(spared===1?"":"s")+" to spare")
       : "You needed a few more moves — try again.";
     if(win){
       sfxWin();
@@ -583,15 +539,12 @@ h1{ font-size:30px; line-height:1; }
   document.getElementById("btnBack").addEventListener("click",showLevels);
   document.getElementById("btnRestart").addEventListener("click",function(){ if(!busy) startLevel(curIndex); });
   document.getElementById("btnAid").addEventListener("click",function(e){
-    aid=!aid; e.currentTarget.classList.toggle("on",aid);
-    e.currentTarget.setAttribute("aria-pressed",aid?"true":"false");
-    lsSet("hm_aid",aid?"1":"0"); if(state) render();
+    aid=!aid; e.currentTarget.classList.toggle("on",aid); e.currentTarget.setAttribute("aria-pressed",aid?"true":"false");
+    lsSet("hm_aid",aid?"1":"0"); if(state) paintAll();
   });
   document.getElementById("btnSound").addEventListener("click",function(e){
-    muted=!muted; ensureAudio();
-    e.currentTarget.setAttribute("aria-pressed",muted?"false":"true");
-    e.currentTarget.style.opacity=muted?"0.45":"1";
-    lsSet("hm_mute",muted?"1":"0"); if(!muted) sfxMix();
+    muted=!muted; ensureAudio(); e.currentTarget.setAttribute("aria-pressed",muted?"false":"true");
+    e.currentTarget.style.opacity=muted?"0.45":"1"; lsSet("hm_mute",muted?"1":"0"); if(!muted) sfxMix(2);
   });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&screenGame.style.display!=="none"&&!over.classList.contains("show")) showLevels(); });
 
@@ -599,7 +552,7 @@ h1{ font-size:30px; line-height:1; }
   aid=lsGet("hm_aid")==="1"; muted=lsGet("hm_mute")==="1";
   document.getElementById("btnAid").setAttribute("aria-pressed",aid?"true":"false");
   var sb=document.getElementById("btnSound"); sb.setAttribute("aria-pressed",muted?"false":"true"); sb.style.opacity=muted?"0.45":"1";
-  if(!LEVELS.length){ document.getElementById("levelGrid").innerHTML='<p style="grid-column:1/-1;color:var(--ink-soft)">No levels found — run tools/factory.mjs to generate levels.js.</p>'; }
+  if(!LEVELS.length){ document.getElementById("levelGrid").innerHTML='<p style="grid-column:1/-1;color:var(--ink-soft)">No levels found — run tools/feeltest.mjs to generate levels.js.</p>'; }
   showLevels();
 })();
 </script>
