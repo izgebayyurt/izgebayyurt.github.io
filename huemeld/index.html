@@ -128,6 +128,7 @@ h1{ font-size:30px; line-height:1; }
 .tile.new{ animation:hmDrop .22s var(--pop); }
 .tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
 .tile.squish{ animation:hmSquish .3s var(--pop); }
+.tile.nope{ animation:hmNope .32s var(--calm); }
 /* the carried tile lifts the instant you press and leans toward your finger — merging feels smooth and continuous, not a snap */
 .tile.lift{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(1.14); z-index:6; box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 7px 12px rgba(44,39,51,.32); transition:transform .09s linear; }
 /* square-to-circle + colour tint on the meld target (same-colour joins get a gentle pulse) */
@@ -167,6 +168,7 @@ h1{ font-size:30px; line-height:1; }
 @keyframes hmMix{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 45%{transform:rotate(0deg) scale(1.28)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
 @keyframes hmBob{ 0%,100%{transform:rotate(var(--rot,0deg)) scale(1.02)} 50%{transform:rotate(var(--rot,0deg)) scale(1.1)} }
 @keyframes hmSquish{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 40%{transform:rotate(var(--rot,0deg)) scaleX(1.25) scaleY(.72)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmNope{ 0%,100%{transform:rotate(var(--rot,0deg)) translateX(0)} 25%{transform:rotate(var(--rot,0deg)) translateX(-3px)} 75%{transform:rotate(var(--rot,0deg)) translateX(3px)} }
 @keyframes hmReady{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
 @keyframes hmToast{ 0%{transform:translateX(-50%) translateY(6px) scale(.85); opacity:0} 18%{transform:translateX(-50%) translateY(0) scale(1); opacity:1} 76%{opacity:1} 100%{transform:translateX(-50%) translateY(-12px); opacity:0} }
 @media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; } .tile.incombo{ animation:none; } }
@@ -225,7 +227,7 @@ h1{ font-size:30px; line-height:1; }
         </div>
       </div>
     </div>
-    <p class="ghint">Drag one paint onto a <b>different</b> one to meld · keep melding the same colour to grow a combo · lift and it <b>detonates</b></p>
+    <p class="ghint">Mix two <b>different</b> paints into a new colour, or merge <b>same</b> colours together · keep going, then lift to <b>pop</b> the combo</p>
   </section>
 
 </div>
@@ -466,15 +468,28 @@ h1{ font-size:30px; line-height:1; }
     sfxMix(sess.count);
   }
   function doCollect(from,to,firstAnchor){
+    var col=state.grid[to.r][to.c];   // same colour on both
     if(firstAnchor) HM.sessionCollect(state, sess, from.r, from.c);
     HM.sessionCollect(state, sess, to.r, to.c);
     gest.carry=sess.color;
     landMove();
-    applyDim();
-    if(firstAnchor) markCollected(from.r,from.c);
-    markCollected(to.r,to.c);
-    setAnim(cells[to.r][to.c].tile, "mixed", 280);   // same-colour join still pops satisfyingly
-    moveAnchorTo(to); updateCount(); sfxEat(sess.count);
+    setLift(from,false); gest.anchor={ r:to.r, c:to.c };
+    applyDim(); updateCount();
+    // goo-fuse the swiped tile INTO the target and hide it, so same colours visibly merge and the
+    // swiped one goes away (it stays logically collected and still credits when the combo detonates)
+    var fref=cells[from.r][from.c], tref=cells[to.r][to.c];
+    fref.tile.style.visibility="hidden"; tref.tile.style.visibility="hidden";
+    playGoo(from, to, HEX[col], HEX[col], HEX[col]);
+    var fc={ r:from.r, c:from.c }, tc={ r:to.r, c:to.c }, myState=state;
+    setTimeout(function(){
+      if(state!==myState || !cells.length) return;
+      hideGoo();
+      var sf=cells[fc.r][fc.c]; if(sf) sf.tile.style.visibility="hidden";   // swiped tile stays gone until detonation
+      var t=cells[tc.r][tc.c]; if(!t) return; t=t.tile; t.style.visibility="";
+      if(sess && gest && gest.anchor.r===tc.r && gest.anchor.c===tc.c){ t.classList.remove("incombo"); t.classList.add("lift"); }
+      else { t.classList.remove("lift"); t.classList.add("incombo"); }
+    }, GOO_MS-30);
+    sfxMix(sess.count);
   }
 
   function tryStep(from,to){
@@ -489,7 +504,9 @@ h1{ font-size:30px; line-height:1; }
     }
     // CHAIN / SWEEP: target is the carried colour
     if(B===carry && (lock==null || B===lock)){ doCollect(from,to, lock==null); return; }
-    // else inert (session continues)
+    // incompatible (e.g. two different balls — no colour they make): a quick "can't" shake, once per tile
+    var k=to.r+","+to.c;
+    if(gest.nopeCell!==k){ gest.nopeCell=k; var nt=cells[to.r]&&cells[to.r][to.c]; if(nt) setAnim(nt.tile,"nope",340); }
   }
 
   function stopMeter(){ if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; } meterEl.classList.remove("run","show"); }
