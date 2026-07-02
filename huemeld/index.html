@@ -268,8 +268,8 @@ h1{ font-size:30px; line-height:1; }
      so it needs no levels.js rebuild and can't disturb the shipped levels. */
   var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:20, goal:"tubes", objectives:[],
-    tubes:{ O:20, G:20, P:20 } };
+    spawn:{ R:4, Y:4, B:4 }, moves:30, goal:"tubes", objectives:[],
+    tubes:{ O:8, G:8, P:8 } };
   LEVELS=LEVELS.concat([TUBE_TEST]);
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
@@ -530,15 +530,13 @@ h1{ font-size:30px; line-height:1; }
     anim=null;
   }
 
+  /* two verbs: MIX two DIFFERENT primaries -> a secondary (spends a move, drops
+     the board, no pop); FUSE a secondary onto a SAME-colour secondary -> the
+     combo (free, confined to this one dragged tile). Nothing else is legal. */
   function classifyDrag(nbColor){
-    var carry=gest.carry, lock=sess.color;
-    if(HM.isPrim(carry) && HM.isPrim(nbColor) && nbColor!==carry){
-      var blend=HM.mix(carry,nbColor);
-      if(lock==null || (sess.hadMerge && blend===lock)) return "mix";
-      return null;   // would make a different colour than the locked combo
-    }
-    if(nbColor===carry && (lock==null || nbColor===lock)) return "fuse";   // same colour
-    return null;
+    var carry=gest.carry;
+    if(HM.isPrim(carry)) return (HM.isPrim(nbColor) && nbColor!==carry) ? "mix" : null;
+    return (nbColor===carry && !HM.isPrim(nbColor)) ? "fuse" : null;
   }
   function updateTarget(px,py){
     var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A){ gest.target=null; gest.t=0; gest.targetType=null; return; }
@@ -560,46 +558,73 @@ h1{ font-size:30px; line-height:1; }
   function commitSwipe(){
     var from={ r:gest.anchor.r, c:gest.anchor.c }, to=gest.target, type=gest.targetType;
     if(!to || !type) return;
-    if(type==="mix") applyMergeState(from,to);
-    else applyFuseState(from,to);
     gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
+    if(type==="mix") applyMixNow(from,to);   // atomic: spends a move, then the board drops
+    else applyComboFuse(from,to);            // free: adds this tile to the swoop
   }
-  function applyMergeState(from,to){
-    var colA=HEX[gest.carry], colB=HEX[state.grid[to.r][to.c]], sp=HM.isPrim(gest.carry), tp=HM.isPrim(state.grid[to.r][to.c]);
-    HM.sessionMerge(state, sess, from, to);   // grid: from -> null, to -> blend
-    gest.carry=sess.color; landMove();
-    paintTile(from.r,from.c);                  // the swiped square's cell is now empty and sits there
-    var t=cells[to.r][to.c].tile; t.classList.remove("dim");
-    t.classList.toggle("sec", !HM.isPrim(sess.color)); t.style.setProperty("--pc",HEX[sess.color]);
-    t.querySelector(".sym").textContent = aid ? sess.color : "";
-    setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
-    sess.epR=to.r; sess.epC=to.c;   // last landing = detonation epicentre for the wave-pop
-    applyDim(); bumpBlob(1);
-    playMergeAnim(from, to, colA, colB, HEX[sess.color], sp, tp);   // fire-and-forget 0.5s goo
-    sfxMix(sess.count);
+  function spendMove(){ if(state.movesLeft>0){ state.movesLeft--; updateMoves(); } }
+  function adjDiffPrim(tp,col){
+    var nb=[[tp.r+1,tp.c],[tp.r-1,tp.c],[tp.r,tp.c+1],[tp.r,tp.c-1]];
+    for(var i=0;i<4;i++){ var r=nb[i][0],c=nb[i][1]; if(HM.playable(state,r,c)){ var v=state.grid[r][c]; if(v&&HM.isPrim(v)&&v!==col) return true; } }
+    return false;
   }
-  function applyFuseState(from,to){
-    var col=HEX[state.grid[to.r][to.c]], sp=HM.isPrim(state.grid[from.r][from.c]);
-    HM.sessionCollect(state,sess,from.r,from.c);   // collect both ends (idempotent — safe when continuing a blob)
-    HM.sessionCollect(state,sess,to.r,to.c);
-    state.grid[from.r][from.c]=null;               // CONSUME the swiped tile — empty spot, can't be dragged back onto
-    gest.carry=sess.color; landMove();
+  function hasComboPair(){   // any two adjacent same-colour SECONDARIES = a free combo is still possible
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){
+      if(!HM.playable(state,r,c)) continue; var v=state.grid[r][c]; if(!v||HM.isPrim(v)) continue;
+      if(HM.playable(state,r,c+1)&&state.grid[r][c+1]===v) return true;
+      if(HM.playable(state,r+1,c)&&state.grid[r+1][c]===v) return true;
+    }
+    return false;
+  }
+  function finishTurn(){   // win when the goal is met; lose only when out of moves AND no free combo remains
+    HM.checkEnd(state);
+    if(state.won){ showEnd(true, state.movesLeft); return; }
+    if(state.movesLeft<=0 && !hasComboPair()){ showEnd(false, 0); }
+  }
+  /* MIX (spends a move): two different primaries fuse into their blend secondary,
+     which STAYS on the board; then gravity drops everything once. One at a time. */
+  function applyMixNow(from,to){
+    if(busy) return;
+    var carry=gest.carry, tcol=state.grid[to.r][to.c];
+    var colA=HEX[carry], colB=HEX[tcol], blend=HM.mix(carry,tcol);
+    busy=true; gest.spent=true;
+    HM.applyMix(state, from, to);              // grid: from -> null, to -> blend (no gravity yet)
+    spendMove();
     paintTile(from.r,from.c);
-    var t=cells[to.r][to.c].tile; t.classList.remove("dim");
+    var t=cells[to.r][to.c].tile; t.classList.add("sec"); t.style.setProperty("--pc",HEX[blend]); t.querySelector(".sym").textContent = aid ? blend : "";
+    setLift(from,false); setLift(to,false);
+    playMergeAnim(from, to, colA, colB, HEX[blend], true, true);   // goo: two squares morph into a circle
+    sfxMix(1);
+    var myState=state;
+    setTimeout(function(){
+      if(state!==myState){ busy=false; return; }
+      finishAnim();
+      var fresh=HM.gravity(state, Math.random);                   // things fall
+      if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+      paintAll();
+      Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      busy=false;
+      finishTurn();
+    }, ANIM_MS+30);
+  }
+  /* COMBO fuse (free): collect this same-colour secondary into the swoop. The
+     board suspends for the drag; nothing pops until you lift (resolveCombo). */
+  function applyComboFuse(from,to){
+    if(!sess){ sess=HM.newSession("chain", gest.carry); sess.moves=0; }   // open the combo lazily on the first fuse
+    var col=HEX[state.grid[to.r][to.c]];
+    HM.sessionCollect(state,sess,from.r,from.c);
+    HM.sessionCollect(state,sess,to.r,to.c);
+    state.grid[from.r][from.c]=null;           // consume the swiped tile — can't be dragged back onto
+    paintTile(from.r,from.c);
+    cells[to.r][to.c].tile.classList.remove("dim");
     setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
-    sess.epR=to.r; sess.epC=to.c;   // last landing = detonation epicentre for the wave-pop
+    sess.epR=to.r; sess.epC=to.c;
     applyDim(); bumpBlob(2);
-    playMergeAnim(from, to, col, col, col, sp, sp);   // same colour: blobs fuse, no colour change
+    playMergeAnim(from, to, col, col, col, false, false);   // two circles fuse, no colour change
     sfxMix(sess.count);
   }
 
   function stopMeter(){ if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; } meterEl.classList.remove("run","show"); }
-  function armMeter(){
-    if(resolveTid) clearTimeout(resolveTid);
-    meterEl.classList.add("show");
-    meterEl.classList.remove("run"); void meterEl.offsetWidth; meterEl.classList.add("run");
-    resolveTid=setTimeout(resolveNow, RIPEN_MS);
-  }
 
   /* combo tiers: 2-3 normal · 4-6 GOOD · 7-9 SWEET · 10+ HUEMELD. n is the
      session count (how many melds/fuses piled into this one detonation). */
@@ -619,12 +644,12 @@ h1{ font-size:30px; line-height:1; }
     setTimeout(function(){ board.classList.remove("shake"); }, 460);
   }
 
-  async function resolveNow(){
+  async function resolveCombo(){   // the swoop: pop everything collected, free (no move), fires the juice
     if(!sess||busy) return;
     var mySess=sess, myState=state;   // pin what we're resolving — a mid-await level change must not corrupt a fresh board
-    busy=true; stopMeter(); finishAnim();
+    busy=true; finishAnim();
     var keys=Object.keys(mySess.collected), n=mySess.count;
-    var color=mySess.color, hadMerge=mySess.hadMerge;
+    var color=mySess.color;
     var tier=comboTier(n);
     // wave-pop: tiles burst in ripples outward from where the finger lifted
     var ep=(mySess.epR!=null)?{r:mySess.epR,c:mySess.epC}:null, STEP=45, maxD=0;
@@ -643,30 +668,28 @@ h1{ font-size:30px; line-height:1; }
     // fresh-drop animation on refilled cells
     Object.keys(res.fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
     if(state.goal==="tubes"){ updateTubes(res.tube?res.tube.color:null); if(res.tube){ sfxFill(n); toast("+"+res.tube.add+" "+NAME[res.tube.color]); } }
-    else { updateGoals(); if(res.gain>0 && (hadMerge ? n>=2 : n>=4)) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+(hadMerge?" "+NAME[color]:"")); }
+    else { updateGoals(); if(res.gain>0 && n>=2) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+" "+NAME[color]); }
     updateBars();
     await sleep(180);
     if(state!==myState){ busy=false; return; }
-    HM.checkEnd(state);
-    var spared=state.movesLeft;
     busy=false;
-    if(state.won){ showEnd(true, spared); }
-    else if(state.lost){ showEnd(false, 0); }
+    finishTurn();
   }
 
   board.addEventListener("pointerdown", function(e){
-    if(!e.isPrimary || busy || !state || state.movesLeft<=0) return; ensureAudio();
+    if(!e.isPrimary || busy || !state) return; ensureAudio();
     cacheGeom();
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
-    if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; }   // finger down pauses the ripen
-    meterEl.classList.remove("run");
     var col=state.grid[tp.r][tp.c];
-    // pressing a lone secondary with no session going = free squish toy
-    if(!sess && !HM.isPrim(col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }
+    if(HM.isPrim(col)){
+      if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // no moves left to mix
+      if(!adjDiffPrim(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }  // nothing to mix into
+    } else {
+      if(!primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // lone secondary = squish toy
+    }
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
-    if(!sess){ sess=HM.newSession(null,null); sess.moves=0; }
-    gest={ anchor:tp, carry:col, counted:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
+    gest={ anchor:tp, carry:col, mode:(HM.isPrim(col)?"mix":"combo"), spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
     setLift(tp,true);   // grab: the tile lifts
   });
   function primedPair(tp,col){
@@ -674,20 +697,20 @@ h1{ font-size:30px; line-height:1; }
            (HM.playable(state,tp.r,tp.c+1)&&state.grid[tp.r][tp.c+1]===col)||(HM.playable(state,tp.r,tp.c-1)&&state.grid[tp.r][tp.c-1]===col);
   }
   board.addEventListener("pointermove", function(e){
-    if(!gest || !e.isPrimary) return;
+    if(!gest || !e.isPrimary || gest.spent) return;   // a mix uses up the gesture; ignore further motion
     updateTarget(e.clientX, e.clientY);
     if(gest.targetType && gest.t>SWIPE_T) commitSwipe();   // swipe registers instantly, no hold
   });
   function endGesture(){
     if(!gest) return;
-    if(gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
+    if(!gest.spent && gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
     setLift(gest.anchor,false);
-    var acted=gest.counted;
+    var wasCombo=(gest.mode==="combo");
     gest=null;
-    if(sess && sess.count>0){ armMeter(); }        // relaxed cash-out; a new press cancels it
-    else if(sess && !acted){ sess=null; clearDim(); }
+    if(wasCombo && sess && sess.count>0) resolveCombo();   // lift = the swoop pops (free)
+    else if(sess){ sess=null; clearDim(); }
   }
-  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest) updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
+  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent) updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
   board.addEventListener("pointercancel", function(){ endGesture(); });
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
