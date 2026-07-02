@@ -460,8 +460,12 @@ h1{ font-size:30px; line-height:1; }
     if(nbColor===carry && (lock==null || nbColor===lock)) return "fuse";   // same colour
     return null;
   }
+  function projTo(A,B,px,py){ var vx=B.cx-A.cx, vy=B.cy-A.cy, len2=vx*vx+vy*vy; return { proj:((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp:Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2) }; }
   function updateTarget(px,py){
     var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A){ gest.target=null; gest.t=0; gest.targetType=null; return; }
+    // once a fuse is underway, LOCK to that target — you commit to the tile you dragged to, no roaming
+    if(gest.fuse>0.15 && gest.target){ var Bg=geomOf(gest.target.r,gest.target.c);
+      if(Bg && state.grid[gest.target.r][gest.target.c]){ gest.t=Math.min(1,Math.max(0, projTo(A,Bg,px,py).proj)); return; } }
     var nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.16;
     for(var i=0;i<4;i++){ var B=nb[i]; if(!HM.playable(state,B.r,B.c)||!state.grid[B.r][B.c]) continue;
       var Bg=geomOf(B.r,B.c); if(!Bg) continue;
@@ -469,8 +473,10 @@ h1{ font-size:30px; line-height:1; }
       var proj=((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp=Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2);
       if(proj>bestProj && perp<A.s*0.6){ best=B; bestProj=proj; }
     }
-    if(!best){ gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; return; }
+    if(!best){ gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.fuse=0; return; }
     var tc=state.grid[best.r][best.c], type=classifyDrag(tc);
+    var tk=best.r+","+best.c;
+    if(gest.tkey!==tk){ gest.tkey=tk; gest.fuse=0; }   // new target -> fresh 0.2s hold, never an instant commit
     gest.target=best; gest.t=Math.min(1,bestProj); gest.targetType=type;
     gest.sec = type==="mix" ? HM.mix(gest.carry,tc) : (type==="fuse" ? gest.carry : null);
     var k=best.r+","+best.c;
@@ -492,7 +498,7 @@ h1{ font-size:30px; line-height:1; }
     if(!to){ gest.fuse=0; return; }
     if(type==="mix") applyMergeState(from,to);
     else if(type==="fuse") applyFuseState(from,to);
-    gest.fuse=0; gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
+    gest.fuse=0; gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null; gest.tkey=null;
   }
   function applyMergeState(from,to){
     HM.sessionMerge(state, sess, from, to);   // grid: from -> null, to -> blend
@@ -508,9 +514,9 @@ h1{ font-size:30px; line-height:1; }
   function applyFuseState(from,to){
     HM.sessionCollect(state,sess,from.r,from.c);   // collect both ends (idempotent — safe when continuing a blob)
     HM.sessionCollect(state,sess,to.r,to.c);
+    state.grid[from.r][from.c]=null;               // CONSUME the swiped tile — empty spot, can't be dragged back onto
     gest.carry=sess.color; landMove();
-    hideFx();
-    var sf=cells[from.r]&&cells[from.r][from.c]; if(sf) sf.tile.style.visibility="hidden";   // swiped tile gone (still collected, credits on detonate)
+    hideFx(); paintTile(from.r,from.c);
     var t=cells[to.r][to.c].tile; t.style.visibility=""; t.classList.remove("dim");
     setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
     setAnim(t,"mixed",300);   // a little pop on merge
@@ -564,7 +570,7 @@ h1{ font-size:30px; line-height:1; }
     if(!sess && !HM.isPrim(col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
     if(!sess){ sess=HM.newSession(null,null); sess.moves=0; }
-    gest={ anchor:tp, carry:col, counted:false, target:null, targetType:null, sec:null, t:0, fuse:0, nopeCell:null, blobN:0, blobBadge:null, last:performance.now() };
+    gest={ anchor:tp, carry:col, counted:false, target:null, targetType:null, sec:null, t:0, fuse:0, tkey:null, nopeCell:null, blobN:0, blobBadge:null, last:performance.now() };
     setLift(tp,true);   // grab: the tile lifts
     gest.raf=requestAnimationFrame(tick);
   });

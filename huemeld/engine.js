@@ -177,25 +177,22 @@
     return true;
   }
 
-  /* resolve: pop every collected cell at once (credit objectives capped),
-     score by curve, charge the powerup bar for a primary chain, then run
-     gravity + refill EXACTLY ONCE — the only RNG the whole session consumes. */
+  /* resolve: credit/score by the total combo COUNT (not per surviving cell —
+     consumed source tiles may already be nulled by the UI so they can't be
+     dragged back onto), pop whatever blob tiles remain, charge the powerup bar
+     for a primary chain, then gravity + refill EXACTLY ONCE. */
   function resolveSession(s, sess, rng) {
-    var keys = Object.keys(sess.collected), i, popped = 0;
-    for (i = 0; i < keys.length; i++) {
-      var p = split(keys[i]), col = s.grid[p[0]][p[1]];
-      if (!col) continue;
-      s.grid[p[0]][p[1]] = null;
-      creditObjectives(s, col);
-      popped++;
-    }
-    var kind = sess.hadMerge ? "merge" : (isPrim(sess.color) ? "primary" : "gentle");
-    var gain = scoreCurve(kind, popped);
+    var keys = Object.keys(sess.collected), i;
+    for (i = 0; i < keys.length; i++) { var p = split(keys[i]); if (s.grid[p[0]][p[1]]) s.grid[p[0]][p[1]] = null; }
+    var n = sess.count, color = sess.color;
+    for (i = 0; i < n; i++) creditObjectives(s, color);
+    var kind = sess.hadMerge ? "merge" : (isPrim(color) ? "primary" : "gentle");
+    var gain = scoreCurve(kind, n);
     s.score += gain;
-    if (kind === "primary" && sess.color) s.bars[sess.color] = Math.min(s.barMax, s.bars[sess.color] + popped);
+    if (kind === "primary" && color) s.bars[color] = Math.min(s.barMax, s.bars[color] + n);
     sess.open = false;
     var fresh = gravity(s, rng);
-    return { popped: popped, gain: gain, kind: kind, color: sess.color, fresh: fresh };
+    return { popped: n, gain: gain, kind: kind, color: color, fresh: fresh };
   }
 
   /* burst preview: the connected circle group that WOULD pop if `from` were
