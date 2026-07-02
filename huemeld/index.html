@@ -122,9 +122,6 @@ h1{ font-size:30px; line-height:1; }
 .tile.sec{ border-radius:50%; }
 .tile .streak{ position:absolute; top:15%; left:17%; width:32%; height:20%; border-radius:50%; background:rgba(255,255,255,.4); pointer-events:none; }
 .tile .sym{ position:relative; z-index:2; font-family:var(--font-d); font-weight:700; font-size:clamp(11px,3.2vw,16px); color:#fff; -webkit-text-stroke:.8px var(--line); }
-/* running combo counter on the current melded tile */
-.tile .cnt{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:5; font-family:var(--font-d); font-weight:700; font-size:clamp(15px,4.6vw,24px); color:#fff; -webkit-text-stroke:1px var(--line); pointer-events:none; }
-.tile.showcnt .cnt{ display:flex; }
 .tile.dim{ filter:saturate(.2) brightness(1.08) opacity(.45); }
 .tile.incombo{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 15px 3px rgba(255,255,255,.65); z-index:4; animation:hmBob .7s ease-in-out infinite; }
 .tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
@@ -133,10 +130,13 @@ h1{ font-size:30px; line-height:1; }
 .tile.squish{ animation:hmSquish .3s var(--pop); }
 /* the carried tile lifts the instant you press and leans toward your finger — merging feels smooth and continuous, not a snap */
 .tile.lift{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(1.14); z-index:6; box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 7px 12px rgba(44,39,51,.32); transition:transform .09s linear; }
-/* square-to-circle + colour-blend morph when a meld lands (and a gentle tint shift when same colours join) */
+/* square-to-circle + colour tint on the meld target (same-colour joins get a gentle pulse) */
 .tile.morph{ transition:background .22s var(--calm), border-radius .26s var(--calm); }
-/* the consumed tile flows into the meld, its colour blending to the secondary as it goes */
-.tile.melding{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(.82); opacity:0; z-index:6; transition:transform .22s var(--calm), opacity .22s var(--calm), background .22s var(--calm); }
+/* the metaball goo overlay: two blurred, alpha-thresholded blobs fuse with a liquid neck */
+.mixfx{ position:absolute; display:none; pointer-events:none; z-index:6; overflow:visible; }
+/* running combo count, floating ABOVE the melded tile */
+.combo-badge{ position:absolute; display:none; align-items:center; justify-content:center; min-width:30px; height:30px; padding:0 8px; transform:translate(-50%,-135%); font-family:var(--font-d); font-weight:700; font-size:16px; color:#fff; -webkit-text-stroke:.7px var(--line); border:2.5px solid var(--line); border-radius:999px; box-shadow:0 2px 0 var(--shadow); pointer-events:none; z-index:9; }
+.combo-badge.show{ display:flex; }
 
 .combo-meter{ position:absolute; left:14px; right:14px; top:-3px; height:7px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
 .combo-meter.show{ opacity:1; }
@@ -206,6 +206,14 @@ h1{ font-size:30px; line-height:1; }
     <div class="pups" id="pups"></div>
     <div class="stage">
       <div class="board" id="board"></div>
+      <svg class="mixfx" id="mixfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <filter id="goo"><feGaussianBlur id="gooBlur" in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/></filter>
+        </defs>
+        <g filter="url(#goo)"><circle id="gtgtInk" fill="#2c2733"/><circle id="gsrcInk" fill="#2c2733"/></g>
+        <g filter="url(#goo)"><circle id="gtgt"/><circle id="gsrc"/></g>
+      </svg>
+      <div class="combo-badge" id="comboBadge"><span id="cbCount"></span></div>
       <div class="combo-meter" id="meter"><div class="fill"></div></div>
       <div class="toast" id="toast"></div>
       <div class="over" id="over">
@@ -250,6 +258,10 @@ h1{ font-size:30px; line-height:1; }
   var over=document.getElementById("over");
   var screenLevels=document.getElementById("screen-levels");
   var screenGame=document.getElementById("screen-game");
+  var mixfx=document.getElementById("mixfx"), gooBlur=document.getElementById("gooBlur");
+  var gsrc=document.getElementById("gsrc"), gtgt=document.getElementById("gtgt");
+  var gsrcInk=document.getElementById("gsrcInk"), gtgtInk=document.getElementById("gtgtInk");
+  var comboBadge=document.getElementById("comboBadge"), cbCount=document.getElementById("cbCount");
 
   function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -280,7 +292,7 @@ h1{ font-size:30px; line-height:1; }
     var html="";
     for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){
       if(!state.mask[r][c]){ html+='<div class="cell wall"></div>'; continue; }
-      html+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="tile" style="--rot:'+tileRot(r,c)+'deg"><span class="streak"></span><span class="sym"></span><span class="cnt"></span></div></div>';
+      html+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="tile" style="--rot:'+tileRot(r,c)+'deg"><span class="streak"></span><span class="sym"></span></div></div>';
     }
     board.innerHTML=html;   // the ONLY innerHTML write; never called mid-session
     cells=[];
@@ -301,15 +313,6 @@ h1{ font-size:30px; line-height:1; }
     if(!HM.isPrim(v)) t.classList.add("sec");
     t.querySelector(".sym").textContent = aid ? v : "";
     ref.col=v;
-  }
-  /* update a tile to its new grid colour/shape WITHOUT wiping transient
-     classes — used for the meld target so the .morph transition can play. */
-  function morphTile(r,c){
-    var ref=cells[r]&&cells[r][c]; if(!ref) return; var t=ref.tile, v=state.grid[r][c];
-    t.classList.add("morph"); t.classList.toggle("sec", !HM.isPrim(v));
-    t.style.setProperty("--pc", HEX[v]);
-    t.querySelector(".sym").textContent = aid ? v : ""; ref.col=v;
-    setTimeout(function(){ t.classList.remove("morph"); }, 320);
   }
   function paintAll(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(cells[r]&&cells[r][c]) paintTile(r,c); }
   function setAnim(t, cls, ms){ if(!t) return; t.classList.remove(cls); void t.offsetWidth; t.classList.add(cls); setTimeout(function(){ t.classList.remove(cls); }, ms); }
@@ -378,16 +381,48 @@ h1{ font-size:30px; line-height:1; }
     board.classList.toggle("suspended", !!live);
   }
   function clearDim(){
-    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","lift","showcnt","melding"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
-    board.classList.remove("suspended");
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","lift"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
+    board.classList.remove("suspended"); hideCount(); hideGoo();
   }
   function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("lift"); ref.tile.classList.add("incombo"); } }
-  function clearCounts(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("showcnt"); } }
-  function updateCount(){   // show the running combo total on the tile you just melded
-    clearCounts();
-    if(sess && sess.count>=2 && gest){ var ref=cells[gest.anchor.r]&&cells[gest.anchor.r][gest.anchor.c];
-      if(ref){ ref.tile.querySelector(".cnt").textContent=sess.count; ref.tile.classList.add("showcnt"); } }
+  /* running combo count, floating ABOVE the melded tile (a badge, not on the tile) */
+  function hideCount(){ comboBadge.classList.remove("show"); }
+  function updateCount(){
+    if(!sess || sess.count<2 || !gest){ hideCount(); return; }
+    var a=gest.anchor, ref=cells[a.r]&&cells[a.r][a.c]; if(!ref){ hideCount(); return; }
+    var br=board.getBoundingClientRect(), cr=ref.cell.getBoundingClientRect();
+    comboBadge.style.left=(board.offsetLeft + cr.left-br.left + cr.width/2)+"px";
+    comboBadge.style.top=(board.offsetTop + cr.top-br.top + cr.height/2)+"px";
+    comboBadge.style.background=HEX[sess.color];
+    cbCount.textContent=sess.count;
+    comboBadge.classList.add("show");
   }
+  /* the metaball fuse: two blurred+alpha-thresholded blobs (dark ink layer +
+     colour layer) slide together and merge with a liquid neck, the source's
+     colour blending into the blend as it flows into the target. One-shot,
+     driven by CSS transitions (no rAF) so it's reliable and testable. */
+  function playGoo(from,to,colA,colB,blend){
+    var br=board.getBoundingClientRect();
+    var fr=cells[from.r][from.c].cell.getBoundingClientRect(), tr=cells[to.r][to.c].cell.getBoundingClientRect();
+    var fx=fr.left-br.left+fr.width/2, fy=fr.top-br.top+fr.height/2;
+    var tx=tr.left-br.left+tr.width/2, ty=tr.top-br.top+tr.height/2, R=fr.width*0.40;
+    mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
+    mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
+    mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
+    gooBlur.setAttribute("stdDeviation",(R*0.36).toFixed(1));
+    function put(el,cx,cy,r,fill){ el.setAttribute("cx",cx); el.setAttribute("cy",cy); el.setAttribute("r",r); el.style.transition="none"; el.style.transform="translate(0px,0px)"; el.style.fill=fill; }
+    put(gtgtInk,tx,ty,R+3,"#2c2733"); put(gtgt,tx,ty,R,colB);
+    put(gsrcInk,tx,ty,R+3,"#2c2733"); put(gsrc,tx,ty,R,colA);
+    var off="translate("+(fx-tx).toFixed(1)+"px,"+(fy-ty).toFixed(1)+"px)";
+    gsrc.style.transform=off; gsrcInk.style.transform=off;   // source blobs start over the source cell
+    mixfx.style.display="block";
+    void mixfx.offsetWidth;   // apply the start state before transitioning
+    gsrc.style.transition="transform .26s var(--calm), fill .24s var(--calm)"; gsrcInk.style.transition="transform .26s var(--calm)";
+    gtgt.style.transition="fill .24s var(--calm)";
+    gsrc.style.transform="translate(0px,0px)"; gsrcInk.style.transform="translate(0px,0px)";   // flow into the target
+    gsrc.style.fill=blend; gtgt.style.fill=blend;   // both colours blend to the secondary
+  }
+  function hideGoo(){ mixfx.style.display="none"; }
   function geomOf(r,c){ if(!geom) return null; for(var i=0;i<geom.length;i++) if(geom[i].r===r&&geom[i].c===c) return geom[i]; return null; }
   function setLift(p,on){ var ref=p&&cells[p.r]&&cells[p.r][p.c]; if(!ref) return; var t=ref.tile;
     t.style.removeProperty("--dx"); t.style.removeProperty("--dy");   // start centred either way
@@ -401,23 +436,32 @@ h1{ font-size:30px; line-height:1; }
   function landMove(){ if(!gest.counted){ gest.counted=true; sess.moves++; state.movesLeft--; updateMoves(); } }
 
   function doMerge(from,to){
-    var gf=geomOf(from.r,from.c), gt=geomOf(to.r,to.c), sref=cells[from.r]&&cells[from.r][from.c];
-    HM.sessionMerge(state, sess, from, to);   // engine: from -> hole, to -> blend
-    gest.carry=sess.color;
+    var A=gest.carry, B=state.grid[to.r][to.c];   // primaries before the meld
+    HM.sessionMerge(state, sess, from, to);        // engine: from -> hole, to -> blend
+    var blend=sess.color;
+    gest.carry=blend;
     landMove();
-    morphTile(to.r,to.c);                // destination: its colour transitions to the blend + square->circle
-    applyDim(); markCollected(to.r,to.c);
-    moveAnchorTo(to);                    // the blend lifts as the new carry
-    // the consumed source flows into the meld, its colour blending to the secondary, then vacates the cell
-    if(gf&&gt&&sref){ var st=sref.tile;
-      st.classList.remove("lift","incombo","dim"); void st.offsetWidth;
-      st.classList.add("melding");
-      st.style.setProperty("--dx",(gt.cx-gf.cx).toFixed(1)+"px");
-      st.style.setProperty("--dy",(gt.cy-gf.cy).toFixed(1)+"px");
-      st.style.setProperty("--pc", HEX[sess.color]);
-      setTimeout(function(){ paintTile(from.r,from.c); }, 220);
-    } else { paintTile(from.r,from.c); }
-    updateCount(); sfxMix(sess.count);
+    // logical handoff happens now; the visual fuse plays over the next ~250ms
+    setLift(from,false); gest.anchor={ r:to.r, c:to.c };
+    applyDim(); updateCount();
+    // hide the two real tiles and run the metaball fuse in their place
+    var fref=cells[from.r][from.c], tref=cells[to.r][to.c];
+    fref.tile.style.visibility="hidden"; tref.tile.style.visibility="hidden";
+    playGoo(from, to, HEX[A], HEX[B], HEX[blend]);
+    var fc={ r:from.r, c:from.c }, tc={ r:to.r, c:to.c }, myState=state;
+    setTimeout(function(){
+      if(state!==myState || !cells.length) return;   // level changed mid-fuse
+      hideGoo();
+      paintTile(fc.r, fc.c);   // source cell is empty now
+      var t=cells[tc.r][tc.c]; if(!t) return; t=t.tile;
+      t.style.visibility="";
+      t.classList.toggle("sec", !HM.isPrim(state.grid[tc.r][tc.c]));
+      t.style.setProperty("--pc", HEX[state.grid[tc.r][tc.c]]);
+      // still the carried tile? lift it to keep following; otherwise it's a settled combo tile
+      if(sess && gest && gest.anchor.r===tc.r && gest.anchor.c===tc.c){ t.classList.remove("incombo"); t.classList.add("lift"); }
+      else { t.classList.remove("lift"); t.classList.add("incombo"); }
+    }, 250);
+    sfxMix(sess.count);
   }
   function doCollect(from,to,firstAnchor){
     if(firstAnchor) HM.sessionCollect(state, sess, from.r, from.c);
@@ -552,7 +596,7 @@ h1{ font-size:30px; line-height:1; }
     curIndex=i; curLevel=LEVELS[i];
     state=HM.newState(curLevel); HM.fill(state, Math.random);
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
-    busy=false; sess=null; gest=null; geom=null; stopMeter();
+    busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); hideGoo();
     over.classList.remove("show");
     document.getElementById("gName").textContent="Level "+curLevel.id;
     document.getElementById("gSub").textContent=goalSub(curLevel);
