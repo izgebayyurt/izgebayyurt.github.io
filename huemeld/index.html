@@ -401,15 +401,16 @@ h1{ font-size:30px; line-height:1; }
      colour layer) slide together and merge with a liquid neck, the source's
      colour blending into the blend as it flows into the target. One-shot,
      driven by CSS transitions (no rAF) so it's reliable and testable. */
+  var GOO_MS=440;
   function playGoo(from,to,colA,colB,blend){
     var br=board.getBoundingClientRect();
     var fr=cells[from.r][from.c].cell.getBoundingClientRect(), tr=cells[to.r][to.c].cell.getBoundingClientRect();
     var fx=fr.left-br.left+fr.width/2, fy=fr.top-br.top+fr.height/2;
-    var tx=tr.left-br.left+tr.width/2, ty=tr.top-br.top+tr.height/2, R=fr.width*0.40;
+    var tx=tr.left-br.left+tr.width/2, ty=tr.top-br.top+tr.height/2, R=fr.width*0.46;
     mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
     mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
     mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
-    gooBlur.setAttribute("stdDeviation",(R*0.36).toFixed(1));
+    gooBlur.setAttribute("stdDeviation",(R*0.55).toFixed(1));   // big enough blur that a liquid neck grows between the blobs
     function put(el,cx,cy,r,fill){ el.setAttribute("cx",cx); el.setAttribute("cy",cy); el.setAttribute("r",r); el.style.transition="none"; el.style.transform="translate(0px,0px)"; el.style.fill=fill; }
     put(gtgtInk,tx,ty,R+3,"#2c2733"); put(gtgt,tx,ty,R,colB);
     put(gsrcInk,tx,ty,R+3,"#2c2733"); put(gsrc,tx,ty,R,colA);
@@ -417,9 +418,10 @@ h1{ font-size:30px; line-height:1; }
     gsrc.style.transform=off; gsrcInk.style.transform=off;   // source blobs start over the source cell
     mixfx.style.display="block";
     void mixfx.offsetWidth;   // apply the start state before transitioning
-    gsrc.style.transition="transform .26s var(--calm), fill .24s var(--calm)"; gsrcInk.style.transition="transform .26s var(--calm)";
-    gtgt.style.transition="fill .24s var(--calm)";
-    gsrc.style.transform="translate(0px,0px)"; gsrcInk.style.transform="translate(0px,0px)";   // flow into the target
+    var t=(GOO_MS/1000).toFixed(2)+"s var(--calm)";
+    gsrc.style.transition="transform "+t+", fill "+t; gsrcInk.style.transition="transform "+t;
+    gtgt.style.transition="fill "+t;
+    gsrc.style.transform="translate(0px,0px)"; gsrcInk.style.transform="translate(0px,0px)";   // ooze into the target
     gsrc.style.fill=blend; gtgt.style.fill=blend;   // both colours blend to the secondary
   }
   function hideGoo(){ mixfx.style.display="none"; }
@@ -460,7 +462,7 @@ h1{ font-size:30px; line-height:1; }
       // still the carried tile? lift it to keep following; otherwise it's a settled combo tile
       if(sess && gest && gest.anchor.r===tc.r && gest.anchor.c===tc.c){ t.classList.remove("incombo"); t.classList.add("lift"); }
       else { t.classList.remove("lift"); t.classList.add("incombo"); }
-    }, 250);
+    }, GOO_MS-30);
     sfxMix(sess.count);
   }
   function doCollect(from,to,firstAnchor){
