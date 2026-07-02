@@ -52,22 +52,27 @@
     var p = parseShape(level.shape);
     var grid = [], r;
     for (r = 0; r < p.H; r++) grid.push(new Array(p.W).fill(null));
-    var obj = level.objectives.map(function (o) { return { color: o.color, need: o.count, have: 0 }; });
+    var obj = (level.objectives || []).map(function (o) { return { color: o.color, need: o.count, have: 0 }; });
+    var tubes = null;
+    if (level.tubes) { tubes = {}; for (var tk in level.tubes) if (level.tubes.hasOwnProperty(tk)) tubes[tk] = { need: level.tubes[tk], have: 0 }; }
     return {
       W: p.W, H: p.H, mask: p.mask, grid: grid,
       spawn: level.spawn, spawnFn: makeSpawner(level.spawn),
-      obj: obj, movesLeft: level.moves, moves: level.moves,
+      obj: obj, goal: level.goal || "collect", tubes: tubes,
+      movesLeft: level.moves, moves: level.moves,
       bars: { R: 0, Y: 0, B: 0 }, barMax: BAR_MAX,
       score: 0, won: false, lost: false, level: level
     };
   }
 
+  function cloneTubes(t) { if (!t) return null; var o = {}; for (var k in t) if (t.hasOwnProperty(k)) o[k] = { need: t[k].need, have: t[k].have }; return o; }
   function clone(s) {
     return {
       W: s.W, H: s.H, mask: s.mask,
       grid: s.grid.map(function (row) { return row.slice(); }),
       spawn: s.spawn, spawnFn: s.spawnFn,
       obj: s.obj.map(function (o) { return { color: o.color, need: o.need, have: o.have }; }),
+      goal: s.goal, tubes: cloneTubes(s.tubes),
       bars: { R: s.bars.R, Y: s.bars.Y, B: s.bars.B }, barMax: s.barMax,
       movesLeft: s.movesLeft, moves: s.moves, score: s.score, won: s.won, lost: s.lost, level: s.level
     };
@@ -185,14 +190,17 @@
     var keys = Object.keys(sess.collected), i;
     for (i = 0; i < keys.length; i++) { var p = split(keys[i]); if (s.grid[p[0]][p[1]]) s.grid[p[0]][p[1]] = null; }
     var n = sess.count, color = sess.color;
-    for (i = 0; i < n; i++) creditObjectives(s, color);
+    var tube = null;
+    if (s.goal === "tubes") {   // a combo of a secondary colour pours into its tube; big combos pour far more
+      if (s.tubes && s.tubes[color]) { var add = tubeFill(n); s.tubes[color].have = Math.min(s.tubes[color].need, s.tubes[color].have + add); tube = { color: color, add: add }; }
+    } else for (i = 0; i < n; i++) creditObjectives(s, color);
     var kind = sess.hadMerge ? "merge" : (isPrim(color) ? "primary" : "gentle");
     var gain = scoreCurve(kind, n);
     s.score += gain;
     if (kind === "primary" && color) s.bars[color] = Math.min(s.barMax, s.bars[color] + n);
     sess.open = false;
     var fresh = gravity(s, rng);
-    return { popped: n, gain: gain, kind: kind, color: color, fresh: fresh };
+    return { popped: n, gain: gain, kind: kind, color: color, fresh: fresh, tube: tube };
   }
 
   /* burst preview: the connected circle group that WOULD pop if `from` were
@@ -271,7 +279,9 @@
   }
 
   function objectivesMet(s) { for (var i = 0; i < s.obj.length; i++) if (s.obj[i].have < s.obj[i].need) return false; return true; }
-  function checkEnd(s) { if (objectivesMet(s)) s.won = true; else if (s.movesLeft <= 0) s.lost = true; return s; }
+  function tubeFill(n) { return n * (n + 1) / 2; }   // triangular: a 5-combo pours 15, five 1-combos pour only 5 — combos fill more
+  function tubesMet(s) { if (!s.tubes) return false; for (var k in s.tubes) if (s.tubes.hasOwnProperty(k) && s.tubes[k].have < s.tubes[k].need) return false; return true; }
+  function checkEnd(s) { var met = s.goal === "tubes" ? tubesMet(s) : objectivesMet(s); if (met) s.won = true; else if (s.movesLeft <= 0) s.lost = true; return s; }
 
   /* connected same-colour groups of size >= 2 — chain-session openers */
   function legalChains(s, minSize) {

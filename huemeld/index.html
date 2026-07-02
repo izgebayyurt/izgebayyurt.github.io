@@ -91,6 +91,20 @@ h1{ font-size:30px; line-height:1; }
 .goal.done{ background:#d7f0d0; }
 .goal.done b{ color:#2f7d3a; }
 
+/* liquid tubes: vertical meters that fill with wobbling paint as you cash combos */
+.tubes{ display:flex; gap:16px; justify-content:center; align-items:flex-end; margin-bottom:12px; }
+.tube-wrap{ display:flex; flex-direction:column; align-items:center; gap:5px; }
+.tube{ position:relative; width:36px; height:88px; border:3px solid var(--line); border-radius:13px; background:#fffdf6; overflow:hidden; box-shadow:0 3px 0 var(--shadow); }
+.tube .liquid{ position:absolute; left:0; right:0; bottom:0; height:0%; background:var(--tc); transition:height .55s var(--pop); }
+.tube .liquid::before{ content:""; position:absolute; top:-5px; left:-25%; width:150%; height:10px; background:var(--tc); border-radius:50%; animation:hmWave 2.4s ease-in-out infinite; }
+.tube .liquid::after{ content:""; position:absolute; top:4px; left:5px; width:7px; height:38%; background:rgba(255,255,255,.42); border-radius:6px; }
+.tube.splash .liquid{ animation:hmSplash .5s var(--pop); }
+.tube.full{ box-shadow:0 3px 0 var(--shadow), 0 0 0 3px #ffd15c; }
+.tube.full::after{ content:"✓"; position:absolute; top:3px; left:0; right:0; text-align:center; font-family:var(--font-d); font-weight:700; font-size:15px; color:#fff; -webkit-text-stroke:1px var(--line); z-index:3; }
+.tube-dot{ width:13px; height:13px; border:2px solid var(--line); border-radius:50%; }
+@keyframes hmWave{ 0%,100%{transform:translateX(0)} 50%{transform:translateX(9px)} }
+@keyframes hmSplash{ 0%{transform:scaleY(1)} 35%{transform:scaleY(1.12)} 100%{transform:scaleY(1)} }
+
 /* powerup bars (charged by chaining primaries; the payoff layer comes later) */
 .pups{ display:flex; gap:8px; margin-bottom:12px; }
 .pup{ flex:1; display:flex; align-items:center; gap:6px; }
@@ -248,6 +262,15 @@ h1{ font-size:30px; line-height:1; }
 (function(){
   "use strict";
   var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
+  /* Liquid Tubes preview — a flagged test level (goal:"tubes"): three vertical
+     tubes (O/G/P) fill as you cash combos of that colour, and a big combo pours
+     FAR more than small ones (triangular). Fill all three to win. Appended here
+     so it needs no levels.js rebuild and can't disturb the shipped levels. */
+  var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
+    shape:["#######","#######","#######","#######","#######","#######","#######"],
+    spawn:{ R:4, Y:4, B:4 }, moves:20, goal:"tubes", objectives:[],
+    tubes:{ O:20, G:20, P:20 } };
+  LEVELS=LEVELS.concat([TUBE_TEST]);
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
   var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
@@ -282,7 +305,7 @@ h1{ font-size:30px; line-height:1; }
   function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
   function loadProg(){ try{ return JSON.parse(lsGet("hm_prog")||"{}"); }catch(e){ return {}; } }
   function saveProg(p){ lsSet("hm_prog", JSON.stringify(p)); }
-  function unlocked(i){ if(i===0) return true; var p=loadProg(); var prev=LEVELS[i-1]; return !!(prev && p[prev.id] && p[prev.id].done); }
+  function unlocked(i){ if(i===0) return true; if(LEVELS[i]&&LEVELS[i].test) return true; var p=loadProg(); var prev=LEVELS[i-1]; return !!(prev && p[prev.id] && p[prev.id].done); }
   function starsFor(level, movesLeft){ var r=movesLeft/level.moves; return r>=0.5?3:(r>=0.2?2:1); }
   function starStr(n){ return '<span>'+"★★★".slice(0,n)+'</span><span class="dim">'+"☆☆☆".slice(0,3-n)+'</span>'; }
 
@@ -305,6 +328,7 @@ h1{ font-size:30px; line-height:1; }
     if(n>=10) setTimeout(function(){ beep(base*4,0.3,"sine",0.045); }, steps*55+40);   // HUEMELD sparkle
   }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
+  function sfxFill(n){ var b=300+Math.min(n,10)*22; beep(b,0.1,"sine",0.05); setTimeout(function(){ beep(b*1.34,0.12,"sine",0.045); },70); }   // a rising pour
 
   /* ---------- persistent-DOM board ----------
      Built ONCE per level; every later change mutates existing nodes (class/
@@ -347,12 +371,30 @@ h1{ font-size:30px; line-height:1; }
     for(var i=0;i<state.obj.length;i++){ var o=state.obj[i];
       h+='<div class="goal"><span class="swatch'+(HM.isPrim(o.color)?"":" round")+'" style="background:'+HEX[o.color]+'"></span><b>'+o.need+'</b></div>';
     }
-    goalsEl.innerHTML=h;
+    goalsEl.className="goals"; goalsEl.innerHTML=h;
   }
   function updateGoals(){
     var chips=goalsEl.children;
     for(var i=0;i<state.obj.length;i++){ var o=state.obj[i], rem=Math.max(0,o.need-o.have), chip=chips[i];
       chip.querySelector("b").textContent = rem>0 ? rem : "✓"; chip.classList.toggle("done", rem===0);
+    }
+  }
+  /* liquid tubes (goal:"tubes"): render once, then raise the paint on each cash */
+  var TUBE_ORDER=["O","G","P"];
+  function tubeCols(){ var a=[]; for(var i=0;i<TUBE_ORDER.length;i++){ var k=TUBE_ORDER[i]; if(state.tubes&&state.tubes[k]) a.push(k); } return a; }
+  function renderTubes(){
+    var cols=tubeCols(), h="";
+    for(var i=0;i<cols.length;i++){ var c=cols[i];
+      h+='<div class="tube-wrap"><div class="tube" data-c="'+c+'"><div class="liquid" style="--tc:'+HEX[c]+'"></div></div><span class="tube-dot" style="background:'+HEX[c]+'"></span></div>';
+    }
+    goalsEl.className="tubes"; goalsEl.innerHTML=h; updateTubes(null);
+  }
+  function updateTubes(splashColor){
+    var cols=tubeCols();
+    for(var i=0;i<cols.length;i++){ var c=cols[i], t=state.tubes[c], pct=Math.min(100,Math.round(t.have/t.need*100));
+      var wrap=goalsEl.children[i]; if(!wrap) continue; var tube=wrap.querySelector(".tube"), liq=wrap.querySelector(".liquid");
+      liq.style.height=pct+"%"; tube.classList.toggle("full", t.have>=t.need);
+      if(splashColor===c){ tube.classList.remove("splash"); void tube.offsetWidth; tube.classList.add("splash"); }
     }
   }
   function renderBars(){
@@ -600,8 +642,9 @@ h1{ font-size:30px; line-height:1; }
     clearDim(); paintAll();
     // fresh-drop animation on refilled cells
     Object.keys(res.fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
-    updateGoals(); updateBars();
-    if(res.gain>0 && (hadMerge ? n>=2 : n>=4)) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+(hadMerge?" "+NAME[color]:""));
+    if(state.goal==="tubes"){ updateTubes(res.tube?res.tube.color:null); if(res.tube){ sfxFill(n); toast("+"+res.tube.add+" "+NAME[res.tube.color]); } }
+    else { updateGoals(); if(res.gain>0 && (hadMerge ? n>=2 : n>=4)) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+(hadMerge?" "+NAME[color]:"")); }
+    updateBars();
     await sleep(180);
     if(state!==myState){ busy=false; return; }
     HM.checkEnd(state);
@@ -657,7 +700,8 @@ h1{ font-size:30px; line-height:1; }
       h+='<button class="mk lvl-card'+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
       h+='<div class="num">'+L.id+'</div>';
       h+='<div class="lgoals">';
-      for(var j=0;j<L.objectives.length;j++){ var o=L.objectives[j]; h+='<span class="sw'+(HM.isPrim(o.color)?"":" r")+'" style="background:'+HEX[o.color]+'"></span>'; }
+      if(L.goal==="tubes"){ for(var tk in L.tubes){ if(L.tubes.hasOwnProperty(tk)) h+='<span class="sw r" style="background:'+HEX[tk]+'"></span>'; } }
+      else for(var j=0;j<L.objectives.length;j++){ var o=L.objectives[j]; h+='<span class="sw'+(HM.isPrim(o.color)?"":" r")+'" style="background:'+HEX[o.color]+'"></span>'; }
       h+='</div>';
       h+='<div class="lmeta">'+(lock ? "Locked" : (d&&d.done ? '<span class="st">'+"★".repeat(d.stars)+'</span><span class="st dim">'+"☆".repeat(3-d.stars)+'</span>' : L.moves+" moves"))+'</div>';
       h+='</button>';
@@ -666,7 +710,7 @@ h1{ font-size:30px; line-height:1; }
     document.getElementById("progress").textContent=done+" / "+LEVELS.length;
   }
   function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
-  function goalSub(L){ return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
+  function goalSub(L){ if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
 
   function startLevel(i){
     curIndex=i; curLevel=LEVELS[i];
@@ -674,10 +718,11 @@ h1{ font-size:30px; line-height:1; }
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
     over.classList.remove("show");
-    document.getElementById("gName").textContent="Level "+curLevel.id;
+    document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
     document.getElementById("gSub").textContent=goalSub(curLevel);
     screenLevels.style.display="none"; screenGame.style.display="block";
-    renderGoals(); updateGoals(); renderBars(); updateBars(); updateMoves(); buildBoard();
+    if(curLevel.goal==="tubes") renderTubes(); else { renderGoals(); updateGoals(); }
+    renderBars(); updateBars(); updateMoves(); buildBoard();
   }
 
   function showEnd(win, spared){
