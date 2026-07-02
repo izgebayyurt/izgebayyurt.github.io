@@ -112,6 +112,17 @@ h1{ font-size:30px; line-height:1; }
 .ration.low{ color:#c0392b; }
 .ration.low .dot{ animation:hmReady .8s ease-in-out infinite; }
 
+/* recipe bar: the ordered colour sequence you must trace, with progress */
+.recipe{ display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:7px; margin-bottom:12px; font-family:var(--font-d); }
+.recipe .rlabel{ font-weight:600; font-size:12.5px; letter-spacing:.03em; color:var(--ink-soft); margin-right:4px; }
+.recipe .rarrow{ color:var(--ink-soft); font-size:16px; font-weight:700; }
+.recipe .rchip{ width:27px; height:27px; border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 var(--shadow); position:relative; transition:transform .15s var(--pop); }
+.recipe .rchip.done{ box-shadow:0 2px 0 var(--shadow), 0 0 0 3px #ffd15c; transform:scale(1.06); }
+.recipe .rchip.done::after{ content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; -webkit-text-stroke:.9px var(--line); }
+.recipe .rchip.now{ animation:hmReady .8s ease-in-out infinite; }
+/* the traced circles glow while you build the chain */
+.tile.rlink{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 14px 3px rgba(255,209,92,.75); z-index:5; }
+
 /* powerup bars (charged by chaining primaries; the payoff layer comes later) */
 .pups{ display:flex; gap:8px; margin-bottom:12px; }
 .pup{ flex:1; display:flex; align-items:center; gap:6px; }
@@ -278,7 +289,19 @@ h1{ font-size:30px; line-height:1; }
     shape:["#######","#######","#######","#######","#######","#######","#######"],
     spawn:{ R:4, Y:4, B:4 }, moves:18, goal:"tubes", objectives:[],
     tubes:{ O:10, G:10, P:10 } };   // tight budget: a swoop of N fills n(n+1)/2, so only BIG swoops are efficient enough to win — small combos can't
-  LEVELS=LEVELS.concat([TUBE_TEST]);
+  /* Recipe Chain preview (goal:"recipe"): each level lists RECIPES — ordered
+     colour sequences you must trace through connected secondaries to score.
+     Mix primaries into circles to populate the board, then drag a connected
+     path that spells the recipe (e.g. orange -> green -> purple) to cash it. */
+  var RECIPE1={ id:"R1", test:true, name:"Recipe Chain 1",
+    shape:["#######","#######","#######","#######","#######","#######","#######"],
+    spawn:{ R:4, Y:4, B:4 }, moves:24, goal:"recipe", objectives:[],
+    recipes:[ ["O","G"], ["G","P"], ["P","O"] ] };
+  var RECIPE2={ id:"R2", test:true, name:"Recipe Chain 2",
+    shape:["#######","#######","#######","#######","#######","#######","#######"],
+    spawn:{ R:4, Y:4, B:4 }, moves:32, goal:"recipe", objectives:[],
+    recipes:[ ["O","G","P"], ["P","G","O"], ["G","O","P"] ] };
+  LEVELS=LEVELS.concat([TUBE_TEST, RECIPE1, RECIPE2]);
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
   var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
@@ -416,6 +439,76 @@ h1{ font-size:30px; line-height:1; }
     for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(state.grid[r][c]===sc) n++;
     rationEl.innerHTML='<span class="dot" style="background:'+HEX[sc]+'"></span><b>'+n+'</b> '+NAME[sc]+' left';
     rationEl.classList.toggle("low", n<=4);
+  }
+
+  /* ---------- recipe chains (goal:"recipe") ----------
+     Mix primaries into circles to populate the board, then drag a CONNECTED
+     path of secondaries that spells the current recipe, in order, to cash it.
+     Complete every recipe to win. */
+  function curRecipe(){ return (state.recipes && state.recipes[state.recipeIdx]) || null; }
+  function renderRecipe(){
+    var rc=curRecipe();
+    if(!rc){ goalsEl.className="goals"; goalsEl.innerHTML=""; return; }
+    goalsEl.className="recipe";
+    var h='<span class="rlabel">RECIPE '+(state.recipeIdx+1)+'/'+state.recipes.length+'</span>';
+    for(var i=0;i<rc.length;i++){ if(i) h+='<span class="rarrow">→</span>';
+      h+='<span class="rchip" data-i="'+i+'" style="background:'+HEX[rc[i]]+'"></span>'; }
+    goalsEl.innerHTML=h; updateRecipeBar(0);
+  }
+  function updateRecipeBar(step){
+    var chips=goalsEl.querySelectorAll(".rchip");
+    for(var i=0;i<chips.length;i++){ chips[i].classList.toggle("done", i<step); chips[i].classList.toggle("now", i===step); }
+  }
+  function inTrace(r,c){ if(!gest||!gest.trace) return false; for(var i=0;i<gest.trace.length;i++) if(gest.trace[i].r===r&&gest.trace[i].c===c) return true; return false; }
+  function startRecipeTrace(tp){
+    gest={ anchor:tp, carry:state.grid[tp.r][tp.c], mode:"recipe", spent:false, trace:[{r:tp.r,c:tp.c}], step:1, rtarget:null, t:0 };
+    var ref=cells[tp.r][tp.c]; if(ref) ref.tile.classList.add("rlink");
+    updateRecipeBar(1);
+  }
+  function updateTargetRecipe(px,py){
+    var A=geomOf(gest.anchor.r,gest.anchor.c), rc=curRecipe(); if(!A||!rc){ gest.rtarget=null; gest.t=0; return; }
+    var need=rc[gest.step], nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.12;
+    for(var i=0;i<4;i++){ var B=nb[i]; if(!HM.playable(state,B.r,B.c)) continue;
+      if(state.grid[B.r][B.c]!==need || inTrace(B.r,B.c)) continue;
+      var Bg=geomOf(B.r,B.c); if(!Bg) continue;
+      var vx=Bg.cx-A.cx, vy=Bg.cy-A.cy, len2=vx*vx+vy*vy;
+      var proj=((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp=Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2);
+      if(proj>bestProj && perp<A.s*0.62){ best=B; bestProj=proj; }
+    }
+    gest.rtarget=best; gest.t=best?Math.min(1,bestProj):0;
+  }
+  function extendRecipe(){
+    var to=gest.rtarget; if(!to) return;
+    gest.trace.push({r:to.r,c:to.c}); gest.step++;
+    gest.anchor={r:to.r,c:to.c};
+    var ref=cells[to.r][to.c]; if(ref) ref.tile.classList.add("rlink");
+    gest.rtarget=null; gest.t=0;
+    sfxEat(gest.step); updateRecipeBar(gest.step);
+    if(gest.step>=curRecipe().length) completeRecipe();
+  }
+  function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
+  function abandonRecipe(){ clearRlinks(); if(state && curRecipe()) updateRecipeBar(0); }   // incomplete: drop the highlights, reset the bar
+  async function completeRecipe(){
+    if(busy){ return; }
+    var trace=gest.trace, mySt=state; gest=null; busy=true;
+    spendMove();
+    trace.forEach(function(c){ var ref=cells[c.r]&&cells[c.r][c.c]; if(ref){ ref.tile.classList.remove("rlink"); ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
+    sfxPop(trace.length);
+    await sleep(300);
+    if(state!==mySt){ busy=false; return; }
+    trace.forEach(function(c){ state.grid[c.r][c.c]=null; });
+    var fresh=HM.gravity(state, Math.random);
+    if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+    state.recipeIdx++;
+    clearRlinks(); paintAll();
+    Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+    renderRecipe(); toast("recipe "+state.recipeIdx+" done!");
+    await sleep(160);
+    if(state!==mySt){ busy=false; return; }
+    busy=false;
+    HM.checkEnd(state);
+    if(state.won) showEnd(true, state.movesLeft);
+    else if(state.movesLeft<=0) showEnd(false, 0);
   }
   function renderBars(){
     var h="";
@@ -698,15 +791,23 @@ h1{ font-size:30px; line-height:1; }
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
     var col=state.grid[tp.r][tp.c];
-    if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // out of moves — a mix AND a combo each cost one
+    if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // out of moves — every action costs one
     if(HM.isPrim(col)){
-      if(!adjDiffPrim(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }  // nothing to mix into
+      if(!adjDiffPrim(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // nothing to mix into
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      gest={ anchor:tp, carry:col, mode:"mix", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
+      setLift(tp,true);
+    } else if(state.goal==="recipe"){
+      var rc=curRecipe();
+      if(!rc || col!==rc[0]){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // a trace must start on the recipe's first colour
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      startRecipeTrace(tp);
     } else {
       if(!primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // lone secondary = squish toy
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      gest={ anchor:tp, carry:col, mode:"combo", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
+      setLift(tp,true);
     }
-    try{ board.setPointerCapture(e.pointerId); }catch(_e){}
-    gest={ anchor:tp, carry:col, mode:(HM.isPrim(col)?"mix":"combo"), spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
-    setLift(tp,true);   // grab: the tile lifts
   });
   function primedPair(tp,col){
     return (HM.playable(state,tp.r+1,tp.c)&&state.grid[tp.r+1][tp.c]===col)||(HM.playable(state,tp.r-1,tp.c)&&state.grid[tp.r-1][tp.c]===col)||
@@ -714,6 +815,7 @@ h1{ font-size:30px; line-height:1; }
   }
   board.addEventListener("pointermove", function(e){
     if(!gest || !e.isPrimary || gest.spent) return;   // a mix uses up the gesture; ignore further motion
+    if(gest.mode==="recipe"){ updateTargetRecipe(e.clientX, e.clientY); if(gest.rtarget && gest.t>SWIPE_T) extendRecipe(); return; }
     updateTarget(e.clientX, e.clientY);
     if(gest.targetType && gest.t>SWIPE_T) commitSwipe();   // swipe registers instantly, no hold
   });
@@ -723,6 +825,7 @@ h1{ font-size:30px; line-height:1; }
   }
   function endGesture(abandon){
     if(!gest) return;
+    if(gest.mode==="recipe"){ gest=null; abandonRecipe(); return; }   // an incomplete trace just drops (a completed one already ended itself)
     if(!abandon && !gest.spent && gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
     setLift(gest.anchor,false);
     var wasCombo=(gest.mode==="combo");
@@ -730,7 +833,7 @@ h1{ font-size:30px; line-height:1; }
     if(wasCombo && sess && sess.count>0 && !abandon) resolveCombo();   // lift = the swoop pops (costs one move)
     else if(sess) abandonCombo();                                       // pointercancel / stray release — restore the board
   }
-  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent) updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
+  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent && gest.mode!=="recipe") updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
   board.addEventListener("pointercancel", function(){ endGesture(true); });   // interrupt = abandon the swoop, don't pop it
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
@@ -743,7 +846,8 @@ h1{ font-size:30px; line-height:1; }
       h+='<button class="mk lvl-card'+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
       h+='<div class="num">'+L.id+'</div>';
       h+='<div class="lgoals">';
-      if(L.goal==="tubes"){ for(var tk in L.tubes){ if(L.tubes.hasOwnProperty(tk)) h+='<span class="sw r" style="background:'+HEX[tk]+'"></span>'; } }
+      if(L.goal==="recipe"){ var r0=(L.recipes&&L.recipes[0])||[]; for(var ri=0;ri<r0.length;ri++) h+='<span class="sw r" style="background:'+HEX[r0[ri]]+'"></span>'; }
+      else if(L.goal==="tubes"){ for(var tk in L.tubes){ if(L.tubes.hasOwnProperty(tk)) h+='<span class="sw r" style="background:'+HEX[tk]+'"></span>'; } }
       else for(var j=0;j<L.objectives.length;j++){ var o=L.objectives[j]; h+='<span class="sw'+(HM.isPrim(o.color)?"":" r")+'" style="background:'+HEX[o.color]+'"></span>'; }
       h+='</div>';
       h+='<div class="lmeta">'+(lock ? "Locked" : (d&&d.done ? '<span class="st">'+"★".repeat(d.stars)+'</span><span class="st dim">'+"☆".repeat(3-d.stars)+'</span>' : L.moves+" moves"))+'</div>';
@@ -753,7 +857,7 @@ h1{ font-size:30px; line-height:1; }
     document.getElementById("progress").textContent=done+" / "+LEVELS.length;
   }
   function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
-  function goalSub(L){ if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
+  function goalSub(L){ if(L.goal==="recipe") return "Trace the recipes in order"; if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
 
   function startLevel(i){
     curIndex=i; curLevel=LEVELS[i];
@@ -764,8 +868,12 @@ h1{ font-size:30px; line-height:1; }
     document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
     document.getElementById("gSub").textContent=goalSub(curLevel);
     screenLevels.style.display="none"; screenGame.style.display="block";
-    if(curLevel.goal==="tubes") renderTubes(); else { renderGoals(); updateGoals(); }
-    renderBars(); updateBars(); updateMoves(); buildBoard(); renderRation();
+    if(curLevel.goal==="tubes") renderTubes();
+    else if(curLevel.goal==="recipe") renderRecipe();
+    else { renderGoals(); updateGoals(); }
+    renderBars(); updateBars();
+    pupsEl.style.display = (curLevel.goal==="tubes"||curLevel.goal==="recipe") ? "none" : "";   // powerup bars are a collect-level placeholder; hide on tube/recipe
+    updateMoves(); buildBoard(); renderRation();
   }
 
   function showEnd(win, spared){

@@ -57,10 +57,11 @@
     if (level.tubes) { tubes = {}; for (var tk in level.tubes) if (level.tubes.hasOwnProperty(tk)) tubes[tk] = { need: level.tubes[tk], have: 0 }; }
     var reserve = copyObj(level.reserve), altSpawnFn = null;
     if (reserve) { var alt = {}, sk; for (sk in level.spawn) if (level.spawn.hasOwnProperty(sk) && reserve[sk] == null) alt[sk] = level.spawn[sk]; altSpawnFn = makeSpawner(alt); }
+    var recipes = level.recipes ? level.recipes.map(function (r) { return r.slice(); }) : null;
     return {
       W: p.W, H: p.H, mask: p.mask, grid: grid,
       spawn: level.spawn, spawnFn: makeSpawner(level.spawn), reserve: reserve, altSpawnFn: altSpawnFn,
-      obj: obj, goal: level.goal || "collect", tubes: tubes,
+      obj: obj, goal: level.goal || "collect", tubes: tubes, recipes: recipes, recipeIdx: 0,
       movesLeft: level.moves, moves: level.moves,
       bars: { R: 0, Y: 0, B: 0 }, barMax: BAR_MAX,
       score: 0, won: false, lost: false, level: level
@@ -74,7 +75,7 @@
       grid: s.grid.map(function (row) { return row.slice(); }),
       spawn: s.spawn, spawnFn: s.spawnFn, reserve: copyObj(s.reserve), altSpawnFn: s.altSpawnFn,
       obj: s.obj.map(function (o) { return { color: o.color, need: o.need, have: o.have }; }),
-      goal: s.goal, tubes: cloneTubes(s.tubes),
+      goal: s.goal, tubes: cloneTubes(s.tubes), recipes: s.recipes ? s.recipes.map(function (r) { return r.slice(); }) : null, recipeIdx: s.recipeIdx,
       bars: { R: s.bars.R, Y: s.bars.Y, B: s.bars.B }, barMax: s.barMax,
       movesLeft: s.movesLeft, moves: s.moves, score: s.score, won: s.won, lost: s.lost, level: s.level
     };
@@ -298,7 +299,8 @@
   function objectivesMet(s) { for (var i = 0; i < s.obj.length; i++) if (s.obj[i].have < s.obj[i].need) return false; return true; }
   function tubeFill(n) { return n * (n + 1) / 2; }   // triangular: a 5-combo pours 15, five 1-combos pour only 5 — combos fill more
   function tubesMet(s) { if (!s.tubes) return false; for (var k in s.tubes) if (s.tubes.hasOwnProperty(k) && s.tubes[k].have < s.tubes[k].need) return false; return true; }
-  function checkEnd(s) { var met = s.goal === "tubes" ? tubesMet(s) : objectivesMet(s); if (met) s.won = true; else if (s.movesLeft <= 0) s.lost = true; return s; }
+  function recipesMet(s) { return !!(s.recipes && s.recipeIdx >= s.recipes.length); }
+  function checkEnd(s) { var met = s.goal === "recipe" ? recipesMet(s) : (s.goal === "tubes" ? tubesMet(s) : objectivesMet(s)); if (met) s.won = true; else if (s.movesLeft <= 0) s.lost = true; return s; }
 
   /* connected same-colour groups of size >= 2 — chain-session openers */
   function legalChains(s, minSize) {
