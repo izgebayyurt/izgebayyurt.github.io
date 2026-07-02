@@ -558,22 +558,16 @@ h1{ font-size:30px; line-height:1; }
   function commitSwipe(){
     var from={ r:gest.anchor.r, c:gest.anchor.c }, to=gest.target, type=gest.targetType;
     if(!to || !type) return;
+    var tc=state.grid[to.r][to.c];
+    if(!tc || classifyDrag(tc)!==type) return;   // re-validate: the target could have shifted before this commit
     gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
     if(type==="mix") applyMixNow(from,to);   // atomic: spends a move, then the board drops
-    else applyComboFuse(from,to);            // free: adds this tile to the swoop
+    else applyComboFuse(from,to);            // adds this tile to the swoop (the whole swoop costs one move)
   }
   function spendMove(){ if(state.movesLeft>0){ state.movesLeft--; updateMoves(); } }
   function adjDiffPrim(tp,col){
     var nb=[[tp.r+1,tp.c],[tp.r-1,tp.c],[tp.r,tp.c+1],[tp.r,tp.c-1]];
     for(var i=0;i<4;i++){ var r=nb[i][0],c=nb[i][1]; if(HM.playable(state,r,c)){ var v=state.grid[r][c]; if(v&&HM.isPrim(v)&&v!==col) return true; } }
-    return false;
-  }
-  function hasComboPair(){   // any two adjacent same-colour SECONDARIES = a free combo is still possible
-    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){
-      if(!HM.playable(state,r,c)) continue; var v=state.grid[r][c]; if(!v||HM.isPrim(v)) continue;
-      if(HM.playable(state,r,c+1)&&state.grid[r][c+1]===v) return true;
-      if(HM.playable(state,r+1,c)&&state.grid[r+1][c]===v) return true;
-    }
     return false;
   }
   function finishTurn(){   // win when the goal is met; lose when out of moves (both a mix and a combo cost one)
@@ -678,7 +672,7 @@ h1{ font-size:30px; line-height:1; }
   }
 
   board.addEventListener("pointerdown", function(e){
-    if(!e.isPrimary || busy || !state) return; ensureAudio();
+    if(!e.isPrimary || busy || !state || gest) return; ensureAudio();   // one active gesture at a time — a stray second press must not hijack it
     cacheGeom();
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
@@ -702,17 +696,21 @@ h1{ font-size:30px; line-height:1; }
     updateTarget(e.clientX, e.clientY);
     if(gest.targetType && gest.t>SWIPE_T) commitSwipe();   // swipe registers instantly, no hold
   });
-  function endGesture(){
+  function abandonCombo(){   // interrupted mid-swoop: put the tiles we had consumed back, spend nothing, pop nothing
+    if(sess){ Object.keys(sess.collected).forEach(function(k){ var p=k.split(","); var r=+p[0],c=+p[1]; if(!state.grid[r][c]) state.grid[r][c]=sess.color; }); }
+    sess=null; clearDim(); paintAll();
+  }
+  function endGesture(abandon){
     if(!gest) return;
-    if(!gest.spent && gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
+    if(!abandon && !gest.spent && gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
     setLift(gest.anchor,false);
     var wasCombo=(gest.mode==="combo");
     gest=null;
-    if(wasCombo && sess && sess.count>0) resolveCombo();   // lift = the swoop pops (free)
-    else if(sess){ sess=null; clearDim(); }
+    if(wasCombo && sess && sess.count>0 && !abandon) resolveCombo();   // lift = the swoop pops (costs one move)
+    else if(sess) abandonCombo();                                       // pointercancel / stray release — restore the board
   }
   board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent) updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
-  board.addEventListener("pointercancel", function(){ endGesture(); });
+  board.addEventListener("pointercancel", function(){ endGesture(true); });   // interrupt = abandon the swoop, don't pop it
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
   /* ---------- screens ---------- */
