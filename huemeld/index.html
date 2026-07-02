@@ -172,6 +172,14 @@ h1{ font-size:30px; line-height:1; }
 @keyframes hmNope{ 0%,100%{transform:rotate(var(--rot,0deg)) translateX(0)} 25%{transform:rotate(var(--rot,0deg)) translateX(-3px)} 75%{transform:rotate(var(--rot,0deg)) translateX(3px)} }
 @keyframes hmReady{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
 @keyframes hmToast{ 0%{transform:translateX(-50%) translateY(6px) scale(.85); opacity:0} 18%{transform:translateX(-50%) translateY(0) scale(1); opacity:1} 76%{opacity:1} 100%{transform:translateX(-50%) translateY(-12px); opacity:0} }
+
+/* detonation firework: tier-scaled shake (--amp set per combo) + a celebratory tier callout */
+@keyframes hmShake{ 0%,100%{transform:translate(0,0)} 14%{transform:translate(calc(var(--amp,3px)*-1),1px)} 32%{transform:translate(var(--amp,3px),-2px)} 52%{transform:translate(calc(var(--amp,3px)*-.7),2px)} 72%{transform:translate(calc(var(--amp,3px)*.7),-1px)} 90%{transform:translate(calc(var(--amp,3px)*-.4),1px)} }
+.board.shake{ animation:hmShake .44s var(--calm); }
+.burst{ position:absolute; left:50%; top:44%; transform:translate(-50%,-50%) scale(.4); font-family:var(--font-d); font-weight:700; font-size:38px; color:#fff; -webkit-text-stroke:2.6px var(--line); opacity:0; pointer-events:none; z-index:9; white-space:nowrap; letter-spacing:1px; }
+.burst.show{ animation:hmBurst .95s var(--pop) forwards; }
+@keyframes hmBurst{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.3) rotate(-8deg)} 22%{opacity:1; transform:translate(-50%,-50%) scale(1.18) rotate(-4deg)} 66%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-4deg)} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.06) translateY(-16px) rotate(-4deg)} }
+
 @media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; } .tile.incombo{ animation:none; } }
 </style>
 </head>
@@ -218,6 +226,7 @@ h1{ font-size:30px; line-height:1; }
       </svg>
       <div id="comboBadges"></div>
       <div class="combo-meter" id="meter"><div class="fill"></div></div>
+      <div class="burst" id="burst"></div>
       <div class="toast" id="toast"></div>
       <div class="over" id="over">
         <div class="panel">
@@ -246,6 +255,7 @@ h1{ font-size:30px; line-height:1; }
 
   var state=null, curLevel=null, curIndex=0, busy=false;
   var aid=false, muted=false;
+  var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
   var cells=[];          // persistent DOM: cells[r][c] = {cell, tile} (built once per level)
   var geom=null;         // cached cell centres for index-math hit-testing (per gesture)
   var sess=null;         // engine combo session, persists across gestures until it ripens
@@ -265,6 +275,7 @@ h1{ font-size:30px; line-height:1; }
   var gsrc=document.getElementById("gsrc"), gtgt=document.getElementById("gtgt");
   var gsrcInk=document.getElementById("gsrcInk"), gtgtInk=document.getElementById("gtgtInk");
   var comboBadges=document.getElementById("comboBadges");
+  var burstEl=document.getElementById("burst");
 
   function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -281,7 +292,18 @@ h1{ font-size:30px; line-height:1; }
   function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
   function sfxMix(n){ var b=430+Math.min(n||0,12)*30; beep(b,0.07,"triangle",0.05); setTimeout(function(){ beep(b*1.5,0.09,"triangle",0.04); },55); }
   function sfxEat(n){ beep(520+Math.min(n,14)*24, 0.06, "sine", 0.045); }
-  function sfxPop(n){ var b=340+Math.min(n,12)*16; beep(b,0.13,"sine",0.06); beep(b*1.5,0.15,"sine",0.03); }
+  /* detonation = a rising arpeggio; the bigger the combo, the longer and higher
+     the run climbs, so a fat combo literally sounds like a bigger payoff */
+  function sfxPop(n){
+    if(muted||!actx) return;
+    var steps=Math.max(2, Math.min(8, Math.round(n)+1));
+    var scale=[0,2,4,7,9,12,14,16], base=300+Math.min(n,10)*10;
+    beep(base/2,0.20,"sine",0.05);   // low body thump under the run
+    for(var i=0;i<steps;i++){ (function(i){ setTimeout(function(){
+      beep(base*Math.pow(2, scale[Math.min(i,scale.length-1)]/12), 0.13, "triangle", 0.05);
+    }, i*55); })(i); }
+    if(n>=10) setTimeout(function(){ beep(base*4,0.3,"sine",0.045); }, steps*55+40);   // HUEMELD sparkle
+  }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
 
   /* ---------- persistent-DOM board ----------
@@ -309,7 +331,7 @@ h1{ font-size:30px; line-height:1; }
     var ref=cells[r]&&cells[r][c]; if(!ref) return;
     var t=ref.tile, v=state.grid[r][c];
     t.className="tile";   // reset transient state (dim/incombo/clr/mixed/lift...)
-    t.style.removeProperty("--dx"); t.style.removeProperty("--dy");
+    t.style.removeProperty("--dx"); t.style.removeProperty("--dy"); t.style.removeProperty("animation-delay");
     if(!v){ t.style.visibility="hidden"; return; }
     t.style.visibility="";
     t.style.setProperty("--pc", HEX[v]);
@@ -509,6 +531,7 @@ h1{ font-size:30px; line-height:1; }
     t.classList.toggle("sec", !HM.isPrim(sess.color)); t.style.setProperty("--pc",HEX[sess.color]);
     t.querySelector(".sym").textContent = aid ? sess.color : "";
     setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
+    sess.epR=to.r; sess.epC=to.c;   // last landing = detonation epicentre for the wave-pop
     applyDim(); bumpBlob(1);
     playMergeAnim(from, to, colA, colB, HEX[sess.color], sp, tp);   // fire-and-forget 0.5s goo
     sfxMix(sess.count);
@@ -522,6 +545,7 @@ h1{ font-size:30px; line-height:1; }
     paintTile(from.r,from.c);
     var t=cells[to.r][to.c].tile; t.classList.remove("dim");
     setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
+    sess.epR=to.r; sess.epC=to.c;   // last landing = detonation epicentre for the wave-pop
     applyDim(); bumpBlob(2);
     playMergeAnim(from, to, col, col, col, sp, sp);   // same colour: blobs fuse, no colour change
     sfxMix(sess.count);
@@ -535,15 +559,40 @@ h1{ font-size:30px; line-height:1; }
     resolveTid=setTimeout(resolveNow, RIPEN_MS);
   }
 
+  /* combo tiers: 2-3 normal · 4-6 GOOD · 7-9 SWEET · 10+ HUEMELD. n is the
+     session count (how many melds/fuses piled into this one detonation). */
+  function comboTier(n){
+    if(n>=10) return { i:3, name:"HUEMELD!", col:"#ef4a5a" };
+    if(n>=7)  return { i:2, name:"SWEET!",   col:"#8b5cc7" };
+    if(n>=4)  return { i:1, name:"GOOD!",    col:"#3d8bdf" };
+    return { i:0, name:"", col:"#ffd15c" };
+  }
+  function showBurst(tier){
+    burstEl.textContent=tier.name; burstEl.style.color=tier.col; burstEl.style.fontSize=(34+tier.i*8)+"px";
+    burstEl.classList.remove("show"); void burstEl.offsetWidth; burstEl.classList.add("show");
+  }
+  function shakeBoard(i){
+    board.style.setProperty("--amp",(i*2+2)+"px");
+    board.classList.remove("shake"); void board.offsetWidth; board.classList.add("shake");
+    setTimeout(function(){ board.classList.remove("shake"); }, 460);
+  }
+
   async function resolveNow(){
     if(!sess||busy) return;
     var mySess=sess, myState=state;   // pin what we're resolving — a mid-await level change must not corrupt a fresh board
     busy=true; stopMeter(); finishAnim();
     var keys=Object.keys(mySess.collected), n=mySess.count;
     var color=mySess.color, hadMerge=mySess.hadMerge;
-    keys.forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) ref.tile.classList.add("clr"); });
+    var tier=comboTier(n);
+    // wave-pop: tiles burst in ripples outward from where the finger lifted
+    var ep=(mySess.epR!=null)?{r:mySess.epR,c:mySess.epC}:null, STEP=45, maxD=0;
+    keys.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(!ref) return;
+      var d=ep?Math.min(6,Math.abs(r-ep.r)+Math.abs(c-ep.c)):0; if(d>maxD) maxD=d;
+      ref.tile.style.animationDelay=(d*STEP)+"ms"; ref.tile.classList.add("clr");
+    });
     sfxPop(n);
-    await sleep(250);
+    if(tier.i>0){ showBurst(tier); if(!reduceMotion) shakeBoard(tier.i); }
+    await sleep(250 + maxD*STEP);
     if(sess!==mySess || state!==myState){ busy=false; return; }   // level left/restarted during the pop
     var res=HM.resolveSession(state, mySess, Math.random);   // pops collected, credits, scores, gravity+fill (one RNG draw)
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);   // keep the always-playable invariant after refill
