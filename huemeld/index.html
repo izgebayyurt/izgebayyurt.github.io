@@ -386,7 +386,7 @@ h1{ font-size:30px; line-height:1; }
   }
   function clearDim(){
     for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","lift"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
-    board.classList.remove("suspended"); hideCount(); hideFx();
+    board.classList.remove("suspended"); hideCount(); finishAnim();
   }
   function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("lift"); ref.tile.classList.add("incombo"); } }
   /* Each merge keeps ITS OWN counter, floating above that blob. A blob = one
@@ -413,41 +413,56 @@ h1{ font-size:30px; line-height:1; }
   }
   function landMove(){ if(!gest.counted){ gest.counted=true; sess.moves++; state.movesLeft--; updateMoves(); } }
 
-  /* ---------- the progressive hold-to-fuse ----------
-     As you drag a piece toward an adjacent one and HOLD, gest.fuse ramps 0->1
-     (ANIM_MS), and drawFx renders the two blobs oozing together through the goo
-     filter with their colours gradient-lerping toward the blend. Drag fully /
-     hold to completion and they merge; pull back and they separate. Attribute-
-     based SVG (no CSS transforms) so it renders in every browser. */
-  var ANIM_MS=200, REVERSE_MS=110, ARM_T=0.28, fxHidden=null;   // quick, smooth hold-to-fuse
+  /* ---------- swipe to merge, then watch the fuse ----------
+     A swipe registers and COMMITS the merge the instant your drag crosses toward
+     an adjacent tile (SWIPE_T) — no hold. The gooey fuse then plays as a
+     fire-and-forget 0.5s animation (its own rAF, decoupled from your finger), so
+     you can flick-and-release and still watch it. Attribute-based SVG so it
+     renders everywhere including Safari. */
+  var ANIM_MS=500, SWIPE_T=0.5, MIN_SWIPE=0.34, anim=null;
   function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
   function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
-  function clearFxHidden(){ if(fxHidden){ fxHidden.forEach(function(p){ var ref=cells[p[0]]&&cells[p[0]][p[1]]; if(ref && state.grid[p[0]][p[1]]) ref.tile.style.visibility=""; }); fxHidden=null; } }
-  function hideFx(){ mixfx.style.display="none"; clearFxHidden(); }
-  function drawFx(){
-    if(!gest || !gest.target || gest.fuse<=0.01 || !(gest.targetType==="mix"||gest.targetType==="fuse")){ if(mixfx.style.display!=="none") hideFx(); return; }
-    var A=geomOf(gest.anchor.r,gest.anchor.c), B=geomOf(gest.target.r,gest.target.c); if(!A||!B){ hideFx(); return; }
+  function placeRect(el,cx,cy,half,rad,rr,fill){ el.setAttribute("x",(cx-half).toFixed(1)); el.setAttribute("y",(cy-half).toFixed(1)); el.setAttribute("width",(half*2).toFixed(1)); el.setAttribute("height",(half*2).toFixed(1)); var rq=Math.min(rad,half).toFixed(1); el.setAttribute("rx",rq); el.setAttribute("ry",rq); el.setAttribute("transform","rotate("+rr+" "+cx.toFixed(1)+" "+cy.toFixed(1)+")"); if(fill) el.setAttribute("fill",fill); }
+  function hideTile(r,c){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.style.visibility="hidden"; }
+  function revealTile(r,c){ var ref=cells[r]&&cells[r][c]; if(ref && state.grid[r][c]) ref.tile.style.visibility=""; }
+  function playMergeAnim(from,to,colA,colB,blend,sp,tp){
+    if(anim) finishAnim();   // cut any in-flight fuse (its tiles are already in final state)
+    var A=geomOf(from.r,from.c), B=geomOf(to.r,to.c); if(!A||!B) return;
+    anim={ from:{r:from.r,c:from.c}, to:{r:to.r,c:to.c}, ax:A.bx, ay:A.by, bx:B.bx, by:B.by, s:A.s,
+           colA:colA, colB:colB, blend:blend, sp:sp, tp:tp, p:0, last:performance.now() };
+    hideTile(from.r,from.c); hideTile(to.r,to.c);
+    anim.raf=requestAnimationFrame(animTick);
+  }
+  function animTick(now){
+    if(!anim) return;
+    anim.p=Math.min(1, anim.p + (now-anim.last)/ANIM_MS); anim.last=now;
+    drawAnim();
+    if(anim.p>=1){ finishAnim(); return; }
+    anim.raf=requestAnimationFrame(animTick);
+  }
+  function drawAnim(){
+    if(!anim) return;
     mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
     mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
     mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
-    var f=gest.fuse, R=A.s*0.40;
-    gooBlur.setAttribute("stdDeviation",(R*(0.30+0.32*f)).toFixed(1));   // blur (and the liquid neck) grows as they fuse
-    var posFrac=Math.min(1, Math.max(gest.t, f));
-    var sx=A.bx+(B.bx-A.bx)*posFrac, sy=A.by+(B.by-A.by)*posFrac;
-    var carry=gest.carry, tgt0=state.grid[B.r][B.c]||carry, sec=gest.sec||carry;
-    var colS=lerpHex(HEX[carry], HEX[sec], f), colT=lerpHex(HEX[tgt0], HEX[sec], f);
-    var srcRad=HM.isPrim(carry)? R*(0.26+0.74*posFrac) : R;   // primary morphs square->circle as it fuses
-    var tgtRad=HM.isPrim(tgt0)? R*(0.26+0.74*f) : R;
-    function place(el,cx,cy,half,rad,rr,fill){ el.setAttribute("x",(cx-half).toFixed(1)); el.setAttribute("y",(cy-half).toFixed(1)); el.setAttribute("width",(half*2).toFixed(1)); el.setAttribute("height",(half*2).toFixed(1)); var rq=Math.min(rad,half).toFixed(1); el.setAttribute("rx",rq); el.setAttribute("ry",rq); el.setAttribute("transform","rotate("+rr+" "+cx.toFixed(1)+" "+cy.toFixed(1)+")"); if(fill) el.setAttribute("fill",fill); }
-    place(gtgtInk, B.bx,B.by, R+3, tgtRad+3, tileRot(B.r,B.c), "#2c2733");
-    place(gsrcInk, sx,sy, R+3, srcRad+3, tileRot(A.r,A.c), "#2c2733");
-    place(gtgt, B.bx,B.by, R, tgtRad, tileRot(B.r,B.c), colT);
-    place(gsrc, sx,sy, R, srcRad, tileRot(A.r,A.c), colS);
+    var p=anim.p, R=anim.s*0.40;
+    gooBlur.setAttribute("stdDeviation",(R*(0.30+0.34*p)).toFixed(1));   // liquid neck grows as they fuse
+    var sx=anim.ax+(anim.bx-anim.ax)*p, sy=anim.ay+(anim.by-anim.ay)*p;
+    var colS=lerpHex(anim.colA, anim.blend, p), colT=lerpHex(anim.colB, anim.blend, p);
+    var srcRad=anim.sp? R*(0.26+0.74*p) : R, tgtRad=anim.tp? R*(0.26+0.74*p) : R;   // primaries morph square->circle
+    placeRect(gtgtInk, anim.bx,anim.by, R+3, tgtRad+3, tileRot(anim.to.r,anim.to.c), "#2c2733");
+    placeRect(gsrcInk, sx,sy, R+3, srcRad+3, tileRot(anim.from.r,anim.from.c), "#2c2733");
+    placeRect(gtgt, anim.bx,anim.by, R, tgtRad, tileRot(anim.to.r,anim.to.c), colT);
+    placeRect(gsrc, sx,sy, R, srcRad, tileRot(anim.from.r,anim.from.c), colS);
     mixfx.style.display="block";
-    clearFxHidden();
-    var ta=cells[A.r]&&cells[A.r][A.c], tb=cells[B.r]&&cells[B.r][B.c];
-    if(ta) ta.tile.style.visibility="hidden"; if(tb) tb.tile.style.visibility="hidden";
-    fxHidden=[[A.r,A.c],[B.r,B.c]];
+  }
+  function finishAnim(){
+    if(!anim) return;
+    if(anim.raf) cancelAnimationFrame(anim.raf);
+    mixfx.style.display="none";
+    revealTile(anim.from.r,anim.from.c); revealTile(anim.to.r,anim.to.c);
+    var tt=cells[anim.to.r]&&cells[anim.to.r][anim.to.c]; if(tt) setAnim(tt.tile,"mixed",280);   // a little pop as it settles
+    anim=null;
   }
 
   function classifyDrag(nbColor){
@@ -460,67 +475,55 @@ h1{ font-size:30px; line-height:1; }
     if(nbColor===carry && (lock==null || nbColor===lock)) return "fuse";   // same colour
     return null;
   }
-  function projTo(A,B,px,py){ var vx=B.cx-A.cx, vy=B.cy-A.cy, len2=vx*vx+vy*vy; return { proj:((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp:Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2) }; }
   function updateTarget(px,py){
     var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A){ gest.target=null; gest.t=0; gest.targetType=null; return; }
-    // once a fuse is underway, LOCK to that target — you commit to the tile you dragged to, no roaming
-    if(gest.fuse>0.15 && gest.target){ var Bg=geomOf(gest.target.r,gest.target.c);
-      if(Bg && state.grid[gest.target.r][gest.target.c]){ gest.t=Math.min(1,Math.max(0, projTo(A,Bg,px,py).proj)); return; } }
-    var nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.16;
+    var nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.12;
     for(var i=0;i<4;i++){ var B=nb[i]; if(!HM.playable(state,B.r,B.c)||!state.grid[B.r][B.c]) continue;
       var Bg=geomOf(B.r,B.c); if(!Bg) continue;
       var vx=Bg.cx-A.cx, vy=Bg.cy-A.cy, len2=vx*vx+vy*vy;
       var proj=((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp=Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2);
-      if(proj>bestProj && perp<A.s*0.6){ best=B; bestProj=proj; }
+      if(proj>bestProj && perp<A.s*0.62){ best=B; bestProj=proj; }
     }
-    if(!best){ gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.fuse=0; return; }
+    if(!best){ gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; return; }
     var tc=state.grid[best.r][best.c], type=classifyDrag(tc);
-    var tk=best.r+","+best.c;
-    if(gest.tkey!==tk){ gest.tkey=tk; gest.fuse=0; }   // new target -> fresh 0.2s hold, never an instant commit
     gest.target=best; gest.t=Math.min(1,bestProj); gest.targetType=type;
     gest.sec = type==="mix" ? HM.mix(gest.carry,tc) : (type==="fuse" ? gest.carry : null);
     var k=best.r+","+best.c;
     if(!type){ if(gest.nopeCell!==k){ gest.nopeCell=k; var nt=cells[best.r]&&cells[best.r][best.c]; if(nt) setAnim(nt.tile,"nope",340); } }
     else gest.nopeCell=null;
   }
-
-  function tick(now){
-    if(!gest){ return; }
-    var dt=Math.min(60, now-(gest.last||now)); gest.last=now;
-    var armed=(gest.targetType==="mix"||gest.targetType==="fuse") && gest.t>ARM_T;
-    gest.fuse=Math.max(0, Math.min(1, gest.fuse + (armed ? dt/ANIM_MS : -dt/REVERSE_MS)));
-    drawFx();
-    if(armed && gest.fuse>=1){ commitFuse(); }
-    gest.raf=requestAnimationFrame(tick);
-  }
-  function commitFuse(){
+  function commitSwipe(){
     var from={ r:gest.anchor.r, c:gest.anchor.c }, to=gest.target, type=gest.targetType;
-    if(!to){ gest.fuse=0; return; }
+    if(!to || !type) return;
     if(type==="mix") applyMergeState(from,to);
-    else if(type==="fuse") applyFuseState(from,to);
-    gest.fuse=0; gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null; gest.tkey=null;
+    else applyFuseState(from,to);
+    gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
   }
   function applyMergeState(from,to){
+    var colA=HEX[gest.carry], colB=HEX[state.grid[to.r][to.c]], sp=HM.isPrim(gest.carry), tp=HM.isPrim(state.grid[to.r][to.c]);
     HM.sessionMerge(state, sess, from, to);   // grid: from -> null, to -> blend
     gest.carry=sess.color; landMove();
-    hideFx(); paintTile(from.r,from.c);        // the swiped square's cell is now empty and sits there
-    var t=cells[to.r][to.c].tile; t.style.visibility=""; t.classList.remove("dim");
+    paintTile(from.r,from.c);                  // the swiped square's cell is now empty and sits there
+    var t=cells[to.r][to.c].tile; t.classList.remove("dim");
     t.classList.toggle("sec", !HM.isPrim(sess.color)); t.style.setProperty("--pc",HEX[sess.color]);
     t.querySelector(".sym").textContent = aid ? sess.color : "";
     setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
-    setAnim(t,"mixed",300);   // a little pop on merge
-    applyDim(); bumpBlob(1); sfxMix(sess.count);
+    applyDim(); bumpBlob(1);
+    playMergeAnim(from, to, colA, colB, HEX[sess.color], sp, tp);   // fire-and-forget 0.5s goo
+    sfxMix(sess.count);
   }
   function applyFuseState(from,to){
+    var col=HEX[state.grid[to.r][to.c]], sp=HM.isPrim(state.grid[from.r][from.c]);
     HM.sessionCollect(state,sess,from.r,from.c);   // collect both ends (idempotent — safe when continuing a blob)
     HM.sessionCollect(state,sess,to.r,to.c);
     state.grid[from.r][from.c]=null;               // CONSUME the swiped tile — empty spot, can't be dragged back onto
     gest.carry=sess.color; landMove();
-    hideFx(); paintTile(from.r,from.c);
-    var t=cells[to.r][to.c].tile; t.style.visibility=""; t.classList.remove("dim");
+    paintTile(from.r,from.c);
+    var t=cells[to.r][to.c].tile; t.classList.remove("dim");
     setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
-    setAnim(t,"mixed",300);   // a little pop on merge
-    applyDim(); bumpBlob(2); sfxMix(sess.count);
+    applyDim(); bumpBlob(2);
+    playMergeAnim(from, to, col, col, col, sp, sp);   // same colour: blobs fuse, no colour change
+    sfxMix(sess.count);
   }
 
   function stopMeter(){ if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; } meterEl.classList.remove("run","show"); }
@@ -534,7 +537,7 @@ h1{ font-size:30px; line-height:1; }
   async function resolveNow(){
     if(!sess||busy) return;
     var mySess=sess, myState=state;   // pin what we're resolving — a mid-await level change must not corrupt a fresh board
-    busy=true; stopMeter();
+    busy=true; stopMeter(); finishAnim();
     var keys=Object.keys(mySess.collected), n=mySess.count;
     var color=mySess.color, hadMerge=mySess.hadMerge;
     keys.forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) ref.tile.classList.add("clr"); });
@@ -570,9 +573,8 @@ h1{ font-size:30px; line-height:1; }
     if(!sess && !HM.isPrim(col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }
     try{ board.setPointerCapture(e.pointerId); }catch(_e){}
     if(!sess){ sess=HM.newSession(null,null); sess.moves=0; }
-    gest={ anchor:tp, carry:col, counted:false, target:null, targetType:null, sec:null, t:0, fuse:0, tkey:null, nopeCell:null, blobN:0, blobBadge:null, last:performance.now() };
+    gest={ anchor:tp, carry:col, counted:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
     setLift(tp,true);   // grab: the tile lifts
-    gest.raf=requestAnimationFrame(tick);
   });
   function primedPair(tp,col){
     return (HM.playable(state,tp.r+1,tp.c)&&state.grid[tp.r+1][tp.c]===col)||(HM.playable(state,tp.r-1,tp.c)&&state.grid[tp.r-1][tp.c]===col)||
@@ -580,12 +582,12 @@ h1{ font-size:30px; line-height:1; }
   }
   board.addEventListener("pointermove", function(e){
     if(!gest || !e.isPrimary) return;
-    updateTarget(e.clientX, e.clientY);   // the rAF tick() ramps the fuse toward whatever we're dragging at
+    updateTarget(e.clientX, e.clientY);
+    if(gest.targetType && gest.t>SWIPE_T) commitSwipe();   // swipe registers instantly, no hold
   });
   function endGesture(){
     if(!gest) return;
-    if(gest.raf) cancelAnimationFrame(gest.raf);
-    hideFx();
+    if(gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
     setLift(gest.anchor,false);
     var acted=gest.counted;
     gest=null;
@@ -620,7 +622,7 @@ h1{ font-size:30px; line-height:1; }
     curIndex=i; curLevel=LEVELS[i];
     state=HM.newState(curLevel); HM.fill(state, Math.random);
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
-    busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); hideFx();
+    busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
     over.classList.remove("show");
     document.getElementById("gName").textContent="Level "+curLevel.id;
     document.getElementById("gSub").textContent=goalSub(curLevel);
