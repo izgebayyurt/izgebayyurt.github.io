@@ -594,7 +594,7 @@ h1{ font-size:30px; line-height:1; }
     if(sess && sess.count>0){ armMeter(); }        // relaxed cash-out; a new press cancels it
     else if(sess && !acted){ sess=null; clearDim(); }
   }
-  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; endGesture(); });
+  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest) updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
   board.addEventListener("pointercancel", function(){ endGesture(); });
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
