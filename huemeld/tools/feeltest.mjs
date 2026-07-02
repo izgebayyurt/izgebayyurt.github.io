@@ -22,10 +22,13 @@ const octagon = ["..####..", ".######.", "########", "########", "########", "##
    roughly one secondary, so a ~14-20 target naturally needs ~15-24 moves.
    Juicy circle weights (2, never 3 — deadlock risk) put a little treasure on
    the board for free sweeps. */
+/* Primaries ONLY spawn — secondaries never fall onto the board; they exist
+   only when you manufacture them by merging. */
+const PRIM = { R: 4, Y: 4, B: 4 };
 const SPECS = [
-  { shape: rect7, spawn: { R: 4, Y: 4, B: 4, O: 2, G: 1, P: 1 }, objectives: [{ color: "O", count: 14 }] },
-  { shape: heart, spawn: { R: 4, Y: 4, B: 4, O: 1, G: 2, P: 1 }, objectives: [{ color: "G", count: 16 }] },
-  { shape: octagon, spawn: { R: 4, Y: 4, B: 4, O: 2, G: 1, P: 2 }, objectives: [{ color: "O", count: 10 }, { color: "P", count: 10 }] }
+  { shape: rect7, spawn: PRIM, objectives: [{ color: "O", count: 14 }] },
+  { shape: heart, spawn: PRIM, objectives: [{ color: "G", count: 16 }] },
+  { shape: octagon, spawn: PRIM, objectives: [{ color: "O", count: 10 }, { color: "P", count: 10 }] }
 ];
 
 const FLOOR = 15;         // no tiny budgets — raise the target instead of squeezing moves
