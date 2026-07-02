@@ -122,6 +122,9 @@ h1{ font-size:30px; line-height:1; }
 .tile.sec{ border-radius:50%; }
 .tile .streak{ position:absolute; top:15%; left:17%; width:32%; height:20%; border-radius:50%; background:rgba(255,255,255,.4); pointer-events:none; }
 .tile .sym{ position:relative; z-index:2; font-family:var(--font-d); font-weight:700; font-size:clamp(11px,3.2vw,16px); color:#fff; -webkit-text-stroke:.8px var(--line); }
+/* running combo counter on the current melded tile */
+.tile .cnt{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:5; font-family:var(--font-d); font-weight:700; font-size:clamp(15px,4.6vw,24px); color:#fff; -webkit-text-stroke:1px var(--line); pointer-events:none; }
+.tile.showcnt .cnt{ display:flex; }
 .tile.dim{ filter:saturate(.2) brightness(1.08) opacity(.45); }
 .tile.incombo{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 15px 3px rgba(255,255,255,.65); z-index:4; animation:hmBob .7s ease-in-out infinite; }
 .tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
@@ -131,7 +134,9 @@ h1{ font-size:30px; line-height:1; }
 /* the carried tile lifts the instant you press and leans toward your finger — merging feels smooth and continuous, not a snap */
 .tile.lift{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(1.14); z-index:6; box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 7px 12px rgba(44,39,51,.32); transition:transform .09s linear; }
 /* square-to-circle + colour-blend morph when a meld lands (and a gentle tint shift when same colours join) */
-.tile.morph{ transition:background .2s var(--calm), border-radius .26s var(--calm); }
+.tile.morph{ transition:background .22s var(--calm), border-radius .26s var(--calm); }
+/* the consumed tile flows into the meld, its colour blending to the secondary as it goes */
+.tile.melding{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(.82); opacity:0; z-index:6; transition:transform .22s var(--calm), opacity .22s var(--calm), background .22s var(--calm); }
 
 .combo-meter{ position:absolute; left:14px; right:14px; top:-3px; height:7px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
 .combo-meter.show{ opacity:1; }
@@ -275,7 +280,7 @@ h1{ font-size:30px; line-height:1; }
     var html="";
     for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){
       if(!state.mask[r][c]){ html+='<div class="cell wall"></div>'; continue; }
-      html+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="tile" style="--rot:'+tileRot(r,c)+'deg"><span class="streak"></span><span class="sym"></span></div></div>';
+      html+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="tile" style="--rot:'+tileRot(r,c)+'deg"><span class="streak"></span><span class="sym"></span><span class="cnt"></span></div></div>';
     }
     board.innerHTML=html;   // the ONLY innerHTML write; never called mid-session
     cells=[];
@@ -373,10 +378,16 @@ h1{ font-size:30px; line-height:1; }
     board.classList.toggle("suspended", !!live);
   }
   function clearDim(){
-    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","press","lift"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","lift","showcnt","melding"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
     board.classList.remove("suspended");
   }
   function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("lift"); ref.tile.classList.add("incombo"); } }
+  function clearCounts(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("showcnt"); } }
+  function updateCount(){   // show the running combo total on the tile you just melded
+    clearCounts();
+    if(sess && sess.count>=2 && gest){ var ref=cells[gest.anchor.r]&&cells[gest.anchor.r][gest.anchor.c];
+      if(ref){ ref.tile.querySelector(".cnt").textContent=sess.count; ref.tile.classList.add("showcnt"); } }
+  }
   function geomOf(r,c){ if(!geom) return null; for(var i=0;i<geom.length;i++) if(geom[i].r===r&&geom[i].c===c) return geom[i]; return null; }
   function setLift(p,on){ var ref=p&&cells[p.r]&&cells[p.r][p.c]; if(!ref) return; var t=ref.tile;
     t.style.removeProperty("--dx"); t.style.removeProperty("--dy");   // start centred either way
@@ -390,14 +401,23 @@ h1{ font-size:30px; line-height:1; }
   function landMove(){ if(!gest.counted){ gest.counted=true; sess.moves++; state.movesLeft--; updateMoves(); } }
 
   function doMerge(from,to){
+    var gf=geomOf(from.r,from.c), gt=geomOf(to.r,to.c), sref=cells[from.r]&&cells[from.r][from.c];
     HM.sessionMerge(state, sess, from, to);   // engine: from -> hole, to -> blend
     gest.carry=sess.color;
     landMove();
-    paintTile(from.r,from.c);            // source is now a hole (the lean toward `to` sold the motion)
-    morphTile(to.r,to.c);                // destination morphs square->circle + colour blend
-    setAnim(cells[to.r][to.c].tile, "mixed", 300);
+    morphTile(to.r,to.c);                // destination: its colour transitions to the blend + square->circle
     applyDim(); markCollected(to.r,to.c);
-    moveAnchorTo(to); sfxMix(sess.count);
+    moveAnchorTo(to);                    // the blend lifts as the new carry
+    // the consumed source flows into the meld, its colour blending to the secondary, then vacates the cell
+    if(gf&&gt&&sref){ var st=sref.tile;
+      st.classList.remove("lift","incombo","dim"); void st.offsetWidth;
+      st.classList.add("melding");
+      st.style.setProperty("--dx",(gt.cx-gf.cx).toFixed(1)+"px");
+      st.style.setProperty("--dy",(gt.cy-gf.cy).toFixed(1)+"px");
+      st.style.setProperty("--pc", HEX[sess.color]);
+      setTimeout(function(){ paintTile(from.r,from.c); }, 220);
+    } else { paintTile(from.r,from.c); }
+    updateCount(); sfxMix(sess.count);
   }
   function doCollect(from,to,firstAnchor){
     if(firstAnchor) HM.sessionCollect(state, sess, from.r, from.c);
@@ -408,7 +428,7 @@ h1{ font-size:30px; line-height:1; }
     if(firstAnchor) markCollected(from.r,from.c);
     markCollected(to.r,to.c);
     setAnim(cells[to.r][to.c].tile, "mixed", 280);   // same-colour join still pops satisfyingly
-    moveAnchorTo(to); sfxEat(sess.count);
+    moveAnchorTo(to); updateCount(); sfxEat(sess.count);
   }
 
   function tryStep(from,to){
@@ -482,11 +502,13 @@ h1{ font-size:30px; line-height:1; }
   }
   board.addEventListener("pointermove", function(e){
     if(!gest || !e.isPrimary) return;
-    // lean the carried tile toward the finger — smooth, continuous, starts the instant you move
+    // lean the carried tile toward the finger, LOCKED to one axis — pieces slide on the grid
+    // (orthogonally), never freely/diagonally
     var ga=geomOf(gest.anchor.r,gest.anchor.c), at=cells[gest.anchor.r]&&cells[gest.anchor.r][gest.anchor.c];
-    if(ga && at){ var lim=ga.s*0.9;
-      at.tile.style.setProperty("--dx", Math.max(-lim,Math.min(lim, e.clientX-ga.cx)).toFixed(1)+"px");
-      at.tile.style.setProperty("--dy", Math.max(-lim,Math.min(lim, e.clientY-ga.cy)).toFixed(1)+"px");
+    if(ga && at){ var lim=ga.s*0.9, ox=e.clientX-ga.cx, oy=e.clientY-ga.cy, dx=0, dy=0;
+      if(Math.abs(ox)>=Math.abs(oy)) dx=Math.max(-lim,Math.min(lim,ox)); else dy=Math.max(-lim,Math.min(lim,oy));
+      at.tile.style.setProperty("--dx", dx.toFixed(1)+"px");
+      at.tile.style.setProperty("--dy", dy.toFixed(1)+"px");
     }
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || (tp.r===gest.anchor.r && tp.c===gest.anchor.c)) return;
