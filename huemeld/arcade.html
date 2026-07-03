@@ -146,7 +146,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>Huemeld Arcade</h2>
         <div class="howrow"><span class="chip" style="background:#ef4a5a"></span>+<span class="chip" style="background:#f6c445"></span>=<span class="chip ci" style="background:#f2913d"></span></div>
-        <p><b>Drag</b> the block sideways, <b>tap</b> to spin it, <b>flick down</b> to drop.<br>Paint poured <b>onto</b> a different paint blends into a circle — <b>spin</b> the block to choose its chemistry!<br><b>Three</b> twin circles touching <b>POP!</b> Big pops (4+) <b>shatter</b> paints around them.<br>Same-paint <b>2×2</b>s auto-clean. Don't overflow!</p>
+        <p><b>Drag</b> the block sideways, <b>tap</b> to spin it, <b>flick down</b> to drop.<br>Paint poured <b>onto</b> a different paint blends into a circle — <b>spin</b> the block to choose its chemistry!<br>One rule: a <b>2×2 square</b> or <b>4-in-a-row</b> of any colour <b>POPS!</b><br>Circles score <b>4×</b> what plain paint does. Don't overflow!</p>
         <button class="mk" id="btnStart">Play</button>
       </div>
     </div>
@@ -160,7 +160,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       </div>
     </div>
   </div>
-  <p class="tip">pour a colour <b>onto</b> a different one to blend · verticals in the block <b>pre-mix</b> · park <b>pairs</b>, pop with a <b>third</b></p>
+  <p class="tip">pour <b>onto</b> a different colour to blend · <b>square it (2×2)</b> or <b>line it (4)</b> to pop · circles pay <b>4×</b></p>
 
 <script>
 (function(){
@@ -235,39 +235,37 @@ function gravity(){
 }
 
 /* ---------- pops & cascades ---------- */
-function findGroups(){
-  var seen={}, out=[];
-  for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){
-    var t=grid[r][c];
-    if(!t || isPrim(t.color) || seen[r+","+c]) continue;
-    var q=[[r,c]], comp=[]; seen[r+","+c]=1;
-    while(q.length){
-      var cur=q.pop(), y=cur[0], x=cur[1];
-      comp.push(grid[y][x]);
-      [[y+1,x],[y-1,x],[y,x+1],[y,x-1]].forEach(function(nb){
-        var ny=nb[0], nx=nb[1];
-        if(ny<0||nx<0||ny>=ROWS||nx>=COLS||seen[ny+","+nx]) return;
-        var o=grid[ny][nx];
-        if(o && o.color===t.color){ seen[ny+","+nx]=1; q.push([ny,nx]); }
-      });
+/* THE pop rule (the only one): same colour — ANY colour — arranged as a 2x2 square or 4+ in a straight line pops.
+   Overlaps pop wholesale (a run of 5 pops all 5; a 2x3 clump pops all 6). Circles score 4x what primaries do. */
+function findPatterns(){
+  var mark={};
+  for(var r=0;r<ROWS;r++){   // horizontal runs >=4
+    var run=1;
+    for(var c=1;c<=COLS;c++){
+      var same = c<COLS && grid[r][c] && grid[r][c-1] && grid[r][c].color===grid[r][c-1].color;
+      if(same) run++;
+      else { if(run>=4){ for(var k=c-run;k<c;k++) mark[r+","+k]=1; } run=1; }
     }
-    if(comp.length>=3) out.push(comp);   // pop at THREE — park pairs, detonate with the third
   }
-  return out;
-}
-function find2x2(){   // four same-colour primaries in a square auto-clean (the sediment valve; also a deliberate "discard" for monochrome pieces)
-  var seen={}, out=[];
-  for(var r=0;r<ROWS-1;r++) for(var c=0;c<COLS-1;c++){
-    var a=grid[r][c];
-    if(!a || !isPrim(a.color)) continue;
-    var b=grid[r][c+1], d=grid[r+1][c], e=grid[r+1][c+1];
+  for(var c2=0;c2<COLS;c2++){   // vertical runs >=4
+    var run2=1;
+    for(var r2=1;r2<=ROWS;r2++){
+      var same2 = r2<ROWS && grid[r2][c2] && grid[r2-1][c2] && grid[r2][c2].color===grid[r2-1][c2].color;
+      if(same2) run2++;
+      else { if(run2>=4){ for(var k2=r2-run2;k2<r2;k2++) mark[k2+","+c2]=1; } run2=1; }
+    }
+  }
+  for(var r3=0;r3<ROWS-1;r3++) for(var c3=0;c3<COLS-1;c3++){   // 2x2 squares
+    var a=grid[r3][c3]; if(!a) continue;
+    var b=grid[r3][c3+1], d=grid[r3+1][c3], e=grid[r3+1][c3+1];
     if(b&&d&&e && b.color===a.color && d.color===a.color && e.color===a.color){
-      [a,b,d,e].forEach(function(t){ var k=t.row+","+t.col; if(!seen[k]){ seen[k]=1; out.push(t); } });
+      mark[r3+","+c3]=1; mark[r3+","+(c3+1)]=1; mark[(r3+1)+","+c3]=1; mark[(r3+1)+","+(c3+1)]=1;
     }
   }
+  var out=[];
+  for(var key in mark){ var p=key.split(","); out.push(grid[+p[0]][+p[1]]); }
   return out;
 }
-function potScore(n,chain){ return (n*25 + (n-2)*40) * chain; }
 function floatScore(px,py,txt){ var f=document.createElement("div"); f.className="float"; f.textContent=txt; f.style.left=px+"px"; f.style.top=py+"px"; well.appendChild(f); setTimeout(function(){ f.remove(); },800); }
 function showChain(n){ chainEl.textContent="CHAIN ×"+n+"!"; chainEl.classList.remove("show"); void chainEl.offsetWidth; chainEl.classList.add("show"); well.classList.remove("shake"); void well.offsetWidth; well.classList.add("shake"); }
 function addScore(n){ score+=n; scoreEl.textContent=score; if(score>best){ best=score; bestEl.textContent=best; } }
@@ -309,45 +307,23 @@ async function resolve(){
       await sleep(120);
       continue;
     }
-    var groups=findGroups();
-    var squares=find2x2();
-    if(!groups.length && !squares.length) break;
+    var marked=findPatterns();
+    if(!marked.length) break;
     var cs=cellSize();
-    if(groups.length){ chain++; if(chain>maxChain) maxChain=chain; }   // only real pops drive the multiplier
-    var mult=Math.max(1,chain);
-    var splash=[], seenS={};   // only a BIG pop (4+ group) shatters the primaries hugging it
-    groups.forEach(function(g){
-      if(g.length<4) return;
-      g.forEach(function(t){
-        [[t.row+1,t.col],[t.row-1,t.col],[t.row,t.col+1],[t.row,t.col-1]].forEach(function(nb){
-          var ny=nb[0], nx=nb[1];
-          if(ny<0||nx<0||ny>=ROWS||nx>=COLS) return;
-          var o=grid[ny][nx], k=ny+","+nx;
-          if(o && isPrim(o.color) && !seenS[k]){ seenS[k]=1; splash.push(o); }
-        });
-      });
+    chain++; if(chain>maxChain) maxChain=chain;   // every pattern pass is a real pop now — one rule, one multiplier
+    var base=0, sx=0, sy=0;
+    marked.forEach(function(t){
+      t.el.classList.add("pop"); pops++;
+      base += isPrim(t.color) ? 10 : 40;   // circles are manufactured — they pay 4x
+      sx+=t.col; sy+=t.row;
     });
-    for(var gi=0; gi<groups.length; gi++){
-      var g=groups[gi], sx=0, sy=0;
-      for(var i=0;i<g.length;i++){ g[i].el.classList.add("pop"); sx+=g[i].col; sy+=g[i].row; pops++; }
-      var pts=potScore(g.length, mult);
-      addScore(pts);
-      floatScore((sx/g.length)*cs+cs*0.1, (sy/g.length)*cs-6, "+"+pts);
-    }
-    splash.forEach(function(t){ t.el.classList.add("pop"); pops++; });
-    if(splash.length) addScore(splash.length*5*mult);
-    if(squares.length){
-      var qx=0, qy=0;
-      squares.forEach(function(t){ t.el.classList.add("pop"); pops++; qx+=t.col; qy+=t.row; });
-      addScore(squares.length*5);
-      floatScore((qx/squares.length)*cs+cs*0.1, (qy/squares.length)*cs-6, "+"+(squares.length*5));
-    }
+    var pts=base*chain;
+    addScore(pts);
+    floatScore((sx/marked.length)*cs+cs*0.1, (sy/marked.length)*cs-6, "+"+pts);
     if(chain>=2) showChain(chain);
-    if(groups.length) sfxPop(groups[0].length, mult); else beep(280,0.09,"triangle",0.045);
+    sfxPop(marked.length, chain);
     await sleep(250);
-    for(var gi2=0; gi2<groups.length; gi2++) groups[gi2].forEach(removeTile);
-    splash.forEach(removeTile);
-    squares.forEach(removeTile);
+    marked.forEach(removeTile);
   }
   busy=false;
   updateDanger();
