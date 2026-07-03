@@ -435,7 +435,7 @@ h1{ font-size:30px; line-height:1; }
   function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
   function loadProg(){ try{ return JSON.parse(lsGet("hm_prog")||"{}"); }catch(e){ return {}; } }
   function saveProg(p){ lsSet("hm_prog", JSON.stringify(p)); }
-  function unlocked(i){ if(i===0) return true; if(LEVELS[i]&&LEVELS[i].test) return true; var p=loadProg(); var prev=LEVELS[i-1]; return !!(prev && p[prev.id] && p[prev.id].done); }
+  function unlocked(i){ return true; }   // all levels open — free exploration (non-linear difficulty means you can pick your challenge)
   function starsFor(level, movesLeft){ var r=movesLeft/level.moves; return r>=0.5?3:(r>=0.2?2:1); }
   function starStr(n){ return '<span>'+"★★★".slice(0,n)+'</span><span class="dim">'+"☆☆☆".slice(0,3-n)+'</span>'; }
 
