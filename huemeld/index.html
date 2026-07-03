@@ -204,6 +204,21 @@ h1{ font-size:30px; line-height:1; }
 
 .ghint{ display:none; text-align:center; font-size:12px; color:var(--ink-soft); margin:11px 2px 0; line-height:1.4; }
 .ghint b{ font-weight:700; color:var(--ink); }
+/* tutorial coach — a step-through card that teaches the mechanics on the tutorial level */
+.coach{ display:none; margin:14px 2px 0; background:var(--card); border:2.5px solid var(--line); border-radius:16px; box-shadow:0 3px 0 var(--shadow); padding:14px 16px; }
+.coach .ctext{ font-family:var(--font-u); font-weight:600; font-size:14px; line-height:1.5; color:var(--ink); }
+.coach .ctext b{ font-weight:800; }
+.cmix{ display:none; flex-wrap:wrap; gap:16px; justify-content:center; margin:13px 0 3px; }
+.cmix.show{ display:flex; }
+.cmix .eq{ display:flex; align-items:center; gap:5px; font-family:var(--font-d); font-weight:700; font-size:16px; color:var(--ink-soft); }
+.cchip{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
+.cchip.sq{ border-radius:6px; }
+.cchip.ci{ border-radius:50%; }
+.coach .crow{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+.cdots{ display:flex; gap:6px; }
+.cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
+.cdots i.on{ background:var(--ink); }
+.coach #coachNext{ height:40px; padding:0 22px; font-size:15px; }
 
 @keyframes hmPop{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 42%{transform:rotate(var(--rot,0deg)) scale(1.18)} 100%{transform:rotate(var(--rot,0deg)) scale(.05); opacity:0} }
 @keyframes hmDrop{ from{transform:translateY(-15px) rotate(var(--rot,0deg)); opacity:.2} to{transform:translateY(0) rotate(var(--rot,0deg)); opacity:1} }
@@ -278,6 +293,15 @@ h1{ font-size:30px; line-height:1; }
       </div>
     </div>
     <p class="ghint" id="ghint">Drag a paint onto a <b>different</b> paint to mix a circle. Then <b>drag across</b> circles that spell a recipe to solve it — <b>chain</b> solves in one window for +2 moves!</p>
+    <div class="coach" id="coach">
+      <div class="ctext" id="coachText"></div>
+      <div class="cmix" id="coachMix">
+        <span class="eq"><span class="cchip sq" style="background:#ef4a5a"></span>+<span class="cchip sq" style="background:#f6c445"></span>=<span class="cchip ci" style="background:#f2913d"></span></span>
+        <span class="eq"><span class="cchip sq" style="background:#f6c445"></span>+<span class="cchip sq" style="background:#3d8bdf"></span>=<span class="cchip ci" style="background:#57c268"></span></span>
+        <span class="eq"><span class="cchip sq" style="background:#ef4a5a"></span>+<span class="cchip sq" style="background:#3d8bdf"></span>=<span class="cchip ci" style="background:#9b62d6"></span></span>
+      </div>
+      <div class="crow"><div class="cdots" id="coachDots"></div><button class="mk accent" id="coachNext">Next →</button></div>
+    </div>
   </section>
 
 </div>
@@ -365,7 +389,7 @@ h1{ font-size:30px; line-height:1; }
   LEVELS = genRecipeLevels();
   // Tutorial: a gentle guided level (its own full-width button atop the picker). Teaches mix -> trace with room to spare.
   var TUTORIAL = { id:"T", tutorial:true, name:"Tutorial", shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{R:4,Y:4,B:4}, moves:20, goal:"recipe", objectives:[], recipes:[{ seq:["O","G"], count:1 }], gated:false };
+    spawn:{R:4,Y:4,B:4}, moves:20, goal:"recipe", objectives:[], recipes:[{ seq:["P","O"], count:1 }], gated:false };
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
   var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
@@ -1021,6 +1045,29 @@ h1{ font-size:30px; line-height:1; }
   function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
   function goalSub(L){ if(L.goal==="recipe") return L.gated ? "Chain recipes to survive!" : "Trace the recipes in order"; if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
 
+  /* ---------- tutorial coach: a step-through walkthrough shown on the tutorial level ---------- */
+  var COACH=[
+    { t:"<b>Red, blue and yellow</b> are primary paints — the squares. Swipe one onto a <b>different</b> primary beside it to mix them." },
+    { t:"Mixing two primaries makes a <b>secondary</b> — a circle. Here's every mix:", mix:true },
+    { t:"Your target is the <b>recipes</b> up top. This one wants a <b>purple</b> traced into an <b>orange</b>: make both circles side by side, then drag across them." },
+    { t:"A new circle <b>hangs in the air for 3 seconds</b> — watch the timer bar. Any move resets it; when it runs out the tiles fall. Solve recipes while they hang, and finish <b>2+ in one window</b> for <b>+2 moves each!</b>" },
+    { t:"Stuck? Swipe onto a <b>same-colour</b> primary to <b>clear</b> every connected one and shake things loose. It spends a move too." },
+    { t:"Clear <b>every recipe</b> before you run out of moves. You've got this!" }
+  ];
+  var coachStep=0;
+  var coachEl=document.getElementById("coach"), coachTextEl=document.getElementById("coachText"),
+      coachMixEl=document.getElementById("coachMix"), coachDotsEl=document.getElementById("coachDots"), coachNextEl=document.getElementById("coachNext");
+  function showCoach(){
+    var s=COACH[coachStep];
+    coachTextEl.innerHTML=s.t;
+    coachMixEl.classList.toggle("show", !!s.mix);
+    var dh=""; for(var i=0;i<COACH.length;i++) dh+='<i class="'+(i===coachStep?"on":"")+'"></i>';
+    coachDotsEl.innerHTML=dh;
+    coachNextEl.textContent = coachStep===COACH.length-1 ? "Play! ✦" : "Next →";
+  }
+  function startCoach(){ coachStep=0; coachEl.style.display="block"; showCoach(); }
+  coachNextEl.addEventListener("click", function(){ ensureAudio(); coachStep++; if(coachStep>=COACH.length){ coachEl.style.display="none"; } else showCoach(); });
+
   function startLevel(level, idx){
     curIndex=(idx==null?-1:idx); curLevel=level;
     state=HM.newState(curLevel); HM.fill(state, Math.random);
@@ -1029,7 +1076,8 @@ h1{ font-size:30px; line-height:1; }
     if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn(); winRecipes=0;
     over.classList.remove("show");
     document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
-    document.getElementById("ghint").style.display = curLevel.tutorial ? "block" : "none";   // guidance shows only on the tutorial
+    document.getElementById("ghint").style.display="none";
+    if(curLevel.tutorial) startCoach(); else coachEl.style.display="none";   // the coach walkthrough shows only on the tutorial
     screenLevels.style.display="none"; screenGame.style.display="block";
     if(curLevel.goal==="tubes") renderTubes();
     else if(curLevel.goal==="recipe") renderRecipe();
