@@ -146,7 +146,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>Huemeld Arcade</h2>
         <div class="howrow"><span class="chip" style="background:#ef4a5a"></span>+<span class="chip" style="background:#f6c445"></span>=<span class="chip ci" style="background:#f2913d"></span></div>
-        <p><b>Drag</b> the falling block sideways, <b>tap</b> it to spin, <b>flick down</b> to drop.<br>Mix two <b>different</b> paints into a circle — <b>three</b> twins touching <b>POP!</b><br>Big pops (4+) <b>shatter</b> paints around them · same-paint <b>2×2</b>s auto-clean.<br>Mix freely — new paint only comes when <b>you</b> drop. Don't overflow!</p>
+        <p><b>Drag</b> the block sideways, <b>tap</b> to spin it, <b>flick down</b> to drop.<br>Paint poured <b>onto</b> a different paint blends into a circle — <b>spin</b> the block to choose its chemistry!<br><b>Three</b> twin circles touching <b>POP!</b> Big pops (4+) <b>shatter</b> paints around them.<br>Same-paint <b>2×2</b>s auto-clean. Don't overflow!</p>
         <button class="mk" id="btnStart">Play</button>
       </div>
     </div>
@@ -160,7 +160,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       </div>
     </div>
   </div>
-  <p class="tip">drop blocks where <b>you</b> want the paint · mix freely between drops · park <b>pairs</b>, pop with a <b>third</b></p>
+  <p class="tip">pour a colour <b>onto</b> a different one to blend · verticals in the block <b>pre-mix</b> · park <b>pairs</b>, pop with a <b>third</b></p>
 
 <script>
 (function(){
@@ -178,7 +178,7 @@ var well=document.getElementById("well"), tray=document.getElementById("tray"),
     scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"),
     gc1=document.getElementById("gc1"), gc2=document.getElementById("gc2");
 
-var grid=[], state="menu", busy=false, gest=null;
+var grid=[], state="menu", busy=false;
 var score=0, best=+(localStorage.getItem("hm_arc_hi")||0), pops=0, maxChain=0, piecesDropped=0;
 var piece=null, nextP=null, pieceCol=2, pieceEl=null;   // piece = [tl,tr,bl,br] colours; pieceCol = left column (0..COLS-2)
 bestEl.textContent=best;
@@ -272,11 +272,43 @@ function floatScore(px,py,txt){ var f=document.createElement("div"); f.className
 function showChain(n){ chainEl.textContent="CHAIN ×"+n+"!"; chainEl.classList.remove("show"); void chainEl.offsetWidth; chainEl.classList.add("show"); well.classList.remove("shake"); void well.offsetWidth; well.classList.add("shake"); }
 function addScore(n){ score+=n; scoreEl.textContent=score; if(score>best){ best=score; bestEl.textContent=best; } }
 
+function mergePass(){   // POUR-TO-MERGE: a primary resting on a DIFFERENT primary pours into it (upper blends into lower)
+  var events=[];
+  for(var c=0;c<COLS;c++){
+    for(var r=ROWS-2;r>=0;r--){   // bottom-up: the earliest landing reacts first; consuming the upper stops double-fires
+      var upper=grid[r][c], lower=grid[r+1][c];
+      if(!upper||!lower) continue;
+      if(isPrim(upper.color) && isPrim(lower.color) && upper.color!==lower.color){
+        events.push({upper:upper, lower:lower, mix:mixOf(upper.color,lower.color)});
+        grid[r][c]=null;
+      }
+    }
+  }
+  return events;
+}
 async function resolve(){
   busy=true;
   var chain=0;
   while(true){
     if(gravity()) await sleep(210);
+    var merges=mergePass();
+    if(merges.length){   // landings blend before anything pops — then re-settle, which can trigger MORE landings
+      var mcs=cellSize(), mpad=mcs*0.06;
+      merges.forEach(function(m){
+        m.upper.el.style.zIndex=5;
+        m.upper.el.style.transform="translate("+(m.lower.col*mcs+mpad)+"px,"+(m.lower.row*mcs+mpad)+"px)";
+        m.upper.b.style.transform="scale(.4)";
+      });
+      sfxMix();
+      await sleep(170);
+      merges.forEach(function(m){
+        m.upper.el.remove();
+        setColor(m.lower, m.mix);
+        m.lower.el.classList.remove("mixed"); void m.lower.el.offsetWidth; m.lower.el.classList.add("mixed");
+      });
+      await sleep(120);
+      continue;
+    }
     var groups=findGroups();
     var squares=find2x2();
     if(!groups.length && !squares.length) break;
@@ -333,15 +365,6 @@ function rotatePiece(){ if(!piece||busy||state!=="playing") return; piece=[piece
 function freeIn(c){ var n=0; for(var r=0;r<ROWS;r++) if(!grid[r][c]) n++; return n; }
 function canPlaceAt(a){ return freeIn(a)>=2 && freeIn(a+1)>=2; }
 function canPlace(){ for(var a=0;a<COLS-1;a++) if(canPlaceAt(a)) return true; return false; }
-function hasMix(){
-  for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){
-    var t=grid[r][c]; if(!t||!isPrim(t.color)) continue;
-    var right=c+1<COLS?grid[r][c+1]:null, down=r+1<ROWS?grid[r+1][c]:null;
-    if(right && isPrim(right.color) && right.color!==t.color) return true;
-    if(down && isPrim(down.color) && down.color!==t.color) return true;
-  }
-  return false;
-}
 function renderPiece(){
   if(!pieceEl){ pieceEl=document.createElement("div"); pieceEl.className="piece"; tray.appendChild(pieceEl); }
   if(!piece || state!=="playing"){ pieceEl.style.display="none"; gc1.style.display="none"; gc2.style.display="none"; return; }
@@ -379,10 +402,10 @@ async function dropPiece(){
   renderPiece();
   await sleep(230);
   busy=false;
-  await resolve();   // a monochrome drop self-cleans as a 2x2; collapses can even chain
+  await resolve();   // landings blend, trios pop, collapses re-pour — the whole reaction is one drop's consequence
   if(state!=="playing") return;
   updateDanger();
-  if(!canPlace() && !hasMix()) gameOver();   // nowhere to drop AND nothing to mix = the end
+  if(!canPlace()) gameOver();   // dropping is the only verb now — nowhere to drop = the end
 }
 
 /* ---------- tray input: drag to aim, tap to spin, flick down to drop ---------- */
@@ -408,63 +431,8 @@ tray.addEventListener("pointerup", function(e){
 tray.addEventListener("pointercancel", function(){ tgest=null; });
 tray.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
-/* ---------- well input: swipe to mix ---------- */
-function cellAt(x,y){
-  var rect=well.getBoundingClientRect(), cs=cellSize();
-  var c=Math.floor((x-rect.left)/cs), r=Math.floor((y-rect.top)/cs);
-  if(c<0||r<0||c>=COLS||r>=ROWS) return null;
-  return {c:c,r:r};
-}
-well.addEventListener("pointerdown", function(e){
-  if(state!=="playing"||busy||gest||!e.isPrimary) return;
-  ensureAudio();
-  var p=cellAt(e.clientX,e.clientY); if(!p) return;
-  var t=grid[p.r][p.c]; if(!t||!isPrim(t.color)) return;
-  gest={t:t, x0:e.clientX, y0:e.clientY};
-  t.el.classList.add("lift");
-  try{ well.setPointerCapture(e.pointerId); }catch(_e){}
-});
-well.addEventListener("pointermove", function(e){
-  if(!gest||!e.isPrimary) return;
-  var dx=e.clientX-gest.x0, dy=e.clientY-gest.y0, cs=cellSize();
-  if(Math.max(Math.abs(dx),Math.abs(dy)) < cs*0.35) return;
-  var dc=0, dr=0;
-  if(Math.abs(dx)>Math.abs(dy)) dc=dx>0?1:-1; else dr=dy>0?1:-1;
-  var t=gest.t, tc=t.col+dc, tr=t.row+dr;
-  t.el.classList.remove("lift");
-  var g=gest; gest=null;
-  if(tc<0||tr<0||tc>=COLS||tr>=ROWS) return;
-  attemptMix(g.t, tc, tr);
-});
-function endGest(){ if(gest){ gest.t.el.classList.remove("lift"); gest=null; } }
-well.addEventListener("pointerup", endGest);
-well.addEventListener("pointercancel", endGest);
+/* the well is pure consequence now — pouring happens by DROPPING, so the tray is the only input surface */
 well.addEventListener("contextmenu", function(e){ e.preventDefault(); });
-
-async function attemptMix(src, tc, tr){
-  var dst=grid[tr][tc];
-  if(!dst || !isPrim(dst.color) || !isPrim(src.color) || dst.color===src.color){
-    src.el.classList.remove("nope"); void src.el.offsetWidth; src.el.classList.add("nope");
-    beep(160,0.08,"square",0.03);
-    return;
-  }
-  var m=mixOf(src.color,dst.color);
-  busy=true;
-  grid[src.row][src.col]=null;
-  var cs=cellSize(), pad=cs*0.06;
-  src.el.style.zIndex=5;
-  src.el.style.transform="translate("+(tc*cs+pad)+"px,"+(tr*cs+pad)+"px)";
-  src.b.style.transform="scale(.5)";
-  sfxMix();
-  await sleep(130);
-  src.el.remove();
-  setColor(dst,m);
-  dst.el.classList.remove("mixed"); void dst.el.offsetWidth; dst.el.classList.add("mixed");
-  await sleep(90);
-  await resolve();
-  if(state!=="playing") return;
-  if(!canPlace() && !hasMix()) gameOver();   // mixed yourself into a corner with no room for the piece
-}
 
 /* ---------- game flow ---------- */
 function clearBoard(){ for(var r=0;r<ROWS;r++){ for(var c=0;c<COLS;c++){ if(grid[r]&&grid[r][c]) grid[r][c].el.remove(); } } grid=[]; for(var r2=0;r2<ROWS;r2++){ grid[r2]=[]; for(var c2=0;c2<COLS;c2++) grid[r2][c2]=null; } }
@@ -473,7 +441,7 @@ function start(){
   score=0; pops=0; maxChain=0; piecesDropped=0; scoreEl.textContent="0";
   document.getElementById("ovStart").classList.remove("show");
   document.getElementById("ovOver").classList.remove("show");
-  state="playing"; busy=false; gest=null; tgest=null;
+  state="playing"; busy=false; tgest=null;
   piece=rollPiece(); nextP=rollPiece(); pieceCol=2;
   renderPiece();
   updateDanger();
@@ -505,8 +473,8 @@ window.__arc={
   setPiece:function(cols){ piece=cols.slice(); renderPiece(); },
   setCol:function(c){ pieceCol=c; renderPiece(); },
   rotate:rotatePiece, drop:dropPiece,
-  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, pieces:piecesDropped, hasMix:hasMix(), canPlace:canPlace()}; },
-  mixAt:attemptMix, tileAt:function(c,r){ return grid[r][c]; }
+  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, pieces:piecesDropped, canPlace:canPlace()}; },
+  tileAt:function(c,r){ return grid[r][c]; }
 };
 })();
 </script>
