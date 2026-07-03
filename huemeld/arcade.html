@@ -35,10 +35,14 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .sc b{ font-family:var(--font-d); font-size:17px; line-height:1.1; }
 .mutebtn{ width:36px; height:36px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; }
 
-/* next-wave bar — same visual language as the main game's combo meter */
-.wavebar{ width:min(94vw,420px); height:10px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; box-shadow:0 2px 0 var(--shadow); margin-bottom:8px; }
-.wavebar .fill{ height:100%; width:100%; background:#8fc7ff; }
-.wavebar.warn .fill{ background:#ef4a5a; }
+/* incoming-rain preview — the next mix drops exactly these tiles (full information, zero clock) */
+.nextbar{ width:min(94vw,420px); display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.nlab{ font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); }
+.nextrow{ flex:1; display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.nextrow .slot{ height:18px; display:flex; align-items:center; justify-content:center; }
+.nextrow .slot i{ width:13px; height:13px; border:2px solid var(--line); border-radius:4px; box-shadow:0 1.5px 0 var(--shadow); }
+.calm{ display:none; font-family:var(--font-d); font-weight:700; font-size:11px; color:var(--ink); background:#d7f0d0; border:2px solid #2f7d3a; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+.calm.on{ display:inline-block; }
 
 .wellwrap{ position:relative; width:min(94vw,420px); }
 .well{
@@ -124,7 +128,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <button class="mutebtn" id="mute" aria-label="Sound">♪</button>
     </div>
   </div>
-  <div class="wavebar" id="wavebar"><div class="fill" id="wavefill"></div></div>
+  <div class="nextbar"><span class="nlab">next</span><div class="nextrow" id="nextrow"></div><span class="calm" id="calm"></span></div>
   <div class="wellwrap">
     <div class="well" id="well"></div>
     <div class="chain" id="chain"></div>
@@ -132,13 +136,13 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>Huemeld Arcade</h2>
         <div class="howrow"><span class="chip" style="background:#ef4a5a"></span>+<span class="chip" style="background:#f6c445"></span>=<span class="chip ci" style="background:#f2913d"></span></div>
-        <p>Swipe two <b>different</b> paints together to mix.<br><b>Three</b> mixed colours touching = <b>POP!</b><br>Big pops (4+) <b>shatter</b> the paints around them.<br>Four same paints in a <b>2×2</b> square auto-clean.<br><b>Chains</b> push the next wave back. Don't overflow!</p>
+        <p>Every mix drops the <b>next</b> paints — shown up top. No clock, all thinking.<br><b>Three</b> mixed colours touching = <b>POP!</b><br>Big pops (4+) <b>shatter</b> the paints around them.<br>Four same paints in a <b>2×2</b> square auto-clean.<br><b>Chains</b> earn ☂ calm mixes — no rain. Don't overflow!</p>
         <button class="mk" id="btnStart">Play</button>
       </div>
     </div>
     <div class="ov" id="ovOver">
       <div class="panel">
-        <h2>The well is full!</h2>
+        <h2 id="overTitle2">The well is full!</h2>
         <div class="bigscore" id="finalScore">0</div>
         <p class="newbest" id="newBest" style="display:none">★ new best! ★</p>
         <p id="overStats"></p>
@@ -146,7 +150,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       </div>
     </div>
   </div>
-  <p class="tip">park <b>pairs</b>, detonate with a <b>third</b> · 4+ pops <b>splash</b> · same-colour <b>2×2</b>s self-clean · <b>chains</b> buy time</p>
+  <p class="tip">take your time — paint falls only when <b>you</b> mix · park <b>pairs</b>, detonate with a <b>third</b> · <b>chains</b> earn ☂ calm mixes</p>
 
 <script>
 (function(){
@@ -159,13 +163,13 @@ function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
 function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
 
-var well=document.getElementById("well"), waveFillEl=document.getElementById("wavefill"), waveBarEl=document.getElementById("wavebar");
+var well=document.getElementById("well"), nextRowEl=document.getElementById("nextrow"), calmEl=document.getElementById("calm");
 var scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"), chainEl=document.getElementById("chain");
 
 var grid=[], state="menu", busy=false, gest=null;
 var score=0, best=+(localStorage.getItem("hm_arc_hi")||0), pops=0, maxChain=0;
-var waveTid=0, warnTid=0, waveInt=4500, waveSize=3, waveN=0, waveT0=0, waveMs=0;
-var WAVE0=4500, WAVE_MIN=2200, WAVE_DECAY=0.985, CHAIN_TIME_BONUS=700;   // gentler ramp; chains push the next wave back
+var nextWave=[], skipCredits=0, movesTaken=0;   // TURN-BASED rain: paint falls because you MIXED, never because time passed
+var WAVE_BASE=2, WAVE_MAX=4, WAVE_RAMP_EVERY=24;   // wave size 2, +1 every 24 mixes, cap 4
 bestEl.textContent=best;
 
 /* ---------- audio (same beep voice as the main game) ---------- */
@@ -257,7 +261,7 @@ function find2x2(){   // four same-colour primaries in a square auto-clean (the 
 }
 async function resolve(){
   busy=true;
-  var chain=0, timeBonus=0;
+  var chain=0;
   while(true){
     if(gravity()) await sleep(210);
     var groups=findGroups();
@@ -266,7 +270,6 @@ async function resolve(){
     var cs=cellSize();
     if(groups.length){   // only real secondary pops drive the chain multiplier — 2x2 cleans are janitorial
       chain++; if(chain>maxChain) maxChain=chain;
-      if(chain>=2) timeBonus+=CHAIN_TIME_BONUS;
     }
     var mult=Math.max(1,chain);
     // splash: only a BIG pop (4+ group) shatters the primaries hugging it
@@ -306,45 +309,62 @@ async function resolve(){
   }
   busy=false;
   updateDanger();
-  if(timeBonus) delayWave(timeBonus);
+  return chain;   // callers convert chains into calm mixes
 }
 
-/* ---------- the rain ---------- */
+/* ---------- the rain (turn-based: falls only when you mix; the preview shows exactly what's coming) ---------- */
 function colsWithSpace(){ var a=[]; for(var c=0;c<COLS;c++) if(!grid[0][c]) a.push(c); return a; }
-function waveBarRun(ms){
-  waveFillEl.style.transition="none"; waveFillEl.style.width="100%"; void waveFillEl.offsetWidth;
-  waveFillEl.style.transition="width "+ms+"ms linear"; waveFillEl.style.width="0%";
-  waveBarEl.classList.remove("warn");
-  if(warnTid) clearTimeout(warnTid);
-  warnTid=setTimeout(function(){ waveBarEl.classList.add("warn"); }, Math.max(0,ms-900));
+function waveSizeNow(){ return Math.min(WAVE_MAX, WAVE_BASE + Math.floor(movesTaken/WAVE_RAMP_EVERY)); }
+function rollWave(){
+  nextWave=[];
+  var n=waveSizeNow(), cols=[];
+  for(var c=0;c<COLS;c++) cols.push(c);
+  for(var i=cols.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=cols[i]; cols[i]=cols[j]; cols[j]=t; }
+  for(var k=0;k<n;k++) nextWave.push({col:cols[k], color:PRIMS[(Math.random()*3)|0]});
+  renderNext();
 }
-function scheduleWave(){ if(waveTid) clearTimeout(waveTid); waveT0=performance.now(); waveMs=waveInt; waveTid=setTimeout(doWave, waveInt); waveBarRun(waveInt); }
-function delayWave(bonus){   // chains buy time: the pending wave gets pushed back and the bar visibly refills
-  if(!waveTid || state!=="playing") return;
-  var remaining=Math.max(0, waveMs-(performance.now()-waveT0)) + bonus;
-  clearTimeout(waveTid); waveT0=performance.now(); waveMs=remaining;
-  waveTid=setTimeout(doWave, remaining); waveBarRun(remaining);
-}
-async function doWave(){
-  waveTid=0;
-  if(state!=="playing") return;
-  if(busy){ waveTid=setTimeout(doWave,250); return; }
-  var avail=colsWithSpace();
-  if(!avail.length){ gameOver(); return; }
-  var n=Math.min(waveSize, avail.length);
-  for(var i=avail.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=avail[i]; avail[i]=avail[j]; avail[j]=t; }
-  for(var k=0;k<n;k++){
-    var c=avail[k], nr=-1;
-    for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; }
-    if(nr>=0) makeTile(c, nr, PRIMS[(Math.random()*3)|0], true);
+function renderNext(){
+  var h="";
+  for(var c=0;c<COLS;c++){
+    var w=null; for(var i=0;i<nextWave.length;i++) if(nextWave[i].col===c) w=nextWave[i];
+    h+='<div class="slot">'+(w?'<i style="background:'+HEX[w.color]+'"></i>':'')+'</div>';
   }
-  waveN++;
-  waveInt=Math.max(WAVE_MIN, waveInt*WAVE_DECAY);
-  if(waveN%15===0) waveSize=Math.min(4, waveSize+1);
-  updateDanger();
-  if(!colsWithSpace().length && state==="playing"){ gameOver(); return; }
-  scheduleWave();
-  resolve();   // rain can complete a 2x2 (auto-clean) — and its collapse can even slam twins into a lucky chain
+  nextRowEl.innerHTML=h;
+  calmEl.textContent="☂ calm ×"+skipCredits;
+  calmEl.classList.toggle("on", skipCredits>0);
+}
+async function dropWave(){   // deliver the previewed wave; a full column spills to a random free one
+  for(var i=0;i<nextWave.length;i++){
+    var w=nextWave[i], c=w.col;
+    if(grid[0][c]){ var avail=colsWithSpace(); if(!avail.length){ gameOver("full"); return false; } c=avail[(Math.random()*avail.length)|0]; }
+    var nr=-1; for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; }
+    if(nr>=0) makeTile(c, nr, w.color, true);
+  }
+  await sleep(200);
+  return true;
+}
+function hasMix(){   // any adjacent different-primary pair left?
+  for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){
+    var t=grid[r][c]; if(!t||!isPrim(t.color)) continue;
+    var right=c+1<COLS?grid[r][c+1]:null, down=r+1<ROWS?grid[r+1][c]:null;
+    if(right && isPrim(right.color) && right.color!==t.color) return true;
+    if(down && isPrim(down.color) && down.color!==t.color) return true;
+  }
+  return false;
+}
+async function afterMove(){   // one mix = one world-step: rain (or a banked calm), then re-check the future
+  movesTaken++;
+  if(skipCredits>0){
+    skipCredits--;                                        // a chain bought this calm — no rain this mix
+    floatScore(well.clientWidth/2-24, 12, "☂ calm");
+  } else {
+    if(!await dropWave()) return;
+    var ch=await resolve();                               // rain can complete a 2x2 / slam parked twins into a lucky chain
+    skipCredits+=Math.max(0, ch-1);
+  }
+  if(state!=="playing") return;
+  rollWave();
+  if(!hasMix()){ gameOver("stuck"); }
 }
 function updateDanger(){
   var danger=false;
@@ -405,7 +425,9 @@ async function attemptMix(src, tc, tr){
   setColor(dst,m);
   dst.el.classList.remove("mixed"); void dst.el.offsetWidth; dst.el.classList.add("mixed");
   await sleep(90);
-  await resolve();   // gravity + pop cascades (resolve clears busy)
+  var ch=await resolve();                  // gravity + pop cascades (resolve clears busy)
+  skipCredits+=Math.max(0, ch-1);          // chains earn calm mixes — a x2 immediately spares you this move's rain
+  if(state==="playing") await afterMove(); // the world steps ONLY because you mixed
 }
 
 /* ---------- game flow ---------- */
@@ -435,36 +457,27 @@ function seed(){
   }
 }
 function start(){
-  clearBoard();
-  score=0; pops=0; maxChain=0; scoreEl.textContent="0";
-  waveInt=WAVE0; waveSize=3; waveN=0;
+  score=0; pops=0; maxChain=0; movesTaken=0; skipCredits=0; scoreEl.textContent="0";
   document.getElementById("ovStart").classList.remove("show");
   document.getElementById("ovOver").classList.remove("show");
   state="playing"; busy=false; gest=null;
-  seed();
-  scheduleWave();
+  for(var tries=0; tries<10; tries++){ clearBoard(); seed(); if(hasMix()) break; }   // never open on a dead board
+  rollWave();
 }
-function gameOver(){
+function gameOver(reason){
   state="over";
-  if(waveTid){ clearTimeout(waveTid); waveTid=0; }
-  if(warnTid){ clearTimeout(warnTid); warnTid=0; }
-  waveBarEl.classList.remove("warn");
-  waveFillEl.style.transition="none"; waveFillEl.style.width="0%";
   well.classList.remove("danger");
   sfxOver();
   var isBest = score>=best && score>0 && score>=+(localStorage.getItem("hm_arc_hi")||0);
   if(score>+(localStorage.getItem("hm_arc_hi")||0)) localStorage.setItem("hm_arc_hi",""+score);
+  document.getElementById("overTitle2").textContent = reason==="stuck" ? "No mixes left!" : "The well is full!";
   document.getElementById("finalScore").textContent=score;
   document.getElementById("newBest").style.display=isBest?"block":"none";
-  document.getElementById("overStats").textContent=pops+" pops · longest chain ×"+Math.max(1,maxChain);
+  document.getElementById("overStats").textContent=movesTaken+" mixes · "+pops+" pops · best chain ×"+Math.max(1,maxChain);
   document.getElementById("ovOver").classList.add("show");
 }
 document.getElementById("btnStart").addEventListener("click",function(){ ensureAudio(); start(); });
 document.getElementById("btnAgain").addEventListener("click",function(){ ensureAudio(); start(); });
-document.addEventListener("visibilitychange",function(){
-  if(document.hidden){ if(waveTid){ clearTimeout(waveTid); waveTid=0; } }
-  else if(state==="playing" && !waveTid){ scheduleWave(); }
-});
 
 clearBoard();
 
@@ -472,8 +485,10 @@ clearBoard();
 window.__arc={
   grid:function(){ return grid.map(function(row){ return row.map(function(t){ return t?t.color:"."; }).join(""); }); },
   place:function(c,r,color){ if(grid[r][c]) removeTile(grid[r][c]); return makeTile(c,r,color,false); },
-  resolve:resolve, doWave:doWave, start:start,
-  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, waveInt:waveInt, waveMs:waveMs, waveRemaining:waveTid?Math.round(waveMs-(performance.now()-waveT0)):0}; },
+  resolve:resolve, dropWave:dropWave, start:start, rollWave:rollWave,
+  calm:function(n){ skipCredits=n; renderNext(); },
+  next:function(){ return nextWave.slice(); },
+  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, movesTaken:movesTaken, skipCredits:skipCredits, waveSize:waveSizeNow(), hasMix:hasMix()}; },
   mixAt:attemptMix, tileAt:function(c,r){ return grid[r][c]; }
 };
 })();
