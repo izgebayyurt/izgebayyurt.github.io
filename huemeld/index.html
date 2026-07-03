@@ -320,9 +320,13 @@ h1{ font-size:30px; line-height:1; }
       }
       var solves=0, buildCost=0;   // buildCost = un-refundable mixes: each secondary slot in every required trace
       for(var k=0;k<recipes.length;k++){ solves+=recipes[k].count; var sc=0, sq=recipes[k].seq; for(var q=0;q<sq.length;q++) if(!HM.isPrim(sq[q])) sc++; buildCost+=recipes[k].count*sc; }
-      // budget scales with the level's OWN work (mixes + one trace each) plus a slack that shrinks as levels climb;
-      // chaining then earns extra headroom on top. No flat cushion, so more targets => proportionally tighter play.
-      out.push({ id:L, name:"Level "+L, shape:RSHAPE, spawn:{R:4,Y:4,B:4}, moves:buildCost+solves+Math.round(9-3*t), goal:"recipe", objectives:[], recipes:recipes });
+      // budget scales with the level's OWN work (mixes + one trace each) plus a slack that shrinks as levels climb.
+      // TOP-BAND COMBO GATE (t>0.6): a penalty pulls the hardest levels' slack to <=0 — below the no-chain cost —
+      // so you MUST chain recipes (banking the +2s) to win. Budget still stays above the un-refundable buildCost
+      // floor, so it's always winnable WITH chaining. No flat cushion, so more targets => proportionally tighter play.
+      var pen = t>0.6 ? Math.round(8*(t-0.6)/0.4) : 0;
+      var slack = Math.round(9-3*t) - pen;
+      out.push({ id:L, name:"Level "+L, shape:RSHAPE, spawn:{R:4,Y:4,B:4}, moves:buildCost+solves+slack, goal:"recipe", objectives:[], recipes:recipes, gated: slack<=0 });
     }
     return out;
   }
@@ -981,7 +985,7 @@ h1{ font-size:30px; line-height:1; }
     document.getElementById("progress").textContent=done+" / "+LEVELS.length;
   }
   function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
-  function goalSub(L){ if(L.goal==="recipe") return "Trace the recipes in order"; if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
+  function goalSub(L){ if(L.goal==="recipe") return L.gated ? "Chain recipes to survive!" : "Trace the recipes in order"; if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
 
   function startLevel(i){
     curIndex=i; curLevel=LEVELS[i];
