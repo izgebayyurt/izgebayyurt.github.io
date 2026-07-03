@@ -146,6 +146,7 @@ h1{ font-size:30px; line-height:1; }
 .cell{ position:relative; aspect-ratio:1; }
 /* a faint dot marks every square so an emptied (suspended) cell reads as an intentional socket, not a gap; a filled tile sits on top and covers it */
 .cell::before{ content:""; position:absolute; left:50%; top:50%; width:20%; height:20%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.15; }
+.cell.wall::before{ display:none; }   /* non-playable cells are invisible gaps, no socket dot */
 /* 1-second-left warning: a shake ripples across the board from one corner, telling you the suspended tiles are about to fall */
 .cell.shakewarn{ --amp:2.5px; animation:hmShake .42s var(--calm); }
 .tile{
@@ -303,31 +304,61 @@ h1{ font-size:30px; line-height:1; }
      higher counts, more primaries mixed in. Deterministic (seeded) so each level
      plays the same every time. Each recipe = {seq:[colours], count:times}. */
   function genRecipeLevels(){
-    var RSHAPE=["#######","#######","#######","#######","#######","#######","#######"];
     var S=["O","G","P"], P=["R","Y","B"];
     var seed=987654321; function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
     function pick(a){ return a[(rnd()*a.length)|0]; }
+    var isP=HM.isPrim;
+    // Board-shape library — 7x7 masks ("#"=play, "."=wall). Every column's playable cells
+    // are CONTIGUOUS so gravity never drops a tile across a gap.
+    var SHAPES=[
+      ["#######","#######","#######","#######","#######","#######","#######"],   // full 49
+      [".#####.","#######","#######","#######","#######","#######",".#####."],   // notched corners 45
+      ["#######","#######","#######","#######","#######",".#####.","..###.."],   // bowl 43
+      ["..###..",".#####.",".#####.","#######","#######","#######","#######"],   // trapezoid up 41
+      ["#######","#######","#######","#######",".#####.",".#####.","..###.."],   // trapezoid down 41
+      ["###....","####...","#####..","######.","#######","#######","#######"],   // stair 39
+      ["....###","...####","..#####",".######","#######","#######","#######"],   // stair mirror 39
+      ["..###..",".#####.","#######","#######","#######",".#####.","..###.."],   // octagon 37
+      [".#####.",".#####.",".#####.",".#####.",".#####.",".#####.",".#####."],   // narrow 35
+      ["..###..","..###..","#######","#######","#######","..###..","..###.."],   // plus 33
+      ["...#...","..###..",".#####.","#######",".#####.","..###..","...#..."]    // diamond 25
+    ];
+    function cellCount(sh){ var n=0,r,c; for(r=0;r<sh.length;r++) for(c=0;c<sh[r].length;c++) if(sh[r][c]==="#") n++; return n; }
+    var SHINFO=SHAPES.map(function(sh){ return {sh:sh, n:cellCount(sh)}; });
     var out=[];
-    for(var L=1;L<=20;L++){
-      var t=(L-1)/19;
-      var nRec=Math.max(1, Math.min(6, Math.round(1+t*5)));
+    for(var i=0;i<100;i++){
+      var L=i+1;
+      // NON-LINEAR difficulty: a slowly-rising floor + wide variance, so consecutive levels
+      // zig-zag in hardness (an easy breather can follow a spike) while the baseline still
+      // climbs enough to stay unlockable. The first ~8 are kept gentle for onboarding.
+      var floorD=0.22+0.50*(i/99);
+      var amp=(i<5)?0.12:0.32;
+      var d=Math.max(0.03, Math.min(1, floorD+(rnd()*2-1)*amp));
+      if(i<10) d=Math.min(d, 0.52);   // no HARD/XHARD walls in the first 10 (post-tutorial onboarding)
+      var nRec=Math.max(1, Math.min(6, Math.round(1+d*5)));
       var recipes=[];
-      for(var i=0;i<nRec;i++){
-        var len=Math.max(2, Math.min(4, 2+Math.floor(t*2+rnd())));
+      for(var k=0;k<nRec;k++){
+        var len=Math.max(2, Math.min(4, 2+Math.floor(d*2+rnd())));
         var seq=[pick(S)];   // first colour is a secondary — an unambiguous trace start
-        for(var j=1;j<len;j++) seq.push( rnd() < (0.15+0.25*t) ? pick(P) : pick(S) );
-        var count=Math.max(1, Math.min(3, Math.round(1+t*1.4*rnd()+rnd()*0.7)));
+        for(var j=1;j<len;j++) seq.push( rnd() < (0.1+0.3*d) ? pick(P) : pick(S) );
+        var count=Math.max(1, Math.min(3, Math.round(1+d*1.4*rnd()+rnd()*0.7)));
         recipes.push({ seq:seq, count:count });
       }
       var solves=0, buildCost=0;   // buildCost = un-refundable mixes: each secondary slot in every required trace
-      for(var k=0;k<recipes.length;k++){ solves+=recipes[k].count; var sc=0, sq=recipes[k].seq; for(var q=0;q<sq.length;q++) if(!HM.isPrim(sq[q])) sc++; buildCost+=recipes[k].count*sc; }
-      // budget scales with the level's OWN work (mixes + one trace each) plus a slack that shrinks as levels climb.
-      // TOP-BAND COMBO GATE (t>0.6): a penalty pulls the hardest levels' slack to <=0 — below the no-chain cost —
-      // so you MUST chain recipes (banking the +2s) to win. Budget still stays above the un-refundable buildCost
-      // floor, so it's always winnable WITH chaining. No flat cushion, so more targets => proportionally tighter play.
-      var pen = t>0.6 ? Math.round(8*(t-0.6)/0.4) : 0;
-      var slack = Math.round(9-3*t) - pen;
-      out.push({ id:L, name:"Level "+L, shape:RSHAPE, spawn:{R:4,Y:4,B:4}, moves:buildCost+solves+slack, goal:"recipe", objectives:[], recipes:recipes, gated: slack<=0 });
+      for(var m=0;m<recipes.length;m++){ solves+=recipes[m].count; var sc=0, sq=recipes[m].seq; for(var q=0;q<sq.length;q++) if(!isP(sq[q])) sc++; buildCost+=recipes[m].count*sc; }
+      // pick a board with enough room for the work, varied among the valid ones
+      var need=Math.max(24, buildCost+solves+12);
+      var valid=SHINFO.filter(function(x){ return x.n>=need; });
+      if(!valid.length) valid=[SHINFO[0]];
+      var shp=valid[(rnd()*valid.length)|0], cells=shp.n;
+      // budget = work + slack; smaller/odd boards get a little more slack (routing friction).
+      // The hardest levels (d>0.82, past the intro) are COMBO-GATED: slack pulled <=0 so you must
+      // chain. A safety floor keeps every level winnable (build everything, then chain the traces).
+      var slack=Math.round(6-2*d)+Math.round((49-cells)/12);
+      var gated=(d>0.80 && L>20);
+      if(gated) slack-=(2+Math.round(3*(d-0.82)/0.18));
+      var moves=Math.max(buildCost+Math.max(2,Math.ceil(solves*0.4)), buildCost+solves+slack);
+      out.push({ id:L, name:"Level "+L, shape:shp.sh, spawn:{R:4,Y:4,B:4}, moves:moves, goal:"recipe", objectives:[], recipes:recipes, gated:gated, diff:d });
     }
     return out;
   }
@@ -970,7 +1001,7 @@ h1{ font-size:30px; line-height:1; }
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
   /* ---------- screens ---------- */
-  function tierOf(L){ return L.gated ? "xhard" : (L.id<=5 ? "easy" : (L.id<=12 ? "med" : "hard")); }   // border colour = difficulty
+  function tierOf(L){ var d=L.diff||0; return d>0.80?"xhard":(d>0.56?"hard":(d>0.30?"med":"easy")); }   // border colour = this level's OWN difficulty
   function miniStars(n){ n=n||0; return "★★★".slice(0,n)+'<span class="d">'+"☆☆☆".slice(0,3-n)+'</span>'; }
   function renderLevelSelect(){
     var p=loadProg(), done=0, h="";
