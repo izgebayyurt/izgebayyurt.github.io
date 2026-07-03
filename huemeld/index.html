@@ -141,6 +141,10 @@ h1{ font-size:30px; line-height:1; }
 }
 .board.suspended{ box-shadow:0 5px 0 var(--shadow), 0 0 0 3px #ffd15c, 0 0 24px 5px rgba(255,209,92,.55); }
 .cell{ position:relative; aspect-ratio:1; }
+/* a faint dot marks every square so an emptied (suspended) cell reads as an intentional socket, not a gap; a filled tile sits on top and covers it */
+.cell::before{ content:""; position:absolute; left:50%; top:50%; width:20%; height:20%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.15; }
+/* 1-second-left warning: a shake ripples across the board from one corner, telling you the suspended tiles are about to fall */
+.cell.shakewarn{ --amp:4px; animation:hmShake .42s var(--calm); }
 .tile{
   position:absolute; inset:7%;
   background:var(--pc); border:3px solid var(--line);
@@ -468,7 +472,7 @@ h1{ font-size:30px; line-height:1; }
      with a mix). Mixing SUSPENDS the board for RECIPE_HOLD ms; any merge or solve
      resets it; on lapse the board falls (gravity). Solve 2+ recipes in one held
      window and each extra one banks +2 moves. Complete every recipe to win. */
-  var RECIPE_HOLD=3000, suspendTid=0, winRecipes=0;
+  var RECIPE_HOLD=3000, WARN_LEAD=1000, suspendTid=0, warnTid=0, shakeClrTid=0, winRecipes=0;
   function renderRecipe(){
     if(!state.recipes){ goalsEl.className="goals"; goalsEl.innerHTML=""; return; }
     goalsEl.className="recipes";
@@ -524,15 +528,30 @@ h1{ font-size:30px; line-height:1; }
   }
   function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
   function abandonRecipe(){ clearRlinks(); }
-  function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); showHoldMeter(); }
+  function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); if(warnTid) clearTimeout(warnTid); warnTid=setTimeout(shakeWarn, RECIPE_HOLD-WARN_LEAD); clearShakeWarn(); showHoldMeter(); }
   function showHoldMeter(){                                     // the combo timer — a bar draining full→empty over the 3s window
     meterEl.classList.add("show");
     var f=meterEl.querySelector(".fill");
     if(f){ f.style.transition="none"; f.style.width="100%"; void f.offsetWidth; f.style.transition="width "+RECIPE_HOLD+"ms linear"; f.style.width="0%"; }
   }
   function hideHoldMeter(){ meterEl.classList.remove("show","run"); }
+  function shakeWarn(){                                         // 1s before the drop: ripple a shake across the whole board from a corner
+    warnTid=0;
+    if(busy || gest || !state || state.goal!=="recipe") return;
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.cell.classList.remove("shakewarn"); }
+    void board.offsetWidth;                                     // one reflow so re-adding the class restarts the animation
+    var maxd=0;
+    for(var r2=0;r2<state.H;r2++) for(var c2=0;c2<state.W;c2++){ var ref2=cells[r2]&&cells[r2][c2]; if(!ref2) continue; var d=r2+c2; if(d>maxd) maxd=d; ref2.cell.style.animationDelay=(d*28)+"ms"; ref2.cell.classList.add("shakewarn"); }
+    if(shakeClrTid) clearTimeout(shakeClrTid);
+    shakeClrTid=setTimeout(clearShakeWarn, maxd*28 + 480);
+  }
+  function clearShakeWarn(){
+    if(shakeClrTid){ clearTimeout(shakeClrTid); shakeClrTid=0; }
+    for(var r=0;r<cells.length;r++){ var row=cells[r]; if(!row) continue; for(var c=0;c<row.length;c++){ var ref=row[c]; if(ref){ ref.cell.classList.remove("shakewarn"); ref.cell.style.removeProperty("animation-delay"); } } }
+  }
+  function clearWarn(){ if(warnTid){ clearTimeout(warnTid); warnTid=0; } clearShakeWarn(); }
   async function dropSuspended(){
-    suspendTid=0;
+    suspendTid=0; clearWarn();
     if(busy || gest){ bumpSuspend(); return; }                 // still acting — defer the fall
     if(!state || state.goal!=="recipe"){ winRecipes=0; hideHoldMeter(); return; }
     winRecipes=0; busy=true; hideHoldMeter();
@@ -548,7 +567,7 @@ h1{ font-size:30px; line-height:1; }
   async function completeRecipe(){
     if(busy){ return; }
     var trace=gest.trace, rec=gest.rec, mySt=state; gest=null; busy=true;
-    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; }
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn();
     spendMove();
     trace.forEach(function(c){ var ref=cells[c.r]&&cells[c.r][c.c]; if(ref){ ref.tile.classList.remove("rlink"); ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
     sfxPop(trace.length);
@@ -882,6 +901,7 @@ h1{ font-size:30px; line-height:1; }
 
   board.addEventListener("pointerdown", function(e){
     if(!e.isPrimary || busy || !state || gest) return; ensureAudio();   // one active gesture at a time — a stray second press must not hijack it
+    clearShakeWarn();                                                    // touching the board dismisses the warning ripple and clears its transform before we read geometry
     cacheGeom();
     var tp=cellAt(e.clientX,e.clientY);
     if(!tp || !state.grid[tp.r][tp.c]) return;
@@ -962,7 +982,7 @@ h1{ font-size:30px; line-height:1; }
     state=HM.newState(curLevel); HM.fill(state, Math.random);
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
-    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } winRecipes=0;
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn(); winRecipes=0;
     over.classList.remove("show");
     document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
     document.getElementById("gSub").textContent=goalSub(curLevel);
@@ -976,7 +996,7 @@ h1{ font-size:30px; line-height:1; }
   }
 
   function showEnd(win, spared){
-    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } hideHoldMeter();
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn(); hideHoldMeter();
     if(spared==null) spared=state.movesLeft;
     document.getElementById("overTitle").textContent = win ? "Cleared!" : "Out of moves";
     var stars = win ? starsFor(curLevel, spared) : 0;
