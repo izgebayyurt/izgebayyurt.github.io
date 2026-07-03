@@ -124,6 +124,17 @@
     for (var c = 0; c < s.W; c++) { var rows = colRows(s, c); for (var i = 0; i < rows.length; i++) s.grid[rows[i]][c] = spawnTile(s, rng); }
   }
 
+  /* refill empty cells IN PLACE with fresh primaries, moving nothing — the
+     suspended-board counterpart to gravity(): circles stay exactly where the
+     player placed them, only the emptied source/pop cells get new paint. */
+  function topUp(s, rng) {
+    var fresh = {};
+    for (var r = 0; r < s.H; r++) for (var c = 0; c < s.W; c++) {
+      if (playable(s, r, c) && !s.grid[r][c]) { s.grid[r][c] = spawnTile(s, rng); fresh[r + "," + c] = 1; }
+    }
+    return fresh;
+  }
+
   /* the fusion: `from` empties, `to` becomes the blend. The newborn lands in
      the DESTINATION cell, which is what makes drag direction the aiming
      mechanic — the caller owes the burst + gravity. */
@@ -321,7 +332,7 @@
     isPrim: isPrim, mix: mix, split: split,
     makeSpawner: makeSpawner, parseShape: parseShape, playable: playable,
     colRows: colRows, playableCount: playableCount,
-    newState: newState, clone: clone, fill: fill, gravity: gravity, applyMix: applyMix,
+    newState: newState, clone: clone, fill: fill, gravity: gravity, topUp: topUp, applyMix: applyMix,
     groupAt: groupAt, fusePreview: fusePreview, legalFuses: legalFuses, legalChains: legalChains,
     hasFusePair: hasFusePair, reshufflePrimaries: reshufflePrimaries,
     scoreCurve: scoreCurve, newSession: newSession, sessionMerge: sessionMerge,

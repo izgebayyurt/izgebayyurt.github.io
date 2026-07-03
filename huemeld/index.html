@@ -275,7 +275,7 @@ h1{ font-size:30px; line-height:1; }
 
 </div>
 
-<script src="engine.js"></script>
+<script src="engine.js?v=2"></script>
 <script src="levels.js"></script>
 <script>
 (function(){
@@ -497,7 +497,7 @@ h1{ font-size:30px; line-height:1; }
     await sleep(300);
     if(state!==mySt){ busy=false; return; }
     trace.forEach(function(c){ state.grid[c.r][c.c]=null; });
-    var fresh=HM.gravity(state, Math.random);
+    var fresh=HM.topUp(state, Math.random);   // suspended board: popped circles refill in place, everything else stays put
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     state.recipeIdx++;
     clearRlinks(); paintAll();
@@ -710,10 +710,17 @@ h1{ font-size:30px; line-height:1; }
     setTimeout(function(){
       if(state!==myState){ busy=false; return; }
       finishAnim();
-      var fresh=HM.gravity(state, Math.random);                   // things fall
-      if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
-      paintAll();
-      Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      if(state.goal==="recipe"){
+        var freshR=HM.topUp(state, Math.random);   // SUSPENDED: circles stay put; only the emptied source cell refills in place — no falling, no depletion
+        if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+        paintAll();
+        Object.keys(freshR).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      } else {
+        var fresh=HM.gravity(state, Math.random);                   // things fall
+        if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+        paintAll();
+        Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      }
       updateRation();
       busy=false;
       finishTurn();
@@ -750,7 +757,7 @@ h1{ font-size:30px; line-height:1; }
     setTimeout(function(){
       if(state!==myState){ busy=false; return; }
       group.forEach(function(k){ var p=k.split(","); state.grid[+p[0]][+p[1]]=null; });
-      var fresh=HM.gravity(state, Math.random);
+      var fresh=(state.goal==="recipe")?HM.topUp(state, Math.random):HM.gravity(state, Math.random);   // recipe board is suspended: clear refills in place
       if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
       paintAll();
       Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
