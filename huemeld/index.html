@@ -548,7 +548,7 @@ h1{ font-size:30px; line-height:1; }
      with a mix). Mixing SUSPENDS the board for RECIPE_HOLD ms; any merge or solve
      resets it; on lapse the board falls (gravity). Solve 2+ recipes in one held
      window and each extra one banks +2 moves. Complete every recipe to win. */
-  var RECIPE_HOLD=3000, WARN_LEAD=1000, suspendTid=0, warnTid=0, shakeClrTid=0, winRecipes=0;
+  var RECIPE_HOLD=3000, WARN_LEAD=1000, suspendTid=0, warnTid=0, shakeClrTid=0, winRecipes=0, holdDeadline=0, holdRemaining=0, holdPaused=false;
   function renderRecipe(){
     if(!state.recipes){ goalsEl.className="goals"; goalsEl.innerHTML=""; return; }
     goalsEl.className="recipes";
@@ -604,13 +604,32 @@ h1{ font-size:30px; line-height:1; }
   }
   function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
   function abandonRecipe(){ clearRlinks(); }
-  function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); if(warnTid) clearTimeout(warnTid); warnTid=setTimeout(shakeWarn, RECIPE_HOLD-WARN_LEAD); clearShakeWarn(); showHoldMeter(); }
-  function pauseHold(){   // freeze the 3s window (and its draining bar) while a move animation plays; it restarts when the move lands (bumpSuspend)
+  function armHold(ms){   // (re)start the drop + warning timers with `ms` left, and stamp the deadline
+    if(suspendTid) clearTimeout(suspendTid);
+    if(warnTid) clearTimeout(warnTid);
+    suspendTid=setTimeout(dropSuspended, ms);
+    var wi=ms-WARN_LEAD; warnTid = wi>0 ? setTimeout(shakeWarn, wi) : 0;
+    holdDeadline=performance.now()+ms; holdPaused=false;
+  }
+  function bumpSuspend(){ armHold(RECIPE_HOLD); clearShakeWarn(); showHoldMeter(); }   // a move RESETS the window to a full 3s
+  function pauseHold(){   // freeze the window + its bar the instant a move BEGINS (pointerdown); a landed move resets it, an abandoned one resumes it
+    if(holdPaused || !holdDeadline) return;
     if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; }
     if(warnTid){ clearTimeout(warnTid); warnTid=0; }
-    clearShakeWarn();
+    holdRemaining=Math.max(0, holdDeadline-performance.now());
+    holdPaused=true; clearShakeWarn();
     var f=meterEl.querySelector(".fill");
     if(f && meterEl.classList.contains("show")){ f.style.transition="none"; f.style.width=f.getBoundingClientRect().width+"px"; }
+  }
+  function resumeHold(){   // gesture ended with NO move — carry the timer on from where it froze (never a free reset)
+    if(!holdPaused) return;
+    holdPaused=false;
+    if(holdRemaining<=0){ dropSuspended(); return; }
+    suspendTid=setTimeout(dropSuspended, holdRemaining);
+    var wi=holdRemaining-WARN_LEAD; warnTid = wi>0 ? setTimeout(shakeWarn, wi) : 0;
+    holdDeadline=performance.now()+holdRemaining;
+    var f=meterEl.querySelector(".fill");
+    if(f && meterEl.classList.contains("show")){ void f.offsetWidth; f.style.transition="width "+holdRemaining+"ms linear"; f.style.width="0%"; if(wi<=0) meterEl.classList.add("warn"); }
   }
   function showHoldMeter(){                                     // the combo timer — a bar draining full→empty over the 3s window
     meterEl.classList.add("show"); meterEl.classList.remove("warn");   // a fresh/reset window is yellow again
@@ -635,7 +654,7 @@ h1{ font-size:30px; line-height:1; }
     if(shakeClrTid){ clearTimeout(shakeClrTid); shakeClrTid=0; }
     for(var r=0;r<cells.length;r++){ var row=cells[r]; if(!row) continue; for(var c=0;c<row.length;c++){ var ref=row[c]; if(ref){ ref.cell.classList.remove("shakewarn"); ref.cell.style.removeProperty("animation-delay"); } } }
   }
-  function clearWarn(){ if(warnTid){ clearTimeout(warnTid); warnTid=0; } clearShakeWarn(); meterEl.classList.remove("warn"); }
+  function clearWarn(){ if(warnTid){ clearTimeout(warnTid); warnTid=0; } clearShakeWarn(); meterEl.classList.remove("warn"); holdDeadline=0; holdPaused=false; }
   async function dropSuspended(){
     suspendTid=0; clearWarn();
     if(busy || gest){ bumpSuspend(); return; }                 // still acting — defer the fall
@@ -1010,6 +1029,7 @@ h1{ font-size:30px; line-height:1; }
       gest={ anchor:tp, carry:col, mode:"combo", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
       setLift(tp,true);
     }
+    if(gest) pauseHold();   // freeze the combo timer the instant a move begins (a landed move resets it; an abandoned one resumes it)
   });
   function primedPair(tp,col){
     return (HM.playable(state,tp.r+1,tp.c)&&state.grid[tp.r+1][tp.c]===col)||(HM.playable(state,tp.r-1,tp.c)&&state.grid[tp.r-1][tp.c]===col)||
@@ -1037,8 +1057,8 @@ h1{ font-size:30px; line-height:1; }
     if(wasCombo && sess && sess.count>0 && !abandon) resolveCombo();   // lift = the swoop pops (costs one move)
     else if(sess) abandonCombo();                                       // pointercancel / stray release — restore the board
   }
-  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent && gest.mode!=="recipe") updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
-  board.addEventListener("pointercancel", function(){ endGesture(true); });   // interrupt = abandon the swoop, don't pop it
+  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent && gest.mode!=="recipe") updateTarget(e.clientX, e.clientY); endGesture(); if(holdPaused && !busy) resumeHold(); });   // a fast flick may fire NO pointermove — read the swipe from the release point; no move committed => resume the frozen timer
+  board.addEventListener("pointercancel", function(){ endGesture(true); if(holdPaused && !busy) resumeHold(); });   // interrupt = abandon the swoop, don't pop it
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
   /* ---------- screens ---------- */
