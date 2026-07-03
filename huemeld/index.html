@@ -112,15 +112,14 @@ h1{ font-size:30px; line-height:1; }
 .ration.low{ color:#c0392b; }
 .ration.low .dot{ animation:hmReady .8s ease-in-out infinite; }
 
-/* recipe bar: the ordered colour sequence you must trace, with progress */
-.recipe{ display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:7px; margin-bottom:12px; font-family:var(--font-d); }
-.recipe .rlabel{ font-weight:600; font-size:12.5px; letter-spacing:.03em; color:var(--ink-soft); margin-right:4px; }
-.recipe .rarrow{ color:var(--ink-soft); font-size:16px; font-weight:700; }
-.recipe .rchip{ width:27px; height:27px; border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 var(--shadow); position:relative; transition:transform .15s var(--pop); }
-.recipe .rchip.done{ box-shadow:0 2px 0 var(--shadow), 0 0 0 3px #ffd15c; transform:scale(1.06); }
-.recipe .rchip.done::after{ content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; -webkit-text-stroke:.9px var(--line); }
-.recipe .rchip.now{ animation:hmReady .8s ease-in-out infinite; }
-/* the traced circles glow while you build the chain */
+/* recipe pillboxes: every recipe shown up front — its colour dots + done/count, green when met */
+.recipes{ display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+.pill{ display:inline-flex; align-items:center; gap:5px; background:var(--paper2); border:2.5px solid var(--line); border-radius:999px; padding:4px 9px; box-shadow:0 3px 0 var(--shadow); }
+.pill .pdot{ width:16px; height:16px; border:2px solid var(--line); border-radius:50%; }
+.pill .pn{ font-family:var(--font-d); font-weight:700; font-size:13px; margin-left:2px; min-width:20px; text-align:center; }
+.pill.full{ background:#d7f0d0; border-color:#2f7d3a; }
+.pill.full .pn{ color:#2f7d3a; font-size:15px; }
+/* the traced tiles glow while you build the chain */
 .tile.rlink{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 14px 3px rgba(255,209,92,.75); z-index:5; }
 
 /* powerup bars (charged by chaining primaries; the payoff layer comes later) */
@@ -270,12 +269,12 @@ h1{ font-size:30px; line-height:1; }
         </div>
       </div>
     </div>
-    <p class="ghint">Mix two <b>different</b> paints into a new colour, or merge <b>same</b> colours together · keep going, then lift to <b>pop</b> the combo</p>
+    <p class="ghint">Mix paints into circles (they hang for 3s), then <b>trace</b> a recipe's colours to solve it · clear same colours to churn · <b>chain</b> solves in one window for +2 moves each</p>
   </section>
 
 </div>
 
-<script src="engine.js?v=2"></script>
+<script src="engine.js?v=3"></script>
 <script src="levels.js"></script>
 <script>
 (function(){
@@ -293,15 +292,32 @@ h1{ font-size:30px; line-height:1; }
      colour sequences you must trace through connected secondaries to score.
      Mix primaries into circles to populate the board, then drag a connected
      path that spells the recipe (e.g. orange -> green -> purple) to cash it. */
-  var RECIPE1={ id:"R1", test:true, name:"Recipe Chain 1",
-    shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:30, goal:"recipe", objectives:[],
-    recipes:[ ["O","O","G"], ["G","G","P"], ["O","P","P"] ] };   // multiples: two of a colour, then a third
-  var RECIPE2={ id:"R2", test:true, name:"Recipe Chain 2",
-    shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:42, goal:"recipe", objectives:[],
-    recipes:[ ["O","O","G","G"], ["P","P","O","G"] ] };   // longer, more doubles
-  LEVELS=LEVELS.concat([TUBE_TEST, RECIPE1, RECIPE2]);
+  /* 20 recipe levels (goal:"recipe"), escalating: more recipes, longer sequences,
+     higher counts, more primaries mixed in. Deterministic (seeded) so each level
+     plays the same every time. Each recipe = {seq:[colours], count:times}. */
+  function genRecipeLevels(){
+    var RSHAPE=["#######","#######","#######","#######","#######","#######","#######"];
+    var S=["O","G","P"], P=["R","Y","B"];
+    var seed=987654321; function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+    function pick(a){ return a[(rnd()*a.length)|0]; }
+    var out=[];
+    for(var L=1;L<=20;L++){
+      var t=(L-1)/19;
+      var nRec=Math.max(1, Math.min(6, Math.round(1+t*5)));
+      var recipes=[];
+      for(var i=0;i<nRec;i++){
+        var len=Math.max(2, Math.min(4, 2+Math.floor(t*2+rnd())));
+        var seq=[pick(S)];   // first colour is a secondary — an unambiguous trace start
+        for(var j=1;j<len;j++) seq.push( rnd() < (0.15+0.25*t) ? pick(P) : pick(S) );
+        var count=Math.max(1, Math.min(3, Math.round(1+t*1.4*rnd()+rnd()*0.7)));
+        recipes.push({ seq:seq, count:count });
+      }
+      var solves=0; for(var k=0;k<recipes.length;k++) solves+=recipes[k].count;
+      out.push({ id:L, name:"Level "+L, shape:RSHAPE, spawn:{R:4,Y:4,B:4}, moves:14+solves*3+Math.round(t*14), goal:"recipe", objectives:[], recipes:recipes });
+    }
+    return out;
+  }
+  LEVELS = genRecipeLevels();
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
   var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
@@ -442,32 +458,49 @@ h1{ font-size:30px; line-height:1; }
   }
 
   /* ---------- recipe chains (goal:"recipe") ----------
-     Mix primaries into circles to populate the board, then drag a CONNECTED
-     path of secondaries that spells the current recipe, in order, to cash it.
-     Complete every recipe to win. */
-  function curRecipe(){ return (state.recipes && state.recipes[state.recipeIdx]) || null; }
+     Every recipe shows up front as a PILLBOX: its colour circles + done/count,
+     turning green with a ✓ when its count is met. TRACE a connected path of tiles
+     matching a recipe's colour sequence to score one of it (recipes may include
+     primaries, but never two primaries first, so a trace-start can't be confused
+     with a mix). Mixing SUSPENDS the board for RECIPE_HOLD ms; any merge or solve
+     resets it; on lapse the board falls (gravity). Solve 2+ recipes in one held
+     window and each extra one banks +2 moves. Complete every recipe to win. */
+  var RECIPE_HOLD=3000, suspendTid=0, winRecipes=0;
   function renderRecipe(){
-    var rc=curRecipe();
-    if(!rc){ goalsEl.className="goals"; goalsEl.innerHTML=""; return; }
-    goalsEl.className="recipe";
-    var h='<span class="rlabel">RECIPE '+(state.recipeIdx+1)+'/'+state.recipes.length+'</span>';
-    for(var i=0;i<rc.length;i++){ if(i) h+='<span class="rarrow">→</span>';
-      h+='<span class="rchip" data-i="'+i+'" style="background:'+HEX[rc[i]]+'"></span>'; }
-    goalsEl.innerHTML=h; updateRecipeBar(0);
-  }
-  function updateRecipeBar(step){
-    var chips=goalsEl.querySelectorAll(".rchip");
-    for(var i=0;i<chips.length;i++){ chips[i].classList.toggle("done", i<step); chips[i].classList.toggle("now", i===step); }
+    if(!state.recipes){ goalsEl.className="goals"; goalsEl.innerHTML=""; return; }
+    goalsEl.className="recipes";
+    var h="";
+    for(var i=0;i<state.recipes.length;i++){ var R=state.recipes[i], full=R.done>=R.count;
+      h+='<div class="pill'+(full?" full":"")+'">';
+      for(var j=0;j<R.seq.length;j++) h+='<span class="pdot" style="background:'+HEX[R.seq[j]]+'"></span>';
+      h+='<b class="pn">'+(full?"✓":(R.done+"/"+R.count))+'</b></div>';
+    }
+    goalsEl.innerHTML=h;
   }
   function inTrace(r,c){ if(!gest||!gest.trace) return false; for(var i=0;i<gest.trace.length;i++) if(gest.trace[i].r===r&&gest.trace[i].c===c) return true; return false; }
-  function startRecipeTrace(tp){
-    gest={ anchor:tp, carry:state.grid[tp.r][tp.c], mode:"recipe", spent:false, trace:[{r:tp.r,c:tp.c}], step:1, rtarget:null, t:0 };
-    var ref=cells[tp.r][tp.c]; if(ref) ref.tile.classList.add("rlink");
-    updateRecipeBar(1);
+  function matchRecipe(c0,c1){   // the incomplete recipe (if any) starting with colours [c0,c1]
+    if(!state.recipes) return null;
+    for(var i=0;i<state.recipes.length;i++){ var R=state.recipes[i]; if(R.done>=R.count) continue; if(R.seq[0]===c0 && R.seq[1]===c1) return R; }
+    return null;
+  }
+  function recipeStartHere(tp,col){   // could a trace start here? (col is some incomplete recipe's seq[0] with an adjacent seq[1])
+    if(!state.recipes) return false;
+    var nbs=[[tp.r+1,tp.c],[tp.r-1,tp.c],[tp.r,tp.c+1],[tp.r,tp.c-1]];
+    for(var i=0;i<state.recipes.length;i++){ var R=state.recipes[i]; if(R.done>=R.count||R.seq[0]!==col) continue;
+      for(var j=0;j<4;j++){ var n=nbs[j]; if(HM.playable(state,n[0],n[1]) && state.grid[n[0]][n[1]]===R.seq[1]) return true; } }
+    return false;
+  }
+  function startRecipeTrace(from,to,rec){
+    setLift(from,false);
+    gest.mode="recipe"; gest.rec=rec; gest.trace=[{r:from.r,c:from.c},{r:to.r,c:to.c}]; gest.step=2; gest.rtarget=null; gest.t=0; gest.anchor={r:to.r,c:to.c};
+    var f=cells[from.r]&&cells[from.r][from.c], t=cells[to.r]&&cells[to.r][to.c];
+    if(f) f.tile.classList.add("rlink"); if(t) t.tile.classList.add("rlink");
+    sfxEat(2);
+    if(gest.step>=rec.seq.length) completeRecipe();
   }
   function updateTargetRecipe(px,py){
-    var A=geomOf(gest.anchor.r,gest.anchor.c), rc=curRecipe(); if(!A||!rc){ gest.rtarget=null; gest.t=0; return; }
-    var need=rc[gest.step], nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.12;
+    var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A||!gest.rec){ gest.rtarget=null; gest.t=0; return; }
+    var need=gest.rec.seq[gest.step], nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.12;
     for(var i=0;i<4;i++){ var B=nb[i]; if(!HM.playable(state,B.r,B.c)) continue;
       if(state.grid[B.r][B.c]!==need || inTrace(B.r,B.c)) continue;
       var Bg=geomOf(B.r,B.c); if(!Bg) continue;
@@ -481,34 +514,48 @@ h1{ font-size:30px; line-height:1; }
     var to=gest.rtarget; if(!to) return;
     gest.trace.push({r:to.r,c:to.c}); gest.step++;
     gest.anchor={r:to.r,c:to.c};
-    var ref=cells[to.r][to.c]; if(ref) ref.tile.classList.add("rlink");
+    var ref=cells[to.r]&&cells[to.r][to.c]; if(ref) ref.tile.classList.add("rlink");
     gest.rtarget=null; gest.t=0;
-    sfxEat(gest.step); updateRecipeBar(gest.step);
-    if(gest.step>=curRecipe().length) completeRecipe();
+    sfxEat(gest.step);
+    if(gest.step>=gest.rec.seq.length) completeRecipe();
   }
   function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
-  function abandonRecipe(){ clearRlinks(); if(state && curRecipe()) updateRecipeBar(0); }   // incomplete: drop the highlights, reset the bar
-  async function completeRecipe(){
-    if(busy){ return; }
-    var trace=gest.trace, mySt=state; gest=null; busy=true;
-    spendMove();
-    trace.forEach(function(c){ var ref=cells[c.r]&&cells[c.r][c.c]; if(ref){ ref.tile.classList.remove("rlink"); ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
-    sfxPop(trace.length);
-    await sleep(300);
-    if(state!==mySt){ busy=false; return; }
-    trace.forEach(function(c){ state.grid[c.r][c.c]=null; });
-    var fresh=HM.topUp(state, Math.random);   // suspended board: popped circles refill in place, everything else stays put
+  function abandonRecipe(){ clearRlinks(); }
+  function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); }
+  async function dropSuspended(){
+    suspendTid=0;
+    if(busy || gest){ bumpSuspend(); return; }                 // still acting — defer the fall
+    if(!state || state.goal!=="recipe"){ winRecipes=0; return; }
+    winRecipes=0; busy=true;
+    var fresh=HM.gravity(state, Math.random);                    // the window lapsed — everything falls
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
-    state.recipeIdx++;
-    clearRlinks(); paintAll();
+    paintAll();
     Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
-    renderRecipe(); toast("recipe "+state.recipeIdx+" done!");
-    await sleep(160);
-    if(state!==mySt){ busy=false; return; }
     busy=false;
     HM.checkEnd(state);
     if(state.won) showEnd(true, state.movesLeft);
     else if(state.movesLeft<=0) showEnd(false, 0);
+  }
+  async function completeRecipe(){
+    if(busy){ return; }
+    var trace=gest.trace, rec=gest.rec, mySt=state; gest=null; busy=true;
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; }
+    spendMove();
+    trace.forEach(function(c){ var ref=cells[c.r]&&cells[c.r][c.c]; if(ref){ ref.tile.classList.remove("rlink"); ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
+    sfxPop(trace.length);
+    await sleep(280);
+    if(state!==mySt){ busy=false; return; }
+    trace.forEach(function(c){ state.grid[c.r][c.c]=null; });   // pop the traced tiles — holes stay suspended until the window falls
+    rec.done++; winRecipes++;
+    if(winRecipes>=2){ state.movesLeft+=2; toast("chain! +2 moves"); } else { toast("recipe!"); }
+    clearRlinks(); paintAll(); updateMoves(); renderRecipe();
+    await sleep(120);
+    if(state!==mySt){ busy=false; return; }
+    busy=false;
+    HM.checkEnd(state);
+    if(state.won){ showEnd(true, state.movesLeft); return; }
+    if(state.movesLeft<=0){ showEnd(false, 0); return; }
+    bumpSuspend();   // a recipe-solve keeps the window alive so you can chain the next
   }
   function renderBars(){
     var h="";
@@ -649,10 +696,12 @@ h1{ font-size:30px; line-height:1; }
   function classifyDrag(nbColor){
     var carry=gest.carry;
     if(HM.isPrim(carry)){
-      if(HM.isPrim(nbColor)) return nbColor!==carry ? "mix" : "clear";   // different primaries mix into a secondary; SAME primaries clear
+      if(HM.isPrim(nbColor)) return nbColor!==carry ? "mix" : "clear";   // different primaries mix; SAME primaries clear
+      if(state.goal==="recipe" && matchRecipe(carry, nbColor)) return "recipe";   // primary onto a secondary that starts a recipe
       return null;
     }
-    return (nbColor===carry && !HM.isPrim(nbColor)) ? "fuse" : null;
+    if(state.goal==="recipe") return matchRecipe(carry, nbColor) ? "recipe" : null;   // a secondary starts a recipe trace
+    return (nbColor===carry && !HM.isPrim(nbColor)) ? "fuse" : null;   // tube levels: same-colour secondary swoop
   }
   function updateTarget(px,py){
     var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A){ gest.target=null; gest.t=0; gest.targetType=null; return; }
@@ -679,6 +728,7 @@ h1{ font-size:30px; line-height:1; }
     gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
     if(type==="mix") applyMixNow(from,to);            // atomic: spends a move, then the board drops
     else if(type==="clear") applyClearNow(from,to);   // pop the connected same-colour primary cluster (1 move) — churns the board
+    else if(type==="recipe") startRecipeTrace(from, to, matchRecipe(gest.carry, tc));   // begin a recipe trace
     else applyComboFuse(from,to);                     // secondary swoop (tube levels): adds this tile to the swoop
   }
   function spendMove(){ if(state.movesLeft>0){ state.movesLeft--; updateMoves(); } }
@@ -711,10 +761,8 @@ h1{ font-size:30px; line-height:1; }
       if(state!==myState){ busy=false; return; }
       finishAnim();
       if(state.goal==="recipe"){
-        var freshR=HM.topUp(state, Math.random);   // SUSPENDED: circles stay put; only the emptied source cell refills in place — no falling, no depletion
-        if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
-        paintAll();
-        Object.keys(freshR).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+        paintAll();      // SUSPENDED: the new circle stays where placed, source stays a hole — nothing falls
+        bumpSuspend();   // hold the window; another merge/solve resets the 3s, a lapse drops the board
       } else {
         var fresh=HM.gravity(state, Math.random);                   // things fall
         if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
@@ -748,6 +796,7 @@ h1{ font-size:30px; line-height:1; }
   function applyClearNow(from,to){
     if(busy) return;
     busy=true; gest.spent=true;
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; winRecipes=0; }   // a clear settles the board, ending the suspended window
     var group=HM.groupAt(state, to.r, to.c);   // connected same-colour cluster (from is in it — same colour, adjacent)
     spendMove();
     group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
@@ -757,7 +806,7 @@ h1{ font-size:30px; line-height:1; }
     setTimeout(function(){
       if(state!==myState){ busy=false; return; }
       group.forEach(function(k){ var p=k.split(","); state.grid[+p[0]][+p[1]]=null; });
-      var fresh=(state.goal==="recipe")?HM.topUp(state, Math.random):HM.gravity(state, Math.random);   // recipe board is suspended: clear refills in place
+      var fresh=HM.gravity(state, Math.random);   // clearing settles the board (drops + churns) — a fresh start
       if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
       paintAll();
       Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
@@ -827,16 +876,17 @@ h1{ font-size:30px; line-height:1; }
     if(!tp || !state.grid[tp.r][tp.c]) return;
     var col=state.grid[tp.r][tp.c];
     if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // out of moves — every action costs one
-    if(HM.isPrim(col)){
+    if(state.goal==="recipe"){
+      var okMerge = HM.isPrim(col) && (adjDiffPrim(tp,col) || primedPair(tp,col));   // a primary can mix or clear
+      if(!okMerge && !recipeStartHere(tp,col)){ setAnim(cells[tp.r][tp.c].tile, HM.isPrim(col)?"nope":"squish", 320); if(!HM.isPrim(col)) sfxEat(3); return; }
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      gest={ anchor:tp, carry:col, mode:"mix", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };   // generic: classifyDrag decides mix / clear / recipe on the swipe
+      setLift(tp,true);
+    } else if(HM.isPrim(col)){
       if(!adjDiffPrim(tp,col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // can mix (different) or clear (same)
       try{ board.setPointerCapture(e.pointerId); }catch(_e){}
       gest={ anchor:tp, carry:col, mode:"mix", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
       setLift(tp,true);
-    } else if(state.goal==="recipe"){
-      var rc=curRecipe();
-      if(!rc || col!==rc[0]){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // a trace must start on the recipe's first colour
-      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
-      startRecipeTrace(tp);
     } else {
       if(!primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // lone secondary = squish toy
       try{ board.setPointerCapture(e.pointerId); }catch(_e){}
@@ -862,6 +912,8 @@ h1{ font-size:30px; line-height:1; }
     if(!gest) return;
     if(gest.mode==="recipe"){ gest=null; abandonRecipe(); return; }   // an incomplete trace just drops (a completed one already ended itself)
     if(!abandon && !gest.spent && gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
+    if(!gest) return;                                                 // commitSwipe consumed it (mix/clear resolving, or a 2-length recipe completed)
+    if(gest.mode==="recipe"){ gest=null; abandonRecipe(); return; }   // a longer trace just started on release — can't continue, abandon
     setLift(gest.anchor,false);
     var wasCombo=(gest.mode==="combo");
     gest=null;
@@ -881,7 +933,7 @@ h1{ font-size:30px; line-height:1; }
       h+='<button class="mk lvl-card'+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
       h+='<div class="num">'+L.id+'</div>';
       h+='<div class="lgoals">';
-      if(L.goal==="recipe"){ var r0=(L.recipes&&L.recipes[0])||[]; for(var ri=0;ri<r0.length;ri++) h+='<span class="sw r" style="background:'+HEX[r0[ri]]+'"></span>'; }
+      if(L.goal==="recipe"){ var r0=(L.recipes&&L.recipes[0]&&L.recipes[0].seq)||[]; for(var ri=0;ri<r0.length;ri++) h+='<span class="sw r" style="background:'+HEX[r0[ri]]+'"></span>'; }
       else if(L.goal==="tubes"){ for(var tk in L.tubes){ if(L.tubes.hasOwnProperty(tk)) h+='<span class="sw r" style="background:'+HEX[tk]+'"></span>'; } }
       else for(var j=0;j<L.objectives.length;j++){ var o=L.objectives[j]; h+='<span class="sw'+(HM.isPrim(o.color)?"":" r")+'" style="background:'+HEX[o.color]+'"></span>'; }
       h+='</div>';
@@ -899,6 +951,7 @@ h1{ font-size:30px; line-height:1; }
     state=HM.newState(curLevel); HM.fill(state, Math.random);
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } winRecipes=0;
     over.classList.remove("show");
     document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
     document.getElementById("gSub").textContent=goalSub(curLevel);
