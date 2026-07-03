@@ -144,7 +144,7 @@ h1{ font-size:30px; line-height:1; }
 /* a faint dot marks every square so an emptied (suspended) cell reads as an intentional socket, not a gap; a filled tile sits on top and covers it */
 .cell::before{ content:""; position:absolute; left:50%; top:50%; width:20%; height:20%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.15; }
 /* 1-second-left warning: a shake ripples across the board from one corner, telling you the suspended tiles are about to fall */
-.cell.shakewarn{ --amp:4px; animation:hmShake .42s var(--calm); }
+.cell.shakewarn{ --amp:2.5px; animation:hmShake .42s var(--calm); }
 .tile{
   position:absolute; inset:7%;
   background:var(--pc); border:3px solid var(--line);
@@ -178,6 +178,8 @@ h1{ font-size:30px; line-height:1; }
 .combo-meter{ position:absolute; left:14px; right:14px; top:-7px; height:12px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
 .combo-meter.show{ opacity:1; }
 .combo-meter .fill{ height:100%; width:0; background:#ffc234; }
+.combo-meter.warn{ border-color:#ef4a5a; }
+.combo-meter.warn .fill{ background:#ef4a5a; }
 .combo-meter.run .fill{ width:100%; transition:width var(--ripen) linear; }
 
 .toast{
@@ -384,6 +386,7 @@ h1{ font-size:30px; line-height:1; }
   }
   function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
   function sfxFill(n){ var b=300+Math.min(n,10)*22; beep(b,0.1,"sine",0.05); setTimeout(function(){ beep(b*1.34,0.12,"sine",0.045); },70); }   // a rising pour
+  function sfxWarn(){ beep(392,0.10,"triangle",0.045); setTimeout(function(){ beep(294,0.17,"triangle",0.05); },95); }   // descending "uh-oh" — the suspended board is about to fall
 
   /* ---------- persistent-DOM board ----------
      Built ONCE per level; every later change mutates existing nodes (class/
@@ -530,18 +533,21 @@ h1{ font-size:30px; line-height:1; }
   function abandonRecipe(){ clearRlinks(); }
   function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); if(warnTid) clearTimeout(warnTid); warnTid=setTimeout(shakeWarn, RECIPE_HOLD-WARN_LEAD); clearShakeWarn(); showHoldMeter(); }
   function showHoldMeter(){                                     // the combo timer — a bar draining full→empty over the 3s window
-    meterEl.classList.add("show");
+    meterEl.classList.add("show"); meterEl.classList.remove("warn");   // a fresh/reset window is yellow again
     var f=meterEl.querySelector(".fill");
     if(f){ f.style.transition="none"; f.style.width="100%"; void f.offsetWidth; f.style.transition="width "+RECIPE_HOLD+"ms linear"; f.style.width="0%"; }
   }
-  function hideHoldMeter(){ meterEl.classList.remove("show","run"); }
+  function hideHoldMeter(){ meterEl.classList.remove("show","run","warn"); }
   function shakeWarn(){                                         // 1s before the drop: ripple a shake across the whole board from a corner
     warnTid=0;
     if(busy || gest || !state || state.goal!=="recipe") return;
+    meterEl.classList.add("warn");                              // the timer bar flashes red for the final second
+    sfxWarn();
+    var oR=state.H-1, oC=(state.W/2)|0;                         // ripple radiates from the bottom-centre tile, outward and upward
     for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.cell.classList.remove("shakewarn"); }
     void board.offsetWidth;                                     // one reflow so re-adding the class restarts the animation
     var maxd=0;
-    for(var r2=0;r2<state.H;r2++) for(var c2=0;c2<state.W;c2++){ var ref2=cells[r2]&&cells[r2][c2]; if(!ref2) continue; var d=r2+c2; if(d>maxd) maxd=d; ref2.cell.style.animationDelay=(d*28)+"ms"; ref2.cell.classList.add("shakewarn"); }
+    for(var r2=0;r2<state.H;r2++) for(var c2=0;c2<state.W;c2++){ var ref2=cells[r2]&&cells[r2][c2]; if(!ref2) continue; var d=Math.abs(r2-oR)+Math.abs(c2-oC); if(d>maxd) maxd=d; ref2.cell.style.animationDelay=(d*28)+"ms"; ref2.cell.classList.add("shakewarn"); }
     if(shakeClrTid) clearTimeout(shakeClrTid);
     shakeClrTid=setTimeout(clearShakeWarn, maxd*28 + 480);
   }
@@ -549,7 +555,7 @@ h1{ font-size:30px; line-height:1; }
     if(shakeClrTid){ clearTimeout(shakeClrTid); shakeClrTid=0; }
     for(var r=0;r<cells.length;r++){ var row=cells[r]; if(!row) continue; for(var c=0;c<row.length;c++){ var ref=row[c]; if(ref){ ref.cell.classList.remove("shakewarn"); ref.cell.style.removeProperty("animation-delay"); } } }
   }
-  function clearWarn(){ if(warnTid){ clearTimeout(warnTid); warnTid=0; } clearShakeWarn(); }
+  function clearWarn(){ if(warnTid){ clearTimeout(warnTid); warnTid=0; } clearShakeWarn(); meterEl.classList.remove("warn"); }
   async function dropSuspended(){
     suspendTid=0; clearWarn();
     if(busy || gest){ bumpSuspend(); return; }                 // still acting — defer the fall
