@@ -171,9 +171,9 @@ h1{ font-size:30px; line-height:1; }
 .combo-badge{ position:absolute; display:flex; align-items:center; justify-content:center; min-width:30px; height:30px; padding:0 8px; transform:translate(-50%,-135%); font-family:var(--font-d); font-weight:700; font-size:16px; color:#fff; -webkit-text-stroke:.7px var(--line); border:2.5px solid var(--line); border-radius:999px; box-shadow:0 2px 0 var(--shadow); pointer-events:none; animation:hmBadge .22s var(--pop); }
 @keyframes hmBadge{ 0%{transform:translate(-50%,-135%) scale(.4)} 60%{transform:translate(-50%,-135%) scale(1.18)} 100%{transform:translate(-50%,-135%) scale(1)} }
 
-.combo-meter{ position:absolute; left:14px; right:14px; top:-3px; height:7px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
+.combo-meter{ position:absolute; left:14px; right:14px; top:-7px; height:12px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
 .combo-meter.show{ opacity:1; }
-.combo-meter .fill{ height:100%; width:0; background:#ffd15c; }
+.combo-meter .fill{ height:100%; width:0; background:#ffc234; }
 .combo-meter.run .fill{ width:100%; transition:width var(--ripen) linear; }
 
 .toast{
@@ -521,12 +521,18 @@ h1{ font-size:30px; line-height:1; }
   }
   function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
   function abandonRecipe(){ clearRlinks(); }
-  function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); }
+  function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); showHoldMeter(); }
+  function showHoldMeter(){                                     // the combo timer — a bar draining full→empty over the 3s window
+    meterEl.classList.add("show");
+    var f=meterEl.querySelector(".fill");
+    if(f){ f.style.transition="none"; f.style.width="100%"; void f.offsetWidth; f.style.transition="width "+RECIPE_HOLD+"ms linear"; f.style.width="0%"; }
+  }
+  function hideHoldMeter(){ meterEl.classList.remove("show","run"); }
   async function dropSuspended(){
     suspendTid=0;
     if(busy || gest){ bumpSuspend(); return; }                 // still acting — defer the fall
-    if(!state || state.goal!=="recipe"){ winRecipes=0; return; }
-    winRecipes=0; busy=true;
+    if(!state || state.goal!=="recipe"){ winRecipes=0; hideHoldMeter(); return; }
+    winRecipes=0; busy=true; hideHoldMeter();
     var fresh=HM.gravity(state, Math.random);                    // the window lapsed — everything falls
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     paintAll();
@@ -796,7 +802,6 @@ h1{ font-size:30px; line-height:1; }
   function applyClearNow(from,to){
     if(busy) return;
     busy=true; gest.spent=true;
-    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; winRecipes=0; }   // a clear settles the board, ending the suspended window
     var group=HM.groupAt(state, to.r, to.c);   // connected same-colour cluster (from is in it — same colour, adjacent)
     spendMove();
     group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
@@ -806,13 +811,16 @@ h1{ font-size:30px; line-height:1; }
     setTimeout(function(){
       if(state!==myState){ busy=false; return; }
       group.forEach(function(k){ var p=k.split(","); state.grid[+p[0]][+p[1]]=null; });
-      var fresh=HM.gravity(state, Math.random);   // clearing settles the board (drops + churns) — a fresh start
-      if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
-      paintAll();
-      Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
-      updateRation();
-      busy=false;
-      finishTurn();
+      if(state.goal==="recipe"){
+        paintAll();                                          // SUSPENDED like a mix: the cleared cells stay holes, board doesn't fall
+        updateRation(); busy=false; bumpSuspend(); finishTurn();   // a clear is a merge too — keep the window alive & reset the timer
+      } else {
+        var fresh=HM.gravity(state, Math.random);
+        if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+        paintAll();
+        Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+        updateRation(); busy=false; finishTurn();
+      }
     }, 300);
   }
 
@@ -965,6 +973,7 @@ h1{ font-size:30px; line-height:1; }
   }
 
   function showEnd(win, spared){
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } hideHoldMeter();
     if(spared==null) spared=state.movesLeft;
     document.getElementById("overTitle").textContent = win ? "Cleared!" : "Out of moves";
     var stars = win ? starsFor(curLevel, spared) : 0;
