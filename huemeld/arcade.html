@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f3ead6" />
+<title>Huemeld Arcade (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  --font-d:'Fredoka',sans-serif; --font-u:'Nunito',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.055) 1.2px, transparent 1.3px);
+  background-size:22px 22px;
+  font-family:var(--font-u); color:var(--ink);
+  display:flex; flex-direction:column; align-items:center;
+  overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none;
+  overscroll-behavior:none;
+}
+.top{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 8px; }
+.brand{ display:flex; align-items:baseline; gap:8px; }
+.brand a{ text-decoration:none; color:var(--ink); }
+h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
+.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--ink); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
+.scores{ display:flex; gap:8px; }
+.sc{ background:var(--card); border:2.5px solid var(--line); border-radius:12px; box-shadow:0 3px 0 var(--shadow); padding:4px 12px; text-align:center; min-width:74px; }
+.sc span{ display:block; font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); }
+.sc b{ font-family:var(--font-d); font-size:17px; line-height:1.1; }
+.mutebtn{ width:36px; height:36px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; }
+
+/* next-wave bar — same visual language as the main game's combo meter */
+.wavebar{ width:min(94vw,420px); height:10px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; box-shadow:0 2px 0 var(--shadow); margin-bottom:8px; }
+.wavebar .fill{ height:100%; width:100%; background:#8fc7ff; }
+.wavebar.warn .fill{ background:#ef4a5a; }
+
+.wellwrap{ position:relative; width:min(94vw,420px); }
+.well{
+  position:relative; width:100%; aspect-ratio:7/9;
+  background:var(--card); border:3px solid var(--line); border-radius:18px;
+  box-shadow:0 5px 0 var(--shadow); overflow:hidden;
+}
+.well.danger{ animation:dangerPulse .8s ease-in-out infinite; }
+@keyframes dangerPulse{ 0%,100%{border-color:var(--line)} 50%{border-color:#ef4a5a; box-shadow:0 5px 0 rgba(239,74,90,.5)} }
+.well.shake{ animation:wellShake .3s; }
+@keyframes wellShake{ 0%,100%{transform:translate(0,0)} 25%{transform:translate(-4px,2px)} 55%{transform:translate(4px,-2px)} 80%{transform:translate(-2px,1px)} }
+
+.t{ position:absolute; left:0; top:0; transition:transform .19s cubic-bezier(.3,1.25,.6,1); will-change:transform; }
+.t .b{
+  display:block; width:100%; height:100%;
+  background:var(--pc); border:3px solid var(--line);
+  border-radius:24% 30% 26% 32% / 28% 24% 32% 26%;
+  box-shadow:1.5px 2px 0 var(--shadow);
+  transform:rotate(var(--rot,0deg));
+  transition:transform .1s, border-radius .22s, background .2s;
+  position:relative;
+}
+.t .b::after{ content:""; position:absolute; top:14%; left:16%; width:34%; height:22%; border-radius:50%; background:rgba(255,255,255,.4); }
+.t.S .b{ border-radius:50%; }
+.t.lift .b{ transform:rotate(var(--rot,0deg)) scale(1.14); box-shadow:0 0 0 2px #fff, 0 4px 8px var(--shadow); }
+.t.mixed .b{ animation:mixb .28s cubic-bezier(.3,1.4,.6,1); }
+@keyframes mixb{ 0%{transform:scale(.7)} 55%{transform:scale(1.3)} 100%{transform:scale(1)} }
+.t.nope .b{ animation:nopeb .3s; }
+@keyframes nopeb{ 0%,100%{transform:translateX(0) rotate(var(--rot,0deg))} 30%{transform:translateX(-4px) rotate(var(--rot,0deg))} 70%{transform:translateX(4px) rotate(var(--rot,0deg))} }
+.t.pop{ z-index:4; }
+.t.pop .b{ animation:popb .26s cubic-bezier(.36,.07,.6,1) forwards; }
+@keyframes popb{ 0%{transform:scale(1)} 40%{transform:scale(1.28)} 100%{transform:scale(.05); opacity:0} }
+
+.float{
+  position:absolute; z-index:6; pointer-events:none;
+  font-family:var(--font-d); font-weight:700; font-size:17px; color:var(--ink);
+  text-shadow:0 0 4px #fff, 0 0 8px #fff;
+  animation:rise .75s ease-out forwards;
+}
+@keyframes rise{ 0%{transform:translateY(0); opacity:0} 15%{opacity:1} 100%{transform:translateY(-34px); opacity:0} }
+
+.chain{
+  position:absolute; left:50%; top:38%; transform:translate(-50%,-50%) scale(.4) rotate(-4deg);
+  z-index:7; pointer-events:none; opacity:0;
+  font-family:var(--font-d); font-weight:700; font-size:34px; color:#fff;
+  -webkit-text-stroke:2px var(--ink); text-shadow:0 4px 0 var(--shadow);
+}
+.chain.show{ animation:chainIn .7s cubic-bezier(.3,1.4,.6,1) forwards; }
+@keyframes chainIn{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.4) rotate(-4deg)} 25%{opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(-4deg)} 70%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-4deg)} 100%{opacity:0; transform:translate(-50%,-56%) scale(1) rotate(-4deg)} }
+
+.ov{
+  position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+  background:rgba(243,234,214,.9); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.ov.show{ opacity:1; pointer-events:auto; }
+.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 24px; text-align:center; max-width:86%; }
+.panel h2{ font-family:var(--font-d); font-weight:700; font-size:26px; margin-bottom:8px; }
+.panel p{ font-size:13.5px; font-weight:700; color:var(--ink-soft); line-height:1.55; }
+.panel .bigscore{ font-family:var(--font-d); font-weight:700; font-size:34px; margin:6px 0 2px; }
+.panel .newbest{ color:#2f7d3a; font-weight:800; font-size:13px; }
+.howrow{ display:flex; align-items:center; justify-content:center; gap:5px; margin:10px 0 2px; font-family:var(--font-d); font-weight:700; color:var(--ink-soft); }
+.chip{ width:20px; height:20px; border:2.5px solid var(--line); border-radius:6px; box-shadow:0 2px 0 var(--shadow); }
+.chip.ci{ border-radius:50%; }
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:#ffd15c; border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); height:48px; padding:0 30px; font-size:17px; margin-top:14px;
+  transition:transform .08s, box-shadow .08s; touch-action:manipulation;
+}
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:9px; line-height:1.45; }
+.tip b{ color:var(--ink); }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">ARCADE</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="scores">
+        <div class="sc"><span>score</span><b id="score">0</b></div>
+        <div class="sc"><span>best</span><b id="best">0</b></div>
+      </div>
+      <button class="mutebtn" id="mute" aria-label="Sound">♪</button>
+    </div>
+  </div>
+  <div class="wavebar" id="wavebar"><div class="fill" id="wavefill"></div></div>
+  <div class="wellwrap">
+    <div class="well" id="well"></div>
+    <div class="chain" id="chain"></div>
+    <div class="ov show" id="ovStart">
+      <div class="panel">
+        <h2>Huemeld Arcade</h2>
+        <div class="howrow"><span class="chip" style="background:#ef4a5a"></span>+<span class="chip" style="background:#f6c445"></span>=<span class="chip ci" style="background:#f2913d"></span></div>
+        <p>Swipe two <b>different</b> paints together to mix.<br>Twin mixed colours touching = <b>POP!</b><br>Pops make things fall — <b>chain them.</b><br>Don't let the well fill up.</p>
+        <button class="mk" id="btnStart">Play</button>
+      </div>
+    </div>
+    <div class="ov" id="ovOver">
+      <div class="panel">
+        <h2>The well is full!</h2>
+        <div class="bigscore" id="finalScore">0</div>
+        <p class="newbest" id="newBest" style="display:none">★ new best! ★</p>
+        <p id="overStats"></p>
+        <button class="mk" id="btnAgain">Again</button>
+      </div>
+    </div>
+  </div>
+  <p class="tip">mix a colour <b>next to its twin</b> to pop the group · engineer the falls for <b>chains</b></p>
+
+<script>
+(function(){
+"use strict";
+var COLS=7, ROWS=9;
+var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6"};
+var MIXMAP={RY:"O",BR:"P",BY:"G"};
+var PRIMS=["R","Y","B"];
+function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
+function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+var well=document.getElementById("well"), waveFillEl=document.getElementById("wavefill"), waveBarEl=document.getElementById("wavebar");
+var scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"), chainEl=document.getElementById("chain");
+
+var grid=[], state="menu", busy=false, gest=null;
+var score=0, best=+(localStorage.getItem("hm_arc_hi")||0), pops=0, maxChain=0;
+var waveTid=0, warnTid=0, waveInt=4200, waveSize=3, waveN=0;
+var WAVE0=4200, WAVE_MIN=1500, WAVE_DECAY=0.975;
+bestEl.textContent=best;
+
+/* ---------- audio (same beep voice as the main game) ---------- */
+var actx=null, muted=localStorage.getItem("hm_arc_mute")==="1";
+document.getElementById("mute").style.opacity=muted?"0.45":"1";
+function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
+function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
+function sfxMix(){ beep(430,0.07,"triangle",0.05); setTimeout(function(){ beep(650,0.09,"triangle",0.04); },55); }
+function sfxPop(n,chain){ var b=380+chain*120; for(var i=0;i<Math.min(n,5);i++)(function(i){ setTimeout(function(){ beep(b*Math.pow(1.22,i),0.09,"triangle",0.05); }, i*45); })(i); }
+function sfxOver(){ [440,330,220].forEach(function(f,i){ setTimeout(function(){ beep(f,0.22,"sine",0.05); }, i*160); }); }
+document.getElementById("mute").addEventListener("click",function(e){ muted=!muted; ensureAudio(); localStorage.setItem("hm_arc_mute",muted?"1":"0"); e.currentTarget.style.opacity=muted?"0.45":"1"; if(!muted) sfxMix(); });
+
+/* ---------- layout ---------- */
+function cellSize(){ return well.clientWidth/COLS; }
+function placeEl(t){ var cs=cellSize(), pad=cs*0.06; t.el.style.width=(cs-pad*2)+"px"; t.el.style.height=(cs-pad*2)+"px"; t.el.style.transform="translate("+(t.col*cs+pad)+"px,"+(t.row*cs+pad)+"px)"; }
+window.addEventListener("resize", function(){ forAll(placeEl); });
+function forAll(fn){ for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++) if(grid[r][c]) fn(grid[r][c]); }
+
+/* ---------- tiles ---------- */
+function makeTile(col,row,color,fromTop){
+  var el=document.createElement("div"); el.className="t"+(isPrim(color)?"":" S");
+  var b=document.createElement("i"); b.className="b"; b.style.background=HEX[color];
+  b.style.setProperty("--rot",((col*7+row*13)%5-2)+"deg");
+  el.appendChild(b); well.appendChild(el);
+  var t={col:col,row:row,color:color,el:el,b:b};
+  grid[row][col]=t;
+  var cs=cellSize(), pad=cs*0.06;
+  el.style.width=(cs-pad*2)+"px"; el.style.height=(cs-pad*2)+"px";
+  if(fromTop){ el.style.transition="none"; el.style.transform="translate("+(col*cs+pad)+"px,"+(-cs)+"px)"; void el.offsetWidth; el.style.transition=""; }
+  placeEl(t);
+  return t;
+}
+function setColor(t,color){ t.color=color; t.b.style.background=HEX[color]; t.el.classList.toggle("S", !isPrim(color)); }
+function removeTile(t){ if(grid[t.row][t.col]===t) grid[t.row][t.col]=null; t.el.remove(); }
+
+/* ---------- gravity ---------- */
+function gravity(){
+  var moved=false;
+  for(var c=0;c<COLS;c++){
+    var stack=[];
+    for(var r=ROWS-1;r>=0;r--) if(grid[r][c]) stack.push(grid[r][c]);
+    for(var r2=0;r2<ROWS;r2++) grid[r2][c]=null;
+    for(var k=0;k<stack.length;k++){
+      var t=stack[k], nr=ROWS-1-k;
+      grid[nr][c]=t;
+      if(t.row!==nr){ t.row=nr; placeEl(t); moved=true; }
+    }
+  }
+  return moved;
+}
+
+/* ---------- pops & cascades ---------- */
+function findGroups(){
+  var seen={}, out=[];
+  for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){
+    var t=grid[r][c];
+    if(!t || isPrim(t.color) || seen[r+","+c]) continue;
+    var q=[[r,c]], comp=[]; seen[r+","+c]=1;
+    while(q.length){
+      var cur=q.pop(), y=cur[0], x=cur[1];
+      comp.push(grid[y][x]);
+      [[y+1,x],[y-1,x],[y,x+1],[y,x-1]].forEach(function(nb){
+        var ny=nb[0], nx=nb[1];
+        if(ny<0||nx<0||ny>=ROWS||nx>=COLS||seen[ny+","+nx]) return;
+        var o=grid[ny][nx];
+        if(o && o.color===t.color){ seen[ny+","+nx]=1; q.push([ny,nx]); }
+      });
+    }
+    if(comp.length>=2) out.push(comp);
+  }
+  return out;
+}
+function potScore(n,chain){ return (n*25 + (n-2)*40) * chain; }
+function floatScore(px,py,txt){ var f=document.createElement("div"); f.className="float"; f.textContent=txt; f.style.left=px+"px"; f.style.top=py+"px"; well.appendChild(f); setTimeout(function(){ f.remove(); },800); }
+function showChain(n){ chainEl.textContent="CHAIN ×"+n+"!"; chainEl.classList.remove("show"); void chainEl.offsetWidth; chainEl.classList.add("show"); well.classList.remove("shake"); void well.offsetWidth; well.classList.add("shake"); }
+function addScore(n){ score+=n; scoreEl.textContent=score; if(score>best){ best=score; bestEl.textContent=best; } }
+
+async function resolve(){
+  busy=true;
+  var chain=0;
+  while(true){
+    if(gravity()) await sleep(210);
+    var groups=findGroups();
+    if(!groups.length) break;
+    chain++; if(chain>maxChain) maxChain=chain;
+    var cs=cellSize();
+    for(var gi=0; gi<groups.length; gi++){
+      var g=groups[gi], sx=0, sy=0;
+      for(var i=0;i<g.length;i++){ g[i].el.classList.add("pop"); sx+=g[i].col; sy+=g[i].row; pops++; }
+      var pts=potScore(g.length, chain);
+      addScore(pts);
+      floatScore((sx/g.length)*cs+cs*0.1, (sy/g.length)*cs-6, "+"+pts);
+    }
+    if(chain>=2) showChain(chain);
+    sfxPop(groups[0].length, chain);
+    await sleep(250);
+    for(var gi2=0; gi2<groups.length; gi2++) groups[gi2].forEach(removeTile);
+  }
+  busy=false;
+  updateDanger();
+}
+
+/* ---------- the rain ---------- */
+function colsWithSpace(){ var a=[]; for(var c=0;c<COLS;c++) if(!grid[0][c]) a.push(c); return a; }
+function waveBarRun(ms){
+  waveFillEl.style.transition="none"; waveFillEl.style.width="100%"; void waveFillEl.offsetWidth;
+  waveFillEl.style.transition="width "+ms+"ms linear"; waveFillEl.style.width="0%";
+  waveBarEl.classList.remove("warn");
+  if(warnTid) clearTimeout(warnTid);
+  warnTid=setTimeout(function(){ waveBarEl.classList.add("warn"); }, Math.max(0,ms-900));
+}
+function scheduleWave(){ if(waveTid) clearTimeout(waveTid); waveTid=setTimeout(doWave, waveInt); waveBarRun(waveInt); }
+async function doWave(){
+  waveTid=0;
+  if(state!=="playing") return;
+  if(busy){ waveTid=setTimeout(doWave,250); return; }
+  var avail=colsWithSpace();
+  if(!avail.length){ gameOver(); return; }
+  var n=Math.min(waveSize, avail.length);
+  for(var i=avail.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=avail[i]; avail[i]=avail[j]; avail[j]=t; }
+  for(var k=0;k<n;k++){
+    var c=avail[k], nr=-1;
+    for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; }
+    if(nr>=0) makeTile(c, nr, PRIMS[(Math.random()*3)|0], true);
+  }
+  waveN++;
+  waveInt=Math.max(WAVE_MIN, waveInt*WAVE_DECAY);
+  if(waveN%12===0) waveSize=Math.min(5, waveSize+1);
+  updateDanger();
+  if(!colsWithSpace().length && state==="playing"){ gameOver(); return; }
+  scheduleWave();
+}
+function updateDanger(){
+  var danger=false;
+  for(var c=0;c<COLS;c++) if(grid[1] && grid[1][c]){ danger=true; break; }
+  well.classList.toggle("danger", danger && state==="playing");
+}
+
+/* ---------- input: swipe to mix ---------- */
+function cellAt(x,y){
+  var rect=well.getBoundingClientRect(), cs=cellSize();
+  var c=Math.floor((x-rect.left)/cs), r=Math.floor((y-rect.top)/cs);
+  if(c<0||r<0||c>=COLS||r>=ROWS) return null;
+  return {c:c,r:r};
+}
+well.addEventListener("pointerdown", function(e){
+  if(state!=="playing"||busy||gest||!e.isPrimary) return;
+  ensureAudio();
+  var p=cellAt(e.clientX,e.clientY); if(!p) return;
+  var t=grid[p.r][p.c]; if(!t||!isPrim(t.color)) return;
+  gest={t:t, x0:e.clientX, y0:e.clientY};
+  t.el.classList.add("lift");
+  try{ well.setPointerCapture(e.pointerId); }catch(_e){}
+});
+well.addEventListener("pointermove", function(e){
+  if(!gest||!e.isPrimary) return;
+  var dx=e.clientX-gest.x0, dy=e.clientY-gest.y0, cs=cellSize();
+  if(Math.max(Math.abs(dx),Math.abs(dy)) < cs*0.35) return;
+  var dc=0, dr=0;
+  if(Math.abs(dx)>Math.abs(dy)) dc=dx>0?1:-1; else dr=dy>0?1:-1;
+  var t=gest.t, tc=t.col+dc, tr=t.row+dr;
+  t.el.classList.remove("lift");
+  var g=gest; gest=null;
+  if(tc<0||tr<0||tc>=COLS||tr>=ROWS) return;
+  attemptMix(g.t, tc, tr);
+});
+function endGest(){ if(gest){ gest.t.el.classList.remove("lift"); gest=null; } }
+well.addEventListener("pointerup", endGest);
+well.addEventListener("pointercancel", endGest);
+well.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+async function attemptMix(src, tc, tr){
+  var dst=grid[tr][tc];
+  if(!dst || !isPrim(dst.color) || dst.color===src.color || !isPrim(src.color)){
+    src.el.classList.remove("nope"); void src.el.offsetWidth; src.el.classList.add("nope");
+    beep(160,0.08,"square",0.03);
+    return;
+  }
+  var m=mixOf(src.color,dst.color);
+  busy=true;
+  grid[src.row][src.col]=null;
+  var cs=cellSize(), pad=cs*0.06;
+  src.el.style.zIndex=5;
+  src.el.style.transform="translate("+(tc*cs+pad)+"px,"+(tr*cs+pad)+"px)";  // slide onto the target
+  src.b.style.transform="scale(.5)";
+  sfxMix();
+  await sleep(130);
+  src.el.remove();
+  setColor(dst,m);
+  dst.el.classList.remove("mixed"); void dst.el.offsetWidth; dst.el.classList.add("mixed");
+  await sleep(90);
+  await resolve();   // gravity + pop cascades (resolve clears busy)
+}
+
+/* ---------- game flow ---------- */
+function clearBoard(){ for(var r=0;r<ROWS;r++){ for(var c=0;c<COLS;c++){ if(grid[r]&&grid[r][c]) grid[r][c].el.remove(); } } grid=[]; for(var r2=0;r2<ROWS;r2++){ grid[r2]=[]; for(var c2=0;c2<COLS;c2++) grid[r2][c2]=null; } }
+function seed(){
+  for(var i=0;i<16;i++){
+    var c=(Math.random()*COLS)|0, nr=-1;
+    for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; }
+    if(nr>=Math.floor(ROWS/2)) makeTile(c,nr,PRIMS[(Math.random()*3)|0],true);
+  }
+}
+function start(){
+  clearBoard();
+  score=0; pops=0; maxChain=0; scoreEl.textContent="0";
+  waveInt=WAVE0; waveSize=3; waveN=0;
+  document.getElementById("ovStart").classList.remove("show");
+  document.getElementById("ovOver").classList.remove("show");
+  state="playing"; busy=false; gest=null;
+  seed();
+  scheduleWave();
+}
+function gameOver(){
+  state="over";
+  if(waveTid){ clearTimeout(waveTid); waveTid=0; }
+  if(warnTid){ clearTimeout(warnTid); warnTid=0; }
+  waveBarEl.classList.remove("warn");
+  waveFillEl.style.transition="none"; waveFillEl.style.width="0%";
+  well.classList.remove("danger");
+  sfxOver();
+  var isBest = score>=best && score>0 && score>=+(localStorage.getItem("hm_arc_hi")||0);
+  if(score>+(localStorage.getItem("hm_arc_hi")||0)) localStorage.setItem("hm_arc_hi",""+score);
+  document.getElementById("finalScore").textContent=score;
+  document.getElementById("newBest").style.display=isBest?"block":"none";
+  document.getElementById("overStats").textContent=pops+" pops · longest chain ×"+Math.max(1,maxChain);
+  document.getElementById("ovOver").classList.add("show");
+}
+document.getElementById("btnStart").addEventListener("click",function(){ ensureAudio(); start(); });
+document.getElementById("btnAgain").addEventListener("click",function(){ ensureAudio(); start(); });
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden){ if(waveTid){ clearTimeout(waveTid); waveTid=0; } }
+  else if(state==="playing" && !waveTid){ scheduleWave(); }
+});
+
+clearBoard();
+
+/* debug hooks for automated testing (harmless in production) */
+window.__arc={
+  grid:function(){ return grid.map(function(row){ return row.map(function(t){ return t?t.color:"."; }).join(""); }); },
+  place:function(c,r,color){ if(grid[r][c]) removeTile(grid[r][c]); return makeTile(c,r,color,false); },
+  resolve:resolve, doWave:doWave, start:start,
+  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, waveInt:waveInt}; },
+  mixAt:attemptMix, tileAt:function(c,r){ return grid[r][c]; }
+};
+})();
+</script>
+</body>
+</html>
