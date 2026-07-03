@@ -295,12 +295,12 @@ h1{ font-size:30px; line-height:1; }
      path that spells the recipe (e.g. orange -> green -> purple) to cash it. */
   var RECIPE1={ id:"R1", test:true, name:"Recipe Chain 1",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:24, goal:"recipe", objectives:[],
-    recipes:[ ["O","G"], ["G","P"], ["P","O"] ] };
+    spawn:{ R:4, Y:4, B:4 }, moves:30, goal:"recipe", objectives:[],
+    recipes:[ ["O","O","G"], ["G","G","P"], ["O","P","P"] ] };   // multiples: two of a colour, then a third
   var RECIPE2={ id:"R2", test:true, name:"Recipe Chain 2",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
-    spawn:{ R:4, Y:4, B:4 }, moves:32, goal:"recipe", objectives:[],
-    recipes:[ ["O","G","P"], ["P","G","O"], ["G","O","P"] ] };
+    spawn:{ R:4, Y:4, B:4 }, moves:42, goal:"recipe", objectives:[],
+    recipes:[ ["O","O","G","G"], ["P","P","O","G"] ] };   // longer, more doubles
   LEVELS=LEVELS.concat([TUBE_TEST, RECIPE1, RECIPE2]);
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
@@ -648,7 +648,10 @@ h1{ font-size:30px; line-height:1; }
      combo (free, confined to this one dragged tile). Nothing else is legal. */
   function classifyDrag(nbColor){
     var carry=gest.carry;
-    if(HM.isPrim(carry)) return (HM.isPrim(nbColor) && nbColor!==carry) ? "mix" : null;
+    if(HM.isPrim(carry)){
+      if(HM.isPrim(nbColor)) return nbColor!==carry ? "mix" : "clear";   // different primaries mix into a secondary; SAME primaries clear
+      return null;
+    }
     return (nbColor===carry && !HM.isPrim(nbColor)) ? "fuse" : null;
   }
   function updateTarget(px,py){
@@ -674,8 +677,9 @@ h1{ font-size:30px; line-height:1; }
     var tc=state.grid[to.r][to.c];
     if(!tc || classifyDrag(tc)!==type) return;   // re-validate: the target could have shifted before this commit
     gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
-    if(type==="mix") applyMixNow(from,to);   // atomic: spends a move, then the board drops
-    else applyComboFuse(from,to);            // adds this tile to the swoop (the whole swoop costs one move)
+    if(type==="mix") applyMixNow(from,to);            // atomic: spends a move, then the board drops
+    else if(type==="clear") applyClearNow(from,to);   // pop the connected same-colour primary cluster (1 move) — churns the board
+    else applyComboFuse(from,to);                     // secondary swoop (tube levels): adds this tile to the swoop
   }
   function spendMove(){ if(state.movesLeft>0){ state.movesLeft--; updateMoves(); } }
   function adjDiffPrim(tp,col){
@@ -730,6 +734,30 @@ h1{ font-size:30px; line-height:1; }
     applyDim(); bumpBlob(2);
     playMergeAnim(from, to, col, col, col, false, false);   // two circles fuse, no colour change
     sfxMix(sess.count);
+  }
+  /* CLEAR (spends a move): swipe a primary onto a SAME-colour primary and the
+     whole connected cluster pops, then the board drops. Churns the board so you
+     can refresh/reposition when a recipe needs a colour you can't reach. */
+  function applyClearNow(from,to){
+    if(busy) return;
+    busy=true; gest.spent=true;
+    var group=HM.groupAt(state, to.r, to.c);   // connected same-colour cluster (from is in it — same colour, adjacent)
+    spendMove();
+    group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
+    setLift(from,false); setLift(to,false);
+    sfxPop(group.length);
+    var myState=state;
+    setTimeout(function(){
+      if(state!==myState){ busy=false; return; }
+      group.forEach(function(k){ var p=k.split(","); state.grid[+p[0]][+p[1]]=null; });
+      var fresh=HM.gravity(state, Math.random);
+      if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+      paintAll();
+      Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      updateRation();
+      busy=false;
+      finishTurn();
+    }, 300);
   }
 
   function stopMeter(){ if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; } meterEl.classList.remove("run","show"); }
@@ -793,7 +821,7 @@ h1{ font-size:30px; line-height:1; }
     var col=state.grid[tp.r][tp.c];
     if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // out of moves — every action costs one
     if(HM.isPrim(col)){
-      if(!adjDiffPrim(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // nothing to mix into
+      if(!adjDiffPrim(tp,col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // can mix (different) or clear (same)
       try{ board.setPointerCapture(e.pointerId); }catch(_e){}
       gest={ anchor:tp, carry:col, mode:"mix", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
       setLift(tp,true);
