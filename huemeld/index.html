@@ -312,8 +312,11 @@ h1{ font-size:30px; line-height:1; }
         var count=Math.max(1, Math.min(3, Math.round(1+t*1.4*rnd()+rnd()*0.7)));
         recipes.push({ seq:seq, count:count });
       }
-      var solves=0; for(var k=0;k<recipes.length;k++) solves+=recipes[k].count;
-      out.push({ id:L, name:"Level "+L, shape:RSHAPE, spawn:{R:4,Y:4,B:4}, moves:14+solves*3+Math.round(t*14), goal:"recipe", objectives:[], recipes:recipes });
+      var solves=0, buildCost=0;   // buildCost = un-refundable mixes: each secondary slot in every required trace
+      for(var k=0;k<recipes.length;k++){ solves+=recipes[k].count; var sc=0, sq=recipes[k].seq; for(var q=0;q<sq.length;q++) if(!HM.isPrim(sq[q])) sc++; buildCost+=recipes[k].count*sc; }
+      // budget scales with the level's OWN work (mixes + one trace each) plus a slack that shrinks as levels climb;
+      // chaining then earns extra headroom on top. No flat cushion, so more targets => proportionally tighter play.
+      out.push({ id:L, name:"Level "+L, shape:RSHAPE, spawn:{R:4,Y:4,B:4}, moves:buildCost+solves+Math.round(9-3*t), goal:"recipe", objectives:[], recipes:recipes });
     }
     return out;
   }
