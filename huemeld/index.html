@@ -59,18 +59,21 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; letter-spacing:.
 h1{ font-size:30px; line-height:1; }
 .tagline{ font-family:var(--font-u); font-weight:700; color:var(--ink-soft); font-size:12.5px; margin-top:3px; }
 .progress{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink); background:var(--paper2); border:2.5px solid var(--line); border-radius:999px; padding:5px 13px; box-shadow:0 3px 0 var(--shadow); white-space:nowrap; }
-.grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:13px; margin-top:16px; }
-.lvl-card{ text-align:left; padding:13px 14px; display:flex; flex-direction:column; gap:6px; min-height:104px; position:relative; }
-.lvl-card .num{ font-family:var(--font-d); font-weight:700; font-size:15px; width:30px; height:30px; border:2.5px solid var(--line); border-radius:9px; display:flex; align-items:center; justify-content:center; background:#ffd15c; box-shadow:0 2px 0 var(--shadow); }
-.lgoals{ display:flex; gap:5px; margin-top:auto; }
-.lgoals .sw{ width:17px; height:17px; border:2px solid var(--line); border-radius:5px; }
-.lgoals .sw.r{ border-radius:50%; }
-.lmeta{ font-family:var(--font-u); font-weight:700; font-size:12px; color:var(--ink-soft); }
-.lmeta .st{ font-size:14px; letter-spacing:1px; color:#f0a92c; }
-.lmeta .st.dim{ color:rgba(44,39,51,.22); }
-.lvl-card.lock{ background:#e9e0cb; box-shadow:0 3px 0 rgba(44,39,51,.4); cursor:default; }
-.lvl-card.lock .num{ background:#d8cdb4; color:var(--ink-soft); }
-.lvl-card.lock:active{ transform:none; box-shadow:0 3px 0 rgba(44,39,51,.4); }
+.grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; margin-top:16px; }
+.tut-btn{ grid-column:1 / -1; min-height:50px; font-size:17px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:9px; background:#ffd15c; }
+.tut-btn .tstars{ font-size:13px; letter-spacing:1px; color:#b9791a; }
+.lvl-card{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:6px; border-width:3px; position:relative; }
+.lvl-card .lnum{ font-family:var(--font-d); font-weight:700; font-size:clamp(20px,7.5vw,28px); line-height:1; }
+.lvl-card .lstars{ font-size:13px; letter-spacing:1.5px; color:#f0a92c; line-height:1; }
+.lvl-card .lstars .d{ color:rgba(44,39,51,.2); }
+/* border colour = difficulty tier */
+.lvl-card.easy{ border-color:#57c268; }
+.lvl-card.med{ border-color:#f0a92c; }
+.lvl-card.hard{ border-color:#ef4a5a; }
+.lvl-card.xhard{ border-color:#9b62d6; }
+.lvl-card.lock{ background:#e9e0cb; opacity:.7; cursor:default; }
+.lvl-card.lock .lnum{ color:var(--ink-soft); }
+.lvl-card.lock:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
 .credit{ text-align:center; margin-top:16px; font-size:12px; }
 .credit a{ color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
 
@@ -198,7 +201,7 @@ h1{ font-size:30px; line-height:1; }
 .panel .row{ display:flex; gap:9px; margin-top:12px; }
 .panel .row .mk{ flex:1; height:46px; font-size:15px; border-radius:13px; }
 
-.ghint{ text-align:center; font-size:12px; color:var(--ink-soft); margin:11px 2px 0; line-height:1.4; }
+.ghint{ display:none; text-align:center; font-size:12px; color:var(--ink-soft); margin:11px 2px 0; line-height:1.4; }
 .ghint b{ font-weight:700; color:var(--ink); }
 
 @keyframes hmPop{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 42%{transform:rotate(var(--rot,0deg)) scale(1.18)} 100%{transform:rotate(var(--rot,0deg)) scale(.05); opacity:0} }
@@ -229,7 +232,6 @@ h1{ font-size:30px; line-height:1; }
         <div class="logo" aria-hidden="true"><i></i><i></i><i></i></div>
         <div>
           <h1>Huemeld</h1>
-          <div class="tagline">Meld paints · build a combo · detonate</div>
         </div>
       </div>
       <div class="progress" id="progress">0 / 0</div>
@@ -243,7 +245,6 @@ h1{ font-size:30px; line-height:1; }
       <button class="mk icobtn" id="btnBack" title="Levels" aria-label="Back to levels">←</button>
       <div class="gtitle">
         <h2 id="gName">Level</h2>
-        <div class="sub" id="gSub">Clear the goals</div>
       </div>
       <button class="mk icobtn" id="btnAid" title="Colour aid" aria-label="Colour aid" aria-pressed="false">◐</button>
       <button class="mk icobtn" id="btnSound" title="Sound" aria-label="Sound" aria-pressed="true">♪</button>
@@ -275,7 +276,7 @@ h1{ font-size:30px; line-height:1; }
         </div>
       </div>
     </div>
-    <p class="ghint">Mix paints into circles (they hang for 3s), then <b>trace</b> a recipe's colours to solve it · clear same colours to churn · <b>chain</b> solves in one window for +2 moves each</p>
+    <p class="ghint" id="ghint">Drag a paint onto a <b>different</b> paint to mix a circle. Then <b>drag across</b> circles that spell a recipe to solve it — <b>chain</b> solves in one window for +2 moves!</p>
   </section>
 
 </div>
@@ -331,6 +332,9 @@ h1{ font-size:30px; line-height:1; }
     return out;
   }
   LEVELS = genRecipeLevels();
+  // Tutorial: a gentle guided level (its own full-width button atop the picker). Teaches mix -> trace with room to spare.
+  var TUTORIAL = { id:"T", tutorial:true, name:"Tutorial", shape:["#######","#######","#######","#######","#######","#######","#######"],
+    spawn:{R:4,Y:4,B:4}, moves:20, goal:"recipe", objectives:[], recipes:[{ seq:["O","G"], count:1 }], gated:false };
   var HEX=HM.HEX, NAME=HM.NAME;
   var PRIMS=["R","Y","B"];
   var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
@@ -966,19 +970,18 @@ h1{ font-size:30px; line-height:1; }
   board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
   /* ---------- screens ---------- */
+  function tierOf(L){ return L.gated ? "xhard" : (L.id<=5 ? "easy" : (L.id<=12 ? "med" : "hard")); }   // border colour = difficulty
+  function miniStars(n){ n=n||0; return "★★★".slice(0,n)+'<span class="d">'+"☆☆☆".slice(0,3-n)+'</span>'; }
   function renderLevelSelect(){
     var p=loadProg(), done=0, h="";
+    var td=p[TUTORIAL.id];
+    h+='<button class="mk tut-btn" data-tut="1">▶ Tutorial'+((td&&td.done)?' <span class="tstars">'+miniStars(td.stars)+'</span>':'')+'</button>';
     for(var i=0;i<LEVELS.length;i++){
       var L=LEVELS[i], d=p[L.id], lock=!unlocked(i);
       if(d&&d.done) done++;
-      h+='<button class="mk lvl-card'+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
-      h+='<div class="num">'+L.id+'</div>';
-      h+='<div class="lgoals">';
-      if(L.goal==="recipe"){ var r0=(L.recipes&&L.recipes[0]&&L.recipes[0].seq)||[]; for(var ri=0;ri<r0.length;ri++) h+='<span class="sw r" style="background:'+HEX[r0[ri]]+'"></span>'; }
-      else if(L.goal==="tubes"){ for(var tk in L.tubes){ if(L.tubes.hasOwnProperty(tk)) h+='<span class="sw r" style="background:'+HEX[tk]+'"></span>'; } }
-      else for(var j=0;j<L.objectives.length;j++){ var o=L.objectives[j]; h+='<span class="sw'+(HM.isPrim(o.color)?"":" r")+'" style="background:'+HEX[o.color]+'"></span>'; }
-      h+='</div>';
-      h+='<div class="lmeta">'+(lock ? "Locked" : (d&&d.done ? '<span class="st">'+"★".repeat(d.stars)+'</span><span class="st dim">'+"☆".repeat(3-d.stars)+'</span>' : L.moves+" moves"))+'</div>';
+      h+='<button class="mk lvl-card '+tierOf(L)+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
+      h+='<div class="lnum">'+L.id+'</div>';
+      h+='<div class="lstars">'+miniStars((d&&d.done)?d.stars:0)+'</div>';
       h+='</button>';
     }
     document.getElementById("levelGrid").innerHTML=h;
@@ -987,15 +990,15 @@ h1{ font-size:30px; line-height:1; }
   function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
   function goalSub(L){ if(L.goal==="recipe") return L.gated ? "Chain recipes to survive!" : "Trace the recipes in order"; if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
 
-  function startLevel(i){
-    curIndex=i; curLevel=LEVELS[i];
+  function startLevel(level, idx){
+    curIndex=(idx==null?-1:idx); curLevel=level;
     state=HM.newState(curLevel); HM.fill(state, Math.random);
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
     if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn(); winRecipes=0;
     over.classList.remove("show");
     document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
-    document.getElementById("gSub").textContent=goalSub(curLevel);
+    document.getElementById("ghint").style.display = curLevel.tutorial ? "block" : "none";   // guidance shows only on the tutorial
     screenLevels.style.display="none"; screenGame.style.display="block";
     if(curLevel.goal==="tubes") renderTubes();
     else if(curLevel.goal==="recipe") renderRecipe();
@@ -1024,19 +1027,20 @@ h1{ font-size:30px; line-height:1; }
     h+='<button class="mk" id="obReplay">Replay</button>';
     h+='<button class="mk" id="obLevels">Levels</button>';
     row.innerHTML=h;
-    var nx=document.getElementById("obNext"); if(nx) nx.addEventListener("click",function(){ ensureAudio(); startLevel(curIndex+1); });
-    document.getElementById("obReplay").addEventListener("click",function(){ ensureAudio(); startLevel(curIndex); });
+    var nx=document.getElementById("obNext"); if(nx) nx.addEventListener("click",function(){ ensureAudio(); startLevel(LEVELS[curIndex+1], curIndex+1); });
+    document.getElementById("obReplay").addEventListener("click",function(){ ensureAudio(); startLevel(curLevel, curIndex); });
     document.getElementById("obLevels").addEventListener("click",function(){ ensureAudio(); showLevels(); });
     over.classList.add("show");
   }
 
   /* ---------- wiring ---------- */
   document.getElementById("levelGrid").addEventListener("click",function(e){
+    if(e.target.closest(".tut-btn")){ ensureAudio(); startLevel(TUTORIAL, -1); return; }
     var card=e.target.closest(".lvl-card"); if(!card||card.classList.contains("lock")) return;
-    ensureAudio(); startLevel(+card.dataset.i);
+    ensureAudio(); startLevel(LEVELS[+card.dataset.i], +card.dataset.i);
   });
   document.getElementById("btnBack").addEventListener("click",function(){ if(!busy) showLevels(); });
-  document.getElementById("btnRestart").addEventListener("click",function(){ if(!busy) startLevel(curIndex); });
+  document.getElementById("btnRestart").addEventListener("click",function(){ if(!busy) startLevel(curLevel, curIndex); });
   document.getElementById("btnAid").addEventListener("click",function(e){
     aid=!aid; e.currentTarget.classList.toggle("on",aid); e.currentTarget.setAttribute("aria-pressed",aid?"true":"false");
     lsSet("hm_aid",aid?"1":"0"); if(state) paintAll();
