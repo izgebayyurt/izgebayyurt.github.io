@@ -605,6 +605,13 @@ h1{ font-size:30px; line-height:1; }
   function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
   function abandonRecipe(){ clearRlinks(); }
   function bumpSuspend(){ if(suspendTid) clearTimeout(suspendTid); suspendTid=setTimeout(dropSuspended, RECIPE_HOLD); if(warnTid) clearTimeout(warnTid); warnTid=setTimeout(shakeWarn, RECIPE_HOLD-WARN_LEAD); clearShakeWarn(); showHoldMeter(); }
+  function pauseHold(){   // freeze the 3s window (and its draining bar) while a move animation plays; it restarts when the move lands (bumpSuspend)
+    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; }
+    if(warnTid){ clearTimeout(warnTid); warnTid=0; }
+    clearShakeWarn();
+    var f=meterEl.querySelector(".fill");
+    if(f && meterEl.classList.contains("show")){ f.style.transition="none"; f.style.width=f.getBoundingClientRect().width+"px"; }
+  }
   function showHoldMeter(){                                     // the combo timer — a bar draining full→empty over the 3s window
     meterEl.classList.add("show"); meterEl.classList.remove("warn");   // a fresh/reset window is yellow again
     var f=meterEl.querySelector(".fill");
@@ -646,7 +653,7 @@ h1{ font-size:30px; line-height:1; }
   async function completeRecipe(){
     if(busy){ return; }
     var trace=gest.trace, rec=gest.rec, mySt=state; gest=null; busy=true;
-    if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn();
+    pauseHold(); meterEl.classList.remove("warn");
     spendMove();
     trace.forEach(function(c){ var ref=cells[c.r]&&cells[c.r][c.c]; if(ref){ ref.tile.classList.remove("rlink"); ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
     sfxPop(trace.length);
@@ -855,7 +862,7 @@ h1{ font-size:30px; line-height:1; }
     if(busy) return;
     var carry=gest.carry, tcol=state.grid[to.r][to.c];
     var colA=HEX[carry], colB=HEX[tcol], blend=HM.mix(carry,tcol);
-    busy=true; gest.spent=true;
+    busy=true; gest.spent=true; pauseHold();
     HM.applyMix(state, from, to);              // grid: from -> null, to -> blend (no gravity yet)
     spendMove();
     paintTile(from.r,from.c);
@@ -902,7 +909,7 @@ h1{ font-size:30px; line-height:1; }
      can refresh/reposition when a recipe needs a colour you can't reach. */
   function applyClearNow(from,to){
     if(busy) return;
-    busy=true; gest.spent=true;
+    busy=true; gest.spent=true; pauseHold();
     var group=HM.groupAt(state, to.r, to.c);   // connected same-colour cluster (from is in it — same colour, adjacent)
     spendMove();
     group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
