@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#f3ead6" />
 <title>Huemeld Arcade (prototype)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -172,6 +172,17 @@ var PRIMS=["R","Y","B"];
 function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
 function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+/* iOS Safari ignores user-scalable=no — block pinch (gesture events + multi-touch moves) and double-tap zoom */
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+var lastTouchEnd=0;
+document.addEventListener("touchend", function(e){
+  var now=Date.now();
+  if(now-lastTouchEnd<300 && !e.target.closest("button")) e.preventDefault();   // kill double-tap zoom; buttons may still rapid-tap
+  lastTouchEnd=now;
+}, {passive:false});
 
 var well=document.getElementById("well"), tray=document.getElementById("tray"),
     nextMiniEl=document.getElementById("nextmini"), chainEl=document.getElementById("chain"),

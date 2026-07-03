@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#f3ead6" />
 <title>Huemeld · İzge Bayyurt</title>
 <meta name="description" content="Meld primary paints into a suspended combo, then detonate it. A hand-drawn colour puzzle." />
@@ -335,6 +335,17 @@ h1{ font-size:30px; line-height:1; }
 (function(){
   "use strict";
   var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
+
+  /* iOS Safari ignores user-scalable=no — block pinch (gesture events + multi-touch moves) and double-tap zoom */
+  document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+  document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+  document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+  var lastTouchEnd=0;
+  document.addEventListener("touchend", function(e){
+    var now=Date.now();
+    if(now-lastTouchEnd<300 && !e.target.closest("button")) e.preventDefault();   // kill double-tap zoom; buttons may still rapid-tap
+    lastTouchEnd=now;
+  }, {passive:false});
   /* Liquid Tubes preview — a flagged test level (goal:"tubes"): three vertical
      tubes (O/G/P) fill as you cash combos of that colour, and a big combo pours
      FAR more than small ones (triangular). Fill all three to win. Appended here
