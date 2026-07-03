@@ -311,7 +311,7 @@
   function tubeFill(n) { return n * (n + 1) / 2; }   // triangular: a 5-combo pours 15, five 1-combos pour only 5 — combos fill more
   function tubesMet(s) { if (!s.tubes) return false; for (var k in s.tubes) if (s.tubes.hasOwnProperty(k) && s.tubes[k].have < s.tubes[k].need) return false; return true; }
   function recipesMet(s) { if (!s.recipes || !s.recipes.length) return false; for (var i = 0; i < s.recipes.length; i++) if (s.recipes[i].done < s.recipes[i].count) return false; return true; }
-  function cratesLeft(s) { var n = 0, r, c; for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) if (s.grid[r][c] === "K") n++; return n; }   // "K" = an inert crate block
+  function cratesLeft(s) { var n = 0, r, c, v; for (r = 0; r < s.H; r++) for (c = 0; c < s.W; c++) { v = s.grid[r][c]; if (v && v.charAt(0) === "K") n++; } return n; }   // "K<hp>" = an inert crate block with hit points
   function checkEnd(s) { var met = s.goal === "recipe" ? (recipesMet(s) && cratesLeft(s) === 0) : (s.goal === "tubes" ? tubesMet(s) : objectivesMet(s)); if (met) s.won = true; else if (s.movesLeft <= 0) s.lost = true; return s; }
 
   /* connected same-colour groups of size >= 2 — chain-session openers */

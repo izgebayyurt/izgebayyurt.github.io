@@ -165,6 +165,10 @@ h1{ font-size:30px; line-height:1; }
   background-size:100% 34%,34% 100%;
   box-shadow:inset 0 0 0 3px rgba(255,255,255,.10),1.5px 2px 0 rgba(44,39,51,.28); cursor:default; }
 .tile.crate .streak{ display:none; }
+.tile.crate::after{ content:""; position:absolute; inset:0; border-radius:14%; pointer-events:none; background-repeat:no-repeat; }
+.tile.crate.dmg1::after{ background-image:linear-gradient(52deg, transparent 45%, rgba(52,28,10,.6) 45%, rgba(52,28,10,.6) 55%, transparent 55%); }   /* one crack */
+.tile.crate.dmg2{ filter:brightness(.9); }
+.tile.crate.dmg2::after{ background-image:linear-gradient(52deg, transparent 45%, rgba(52,28,10,.72) 45%, rgba(52,28,10,.72) 55%, transparent 55%),linear-gradient(-52deg, transparent 45%, rgba(52,28,10,.72) 45%, rgba(52,28,10,.72) 55%, transparent 55%); }   /* crossed cracks, about to break */
 /* crate counter in the goals row */
 .pill.crate-pill{ gap:6px; }
 .pill .kbox{ width:15px; height:15px; border-radius:4px; background:#c58f52; border:2px solid #5b3d1e; }
@@ -325,7 +329,7 @@ h1{ font-size:30px; line-height:1; }
 
 </div>
 
-<script src="engine.js?v=4"></script>
+<script src="engine.js?v=5"></script>
 <script src="levels.js"></script>
 <script>
 (function(){
@@ -397,12 +401,13 @@ h1{ font-size:30px; line-height:1; }
       // budget = work + slack; smaller/odd boards get a little more slack (routing friction).
       // The hardest levels (d>0.82, past the intro) are COMBO-GATED: slack pulled <=0 so you must
       // chain. A safety floor keeps every level winnable (build everything, then chain the traces).
-      var crates = (d>0.35 && rnd()<0.5) ? Math.min(6, Math.max(1, Math.round(d*4))) : 0;   // inert blocks (break by clearing next to them) on ~half of medium+ levels
+      var crates = (d>0.35 && rnd()<0.5) ? Math.min(3, Math.max(1, Math.round(d*3))) : 0;   // fewer but TOUGHER inert blocks on ~half of medium+ levels
+      var crateHp = d>0.65 ? 3 : 2;                          // hits to crack through before it breaks (Candy-Crush-style)
       var slack=Math.round(6-2*d)+Math.round((49-cells)/12);
       var gated=(d>0.80 && L>20);
       if(gated) slack-=(2+Math.round(3*(d-0.82)/0.18));
-      var moves=Math.max(buildCost+Math.max(2,Math.ceil(solves*0.4)), buildCost+solves+slack) + crates;   // +1 move budget per crate to break
-      out.push({ id:L, name:"Level "+L, shape:shp.sh, spawn:{R:4,Y:4,B:4}, moves:moves, goal:"recipe", objectives:[], recipes:recipes, crates:crates, gated:gated, diff:d });
+      var moves=Math.max(buildCost+Math.max(2,Math.ceil(solves*0.4)), buildCost+solves+slack) + crates*crateHp;   // budget the extra hits
+      out.push({ id:L, name:"Level "+L, shape:shp.sh, spawn:{R:4,Y:4,B:4}, moves:moves, goal:"recipe", objectives:[], recipes:recipes, crates:crates, crateHp:crateHp, gated:gated, diff:d });
     }
     return out;
   }
@@ -499,19 +504,19 @@ h1{ font-size:30px; line-height:1; }
     t.style.removeProperty("--dx"); t.style.removeProperty("--dy"); t.style.removeProperty("animation-delay");
     if(!v){ t.style.visibility="hidden"; return; }
     t.style.visibility="";
-    if(v==="K"){ t.classList.add("crate"); t.querySelector(".sym").textContent=""; ref.col="K"; return; }   // inert crate block — no colour
+    if(v && v.charAt(0)==="K"){ var hp=(+v.slice(1))||1; t.classList.add("crate"); if(hp<=1) t.classList.add("dmg2"); else if(hp===2) t.classList.add("dmg1"); t.querySelector(".sym").textContent=""; ref.col=v; return; }   // inert crate; cracks show as hp drops
     t.style.setProperty("--pc", HEX[v]);
     if(!HM.isPrim(v)) t.classList.add("sec");
     t.querySelector(".sym").textContent = aid ? v : "";
     ref.col=v;
   }
   function paintAll(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(cells[r]&&cells[r][c]) paintTile(r,c); }
-  function placeCrates(s, n){   // overwrite n random primary cells with inert crates, always leaving >=8 primaries to work with
+  function placeCrates(s, n, hp){   // overwrite n random primary cells with inert crates (hp hits each), leaving >=8 primaries to work with
     if(!n) return;
     var pool=[]; for(var r=0;r<s.H;r++) for(var c=0;c<s.W;c++) if(HM.playable(s,r,c) && HM.isPrim(s.grid[r][c])) pool.push([r,c]);
     for(var i=pool.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
     var k=Math.min(n, Math.max(0, pool.length-8));
-    for(var m=0;m<k;m++){ s.grid[pool[m][0]][pool[m][1]]="K"; }
+    for(var m=0;m<k;m++){ s.grid[pool[m][0]][pool[m][1]]="K"+(hp||2); }
   }
   function setAnim(t, cls, ms){ if(!t) return; t.classList.remove(cls); void t.offsetWidth; t.classList.add(cls); setTimeout(function(){ t.classList.remove(cls); }, ms); }
 
@@ -952,19 +957,19 @@ h1{ font-size:30px; line-height:1; }
     busy=true; gest.spent=true; pauseHold();
     var group=HM.groupAt(state, to.r, to.c);   // connected same-colour cluster (from is in it — same colour, adjacent)
     spendMove();
-    var crates=[], seenK={};                                // any crate orthogonally adjacent to the popped cluster breaks
+    var crates=[], seenK={};                                // crates orthogonally adjacent to the popped cluster take ONE hit
     group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1];
-      [[r+1,c],[r-1,c],[r,c+1],[r,c-1]].forEach(function(nb){ if(HM.playable(state,nb[0],nb[1]) && state.grid[nb[0]][nb[1]]==="K"){ var kk=nb[0]+","+nb[1]; if(!seenK[kk]){ seenK[kk]=1; crates.push(nb); } } });
+      [[r+1,c],[r-1,c],[r,c+1],[r,c-1]].forEach(function(nb){ var v=HM.playable(state,nb[0],nb[1])?state.grid[nb[0]][nb[1]]:null; if(v && v.charAt(0)==="K"){ var kk=nb[0]+","+nb[1]; if(!seenK[kk]){ seenK[kk]=1; crates.push({r:nb[0], c:nb[1], hp:(+v.slice(1))||1}); } } });
     });
     group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
-    crates.forEach(function(nb){ var ref=cells[nb[0]]&&cells[nb[0]][nb[1]]; if(ref) ref.tile.classList.add("clr"); });   // crates crack + pop with the cluster
+    crates.forEach(function(K){ var ref=cells[K.r]&&cells[K.r][K.c]; if(!ref) return; if(K.hp<=1) ref.tile.classList.add("clr"); else setAnim(ref.tile,"squish",300); });   // 1 hp left -> pop; otherwise crack (squish)
     setLift(from,false); setLift(to,false);
     sfxPop(group.length + crates.length);
     var myState=state;
     setTimeout(function(){
       if(state!==myState){ busy=false; return; }
       group.forEach(function(k){ var p=k.split(","); state.grid[+p[0]][+p[1]]=null; });
-      crates.forEach(function(nb){ state.grid[nb[0]][nb[1]]=null; });   // break the adjacent crates
+      crates.forEach(function(K){ if(K.hp<=1) state.grid[K.r][K.c]=null; else state.grid[K.r][K.c]="K"+(K.hp-1); });   // break at 1 hp, otherwise crack down one
       if(state.goal==="recipe"){
         paintAll();                                          // SUSPENDED like a mix: the cleared cells stay holes, board doesn't fall
         if(crates.length) renderRecipe();                    // refresh the crate counter
@@ -1137,7 +1142,7 @@ h1{ font-size:30px; line-height:1; }
   function startLevel(level, idx){
     curIndex=(idx==null?-1:idx); curLevel=level;
     state=HM.newState(curLevel); HM.fill(state, Math.random);
-    placeCrates(state, curLevel.crates||0); state.crateTotal=HM.cratesLeft(state);   // seed inert blocks (some overwrite primaries); count what actually landed
+    placeCrates(state, curLevel.crates||0, curLevel.crateHp||2); state.crateTotal=HM.cratesLeft(state);   // seed inert blocks (some overwrite primaries); count what actually landed
     if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
     busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
     if(suspendTid){ clearTimeout(suspendTid); suspendTid=0; } clearWarn(); winRecipes=0;
