@@ -35,14 +35,22 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .sc b{ font-family:var(--font-d); font-size:17px; line-height:1.1; }
 .mutebtn{ width:36px; height:36px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; }
 
-/* incoming-rain preview — the next mix drops exactly these tiles (full information, zero clock) */
-.nextbar{ width:min(94vw,420px); display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+/* the piece tray — the incoming 2x2 hovers here; drag to aim, tap to spin, flick down to drop */
+.minibar{ width:min(94vw,420px); display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-bottom:3px; min-height:24px; }
 .nlab{ font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); }
-.nextrow{ flex:1; display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
-.nextrow .slot{ height:18px; display:flex; align-items:center; justify-content:center; }
-.nextrow .slot i{ width:13px; height:13px; border:2px solid var(--line); border-radius:4px; box-shadow:0 1.5px 0 var(--shadow); }
-.calm{ display:none; font-family:var(--font-d); font-weight:700; font-size:11px; color:var(--ink); background:#d7f0d0; border:2px solid #2f7d3a; border-radius:999px; padding:2px 9px; white-space:nowrap; }
-.calm.on{ display:inline-block; }
+.mini2{ display:grid; grid-template-columns:repeat(2,11px); grid-auto-rows:11px; gap:2px; }
+.mini2 i{ width:11px; height:11px; border:1.5px solid var(--line); border-radius:3px; }
+.tray{ position:relative; width:min(94vw,420px); aspect-ratio:7/2; margin-bottom:8px; touch-action:none; }
+.tray .guide{ position:absolute; inset:2px; border:2.5px dashed rgba(44,39,51,.16); border-radius:14px; }
+.piece{ position:absolute; top:0; left:0; transition:transform .13s cubic-bezier(.3,1.2,.6,1); cursor:grab; }
+.piece .pchip{
+  position:absolute; border:3px solid var(--line);
+  border-radius:24% 30% 26% 32% / 28% 24% 32% 26%;
+  box-shadow:1.5px 2px 0 var(--shadow);
+}
+.piece .pchip::after{ content:""; position:absolute; top:14%; left:16%; width:34%; height:22%; border-radius:50%; background:rgba(255,255,255,.4); }
+.piece.nope{ animation:pieceNope .3s; }
+@keyframes pieceNope{ 0%,100%{margin-left:0} 30%{margin-left:-5px} 70%{margin-left:5px} }
 
 .wellwrap{ position:relative; width:min(94vw,420px); }
 .well{
@@ -50,6 +58,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   background:var(--card); border:3px solid var(--line); border-radius:18px;
   box-shadow:0 5px 0 var(--shadow); overflow:hidden;
 }
+.well .ghostcol{ position:absolute; top:0; bottom:0; background:rgba(44,39,51,.06); pointer-events:none; display:none; }
 .well.danger{ animation:dangerPulse .8s ease-in-out infinite; }
 @keyframes dangerPulse{ 0%,100%{border-color:var(--line)} 50%{border-color:#ef4a5a; box-shadow:0 5px 0 rgba(239,74,90,.5)} }
 .well.shake{ animation:wellShake .3s; }
@@ -98,9 +107,9 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   background:rgba(243,234,214,.9); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
 }
 .ov.show{ opacity:1; pointer-events:auto; }
-.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 24px; text-align:center; max-width:86%; }
+.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 24px; text-align:center; max-width:88%; }
 .panel h2{ font-family:var(--font-d); font-weight:700; font-size:26px; margin-bottom:8px; }
-.panel p{ font-size:13.5px; font-weight:700; color:var(--ink-soft); line-height:1.55; }
+.panel p{ font-size:13px; font-weight:700; color:var(--ink-soft); line-height:1.55; }
 .panel .bigscore{ font-family:var(--font-d); font-weight:700; font-size:34px; margin:6px 0 2px; }
 .panel .newbest{ color:#2f7d3a; font-weight:800; font-size:13px; }
 .howrow{ display:flex; align-items:center; justify-content:center; gap:5px; margin:10px 0 2px; font-family:var(--font-d); font-weight:700; color:var(--ink-soft); }
@@ -128,15 +137,16 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <button class="mutebtn" id="mute" aria-label="Sound">♪</button>
     </div>
   </div>
-  <div class="nextbar"><span class="nlab">next</span><div class="nextrow" id="nextrow"></div><span class="calm" id="calm"></span></div>
+  <div class="minibar"><span class="nlab">next</span><div class="mini2" id="nextmini"></div></div>
+  <div class="tray" id="tray"><div class="guide"></div></div>
   <div class="wellwrap">
-    <div class="well" id="well"></div>
+    <div class="well" id="well"><div class="ghostcol" id="gc1"></div><div class="ghostcol" id="gc2"></div></div>
     <div class="chain" id="chain"></div>
     <div class="ov show" id="ovStart">
       <div class="panel">
         <h2>Huemeld Arcade</h2>
         <div class="howrow"><span class="chip" style="background:#ef4a5a"></span>+<span class="chip" style="background:#f6c445"></span>=<span class="chip ci" style="background:#f2913d"></span></div>
-        <p>Every mix drops the <b>next</b> paints — shown up top. No clock, all thinking.<br><b>Three</b> mixed colours touching = <b>POP!</b><br>Big pops (4+) <b>shatter</b> the paints around them.<br>Four same paints in a <b>2×2</b> square auto-clean.<br><b>Chains</b> earn ☂ calm mixes — no rain. Don't overflow!</p>
+        <p><b>Drag</b> the falling block sideways, <b>tap</b> it to spin, <b>flick down</b> to drop.<br>Mix two <b>different</b> paints into a circle — <b>three</b> twins touching <b>POP!</b><br>Big pops (4+) <b>shatter</b> paints around them · same-paint <b>2×2</b>s auto-clean.<br>Mix freely — new paint only comes when <b>you</b> drop. Don't overflow!</p>
         <button class="mk" id="btnStart">Play</button>
       </div>
     </div>
@@ -150,7 +160,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       </div>
     </div>
   </div>
-  <p class="tip">take your time — paint falls only when <b>you</b> mix · park <b>pairs</b>, detonate with a <b>third</b> · <b>chains</b> earn ☂ calm mixes</p>
+  <p class="tip">drop blocks where <b>you</b> want the paint · mix freely between drops · park <b>pairs</b>, pop with a <b>third</b></p>
 
 <script>
 (function(){
@@ -163,21 +173,24 @@ function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
 function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
 
-var well=document.getElementById("well"), nextRowEl=document.getElementById("nextrow"), calmEl=document.getElementById("calm");
-var scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"), chainEl=document.getElementById("chain");
+var well=document.getElementById("well"), tray=document.getElementById("tray"),
+    nextMiniEl=document.getElementById("nextmini"), chainEl=document.getElementById("chain"),
+    scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"),
+    gc1=document.getElementById("gc1"), gc2=document.getElementById("gc2");
 
 var grid=[], state="menu", busy=false, gest=null;
-var score=0, best=+(localStorage.getItem("hm_arc_hi")||0), pops=0, maxChain=0;
-var nextWave=[], skipCredits=0, movesTaken=0;   // TURN-BASED rain: paint falls because you MIXED, never because time passed
-var WAVE_BASE=2, WAVE_MAX=4, WAVE_RAMP_EVERY=24;   // wave size 2, +1 every 24 mixes, cap 4
+var score=0, best=+(localStorage.getItem("hm_arc_hi")||0), pops=0, maxChain=0, piecesDropped=0;
+var piece=null, nextP=null, pieceCol=2, pieceEl=null;   // piece = [tl,tr,bl,br] colours; pieceCol = left column (0..COLS-2)
 bestEl.textContent=best;
 
-/* ---------- audio (same beep voice as the main game) ---------- */
+/* ---------- audio ---------- */
 var actx=null, muted=localStorage.getItem("hm_arc_mute")==="1";
 document.getElementById("mute").style.opacity=muted?"0.45":"1";
 function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
 function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
 function sfxMix(){ beep(430,0.07,"triangle",0.05); setTimeout(function(){ beep(650,0.09,"triangle",0.04); },55); }
+function sfxDrop(){ beep(240,0.1,"sine",0.05); setTimeout(function(){ beep(180,0.12,"sine",0.045); },60); }
+function sfxSpin(){ beep(520,0.05,"triangle",0.035); }
 function sfxPop(n,chain){ var b=380+chain*120; for(var i=0;i<Math.min(n,5);i++)(function(i){ setTimeout(function(){ beep(b*Math.pow(1.22,i),0.09,"triangle",0.05); }, i*45); })(i); }
 function sfxOver(){ [440,330,220].forEach(function(f,i){ setTimeout(function(){ beep(f,0.22,"sine",0.05); }, i*160); }); }
 document.getElementById("mute").addEventListener("click",function(e){ muted=!muted; ensureAudio(); localStorage.setItem("hm_arc_mute",muted?"1":"0"); e.currentTarget.style.opacity=muted?"0.45":"1"; if(!muted) sfxMix(); });
@@ -185,7 +198,7 @@ document.getElementById("mute").addEventListener("click",function(e){ muted=!mut
 /* ---------- layout ---------- */
 function cellSize(){ return well.clientWidth/COLS; }
 function placeEl(t){ var cs=cellSize(), pad=cs*0.06; t.el.style.width=(cs-pad*2)+"px"; t.el.style.height=(cs-pad*2)+"px"; t.el.style.transform="translate("+(t.col*cs+pad)+"px,"+(t.row*cs+pad)+"px)"; }
-window.addEventListener("resize", function(){ forAll(placeEl); });
+window.addEventListener("resize", function(){ forAll(placeEl); renderPiece(); });
 function forAll(fn){ for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++) if(grid[r][c]) fn(grid[r][c]); }
 
 /* ---------- tiles ---------- */
@@ -242,12 +255,7 @@ function findGroups(){
   }
   return out;
 }
-function potScore(n,chain){ return (n*25 + (n-2)*40) * chain; }
-function floatScore(px,py,txt){ var f=document.createElement("div"); f.className="float"; f.textContent=txt; f.style.left=px+"px"; f.style.top=py+"px"; well.appendChild(f); setTimeout(function(){ f.remove(); },800); }
-function showChain(n){ chainEl.textContent="CHAIN ×"+n+"!"; chainEl.classList.remove("show"); void chainEl.offsetWidth; chainEl.classList.add("show"); well.classList.remove("shake"); void well.offsetWidth; well.classList.add("shake"); }
-function addScore(n){ score+=n; scoreEl.textContent=score; if(score>best){ best=score; bestEl.textContent=best; } }
-
-function find2x2(){   // four same-colour primaries in a square auto-clean (the Tetris-style sediment valve)
+function find2x2(){   // four same-colour primaries in a square auto-clean (the sediment valve; also a deliberate "discard" for monochrome pieces)
   var seen={}, out=[];
   for(var r=0;r<ROWS-1;r++) for(var c=0;c<COLS-1;c++){
     var a=grid[r][c];
@@ -259,6 +267,11 @@ function find2x2(){   // four same-colour primaries in a square auto-clean (the 
   }
   return out;
 }
+function potScore(n,chain){ return (n*25 + (n-2)*40) * chain; }
+function floatScore(px,py,txt){ var f=document.createElement("div"); f.className="float"; f.textContent=txt; f.style.left=px+"px"; f.style.top=py+"px"; well.appendChild(f); setTimeout(function(){ f.remove(); },800); }
+function showChain(n){ chainEl.textContent="CHAIN ×"+n+"!"; chainEl.classList.remove("show"); void chainEl.offsetWidth; chainEl.classList.add("show"); well.classList.remove("shake"); void well.offsetWidth; well.classList.add("shake"); }
+function addScore(n){ score+=n; scoreEl.textContent=score; if(score>best){ best=score; bestEl.textContent=best; } }
+
 async function resolve(){
   busy=true;
   var chain=0;
@@ -268,12 +281,9 @@ async function resolve(){
     var squares=find2x2();
     if(!groups.length && !squares.length) break;
     var cs=cellSize();
-    if(groups.length){   // only real secondary pops drive the chain multiplier — 2x2 cleans are janitorial
-      chain++; if(chain>maxChain) maxChain=chain;
-    }
+    if(groups.length){ chain++; if(chain>maxChain) maxChain=chain; }   // only real pops drive the multiplier
     var mult=Math.max(1,chain);
-    // splash: only a BIG pop (4+ group) shatters the primaries hugging it
-    var splash=[], seenS={};
+    var splash=[], seenS={};   // only a BIG pop (4+ group) shatters the primaries hugging it
     groups.forEach(function(g){
       if(g.length<4) return;
       g.forEach(function(t){
@@ -309,41 +319,21 @@ async function resolve(){
   }
   busy=false;
   updateDanger();
-  return chain;   // callers convert chains into calm mixes
+  return chain;
+}
+function updateDanger(){
+  var danger=false;
+  for(var c=0;c<COLS;c++) if(grid[1] && grid[1][c]){ danger=true; break; }
+  well.classList.toggle("danger", danger && state==="playing");
 }
 
-/* ---------- the rain (turn-based: falls only when you mix; the preview shows exactly what's coming) ---------- */
-function colsWithSpace(){ var a=[]; for(var c=0;c<COLS;c++) if(!grid[0][c]) a.push(c); return a; }
-function waveSizeNow(){ return Math.min(WAVE_MAX, WAVE_BASE + Math.floor(movesTaken/WAVE_RAMP_EVERY)); }
-function rollWave(){
-  nextWave=[];
-  var n=waveSizeNow(), cols=[];
-  for(var c=0;c<COLS;c++) cols.push(c);
-  for(var i=cols.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=cols[i]; cols[i]=cols[j]; cols[j]=t; }
-  for(var k=0;k<n;k++) nextWave.push({col:cols[k], color:PRIMS[(Math.random()*3)|0]});
-  renderNext();
-}
-function renderNext(){
-  var h="";
-  for(var c=0;c<COLS;c++){
-    var w=null; for(var i=0;i<nextWave.length;i++) if(nextWave[i].col===c) w=nextWave[i];
-    h+='<div class="slot">'+(w?'<i style="background:'+HEX[w.color]+'"></i>':'')+'</div>';
-  }
-  nextRowEl.innerHTML=h;
-  calmEl.textContent="☂ calm ×"+skipCredits;
-  calmEl.classList.toggle("on", skipCredits>0);
-}
-async function dropWave(){   // deliver the previewed wave; a full column spills to a random free one
-  for(var i=0;i<nextWave.length;i++){
-    var w=nextWave[i], c=w.col;
-    if(grid[0][c]){ var avail=colsWithSpace(); if(!avail.length){ gameOver("full"); return false; } c=avail[(Math.random()*avail.length)|0]; }
-    var nr=-1; for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; }
-    if(nr>=0) makeTile(c, nr, w.color, true);
-  }
-  await sleep(200);
-  return true;
-}
-function hasMix(){   // any adjacent different-primary pair left?
+/* ---------- the piece: a 2x2 of primaries YOU place ---------- */
+function rollPiece(){ return [PRIMS[(Math.random()*3)|0], PRIMS[(Math.random()*3)|0], PRIMS[(Math.random()*3)|0], PRIMS[(Math.random()*3)|0]]; }
+function rotatePiece(){ if(!piece||busy||state!=="playing") return; piece=[piece[2],piece[0],piece[3],piece[1]]; sfxSpin(); renderPiece(); }
+function freeIn(c){ var n=0; for(var r=0;r<ROWS;r++) if(!grid[r][c]) n++; return n; }
+function canPlaceAt(a){ return freeIn(a)>=2 && freeIn(a+1)>=2; }
+function canPlace(){ for(var a=0;a<COLS-1;a++) if(canPlaceAt(a)) return true; return false; }
+function hasMix(){
   for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){
     var t=grid[r][c]; if(!t||!isPrim(t.color)) continue;
     var right=c+1<COLS?grid[r][c+1]:null, down=r+1<ROWS?grid[r+1][c]:null;
@@ -352,27 +342,73 @@ function hasMix(){   // any adjacent different-primary pair left?
   }
   return false;
 }
-async function afterMove(){   // one mix = one world-step: rain (or a banked calm), then re-check the future
-  movesTaken++;
-  if(skipCredits>0){
-    skipCredits--;                                        // a chain bought this calm — no rain this mix
-    floatScore(well.clientWidth/2-24, 12, "☂ calm");
-  } else {
-    if(!await dropWave()) return;
-    var ch=await resolve();                               // rain can complete a 2x2 / slam parked twins into a lucky chain
-    skipCredits+=Math.max(0, ch-1);
+function renderPiece(){
+  if(!pieceEl){ pieceEl=document.createElement("div"); pieceEl.className="piece"; tray.appendChild(pieceEl); }
+  if(!piece || state!=="playing"){ pieceEl.style.display="none"; gc1.style.display="none"; gc2.style.display="none"; return; }
+  var cs=cellSize(), pad=cs*0.06;
+  pieceEl.style.display="block";
+  pieceEl.style.width=(cs*2)+"px"; pieceEl.style.height=(cs*2)+"px";
+  pieceEl.style.transform="translate("+(pieceCol*cs)+"px,0)";
+  var h="";
+  var posn=[[0,0],[1,0],[0,1],[1,1]];   // tl,tr,bl,br
+  for(var i=0;i<4;i++){
+    h+='<span class="pchip" style="left:'+(posn[i][0]*cs+pad)+'px; top:'+(posn[i][1]*cs+pad)+'px; width:'+(cs-pad*2)+'px; height:'+(cs-pad*2)+'px; background:'+HEX[piece[i]]+'"></span>';
   }
-  if(state!=="playing") return;
-  rollWave();
-  if(!hasMix()){ gameOver("stuck"); }
+  pieceEl.innerHTML=h;
+  gc1.style.display="block"; gc2.style.display="block";
+  gc1.style.left=(pieceCol*cs)+"px"; gc1.style.width=cs+"px";
+  gc2.style.left=((pieceCol+1)*cs)+"px"; gc2.style.width=cs+"px";
+  renderMini();
 }
-function updateDanger(){
-  var danger=false;
-  for(var c=0;c<COLS;c++) if(grid[1] && grid[1][c]){ danger=true; break; }
-  well.classList.toggle("danger", danger && state==="playing");
+function renderMini(){
+  if(!nextP){ nextMiniEl.innerHTML=""; return; }
+  var h="";
+  [0,1,2,3].forEach(function(i){ h+='<i style="background:'+HEX[nextP[i]]+'"></i>'; });
+  nextMiniEl.innerHTML=h;
+}
+function spawnInto(c,color){ var nr=-1; for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; } if(nr>=0) makeTile(c,nr,color,true); }
+async function dropPiece(){
+  if(busy || state!=="playing" || !piece) return;
+  if(!canPlaceAt(pieceCol)){ pieceEl.classList.remove("nope"); void pieceEl.offsetWidth; pieceEl.classList.add("nope"); beep(160,0.08,"square",0.03); return; }
+  busy=true; piecesDropped++;
+  var a=pieceCol, b=pieceCol+1;
+  spawnInto(a, piece[2]); spawnInto(a, piece[0]);   // bottom-left lands first, top-left stacks on it
+  spawnInto(b, piece[3]); spawnInto(b, piece[1]);
+  sfxDrop();
+  piece=nextP; nextP=rollPiece();
+  renderPiece();
+  await sleep(230);
+  busy=false;
+  await resolve();   // a monochrome drop self-cleans as a 2x2; collapses can even chain
+  if(state!=="playing") return;
+  updateDanger();
+  if(!canPlace() && !hasMix()) gameOver();   // nowhere to drop AND nothing to mix = the end
 }
 
-/* ---------- input: swipe to mix ---------- */
+/* ---------- tray input: drag to aim, tap to spin, flick down to drop ---------- */
+var tgest=null;
+tray.addEventListener("pointerdown", function(e){
+  if(state!=="playing"||busy||!e.isPrimary) return; ensureAudio();
+  tgest={x0:e.clientX, y0:e.clientY, col0:pieceCol, moved:false, dropped:false};
+  try{ tray.setPointerCapture(e.pointerId); }catch(_e){}
+});
+tray.addEventListener("pointermove", function(e){
+  if(!tgest||!e.isPrimary||tgest.dropped) return;
+  var dx=e.clientX-tgest.x0, dy=e.clientY-tgest.y0, cs=cellSize();
+  if(Math.abs(dx)>7||Math.abs(dy)>7) tgest.moved=true;
+  if(dy>cs*0.7 && dy>Math.abs(dx)){ tgest.dropped=true; dropPiece(); return; }   // flick down = drop
+  var nc=Math.max(0, Math.min(COLS-2, tgest.col0+Math.round(dx/cs)));
+  if(nc!==pieceCol){ pieceCol=nc; renderPiece(); }
+});
+tray.addEventListener("pointerup", function(e){
+  if(!tgest||!e.isPrimary) return;
+  var g=tgest; tgest=null;
+  if(!g.moved && !g.dropped) rotatePiece();   // a clean tap spins the piece
+});
+tray.addEventListener("pointercancel", function(){ tgest=null; });
+tray.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+/* ---------- well input: swipe to mix ---------- */
 function cellAt(x,y){
   var rect=well.getBoundingClientRect(), cs=cellSize();
   var c=Math.floor((x-rect.left)/cs), r=Math.floor((y-rect.top)/cs);
@@ -407,7 +443,7 @@ well.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
 async function attemptMix(src, tc, tr){
   var dst=grid[tr][tc];
-  if(!dst || !isPrim(dst.color) || !isPrim(src.color) || dst.color===src.color){   // no manual clear — 2x2 squares auto-clean instead
+  if(!dst || !isPrim(dst.color) || !isPrim(src.color) || dst.color===src.color){
     src.el.classList.remove("nope"); void src.el.offsetWidth; src.el.classList.add("nope");
     beep(160,0.08,"square",0.03);
     return;
@@ -417,7 +453,7 @@ async function attemptMix(src, tc, tr){
   grid[src.row][src.col]=null;
   var cs=cellSize(), pad=cs*0.06;
   src.el.style.zIndex=5;
-  src.el.style.transform="translate("+(tc*cs+pad)+"px,"+(tr*cs+pad)+"px)";  // slide onto the target
+  src.el.style.transform="translate("+(tc*cs+pad)+"px,"+(tr*cs+pad)+"px)";
   src.b.style.transform="scale(.5)";
   sfxMix();
   await sleep(130);
@@ -425,55 +461,34 @@ async function attemptMix(src, tc, tr){
   setColor(dst,m);
   dst.el.classList.remove("mixed"); void dst.el.offsetWidth; dst.el.classList.add("mixed");
   await sleep(90);
-  var ch=await resolve();                  // gravity + pop cascades (resolve clears busy)
-  skipCredits+=Math.max(0, ch-1);          // chains earn calm mixes — a x2 immediately spares you this move's rain
-  if(state==="playing") await afterMove(); // the world steps ONLY because you mixed
+  await resolve();
+  if(state!=="playing") return;
+  if(!canPlace() && !hasMix()) gameOver();   // mixed yourself into a corner with no room for the piece
 }
 
 /* ---------- game flow ---------- */
 function clearBoard(){ for(var r=0;r<ROWS;r++){ for(var c=0;c<COLS;c++){ if(grid[r]&&grid[r][c]) grid[r][c].el.remove(); } } grid=[]; for(var r2=0;r2<ROWS;r2++){ grid[r2]=[]; for(var c2=0;c2<COLS;c2++) grid[r2][c2]=null; } }
-function forms2x2(c,r,color){   // would placing `color` at (c,r) complete a same-colour 2x2?
-  for(var dr=-1;dr<=0;dr++) for(var dc=-1;dc<=0;dc++){
-    var ok=true;
-    for(var i=0;i<2&&ok;i++) for(var j=0;j<2;j++){
-      var rr=r+dr+i, cc=c+dc+j;
-      if(rr===r&&cc===c) continue;
-      if(rr<0||cc<0||rr>=ROWS||cc>=COLS){ ok=false; break; }
-      var o=grid[rr][cc];
-      if(!o || o.color!==color){ ok=false; break; }
-    }
-    if(ok) return true;
-  }
-  return false;
-}
-function seed(){
-  for(var i=0;i<16;i++){
-    var c=(Math.random()*COLS)|0, nr=-1;
-    for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; }
-    if(nr<Math.floor(ROWS/2)) continue;
-    var start=(Math.random()*3)|0, col=PRIMS[start];   // don't seed a pre-completed 2x2 — those are for the player (or the rain) to make
-    for(var k=0;k<3;k++){ var cand=PRIMS[(start+k)%3]; if(!forms2x2(c,nr,cand)){ col=cand; break; } }
-    makeTile(c,nr,col,true);
-  }
-}
 function start(){
-  score=0; pops=0; maxChain=0; movesTaken=0; skipCredits=0; scoreEl.textContent="0";
+  clearBoard();
+  score=0; pops=0; maxChain=0; piecesDropped=0; scoreEl.textContent="0";
   document.getElementById("ovStart").classList.remove("show");
   document.getElementById("ovOver").classList.remove("show");
-  state="playing"; busy=false; gest=null;
-  for(var tries=0; tries<10; tries++){ clearBoard(); seed(); if(hasMix()) break; }   // never open on a dead board
-  rollWave();
+  state="playing"; busy=false; gest=null; tgest=null;
+  piece=rollPiece(); nextP=rollPiece(); pieceCol=2;
+  renderPiece();
+  updateDanger();
 }
-function gameOver(reason){
+function gameOver(){
   state="over";
   well.classList.remove("danger");
+  renderPiece();   // hides the piece + ghosts
   sfxOver();
   var isBest = score>=best && score>0 && score>=+(localStorage.getItem("hm_arc_hi")||0);
   if(score>+(localStorage.getItem("hm_arc_hi")||0)) localStorage.setItem("hm_arc_hi",""+score);
-  document.getElementById("overTitle2").textContent = reason==="stuck" ? "No mixes left!" : "The well is full!";
+  document.getElementById("overTitle2").textContent="The well is full!";
   document.getElementById("finalScore").textContent=score;
   document.getElementById("newBest").style.display=isBest?"block":"none";
-  document.getElementById("overStats").textContent=movesTaken+" mixes · "+pops+" pops · best chain ×"+Math.max(1,maxChain);
+  document.getElementById("overStats").textContent=piecesDropped+" blocks · "+pops+" pops · best chain ×"+Math.max(1,maxChain);
   document.getElementById("ovOver").classList.add("show");
 }
 document.getElementById("btnStart").addEventListener("click",function(){ ensureAudio(); start(); });
@@ -485,10 +500,12 @@ clearBoard();
 window.__arc={
   grid:function(){ return grid.map(function(row){ return row.map(function(t){ return t?t.color:"."; }).join(""); }); },
   place:function(c,r,color){ if(grid[r][c]) removeTile(grid[r][c]); return makeTile(c,r,color,false); },
-  resolve:resolve, dropWave:dropWave, start:start, rollWave:rollWave,
-  calm:function(n){ skipCredits=n; renderNext(); },
-  next:function(){ return nextWave.slice(); },
-  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, movesTaken:movesTaken, skipCredits:skipCredits, waveSize:waveSizeNow(), hasMix:hasMix()}; },
+  resolve:resolve, start:start,
+  piece:function(){ return {cur:piece?piece.slice():null, next:nextP?nextP.slice():null, col:pieceCol}; },
+  setPiece:function(cols){ piece=cols.slice(); renderPiece(); },
+  setCol:function(c){ pieceCol=c; renderPiece(); },
+  rotate:rotatePiece, drop:dropPiece,
+  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, pieces:piecesDropped, hasMix:hasMix(), canPlace:canPlace()}; },
   mixAt:attemptMix, tileAt:function(c,r){ return grid[r][c]; }
 };
 })();
