@@ -231,13 +231,45 @@ var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
 
-/* ---------- audio ---------- */
-var actx=null;
-function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
-function beep(f,d,t,g){ if(!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
-function sfxJun(){ beep(430,0.08,"triangle",0.05); setTimeout(function(){ beep(650,0.1,"triangle",0.045); },60); }
-function sfxDone(){ beep(520,0.09,"triangle",0.05); setTimeout(function(){ beep(780,0.12,"triangle",0.045); },70); }
-function sfxWin(){ [0,110,220,400].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.15,"triangle",0.05); },t); }); }
+/* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
+var actx=null, master=null;
+function ensureAudio(){
+  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); master=actx.createGain(); master.gain.value=0.85; master.connect(actx.destination); }catch(e){ actx=null; } }
+  if(actx&&actx.state==="suspended") actx.resume();
+}
+/* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
+function voice(freq,dur,o){
+  if(!actx) return; o=o||{};
+  try{
+    var t=actx.currentTime, osc=actx.createOscillator(), f=actx.createBiquadFilter(), g=actx.createGain();
+    osc.type=o.type||"sine"; osc.frequency.setValueAtTime(freq,t);
+    if(o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30,o.to), t+(o.gl||dur*0.8));
+    f.type="lowpass"; f.frequency.setValueAtTime(o.lp||2400,t);
+    var peak=o.g||0.05, atk=o.atk||0.006;
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+atk); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(f); f.connect(g); g.connect(master||actx.destination); osc.start(t); osc.stop(t+dur+0.03);
+  }catch(e){}
+}
+/* a struck bell: fundamental + shimmering overtones */
+function bell(freq,dur,gain){ gain=gain||0.05; voice(freq,dur,{g:gain,lp:3200,atk:0.003}); voice(freq*2.01,dur*0.7,{g:gain*0.42,lp:4200,atk:0.003}); voice(freq*3.0,dur*0.45,{g:gain*0.16,lp:5200,atk:0.002}); }
+var SCALE=[0,2,4,7,9,12,14,16,19,21];   // major pentatonic degrees (never dissonant, however fast you draw)
+function noteHz(i){ return 293.66*Math.pow(2, SCALE[Math.max(0,Math.min(i,SCALE.length-1))]/12); }   // from D4
+/* drawing a cell: a soft rounded "paint drop" that rises up the scale as the line grows */
+function sfxDraw(step,up){
+  if(!actx) return; var fq=noteHz(step);
+  voice(fq*(up?1:0.985), 0.12, {type:"sine", to:fq*0.84, gl:0.1, lp:2600, g:0.04, atk:0.003});   // the droplet
+  voice(fq*2, 0.06, {type:"sine", g:0.01, lp:4200, atk:0.002});                                    // faint sparkle
+}
+/* two paints merge: a watery plunk under a warm rising blend chord */
+function sfxJun(){
+  voice(320,0.24,{type:"sine", to:150, gl:0.15, lp:1300, g:0.07, atk:0.004});                     // plunk
+  voice(392,0.28,{type:"triangle", g:0.028, lp:2200, atk:0.02});
+  setTimeout(function(){ voice(587.33,0.3,{type:"triangle", g:0.028, lp:2400, atk:0.02}); },70);
+}
+/* blend reaches its target: a bright two-note bell */
+function sfxDone(){ bell(659.25,0.5,0.06); setTimeout(function(){ bell(987.77,0.62,0.05); },95); }   // E5 -> B5
+/* win: a rising bell arpeggio */
+function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.055); }, i*115); }); }
 
 /* ---------- level state ---------- */
 function applyLevel(L){
@@ -367,18 +399,11 @@ board.addEventListener("pointerdown", function(e){
     else { drag=null; }   // two lines already out — a single tap must NOT reset (double-tap does)
   } else if(o.t==="em"){
     var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
-    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }
-    else if(E2.legs.length<2){
+    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }        // grab a TIP -> drag back to retreat, or extend
+    else if(E2.legs.length<2){                                     // click mid-pipe with a free line -> BRANCH here
       E2.legs.push({cells:[[cell[0],cell[1]]], jun:-1});
       drag={t:"em", e:o.e, l:E2.legs.length-1};
-    } else {
-      destroyJunctionOf(leg);
-      leg.cells=leg.cells.slice(0,o.idx+1);
-      reconcile();
-      // resume dragging whichever surviving leg still holds the grabbed cell
-      drag=null;
-      for(var li2=0; li2<ems[o.e].legs.length; li2++){ if(indexIn(ems[o.e].legs[li2].cells, cell[0], cell[1])>=0){ drag={t:"em", e:o.e, l:li2}; break; } }
-    }
+    } else { drag=null; }   // both lines already drawn — a mid-pipe click does NOT retreat (retreat = drag a tip back, or double-tap the square)
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
   renderPaths();
@@ -487,8 +512,8 @@ function renderDots(){
 /* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
 function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
 var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[];
-var PENTA=[523.25,587.33,659.25,783.99,880.00,1046.5], drawSteps=0;
-function penTick(up){ if(up){ var f=PENTA[Math.min(drawSteps,PENTA.length-1)]; beep(f,0.055,"triangle",0.03); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); beep(PENTA[Math.min(drawSteps,PENTA.length-1)]*0.75,0.05,"triangle",0.022); } }
+var drawSteps=0;
+function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
 function addBloom(r,c,color,dur){ blooms.push({r:r,c:c,color:color,t0:nowMs(),dur:dur||600}); }
 function polyCum(pts){ var cum=[0],tot=0; for(var i=1;i<pts.length;i++){ tot+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); cum.push(tot); } return {cum:cum,total:tot}; }
 function ptAtLen(pts,cum,len){ if(pts.length===1) return pts[0]; if(len<=0) return pts[0]; for(var i=1;i<pts.length;i++){ if(cum[i]>=len){ var seg=(cum[i]-cum[i-1])||1,t=(len-cum[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; }
