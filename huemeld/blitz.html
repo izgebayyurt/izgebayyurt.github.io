@@ -350,7 +350,7 @@ function act(r,c,dr,dc){
 function afterAction(bornKey){
   var res=findLines();
   if(res.cells.length){ draw(null, bornKey); popCells(res.cells, res.maxRun); }
-  else if(phase==="hang"){ draw(null, bornKey); renderHUD(); }   // circle added to frozen board
+  else if(phase==="hang"){ hangLeft=HANG_MS; draw(null, bornKey); renderHUD(); }   // any productive swipe keeps the frozen combo alive
   else { draw(null, bornKey); settleBoard(); }                    // idle non-popping mix -> settle
 }
 function nope(r,c){
