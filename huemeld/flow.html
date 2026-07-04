@@ -416,6 +416,14 @@ function reconcile(){
     if(!ok) dropJunction(j);
   }
 }
+/* drop STRAY emitter legs (just the emitter cell, no pipe) left behind when a fork/branch
+   was started but not drawn — otherwise the phantom leg fills the 2-leg slot and locks the
+   square out of any new line until a double-tap reset. */
+function pruneStrayLegs(){
+  var changed=false;
+  ems.forEach(function(E){ for(var k=E.legs.length-1;k>=0;k--){ if(E.legs[k].cells.length<=1){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); changed=true; } } });
+  if(changed) reconcile();
+}
 /* reconcile, then re-anchor the in-flight drag to its (possibly re-indexed / removed) leg or junction */
 function reconcileAndFixDrag(){
   var active=(drag && drag.t==="em" && ems[drag.e]) ? ems[drag.e].legs[drag.l] : null;
@@ -478,8 +486,8 @@ board.addEventListener("pointermove", function(e){
   var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
   step(cell);
 });
-board.addEventListener("pointerup", function(){ if(demoing && !demoFiring) return; drag=null; });
-board.addEventListener("pointercancel", function(){ if(demoing && !demoFiring) return; drag=null; });
+board.addEventListener("pointerup", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); renderPaths(); });
+board.addEventListener("pointercancel", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); renderPaths(); });
 board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 function legOf(d){ return d.t==="em" ? (ems[d.e].legs[d.l]&&ems[d.e].legs[d.l].cells) : (junctions[d.i]&&junctions[d.i].leg); }
 
@@ -492,14 +500,20 @@ function step(cell){
   var o=occAt(cell[0],cell[1]);
   if(!o){ leg.push(cell); penTick(true); renderPaths(); return; }
 
-  if(drag.t==="jun" && o.t==="em" && ems[o.e].legs[o.l] && ems[o.e].legs[o.l].jun===drag.i){
-    // swiped back from the junction onto one of ITS feeder pipes -> separate the merge
-    var jcell=junctions[drag.i].cell.slice();
-    var fleg=ems[o.e].legs[o.l];
-    destroyJunctionOf(fleg);   // un-merges both feeders (jun -> -1), removes junction + its blend leg
-    if(fleg.cells.length>1 && same(fleg.cells[fleg.cells.length-1], jcell)) fleg.cells.pop();
-    drag={t:"em", e:o.e, l:o.l};
-    sfxJun(); renderPaths(); return;
+  if(drag.t==="jun" && (o.t==="em" || o.t==="emdot")){
+    // swiped back from the junction onto one of ITS feeder pipes (or the feeder's emitter dot,
+    // which is what you hit when the junction sits right next to the square) -> separate the merge
+    var fe=-1, fl=-1;
+    if(o.t==="em" && ems[o.e].legs[o.l] && ems[o.e].legs[o.l].jun===drag.i){ fe=o.e; fl=o.l; }
+    else if(o.t==="emdot"){ var Ee=ems[o.e]; for(var li=0;li<Ee.legs.length;li++){ if(Ee.legs[li].jun===drag.i){ fe=o.e; fl=li; break; } } }
+    if(fe>=0){
+      var jcell=junctions[drag.i].cell.slice();
+      var fleg=ems[fe].legs[fl];
+      destroyJunctionOf(fleg);   // un-merges both feeders (jun -> -1), removes junction + its blend leg
+      if(fleg.cells.length>1 && same(fleg.cells[fleg.cells.length-1], jcell)) fleg.cells.pop();
+      drag={t:"em", e:fe, l:fl};
+      sfxJun(); renderPaths(); return;
+    }
   }
   if(drag.t==="em" && o.t==="em" && o.e!==drag.e){
     var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
