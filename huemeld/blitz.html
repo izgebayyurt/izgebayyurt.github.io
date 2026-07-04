@@ -83,6 +83,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
 /* the frozen combo is about to fall: a fast little tremor warns you, like the level game's drop warning */
 .board.warnshake{ animation:hmWobble .16s linear infinite; }
 @keyframes hmWobble{ 0%,100%{ transform:translate(0,0) } 25%{ transform:translate(-2px,1px) } 75%{ transform:translate(2px,-1px) } }
+/* combo freeze meter — a fuse across the top of the board, drains over the 3s window */
+.combometer{ position:absolute; left:10px; right:10px; top:9px; height:7px; border-radius:999px; background:rgba(44,39,51,.16); overflow:hidden; opacity:0; transition:opacity .12s; z-index:7; pointer-events:none; box-shadow:0 1px 0 rgba(255,255,255,.35); }
+.combometer.show{ opacity:1; }
+.cfill{ position:absolute; left:0; top:0; bottom:0; width:100%; border-radius:999px; background:linear-gradient(90deg,#f6c445,#ffcf5c); }
+.combometer.warn .cfill{ background:linear-gradient(90deg,#ef4a5a,#ff7a6a); }
 /* jackpot flash */
 .jflash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:8; border-radius:14px; }
 .jflash.go{ animation:jFlash .6s ease-out; }
@@ -129,6 +134,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
     </div>
     <div class="boardwrap">
       <div class="board" id="board"></div>
+      <div class="combometer" id="combometer"><div class="cfill" id="cfill"></div></div>
       <div class="jflash" id="jflash"></div>
       <div class="burst" id="burst"></div>
     </div>
@@ -180,6 +186,7 @@ var lastTE=0;
 document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-lastTE<300 && !e.target.closest("button")) e.preventDefault(); lastTE=now; }, {passive:false});
 
 var board=document.getElementById("board"), burstEl=document.getElementById("burst"),
+    combometerEl=document.getElementById("combometer"), cfillEl=document.getElementById("cfill"),
     jflashEl=document.getElementById("jflash"), barsEl=document.getElementById("bars"),
     scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"),
     timenumEl=document.getElementById("timenum"), timebarEl=document.getElementById("timebar"), timefillEl=document.getElementById("timefill");
@@ -280,6 +287,11 @@ function renderHUD(){
   var t=Math.max(0,Math.ceil(timeLeft)); timenumEl.textContent=t;
   timefillEl.style.width=(Math.min(1,timeLeft/START_TIME)*100)+"%";
   timebarEl.classList.toggle("warn", timeLeft<=10 && phase!=="pre" && phase!=="over");
+}
+function updateComboMeter(){
+  var on = phase==="hang" && hangLeft>0;
+  combometerEl.classList.toggle("show", on);
+  if(on){ cfillEl.style.width=(Math.max(0,Math.min(1,hangLeft/HANG_MS))*100)+"%"; combometerEl.classList.toggle("warn", hangLeft<=WARN_LEAD); }
 }
 
 /* ---------- combo callout ---------- */
@@ -398,6 +410,7 @@ function advance(dtMs){
     if(hangLeft<=0){ settleBoard(); }
   }
   board.classList.toggle("warnshake", phase==="hang" && hangLeft<=WARN_LEAD && hangLeft>0);
+  updateComboMeter();
   // warning ticks in last 10s
   var ws=Math.ceil(timeLeft);
   if(timeLeft<=10 && timeLeft>0 && ws!==lastWholeSec){ lastWholeSec=ws; sfxTick(); }
@@ -412,7 +425,7 @@ function loop(now){
 requestAnimationFrame(loop);
 
 function gameOver(){
-  phase="over"; board.classList.remove("warnshake");
+  phase="over"; board.classList.remove("warnshake"); combometerEl.classList.remove("show");
   if(score>best){ best=score; localStorage.setItem("hm_blitz_best",""+best); }
   document.getElementById("finalScore").textContent=score;
   document.getElementById("stBest").textContent=best;
@@ -425,7 +438,7 @@ function gameOver(){
 function startGame(){
   ensureAudio();
   score=0; jackpots=0; chain=0; topChain=0; bars={O:0,G:0,P:0}; timeLeft=START_TIME; hangLeft=0; warned=false; lastWholeSec=99;
-  board.classList.remove("warnshake");
+  board.classList.remove("warnshake"); combometerEl.classList.remove("show");
   newGrid(); phase="idle";
   document.getElementById("ovStart").classList.remove("show");
   document.getElementById("ovOver").classList.remove("show");
