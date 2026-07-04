@@ -71,6 +71,9 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 }
 .mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .pkgrid{ display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-top:10px; max-width:280px; }
+#ovPick{ position:fixed; }
+#ovPick .panel{ max-height:86vh; display:flex; flex-direction:column; }
+#ovPick .pkgrid{ overflow-y:auto; overflow-x:hidden; padding:6px 4px; min-height:0; }
 .pkbtn{
   width:52px; height:52px; border:3px solid var(--line); border-radius:14px; background:var(--card);
   box-shadow:0 3px 0 var(--shadow); cursor:pointer; font-family:var(--font-d); font-weight:700; font-size:17px; color:var(--ink);
@@ -81,6 +84,13 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pkbtn.cur{ background:#ffd15c; }
 .tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
+.cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
+.cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
+.cdots i.on{ background:var(--ink); }
+.coachmix{ display:flex; gap:14px; justify-content:center; align-items:center; margin-bottom:10px; min-height:0; flex-wrap:wrap; }
+.coachmix .mx{ display:flex; align-items:center; gap:3px; font-family:var(--font-d); font-weight:700; font-size:15px; color:var(--ink-soft); }
+.coachmix .sw{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:1px 1.5px 0 var(--shadow); }
+.coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
 </style>
 </head>
 <body>
@@ -113,8 +123,18 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div class="ov" id="ovPick">
       <div class="panel">
         <h2>Levels</h2>
+        <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:4px">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
         <button class="mk" id="btnPickClose">Close</button>
+      </div>
+    </div>
+    <div class="ov" id="ovCoach">
+      <div class="panel">
+        <div class="coachmix" id="coachMix"></div>
+        <h2 id="coachTitle">How to play</h2>
+        <p id="coachBody">…</p>
+        <div class="cdots" id="coachDots"></div>
+        <button class="mk" id="btnCoachNext">Next →</button>
       </div>
     </div>
   </div>
@@ -136,26 +156,60 @@ document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-la
 
 /* ---------- levels: ONE emitter each of R/Y/B, ONE receiver each of O/G/P.
    Every emitter splits into two lines (fork at the dot or branch mid-line; branches
-   never rejoin). Each authored level has a verified full-coverage solution. */
+   never rejoin). Machine-generated: each level has a verified full-coverage solution
+   (16x 5x5, 26x 6x6, 8x 7x7), ordered easiest-first. TUTORIAL is a gentle 5x5. */
+var TUTORIAL={ n:5, ems:[["R",2,3],["Y",3,3],["B",4,4]], tgts:[["O",2,1],["G",0,2],["P",0,1]] };
 var LEVELS=[
-  { name:"The colour wheel", n:5,
-    ems:[["R",2,0],["Y",0,4],["B",4,4]],
-    tgts:[["O",0,0],["G",2,1],["P",3,2]] },
-  { name:"Fork in the road", n:5,
-    ems:[["R",0,0],["Y",2,1],["B",4,2]],
-    tgts:[["O",0,4],["G",1,3],["P",3,2]] },
-  { name:"Mirror mix", n:5,
-    ems:[["R",2,4],["Y",0,0],["B",4,0]],
-    tgts:[["O",0,4],["G",2,3],["P",3,2]] },
-  { name:"Branch out", n:6,
-    ems:[["R",2,1],["Y",2,3],["B",5,3]],
-    tgts:[["O",1,4],["G",5,4],["P",1,2]] },
-  { name:"Snakes", n:6,
-    ems:[["R",1,1],["Y",1,0],["B",3,2]],
-    tgts:[["O",1,4],["G",5,0],["P",2,5]] },
-  { name:"Long way round", n:7,
-    ems:[["R",2,0],["Y",0,6],["B",6,6]],
-    tgts:[["O",0,0],["G",2,1],["P",5,3]] }
+  { n:5, ems:[["R",1,2],["Y",4,2],["B",0,2]], tgts:[["O",4,3],["G",1,1],["P",4,4]] },
+  { n:5, ems:[["R",2,2],["Y",1,3],["B",4,2]], tgts:[["O",3,3],["G",0,0],["P",2,1]] },
+  { n:5, ems:[["R",3,3],["Y",1,3],["B",3,0]], tgts:[["O",2,2],["G",1,4],["P",4,0]] },
+  { n:5, ems:[["R",0,2],["Y",1,3],["B",4,0]], tgts:[["O",3,3],["G",3,1],["P",2,1]] },
+  { n:5, ems:[["R",3,0],["Y",1,1],["B",1,4]], tgts:[["O",0,2],["G",3,2],["P",3,1]] },
+  { n:5, ems:[["R",2,3],["Y",2,2],["B",4,1]], tgts:[["O",0,0],["G",1,1],["P",3,2]] },
+  { n:5, ems:[["R",0,2],["Y",3,2],["B",1,0]], tgts:[["O",2,3],["G",1,2],["P",0,0]] },
+  { n:5, ems:[["R",0,4],["Y",2,4],["B",4,1]], tgts:[["O",2,2],["G",3,1],["P",2,1]] },
+  { n:5, ems:[["R",0,1],["Y",2,0],["B",1,3]], tgts:[["O",0,0],["G",2,2],["P",4,4]] },
+  { n:5, ems:[["R",3,2],["Y",1,4],["B",4,0]], tgts:[["O",1,2],["G",1,3],["P",2,0]] },
+  { n:5, ems:[["R",3,4],["Y",3,0],["B",1,4]], tgts:[["O",4,4],["G",1,0],["P",3,1]] },
+  { n:5, ems:[["R",1,1],["Y",0,2],["B",4,4]], tgts:[["O",2,0],["G",0,4],["P",4,0]] },
+  { n:5, ems:[["R",2,3],["Y",4,3],["B",0,0]], tgts:[["O",0,4],["G",4,0],["P",0,3]] },
+  { n:5, ems:[["R",2,4],["Y",0,2],["B",3,0]], tgts:[["O",0,4],["G",2,3],["P",3,3]] },
+  { n:5, ems:[["R",3,4],["Y",2,0],["B",0,2]], tgts:[["O",2,2],["G",1,0],["P",0,3]] },
+  { n:5, ems:[["R",4,4],["Y",3,0],["B",0,0]], tgts:[["O",3,2],["G",2,2],["P",0,4]] },
+  { n:6, ems:[["R",3,4],["Y",1,1],["B",4,3]], tgts:[["O",2,4],["G",4,1],["P",5,5]] },
+  { n:6, ems:[["R",2,4],["Y",2,5],["B",3,1]], tgts:[["O",1,0],["G",5,0],["P",4,2]] },
+  { n:6, ems:[["R",2,4],["Y",2,0],["B",5,5]], tgts:[["O",2,1],["G",0,2],["P",5,3]] },
+  { n:6, ems:[["R",0,1],["Y",2,4],["B",4,2]], tgts:[["O",4,1],["G",4,4],["P",1,2]] },
+  { n:6, ems:[["R",4,0],["Y",4,4],["B",1,0]], tgts:[["O",2,4],["G",2,5],["P",2,0]] },
+  { n:6, ems:[["R",5,0],["Y",2,3],["B",1,1]], tgts:[["O",1,5],["G",4,1],["P",0,5]] },
+  { n:6, ems:[["R",5,3],["Y",3,4],["B",3,1]], tgts:[["O",0,4],["G",0,0],["P",2,1]] },
+  { n:6, ems:[["R",1,2],["Y",1,5],["B",4,5]], tgts:[["O",1,1],["G",4,3],["P",3,3]] },
+  { n:6, ems:[["R",4,3],["Y",0,5],["B",2,1]], tgts:[["O",3,4],["G",1,4],["P",5,3]] },
+  { n:6, ems:[["R",4,4],["Y",2,4],["B",1,5]], tgts:[["O",4,1],["G",1,0],["P",2,0]] },
+  { n:6, ems:[["R",4,2],["Y",2,4],["B",0,2]], tgts:[["O",5,0],["G",2,1],["P",1,1]] },
+  { n:6, ems:[["R",5,2],["Y",3,0],["B",1,4]], tgts:[["O",2,2],["G",0,5],["P",2,3]] },
+  { n:6, ems:[["R",3,4],["Y",2,1],["B",5,1]], tgts:[["O",5,0],["G",3,3],["P",0,3]] },
+  { n:6, ems:[["R",1,4],["Y",0,0],["B",2,3]], tgts:[["O",5,5],["G",3,1],["P",1,2]] },
+  { n:6, ems:[["R",4,1],["Y",0,3],["B",4,3]], tgts:[["O",1,1],["G",1,2],["P",0,5]] },
+  { n:6, ems:[["R",5,3],["Y",2,3],["B",3,0]], tgts:[["O",1,5],["G",0,0],["P",4,2]] },
+  { n:6, ems:[["R",1,4],["Y",4,2],["B",0,4]], tgts:[["O",5,2],["G",1,1],["P",2,5]] },
+  { n:6, ems:[["R",4,1],["Y",0,3],["B",3,4]], tgts:[["O",2,3],["G",5,5],["P",4,0]] },
+  { n:6, ems:[["R",4,5],["Y",5,2],["B",2,1]], tgts:[["O",4,3],["G",4,2],["P",2,3]] },
+  { n:6, ems:[["R",5,0],["Y",1,2],["B",2,2]], tgts:[["O",5,4],["G",4,4],["P",3,1]] },
+  { n:6, ems:[["R",0,0],["Y",2,4],["B",4,0]], tgts:[["O",4,1],["G",4,3],["P",2,2]] },
+  { n:6, ems:[["R",1,3],["Y",4,0],["B",2,4]], tgts:[["O",1,1],["G",0,5],["P",4,3]] },
+  { n:6, ems:[["R",3,1],["Y",4,2],["B",1,5]], tgts:[["O",5,2],["G",2,2],["P",2,3]] },
+  { n:6, ems:[["R",1,5],["Y",1,2],["B",4,3]], tgts:[["O",3,1],["G",5,0],["P",1,4]] },
+  { n:6, ems:[["R",3,2],["Y",2,2],["B",1,4]], tgts:[["O",4,4],["G",0,1],["P",2,0]] },
+  { n:6, ems:[["R",4,3],["Y",0,4],["B",2,3]], tgts:[["O",3,5],["G",0,0],["P",2,1]] },
+  { n:7, ems:[["R",1,5],["Y",5,1],["B",2,0]], tgts:[["O",3,4],["G",3,5],["P",2,2]] },
+  { n:7, ems:[["R",0,3],["Y",4,4],["B",5,1]], tgts:[["O",2,4],["G",4,3],["P",4,0]] },
+  { n:7, ems:[["R",3,5],["Y",0,3],["B",2,3]], tgts:[["O",4,2],["G",1,3],["P",4,3]] },
+  { n:7, ems:[["R",4,3],["Y",2,1],["B",1,5]], tgts:[["O",3,1],["G",4,5],["P",6,4]] },
+  { n:7, ems:[["R",0,2],["Y",4,2],["B",6,4]], tgts:[["O",2,3],["G",4,4],["P",4,0]] },
+  { n:7, ems:[["R",3,3],["Y",6,4],["B",0,6]], tgts:[["O",5,4],["G",6,2],["P",3,1]] },
+  { n:7, ems:[["R",5,3],["Y",2,1],["B",3,5]], tgts:[["O",6,2],["G",3,3],["P",2,5]] },
+  { n:7, ems:[["R",5,2],["Y",1,2],["B",4,5]], tgts:[["O",4,3],["G",0,4],["P",6,4]] }
 ];
 
 var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
@@ -166,6 +220,9 @@ var board=document.getElementById("board"), canvas=document.getElementById("path
 
 var li=Math.min(+(localStorage.getItem("hm_flow_i")||0), LEVELS.length-1);
 var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
+var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
+var DBL_MS=340;
+var isTut=false;
 
 /* ---------- audio ---------- */
 var actx=null;
@@ -176,16 +233,25 @@ function sfxDone(){ beep(520,0.09,"triangle",0.05); setTimeout(function(){ beep(
 function sfxWin(){ [0,110,220,400].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.15,"triangle",0.05); },t); }); }
 
 /* ---------- level state ---------- */
-function loadLevel(i){
-  li=Math.max(0, Math.min(LEVELS.length-1, i));
-  localStorage.setItem("hm_flow_i",""+li);
-  var L=LEVELS[li];
-  N=L.n; drag=null; solved=false; junctions=[];
+function applyLevel(L){
+  N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   ems=L.ems.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.tgts.map(function(t){ return {sec:t[0], r:t[1], c:t[2], done:false}; });
-  lvNameEl.textContent=(li+1)+". "+L.name;
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
   buildGrid(); renderDots(); renderPaths();
+}
+function loadLevel(i){
+  isTut=false;
+  li=Math.max(0, Math.min(LEVELS.length-1, i));
+  localStorage.setItem("hm_flow_i",""+li);
+  lvNameEl.textContent="Level "+(li+1);
+  applyLevel(LEVELS[li]);
+}
+function loadTutorial(withCoach){
+  isTut=true;
+  lvNameEl.textContent="Tutorial";
+  applyLevel(TUTORIAL);
+  if(withCoach!==false) showCoach(0);
 }
 function cs(){ return board.clientWidth/N; }
 function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
@@ -255,10 +321,19 @@ board.addEventListener("pointerdown", function(e){
     drag={t:"jun", i:o.i};
   } else if(o.t==="emdot"){
     var E=ems[o.e];
-    if(E.legs.length===0){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0}; }
+    var now=Date.now(), isDbl=(lastEmTap.e===o.e && now-lastEmTap.t<DBL_MS);
+    lastEmTap={e:o.e, t:now};
+    if(isDbl){
+      // double-tap resets the whole emitter (both lines), and starts a fresh line so a
+      // double-tap-drag redraws immediately
+      while(E.legs.length){ destroyJunctionOf(E.legs[0]); E.legs.splice(0,1); }
+      E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0};
+      lastEmTap={e:-1, t:0};
+    }
+    else if(E.legs.length===0){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0}; }
     else if(E.legs.length===1 && E.legs[0].cells.length<=1){ E.legs[0]={cells:[[E.r,E.c]], jun:-1}; drag={t:"em", e:o.e, l:0}; }
     else if(E.legs.length===1){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:1}; }
-    else { while(E.legs.length){ destroyJunctionOf(E.legs[0]); E.legs.splice(0,1); } E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0}; }
+    else { drag=null; }   // two lines already out — a single tap must NOT reset (double-tap does)
   } else if(o.t==="em"){
     var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
     if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }
@@ -295,6 +370,15 @@ function step(cell){
   var o=occAt(cell[0],cell[1]);
   if(!o){ leg.push(cell); renderPaths(); return; }
 
+  if(drag.t==="jun" && o.t==="em" && ems[o.e].legs[o.l] && ems[o.e].legs[o.l].jun===drag.i){
+    // swiped back from the junction onto one of ITS feeder pipes -> separate the merge
+    var jcell=junctions[drag.i].cell.slice();
+    var fleg=ems[o.e].legs[o.l];
+    destroyJunctionOf(fleg);   // un-merges both feeders (jun -> -1), removes junction + its blend leg
+    if(fleg.cells.length>1 && same(fleg.cells[fleg.cells.length-1], jcell)) fleg.cells.pop();
+    drag={t:"em", e:o.e, l:o.l};
+    sfxJun(); renderPaths(); return;
+  }
   if(drag.t==="em" && o.t==="em" && o.e!==drag.e){
     var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
     var isHead=(o.idx===oleg.cells.length-1);
@@ -332,9 +416,18 @@ function checkWin(){
   var cov=coverage();
   if(cov<N*N){ toast("All blended — now paint every cell!"); return; }
   solved=true; sfxWin();
+  var wn=document.getElementById("btnWinNext");
+  if(isTut){
+    document.querySelector("#ovWin h2").textContent="You've got it! ✦";
+    document.getElementById("winMsg").textContent="That's the whole game. Ready for Level 1?";
+    wn.style.display=""; wn.textContent="Start ✦";
+    setTimeout(function(){ ovWin.classList.add("show"); }, 350);
+    return;
+  }
+  document.querySelector("#ovWin h2").textContent="Solved! ✦";
   var done=JSON.parse(localStorage.getItem("hm_flow_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow_done", JSON.stringify(done));
   document.getElementById("winMsg").textContent = "Every cell painted."+(li+1<LEVELS.length ? "" : " That's all the levels — for now!");
-  document.getElementById("btnWinNext").style.display = li+1<LEVELS.length ? "" : "none";
+  wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
   setTimeout(function(){ ovWin.classList.add("show"); }, 350);
 }
 
@@ -417,16 +510,51 @@ document.getElementById("pkgrid").addEventListener("click", function(e){
   var b=e.target.closest(".pkbtn"); if(!b) return;
   ensureAudio(); loadLevel(+b.dataset.i);
 });
-document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); loadLevel(li-1); });
-document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); loadLevel(li+1); });
-document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); loadLevel(li); });
-document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); loadLevel(li+1); });
+document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); loadLevel(isTut?0:li-1); });
+document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); loadLevel(isTut?0:li+1); });
+document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(isTut) loadTutorial(false); else loadLevel(li); });
+document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); if(isTut) loadLevel(0); else loadLevel(li+1); });
 
-loadLevel(li);
+/* ---------- tutorial coach (Huemeld-style walkthrough) ---------- */
+var COACH=[
+  { mix:false, t:"Paint flows", b:"Drag out from a coloured square — it's a paint source. Trace a pipe across the grid." },
+  { mix:true,  t:"Two paints mix", b:"Lead one paint into a different one. Where they meet, they bloom into a blend:" },
+  { mix:false, t:"Reach the ✦", b:"Carry that blend along to the matching ✦ target circle to lock it in." },
+  { mix:false, t:"Each source feeds two", b:"Every square must reach TWO blends — fork a second line from its dot, or branch off its own pipe. Double-tap a source to reset it." },
+  { mix:false, t:"Fill every cell", b:"Deliver all three blends AND paint every cell to win. Give it a go!" }
+];
+var coachStep=0, ovCoach=document.getElementById("ovCoach");
+function coachMixHTML(){
+  function sw(col,sh){ return '<span class="sw '+sh+'" style="background:'+HEX[col]+'"></span>'; }
+  return '<div class="mx">'+sw("R","sq")+"+"+sw("Y","sq")+"="+sw("O","ci")+'</div>'
+       + '<div class="mx">'+sw("Y","sq")+"+"+sw("B","sq")+"="+sw("G","ci")+'</div>'
+       + '<div class="mx">'+sw("B","sq")+"+"+sw("R","sq")+"="+sw("P","ci")+'</div>';
+}
+function showCoach(i){
+  coachStep=i; var s=COACH[i], mixEl=document.getElementById("coachMix");
+  mixEl.innerHTML = s.mix ? coachMixHTML() : ""; mixEl.style.display = s.mix ? "flex" : "none";
+  document.getElementById("coachTitle").textContent=s.t;
+  document.getElementById("coachBody").textContent=s.b;
+  var d=""; for(var k=0;k<COACH.length;k++) d+='<i class="'+(k===i?"on":"")+'"></i>';
+  document.getElementById("coachDots").innerHTML=d;
+  document.getElementById("btnCoachNext").textContent=(i===COACH.length-1)?"Play! ✦":"Next →";
+  ovCoach.classList.add("show");
+}
+document.getElementById("btnCoachNext").addEventListener("click", function(){
+  ensureAudio();
+  if(coachStep<COACH.length-1) showCoach(coachStep+1);
+  else ovCoach.classList.remove("show");
+});
+document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadTutorial(true); });
+
+if(!localStorage.getItem("hm_flow_seen")){ localStorage.setItem("hm_flow_seen","1"); loadTutorial(true); }
+else loadLevel(li);
 
 /* debug hooks for automated testing */
 window.__flow={
   load:loadLevel,
+  tut:loadTutorial,
+  count:LEVELS.length,
   state:function(){ return { li:li, n:N, solved:solved, coverage:coverage(),
     tgts:tgts.map(function(t){ return {sec:t.sec, done:t.done}; }),
     junctions:junctions.map(function(j){ return {sec:j.sec, cell:j.cell, legLen:j.leg.length}; }),
