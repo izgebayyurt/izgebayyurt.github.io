@@ -618,9 +618,10 @@ function renderPaths(){
   var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0;
+  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_FAT=1.32;
+  var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
-  function rad(cell, w){ return w/2 + jbump(cell[0],cell[1])*jR; }
+  function rad(cell, w){ var f=junSet[cell[0]+","+cell[1]]?JUNC_FAT:1; return w*0.5*f + jbump(cell[0],cell[1])*jR; }   // fatter dab at a junction -> rounder, thicker T
 
   var legs=[];
   ems.forEach(function(E){ E.legs.forEach(function(Lg){
