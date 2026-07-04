@@ -40,13 +40,10 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   background:var(--card); border:3px solid var(--line); border-radius:18px;
   box-shadow:0 5px 0 var(--shadow); overflow:hidden; touch-action:none;
 }
-.gridlayer,.junlayer,.dotlayer{ position:absolute; inset:0; pointer-events:none; }
+.gridlayer,.dotlayer{ position:absolute; inset:0; pointer-events:none; }
 .pathlayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .gcell{ position:absolute; }
 .gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.12; }
-.jun{ position:absolute; border:3px solid var(--line); border-radius:50%; box-shadow:1.5px 2px 0 var(--shadow); z-index:3; animation:junPop .3s cubic-bezier(.3,1.5,.6,1); }
-.jun::after{ content:""; position:absolute; top:16%; left:18%; width:32%; height:22%; border-radius:50%; background:rgba(255,255,255,.42); }
-@keyframes junPop{ 0%{transform:scale(.4)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
 .dot::after{ content:""; position:absolute; top:14%; left:16%; width:34%; height:22%; border-radius:50%; background:rgba(255,255,255,.4); }
 .dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
@@ -104,7 +101,6 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div class="board" id="board">
       <div class="gridlayer" id="gridlayer"></div>
       <svg class="pathlayer" id="pathsvg" xmlns="http://www.w3.org/2000/svg"></svg>
-      <div class="junlayer" id="junlayer"></div>
       <div class="dotlayer" id="dotlayer"></div>
     </div>
     <div class="toast" id="toast"></div>
@@ -164,7 +160,7 @@ var LEVELS=[
 ];
 
 var board=document.getElementById("board"), svg=document.getElementById("pathsvg"),
-    junL=document.getElementById("junlayer"), dotL=document.getElementById("dotlayer"),
+    dotL=document.getElementById("dotlayer"),
     gridL=document.getElementById("gridlayer"), covEl=document.getElementById("cov"),
     lvNameEl=document.getElementById("lvName"), toastEl=document.getElementById("toast"),
     ovWin=document.getElementById("ovWin"), ovPick=document.getElementById("ovPick");
@@ -344,54 +340,86 @@ function checkWin(){
 function renderDots(){
   var s=cs(), h="";
   function dot(col,r,c,shape,star){
-    var sz=s*0.7, off=(s-sz)/2;
+    var sz=s*0.84, off=(s-sz)/2;
     return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+'</div>';
   }
   ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"sq",false); });
   tgts.forEach(function(T){ h+=dot(T.sec,T.r,T.c,"ci",true); });
   dotL.innerHTML=h;
 }
+/* pipes = chains of FUSED TILES: every covered cell is a fat rounded tile (game-tile proportions,
+   streak and all); seams between consecutive cells are filled so a leg reads as ONE outlined blob.
+   The junction is a circle tile INLINE in the chain — feeders' gradients flow through the seam
+   into it, the blend flows out. Nothing is overlaid; pipe colour is never cut. */
 function renderPaths(){
-  var u=100;
+  var u=100, T=78, TI=92, RAD=24, RADI=30;             // colour tile size / ink tile size / corner radii
+  var offT=(u-T)/2, offI=(u-TI)/2;
   function ctr(cell){ return [cell[1]*u+u/2, cell[0]*u+u/2]; }
-  function ptsAttr(list){ return list.map(function(c){ var p=ctr(c); return p[0]+","+p[1]; }).join(" "); }
-  var defs="", shadow="", inkS="", colS="", gloss="";
-  function strokeLeg(cells, colour, grad){
+  var junSet={};
+  junctions.forEach(function(J,j){ junSet[J.cell[0]+","+J.cell[1]]=j; });
+  var defs="", shadow="", inkS="", colS="", streaks="";
+  function cellRect(cell, big, fill, extra){
+    var sz=big?TI:T, off=big?offI:offT, r=big?RADI:RAD;
+    return '<rect x="'+(cell[1]*u+off)+'" y="'+(cell[0]*u+off)+'" width="'+sz+'" height="'+sz+'" rx="'+r+'" fill="'+fill+'"'+(extra||"")+'/>';
+  }
+  function seamRect(a, b, big, fill, extra){
+    var sz=big?TI:T, off=big?offI:offT;
+    var x, y, w, h;
+    if(a[0]===b[0]){ x=Math.min(a[1],b[1])*u+u/2; y=a[0]*u+off; w=u; h=sz; }
+    else { x=a[1]*u+off; y=Math.min(a[0],b[0])*u+u/2; w=sz; h=u; }
+    return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+fill+'"'+(extra||"")+'/>';
+  }
+  function junCircle(cell, big, fill, extra){
+    var p=ctr(cell), r=big?(TI/2+2):(T/2+2);
+    return '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+fill+'"'+(extra||"")+'/>';
+  }
+  function streak(cell){
+    return '<ellipse cx="'+(cell[1]*u+offT+T*0.33)+'" cy="'+(cell[0]*u+offT+T*0.26)+'" rx="'+(T*0.16)+'" ry="'+(T*0.10)+'" fill="rgba(255,255,255,.34)"/>';
+  }
+  function paintLeg(cells, colour, grad){
     if(!cells || !cells.length) return;
-    if(cells.length===1){   // a lone root reads as a fat marker dab
-      var p=ctr(cells[0]);
-      shadow+='<circle cx="'+(p[0]+3)+'" cy="'+(p[1]+4)+'" r="25" fill="rgba(44,39,51,.3)"/>';
-      inkS+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="25" fill="#2c2733"/>';
-      colS+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="16" fill="'+colour+'"/>';
-      return;
+    var sh="", ik="", co="";
+    for(var i=0;i<cells.length;i++){
+      var cell=cells[i], isJ=junSet.hasOwnProperty(cell[0]+","+cell[1]);
+      if(!isJ){
+        sh+=cellRect(cell,true,"rgba(44,39,51,.3)",' transform="translate(3,4)"');
+        ik+=cellRect(cell,true,"#2c2733");
+        var lastBeforeJ = grad && i===cells.length-2 && junSet.hasOwnProperty(cells[cells.length-1][0]+","+cells[cells.length-1][1]);
+        co+=cellRect(cell,false, lastBeforeJ?("url(#"+grad.id+")"):colour);
+        streaks+=streak(cell);
+      }
+      if(i>0){
+        var prev=cells[i-1];
+        sh+=seamRect(prev,cell,true,"rgba(44,39,51,.3)",' transform="translate(3,4)"');
+        ik+=seamRect(prev,cell,true,"#2c2733");
+        var seamGrad = grad && i===cells.length-1 && isJ;
+        co+=seamRect(prev,cell,false, seamGrad?("url(#"+grad.id+")"):colour);
+      }
     }
-    shadow+='<polyline points="'+ptsAttr(cells)+'" fill="none" stroke="rgba(44,39,51,.3)" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" transform="translate(3,4)"/>';
-    inkS+='<polyline points="'+ptsAttr(cells)+'" fill="none" stroke="#2c2733" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>';
-    var body = grad ? cells.slice(0, cells.length-1) : cells;
-    if(body.length>=2) colS+='<polyline points="'+ptsAttr(body)+'" fill="none" stroke="'+colour+'" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>';
-    if(grad){   // the final segment melts from the paint colour into the blend — THE gradient moment
-      var a=ctr(cells[cells.length-2]), b=ctr(cells[cells.length-1]);
-      defs+='<linearGradient id="'+grad.id+'" gradientUnits="userSpaceOnUse" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"><stop offset="12%" stop-color="'+grad.from+'"/><stop offset="88%" stop-color="'+grad.to+'"/></linearGradient>';
-      colS+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="url(#'+grad.id+')" stroke-width="32" stroke-linecap="round"/>';
+    shadow+=sh; inkS+=ik; colS+=co;
+    if(grad){
+      var a=ctr(cells[cells.length-2]||cells[0]), b=ctr(cells[cells.length-1]);
+      defs+='<linearGradient id="'+grad.id+'" gradientUnits="userSpaceOnUse" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"><stop offset="0%" stop-color="'+grad.from+'"/><stop offset="92%" stop-color="'+grad.to+'"/></linearGradient>';
     }
-    gloss+='<polyline points="'+ptsAttr(cells)+'" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" transform="translate(-4,-5)"/>';
   }
   ems.forEach(function(E,e){ E.legs.forEach(function(Lg,l){
     var grad=null;
     if(Lg.jun>=0 && junctions[Lg.jun]) grad={id:"gr"+e+"_"+l, from:HEX[E.col], to:HEX[junctions[Lg.jun].sec]};
-    strokeLeg(Lg.cells, HEX[E.col], grad);
+    paintLeg(Lg.cells, HEX[E.col], grad);
   }); });
-  junctions.forEach(function(J){ if(J.leg.length>=2) strokeLeg(J.leg, HEX[J.sec], null); });
-  svg.innerHTML="<defs>"+defs+"</defs><g>"+shadow+"</g><g>"+inkS+"</g><g>"+colS+"</g><g>"+gloss+"</g>";
-  var s=cs(), jh="";
+  junctions.forEach(function(J){ paintLeg(J.leg, HEX[J.sec], null); });
+  // the junction itself: a circle tile fused into the chain (drawn once, over the seams, under the streaks)
   junctions.forEach(function(J){
-    var jz=s*0.64, jo=(s-jz)/2;
-    jh+='<div class="jun" style="left:'+(J.cell[1]*s+jo)+'px;top:'+(J.cell[0]*s+jo)+'px;width:'+jz+'px;height:'+jz+'px;background:'+HEX[J.sec]+'"></div>';
+    shadow+=junCircle(J.cell,true,"rgba(44,39,51,.3)",' transform="translate(3,4)"');
+    inkS+=junCircle(J.cell,true,"#2c2733");
+    colS+=junCircle(J.cell,false,HEX[J.sec]);
+    var p=ctr(J.cell);
+    streaks+='<ellipse cx="'+(p[0]-T*0.17)+'" cy="'+(p[1]-T*0.20)+'" rx="'+(T*0.17)+'" ry="'+(T*0.11)+'" fill="rgba(255,255,255,.4)"/>';
   });
-  junL.innerHTML=jh;
+  svg.innerHTML="<defs>"+defs+"</defs><g>"+shadow+"</g><g>"+inkS+"</g><g>"+colS+"</g><g>"+streaks+"</g>";
   covEl.textContent=coverage()+"/"+(N*N)+" painted";
   var dots=dotL.querySelectorAll(".dot");
-  tgts.forEach(function(T){ dots.forEach(function(d){ if(+d.dataset.dr===T.r && +d.dataset.dc===T.c) d.classList.toggle("donept", T.done); }); });
+  tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
 }
 window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 
