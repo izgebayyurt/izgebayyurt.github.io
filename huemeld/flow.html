@@ -109,6 +109,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   <div class="top">
     <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">FLOW</span></div>
     <div class="topbtns">
+      <button class="mkk" id="btnHelp" title="How to play">?</button>
       <button class="mkk" id="btnPick">☰ levels</button>
       <button class="mkk" id="btnReset" title="Reset level">↻</button>
     </div>
@@ -136,9 +137,17 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div class="ov" id="ovPick">
       <div class="panel">
         <h2>Levels</h2>
-        <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:4px">How to play</button>
+        <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:4px">Watch tutorial</button>
         <div class="pkgrid" id="pkgrid"></div>
         <button class="mk" id="btnPickClose">Close</button>
+      </div>
+    </div>
+    <div class="ov" id="ovHelp">
+      <div class="panel">
+        <h2>How to play</h2>
+        <div class="coachmix" id="helpMix"></div>
+        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b>. Every square feeds <b>two</b> blends, so pull <b>two lines</b> from it. Where two colours <b>meet</b> they mix; carry the blend to its matching <b>✦</b>. <b>Fill every square</b> to win.</p>
+        <button class="mk" id="btnHelpClose">Got it</button>
       </div>
     </div>
     <div class="ghost" id="ghost"></div>
@@ -163,7 +172,7 @@ document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-la
    Every emitter splits into two lines (fork at the dot or branch mid-line; branches
    never rejoin). Machine-generated: each level has a verified full-coverage solution
    (16x 5x5, 26x 6x6, 8x 7x7), ordered easiest-first. TUTORIAL is a gentle 5x5. */
-var TUTORIAL={ n:5, ems:[["R",2,3],["Y",3,3],["B",4,4]], tgts:[["O",2,1],["P",0,2],["G",0,4]] };
+var TUTORIAL={ n:5, ems:[["R",2,3],["Y",3,3],["B",4,4]], tgts:[["O",2,1],["G",0,2],["P",0,1]] };
 var LEVELS=[
   { n:5, ems:[["R",1,2],["Y",4,2],["B",0,2]], tgts:[["O",4,3],["G",1,1],["P",4,4]] },
   { n:5, ems:[["R",2,2],["Y",1,3],["B",4,2]], tgts:[["O",3,3],["G",0,0],["P",2,1]] },
@@ -314,10 +323,10 @@ var ghostEl=document.getElementById("ghost"), demoBanEl=document.getElementById(
 var DEMO_STROKES=[
   { cap:"Drag a colour out of its square", cells:[[2,3],[2,2],[3,2]] },
   { cap:"Lead another colour in. They mix!", cap2:"Now carry the blend to its ✦", cap2At:1, cells:[[3,3],[3,2],[3,1],[2,1]] },
-  { cap:"Each colour is used twice. Branch a 2nd line off the first,", cells:[[2,2],[1,2],[1,1],[1,0]] },
-  { cap:"", cells:[[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1],[0,2]] },
-  { cap:"or fork the 2nd line straight from the square.", cells:[[3,3],[3,4]] },
-  { cap:"Every square must be filled to win", cells:[[4,4],[3,4],[2,4],[1,4],[1,3],[0,3],[0,4]] }
+  { cap:"Each colour is used twice. Pull a 2nd line from its square", cells:[[2,3],[1,3],[1,2],[1,1],[1,0]] },
+  { cap:"", cells:[[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1]] },
+  { cap:"Every square splits into two lines", cells:[[3,3],[3,4]] },
+  { cap:"Every square must be filled to win", cells:[[4,4],[3,4],[2,4],[1,4],[0,4],[0,3],[0,2]] }
 ];
 function moveGhost(cell){ var s=cs(); ghostEl.style.left=(cell[1]*s+s/2)+"px"; ghostEl.style.top=(cell[0]*s+s/2)+"px"; }
 function banner(msg){ if(!msg) return; demoBanEl.textContent=msg; demoBanEl.classList.add("show"); }
@@ -471,11 +480,8 @@ board.addEventListener("pointerdown", function(e){
     else { drag=null; }   // two lines already out — a single tap must NOT reset (double-tap does)
   } else if(o.t==="em"){
     var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
-    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }        // grab a TIP -> drag back to retreat, or extend
-    else if(E2.legs.length<2){                                     // click mid-pipe with a free line -> BRANCH here
-      E2.legs.push({cells:[[cell[0],cell[1]]], jun:-1});
-      drag={t:"em", e:o.e, l:E2.legs.length-1};
-    } else { drag=null; }   // both lines already drawn — a mid-pipe click does NOT retreat (retreat = drag a tip back, or double-tap the square)
+    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
+    else { drag=null; }   // a mid-pipe click does nothing — both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
   renderPaths();
@@ -618,10 +624,12 @@ function renderPaths(){
   var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_FAT=1.32;
+  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
   var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
-  function rad(cell, w){ var f=junSet[cell[0]+","+cell[1]]?JUNC_FAT:1; return w*0.5*f + jbump(cell[0],cell[1])*jR; }   // fatter dab at a junction -> rounder, thicker T
+  // ADD a fixed bump at a junction (same for ink + colour) so the T bulges rounder & thicker
+  // but the outline WIDTH stays constant (a multiplier would fatten the border too)
+  function rad(cell, w){ var b=junSet[cell[0]+","+cell[1]]?JUNC_BUMP:0; return w*0.5 + b + jbump(cell[0],cell[1])*jR; }
 
   var legs=[];
   ems.forEach(function(E){ E.legs.forEach(function(Lg){
@@ -723,9 +731,18 @@ document.getElementById("btnNext").addEventListener("click", function(){ ensureA
 document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(isTut) loadTutorial(false); else loadLevel(li); });
 document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); if(isTut) loadLevel(0); else loadLevel(li+1); });
 
-/* tutorial = the ghost-hand demo (defined above); "How to play" replays it */
+/* tutorial = the ghost-hand demo (defined above); "Watch tutorial" replays it */
 document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadTutorial(); });
 document.getElementById("demoskip").addEventListener("click", function(){ ensureAudio(); stopDemo(); playTutorial(); });
+/* ? = a quick always-on legend + rules */
+var ovHelp=document.getElementById("ovHelp");
+(function(){ function sw(col,sh){ return '<span class="sw '+sh+'" style="background:'+HEX[col]+'"></span>'; }
+  document.getElementById("helpMix").innerHTML =
+    '<div class="mx">'+sw("R","sq")+"+"+sw("Y","sq")+"="+sw("O","ci")+'</div>'
+   +'<div class="mx">'+sw("Y","sq")+"+"+sw("B","sq")+"="+sw("G","ci")+'</div>'
+   +'<div class="mx">'+sw("B","sq")+"+"+sw("R","sq")+"="+sw("P","ci")+'</div>'; })();
+document.getElementById("btnHelp").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.add("show"); });
+document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
 
 if(!localStorage.getItem("hm_flow_seen")){ localStorage.setItem("hm_flow_seen","1"); loadTutorial(); }
 else loadLevel(li);
