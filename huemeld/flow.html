@@ -97,6 +97,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .coachmix .mx{ display:flex; align-items:center; gap:3px; font-family:var(--font-d); font-weight:700; font-size:15px; color:var(--ink-soft); }
 .coachmix .sw{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:1px 1.5px 0 var(--shadow); }
 .coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
+/* demo "ghost hand" + caption banner + skip */
+.ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .32s cubic-bezier(.4,0,.2,1), top .32s cubic-bezier(.4,0,.2,1); }
+.demoban{ position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:9; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:14px; padding:8px 18px; border-radius:999px; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; box-shadow:0 3px 0 var(--shadow); max-width:92%; text-align:center; }
+.demoban.show{ opacity:1; }
+.demoskip{ position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:9; display:none; }
+.demoskip.show{ display:block; }
 </style>
 </head>
 <body>
@@ -134,15 +140,9 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
         <button class="mk" id="btnPickClose">Close</button>
       </div>
     </div>
-    <div class="ov" id="ovCoach">
-      <div class="panel">
-        <div class="coachmix" id="coachMix"></div>
-        <h2 id="coachTitle">How to play</h2>
-        <p id="coachBody">…</p>
-        <div class="cdots" id="coachDots"></div>
-        <button class="mk" id="btnCoachNext">Next →</button>
-      </div>
-    </div>
+    <div class="ghost" id="ghost"></div>
+    <div class="demoban" id="demoban"></div>
+    <button class="mkk demoskip" id="demoskip">Skip ▸</button>
   </div>
   <p class="tip">each paint must reach <b>two</b> blends — drag from the dot twice, or grab its line to <b>branch</b> · join two paints that <b>mix</b>, carry the blend to its <b>✦</b> · <b>paint every cell</b></p>
 
@@ -164,7 +164,7 @@ document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-la
    Every emitter splits into two lines (fork at the dot or branch mid-line; branches
    never rejoin). Machine-generated: each level has a verified full-coverage solution
    (16x 5x5, 26x 6x6, 8x 7x7), ordered easiest-first. TUTORIAL is a gentle 5x5. */
-var TUTORIAL={ n:5, ems:[["R",2,3],["Y",3,3],["B",4,4]], tgts:[["O",2,1],["G",0,2],["P",0,1]] };
+var TUTORIAL={ n:5, ems:[["R",2,3],["Y",3,3],["B",4,4]], tgts:[["O",2,1],["P",0,2],["G",0,4]] };
 var LEVELS=[
   { n:5, ems:[["R",1,2],["Y",4,2],["B",0,2]], tgts:[["O",4,3],["G",1,1],["P",4,4]] },
   { n:5, ems:[["R",2,2],["Y",1,3],["B",4,2]], tgts:[["O",3,3],["G",0,0],["P",2,1]] },
@@ -252,13 +252,25 @@ function voice(freq,dur,o){
 }
 /* a struck bell: fundamental + shimmering overtones */
 function bell(freq,dur,gain){ gain=gain||0.05; voice(freq,dur,{g:gain,lp:3200,atk:0.003}); voice(freq*2.01,dur*0.7,{g:gain*0.42,lp:4200,atk:0.003}); voice(freq*3.0,dur*0.45,{g:gain*0.16,lp:5200,atk:0.002}); }
-var SCALE=[0,2,4,7,9,12,14,16,19,21];   // major pentatonic degrees (never dissonant, however fast you draw)
-function noteHz(i){ return 293.66*Math.pow(2, SCALE[Math.max(0,Math.min(i,SCALE.length-1))]/12); }   // from D4
-/* drawing a cell: a soft rounded "paint drop" that rises up the scale as the line grows */
+/* the drawing melody: a MEAN-REVERTING random walk over two octaves of major
+   pentatonic (14 notes). Each cell: roll a direction (biased back toward centre the
+   farther out you are), then a step size from a normal curve (|Z| notes, so 1 std = 1
+   note), clamped to a 5-note max jump. Sounds musical and alive, never repetitive. */
+var SCALE14=[0,2,4,7,9,12,14,16,19,21,24,26,28,31], MEL_BASE=196.00, MEL_C=6.5;   // G3 base, centre index
+var melIdx=6;
+function gauss(){ var u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.2831853*v); }
+function melodyReset(){ melIdx=3+Math.floor(Math.random()*8); }   // random start, away from the extremes
+function nextNote(){
+  var pUp=Math.max(0.12, Math.min(0.88, 0.5 - (melIdx-MEL_C)/MEL_C*0.55));   // pulled toward centre at the edges
+  var dir=Math.random()<pUp ? 1 : -1;
+  var step=Math.max(1, Math.min(5, Math.round(Math.abs(gauss()))));           // |Z| notes, capped at a 5-note leap
+  melIdx=Math.max(0, Math.min(SCALE14.length-1, melIdx+dir*step));
+  return MEL_BASE*Math.pow(2, SCALE14[melIdx]/12);
+}
 function sfxDraw(step,up){
-  if(!actx) return; var fq=noteHz(step);
-  voice(fq*(up?1:0.985), 0.12, {type:"sine", to:fq*0.84, gl:0.1, lp:2600, g:0.04, atk:0.003});   // the droplet
-  voice(fq*2, 0.06, {type:"sine", g:0.01, lp:4200, atk:0.002});                                    // faint sparkle
+  if(!actx) return; var fq=nextNote();
+  voice(fq, 0.12, {type:"sine", to:fq*0.9, gl:0.1, lp:2600, g:up?0.045:0.03, atk:0.003});   // the note
+  voice(fq*2, 0.06, {type:"sine", g:0.009, lp:4200, atk:0.002});                             // faint sparkle
 }
 /* two paints merge: a watery plunk under a warm rising blend chord */
 function sfxJun(){
@@ -281,17 +293,69 @@ function applyLevel(L){
   buildGrid(); renderDots(); renderPaths();
 }
 function loadLevel(i){
-  isTut=false;
+  stopDemo(); isTut=false;
   li=Math.max(0, Math.min(LEVELS.length-1, i));
   localStorage.setItem("hm_flow_i",""+li);
   lvNameEl.textContent="Level "+(li+1);
   applyLevel(LEVELS[li]);
 }
-function loadTutorial(withCoach){
-  isTut=true;
-  lvNameEl.textContent="Tutorial";
-  applyLevel(TUTORIAL);
-  if(withCoach!==false) showCoach(0);
+function loadTutorial(demo){
+  isTut=true; lvNameEl.textContent="Tutorial";
+  if(demo===false) playTutorial(); else startDemo();
+}
+function playTutorial(){ stopDemo(); isTut=true; lvNameEl.textContent="Tutorial"; applyLevel(TUTORIAL); }
+
+/* ---------- SHOW-don't-tell tutorial: a ghost hand auto-plays the real tutorial solve,
+   teaching the core loop AND the two ways a colour makes its second line (branch / fork) ---------- */
+var demoing=false, demoFiring=false, demoTid=0, demoStrokes=null, demoSI=0, demoCI=0;
+var ghostEl=document.getElementById("ghost"), demoBanEl=document.getElementById("demoban"), demoSkipEl=document.getElementById("demoskip");
+/* the tutorial's verified full solution, as player gestures. Each colour is used twice:
+   R makes its 2nd line by BRANCHING off its first (stroke 3); Y makes its 2nd by FORKING
+   from its square (stroke 5) — so the demo shows both. */
+var DEMO_STROKES=[
+  { cap:"Drag a colour out of its square", cells:[[2,3],[2,2],[3,2]] },
+  { cap:"Lead another colour in — they MIX", cap2:"…now carry the blend to its ✦", cap2At:1, cells:[[3,3],[3,2],[3,1],[2,1]] },
+  { cap:"Each colour is used TWICE — here, BRANCH a 2nd line off the first", cells:[[2,2],[1,2],[1,1],[1,0]] },
+  { cap:"", cells:[[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1],[0,2]] },
+  { cap:"…or FORK the 2nd line straight from the square", cells:[[3,3],[3,4]] },
+  { cap:"", cells:[[4,4],[3,4],[2,4],[1,4],[1,3],[0,3],[0,4]] }
+];
+function moveGhost(cell){ var s=cs(); ghostEl.style.left=(cell[1]*s+s/2)+"px"; ghostEl.style.top=(cell[0]*s+s/2)+"px"; }
+function banner(msg){ if(!msg) return; demoBanEl.textContent=msg; demoBanEl.classList.add("show"); }
+function fireDemo(type,cell){
+  var rect=board.getBoundingClientRect(), s=cs(), x=rect.left+cell[1]*s+s/2, y=rect.top+cell[0]*s+s/2;
+  demoFiring=true;
+  try{ board.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:99,isPrimary:true,pointerType:"touch",pressure:type==="pointerup"?0:0.5,buttons:type==="pointerup"?0:1,clientX:x,clientY:y,button:0})); }catch(e){}
+  demoFiring=false;
+}
+function stopDemo(){ clearTimeout(demoTid); demoing=false; demoFiring=false; ghostEl.style.display="none"; demoBanEl.classList.remove("show"); demoSkipEl.classList.remove("show"); }
+function startDemo(){
+  stopDemo(); demoing=true; ensureAudio(); applyLevel(TUTORIAL);
+  demoStrokes=DEMO_STROKES; demoSI=0; demoCI=0; moveGhost(demoStrokes[0].cells[0]);
+  ghostEl.style.display="block"; demoSkipEl.classList.add("show");
+  demoTid=setTimeout(demoNext, 600);
+}
+function demoNext(){
+  if(!demoing) return;
+  if(demoSI>=demoStrokes.length){ finishDemo(); return; }
+  var stroke=demoStrokes[demoSI];
+  if(demoCI < stroke.cells.length){
+    var cell=stroke.cells[demoCI];
+    if(stroke.cap2 && demoCI===stroke.cap2At) banner(stroke.cap2);
+    moveGhost(cell);
+    if(demoCI===0){ banner(stroke.cap); demoCI++; demoTid=setTimeout(function(){ fireDemo("pointerdown",stroke.cells[0]); demoTid=setTimeout(demoNext,300); }, 360); return; }
+    fireDemo("pointermove",cell); demoCI++;
+    demoTid=setTimeout(demoNext, 285);
+  } else {
+    fireDemo("pointerup", stroke.cells[stroke.cells.length-1]);
+    demoSI++; demoCI=0; demoTid=setTimeout(demoNext, 560);
+  }
+}
+function finishDemo(){
+  ghostEl.style.display="none"; banner("That's a full solve! Now you try ✦");
+  demoSkipEl.classList.remove("show");
+  playWinCascade();                                     // celebrate the completed board
+  demoTid=setTimeout(function(){ demoBanEl.classList.remove("show"); playTutorial(); toast("Your turn ✦"); }, 2400);
 }
 function cs(){ return board.clientWidth/N; }
 function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
@@ -369,11 +433,12 @@ function cellAt(x,y){
   return [r,c];
 }
 board.addEventListener("pointerdown", function(e){
+  if(demoing && !demoFiring) return;   // ignore real touches while the demo plays
   if(!e.isPrimary || solved) return; ensureAudio();
   var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
   var o=occAt(cell[0],cell[1]);
   if(!o) return;
-  drawSteps=0;
+  drawSteps=0; melodyReset();
   if(o.t==="jun"){
     var J=junctions[o.i]; J.leg=[J.cell.slice()];
     var tj=tgtFor(J.sec); if(tj) tj.done=false;
@@ -409,12 +474,13 @@ board.addEventListener("pointerdown", function(e){
   renderPaths();
 });
 board.addEventListener("pointermove", function(e){
+  if(demoing && !demoFiring) return;
   if(!drag || !e.isPrimary) return;
   var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
   step(cell);
 });
-board.addEventListener("pointerup", function(){ drag=null; });
-board.addEventListener("pointercancel", function(){ drag=null; });
+board.addEventListener("pointerup", function(){ if(demoing && !demoFiring) return; drag=null; });
+board.addEventListener("pointercancel", function(){ if(demoing && !demoFiring) return; drag=null; });
 board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 function legOf(d){ return d.t==="em" ? (ems[d.e].legs[d.l]&&ems[d.e].legs[d.l].cells) : (junctions[d.i]&&junctions[d.i].leg); }
 
@@ -479,6 +545,7 @@ function coverage(){
 }
 function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
 function checkWin(){
+  if(demoing) return;   // the demo drives its own celebration + hand-off
   if(!tgts.every(function(t){ return t.done; })) return;
   var cov=coverage();
   if(cov<N*N){ toast("All blended — now paint every cell!"); return; }
@@ -642,39 +709,11 @@ document.getElementById("btnNext").addEventListener("click", function(){ ensureA
 document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(isTut) loadTutorial(false); else loadLevel(li); });
 document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); if(isTut) loadLevel(0); else loadLevel(li+1); });
 
-/* ---------- tutorial coach (Huemeld-style walkthrough) ---------- */
-var COACH=[
-  { mix:false, t:"Paint flows", b:"Drag out from a coloured square — it's a paint source. Trace a pipe across the grid." },
-  { mix:true,  t:"Two paints mix", b:"Lead one paint into a different one. Where they meet, they bloom into a blend:" },
-  { mix:false, t:"Reach the ✦", b:"Carry that blend along to the matching ✦ target circle to lock it in." },
-  { mix:false, t:"Each source feeds two", b:"Every square must reach TWO blends — fork a second line from its dot, or branch off its own pipe. Double-tap a source to reset it." },
-  { mix:false, t:"Fill every cell", b:"Deliver all three blends AND paint every cell to win. Give it a go!" }
-];
-var coachStep=0, ovCoach=document.getElementById("ovCoach");
-function coachMixHTML(){
-  function sw(col,sh){ return '<span class="sw '+sh+'" style="background:'+HEX[col]+'"></span>'; }
-  return '<div class="mx">'+sw("R","sq")+"+"+sw("Y","sq")+"="+sw("O","ci")+'</div>'
-       + '<div class="mx">'+sw("Y","sq")+"+"+sw("B","sq")+"="+sw("G","ci")+'</div>'
-       + '<div class="mx">'+sw("B","sq")+"+"+sw("R","sq")+"="+sw("P","ci")+'</div>';
-}
-function showCoach(i){
-  coachStep=i; var s=COACH[i], mixEl=document.getElementById("coachMix");
-  mixEl.innerHTML = s.mix ? coachMixHTML() : ""; mixEl.style.display = s.mix ? "flex" : "none";
-  document.getElementById("coachTitle").textContent=s.t;
-  document.getElementById("coachBody").textContent=s.b;
-  var d=""; for(var k=0;k<COACH.length;k++) d+='<i class="'+(k===i?"on":"")+'"></i>';
-  document.getElementById("coachDots").innerHTML=d;
-  document.getElementById("btnCoachNext").textContent=(i===COACH.length-1)?"Play! ✦":"Next →";
-  ovCoach.classList.add("show");
-}
-document.getElementById("btnCoachNext").addEventListener("click", function(){
-  ensureAudio();
-  if(coachStep<COACH.length-1) showCoach(coachStep+1);
-  else ovCoach.classList.remove("show");
-});
-document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadTutorial(true); });
+/* tutorial = the ghost-hand demo (defined above); "How to play" replays it */
+document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadTutorial(); });
+document.getElementById("demoskip").addEventListener("click", function(){ ensureAudio(); stopDemo(); playTutorial(); });
 
-if(!localStorage.getItem("hm_flow_seen")){ localStorage.setItem("hm_flow_seen","1"); loadTutorial(true); }
+if(!localStorage.getItem("hm_flow_seen")){ localStorage.setItem("hm_flow_seen","1"); loadTutorial(); }
 else loadLevel(li);
 
 /* debug hooks for automated testing */
