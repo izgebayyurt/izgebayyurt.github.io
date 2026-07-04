@@ -80,6 +80,9 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
 @keyframes hmBurst{ 0%{ opacity:0; transform:translate(-50%,-50%) scale(.3) rotate(-8deg) } 22%{ opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(-4deg) } 66%{ opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-4deg) } 100%{ opacity:0; transform:translate(-50%,-50%) scale(1.05) translateY(-16px) rotate(-4deg) } }
 .board.shake{ animation:hmShake .4s var(--calm); }
 @keyframes hmShake{ 0%,100%{ transform:translate(0,0) } 20%{ transform:translate(-3px,1px) } 40%{ transform:translate(3px,-2px) } 60%{ transform:translate(-2px,2px) } 80%{ transform:translate(2px,-1px) } }
+/* the frozen combo is about to fall: a fast little tremor warns you, like the level game's drop warning */
+.board.warnshake{ animation:hmWobble .16s linear infinite; }
+@keyframes hmWobble{ 0%,100%{ transform:translate(0,0) } 25%{ transform:translate(-2px,1px) } 75%{ transform:translate(2px,-1px) } }
 /* jackpot flash */
 .jflash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:8; border-radius:14px; }
 .jflash.go{ animation:jFlash .6s ease-out; }
@@ -167,7 +170,7 @@ var MIX={RY:"O",BR:"P",BY:"G"}, PRIM=["R","Y","B"], SEC=["O","G","P"];
 function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
 function mix(a,b){ return MIX[[a,b].sort().join("")]||null; }
 
-var W=7, H=8, START_TIME=60, HANG_MS=1500, HANG_RATE=0.67, BAR_NEED=14, MIN_LINE=3;
+var W=7, H=8, START_TIME=60, HANG_MS=3000, HANG_RATE=0.67, BAR_NEED=14, MIN_LINE=3, WARN_LEAD=850;
 
 /* iOS zoom guards */
 document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
@@ -181,7 +184,7 @@ var board=document.getElementById("board"), burstEl=document.getElementById("bur
     scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"),
     timenumEl=document.getElementById("timenum"), timebarEl=document.getElementById("timebar"), timefillEl=document.getElementById("timefill");
 
-var grid=[], cells=[], phase="pre", timeLeft=START_TIME, hangLeft=0, chain=0, topChain=0,
+var grid=[], cells=[], phase="pre", timeLeft=START_TIME, hangLeft=0, warned=false, chain=0, topChain=0,
     score=0, jackpots=0, bars={O:0,G:0,P:0}, best=+(localStorage.getItem("hm_blitz_best")||0);
 
 /* ---------- audio ---------- */
@@ -192,6 +195,7 @@ function sfxPop(ch){ var base=360+Math.min(ch,8)*70; beep(base,0.09,"triangle",0
 function sfxNope(){ beep(150,0.12,"sawtooth",0.03); }
 function sfxTick(){ beep(880,0.05,"square",0.03); }
 function sfxJack(){ [0,90,180,300,440].forEach(function(t,i){ setTimeout(function(){ beep(440+i*130,0.18,"triangle",0.06); },t); }); }
+function sfxWarn(){ beep(520,0.09,"triangle",0.04); setTimeout(function(){ beep(380,0.12,"triangle",0.035); },85); }
 function sfxOver(){ [0,140,300].forEach(function(t,i){ setTimeout(function(){ beep(300-i*70,0.22,"sawtooth",0.05); },t); }); }
 
 /* ---------- rng + spawn ---------- */
@@ -295,7 +299,7 @@ function popCells(cells, maxRun){
   score += Math.round(10*n*chain*bonus);
   cells.forEach(function(p){ var col=grid[p[0]][p[1]]; if(col && !isPrim(col)){ bars[col]=Math.min(BAR_NEED,bars[col]+1); splashAt(p[0],p[1],col); } });
   cells.forEach(function(p){ grid[p[0]][p[1]]=null; });
-  phase="hang"; hangLeft=HANG_MS;
+  phase="hang"; hangLeft=HANG_MS; warned=false; board.classList.remove("warnshake");
   draw();
   renderBars(); renderHUD();
   if(chain>=2) showCombo(chain);
@@ -350,7 +354,7 @@ function act(r,c,dr,dc){
 function afterAction(bornKey){
   var res=findLines();
   if(res.cells.length){ draw(null, bornKey); popCells(res.cells, res.maxRun); }
-  else if(phase==="hang"){ hangLeft=HANG_MS; draw(null, bornKey); renderHUD(); }   // any productive swipe keeps the frozen combo alive
+  else if(phase==="hang"){ draw(null, bornKey); renderHUD(); }   // circle added to the frozen board; only a POP extends the window
   else { draw(null, bornKey); settleBoard(); }                    // idle non-popping mix -> settle
 }
 function nope(r,c){
@@ -388,7 +392,12 @@ function advance(dtMs){
   if(phase==="pre"||phase==="over") return;
   var rate = phase==="hang" ? HANG_RATE : 1;
   timeLeft -= (dtMs/1000)*rate;
-  if(phase==="hang"){ hangLeft -= dtMs; if(hangLeft<=0){ settleBoard(); } }
+  if(phase==="hang"){
+    hangLeft -= dtMs;
+    if(hangLeft<=WARN_LEAD && hangLeft>0 && !warned){ warned=true; sfxWarn(); }   // one warn ping as it starts trembling
+    if(hangLeft<=0){ settleBoard(); }
+  }
+  board.classList.toggle("warnshake", phase==="hang" && hangLeft<=WARN_LEAD && hangLeft>0);
   // warning ticks in last 10s
   var ws=Math.ceil(timeLeft);
   if(timeLeft<=10 && timeLeft>0 && ws!==lastWholeSec){ lastWholeSec=ws; sfxTick(); }
@@ -403,7 +412,7 @@ function loop(now){
 requestAnimationFrame(loop);
 
 function gameOver(){
-  phase="over";
+  phase="over"; board.classList.remove("warnshake");
   if(score>best){ best=score; localStorage.setItem("hm_blitz_best",""+best); }
   document.getElementById("finalScore").textContent=score;
   document.getElementById("stBest").textContent=best;
@@ -415,7 +424,8 @@ function gameOver(){
 
 function startGame(){
   ensureAudio();
-  score=0; jackpots=0; chain=0; topChain=0; bars={O:0,G:0,P:0}; timeLeft=START_TIME; hangLeft=0; lastWholeSec=99;
+  score=0; jackpots=0; chain=0; topChain=0; bars={O:0,G:0,P:0}; timeLeft=START_TIME; hangLeft=0; warned=false; lastWholeSec=99;
+  board.classList.remove("warnshake");
   newGrid(); phase="idle";
   document.getElementById("ovStart").classList.remove("show");
   document.getElementById("ovOver").classList.remove("show");
