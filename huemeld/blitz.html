@@ -187,7 +187,7 @@ var MIX={RY:"O",BR:"P",BY:"G"}, PRIM=["R","Y","B"], SEC=["O","G","P"];
 function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
 function mix(a,b){ return MIX[[a,b].sort().join("")]||null; }
 
-var W=7, H=8, START_TIME=60, HANG_MS=3000, HANG_RATE=0.67, BAR_NEED=14, MIN_LINE=3, WARN_LEAD=850;
+var W=7, H=8, START_TIME=120, HANG_MS=3000, HANG_RATE=0.67, BAR_NEED=14, MIN_LINE=3, WARN_LEAD=850;
 
 /* iOS zoom guards */
 document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
