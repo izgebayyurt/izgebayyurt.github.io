@@ -213,6 +213,7 @@ var LEVELS=[
 ];
 
 var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
+    shadowCanvas=document.createElement("canvas"), sctx=shadowCanvas.getContext("2d"),
     dotL=document.getElementById("dotlayer"),
     gridL=document.getElementById("gridlayer"), covEl=document.getElementById("cov"),
     lvNameEl=document.getElementById("lvName"), toastEl=document.getElementById("toast"),
@@ -280,23 +281,45 @@ function occAt(r,c){
   for(var t2=0;t2<tgts.length;t2++){ if(tgts[t2].r===r && tgts[t2].c===c) return {t:"tgt", i:t2}; }
   return null;
 }
-function destroyJunctionOf(leg){
-  if(leg.jun<0) return;
-  var j=leg.jun, J=junctions[j];
-  if(J){
-    ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) Lg.jun=-1; else if(Lg.jun>j) Lg.jun--; }); });
-    var t=tgtFor(J.sec); if(t) t.done=false;
-    junctions.splice(j,1);
+function dropJunction(j){
+  var J=junctions[j]; if(!J) return;
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) Lg.jun=-1; else if(Lg.jun>j) Lg.jun--; }); });
+  var t=tgtFor(J.sec); if(t) t.done=false;
+  junctions.splice(j,1);
+}
+function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
+/* the single source of consistency — run after ANY structural change (retreat, truncate, etc.).
+   Deterministic: derives the valid set of legs/junctions from the raw cell paths. */
+function reconcile(){
+  // A) drop orphaned branch legs: a leg's root must be the emitter cell OR sit on a sibling leg.
+  //    looped, because removing a branch can orphan a branch-of-a-branch.
+  ems.forEach(function(E){
+    var changed=true;
+    while(changed){ changed=false;
+      for(var k=E.legs.length-1;k>=0;k--){
+        var lg=E.legs[k];
+        var bad=!lg.cells.length;
+        if(!bad){ var root=lg.cells[0], onE=(root[0]===E.r&&root[1]===E.c), onSib=false;
+          for(var m=0;m<E.legs.length&&!onSib;m++) if(m!==k && indexIn(E.legs[m].cells,root[0],root[1])>=0) onSib=true;
+          bad=!onE && !onSib; }
+        if(bad){ destroyJunctionOf(lg); E.legs.splice(k,1); changed=true; break; }
+      }
+    }
+  });
+  // B) drop junctions unless BOTH feeders still end exactly on the junction cell
+  for(var j=junctions.length-1;j>=0;j--){
+    var J=junctions[j], feeders=[];
+    ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg); }); });
+    var ok = feeders.length===2 && feeders.every(function(Lg){ var h=Lg.cells[Lg.cells.length-1]; return h && same(h,J.cell); });
+    if(!ok) dropJunction(j);
   }
 }
-function clearOrphans(e){
-  var E=ems[e];
-  for(var k=E.legs.length-1;k>=0;k--){
-    var root=E.legs[k].cells[0];
-    var ok=(root[0]===E.r && root[1]===E.c);
-    if(!ok){ for(var m=0;m<E.legs.length;m++){ if(m!==k && indexIn(E.legs[m].cells, root[0], root[1])>=0){ ok=true; break; } } }
-    if(!ok){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); }
-  }
+/* reconcile, then re-anchor the in-flight drag to its (possibly re-indexed / removed) leg or junction */
+function reconcileAndFixDrag(){
+  var active=(drag && drag.t==="em" && ems[drag.e]) ? ems[drag.e].legs[drag.l] : null;
+  reconcile();
+  if(drag && drag.t==="em"){ var ni=active?ems[drag.e].legs.indexOf(active):-1; if(ni<0) drag=null; else drag.l=ni; }
+  else if(drag && drag.t==="jun"){ if(!junctions[drag.i]) drag=null; }
 }
 
 /* ---------- input ---------- */
@@ -343,9 +366,10 @@ board.addEventListener("pointerdown", function(e){
     } else {
       destroyJunctionOf(leg);
       leg.cells=leg.cells.slice(0,o.idx+1);
-      clearOrphans(o.e);
-      drag={t:"em", e:o.e, l:Math.min(o.l, ems[o.e].legs.length-1)};
-      if(indexIn(ems[o.e].legs[drag.l]&&ems[o.e].legs[drag.l].cells||[], cell[0], cell[1])<0) drag=null;
+      reconcile();
+      // resume dragging whichever surviving leg still holds the grabbed cell
+      drag=null;
+      for(var li2=0; li2<ems[o.e].legs.length; li2++){ if(indexIn(ems[o.e].legs[li2].cells, cell[0], cell[1])>=0){ drag={t:"em", e:o.e, l:li2}; break; } }
     }
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
@@ -365,7 +389,7 @@ function step(cell){
   var leg=legOf(drag); if(!leg){ drag=null; return; }
   var head=leg[leg.length-1];
   if(same(cell,head)) return;
-  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); renderPaths(); return; }
+  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); reconcileAndFixDrag(); renderPaths(); return; }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   var o=occAt(cell[0],cell[1]);
   if(!o){ leg.push(cell); renderPaths(); return; }
@@ -465,14 +489,21 @@ function renderPaths(){
   function line(pts,a,b){ ctx.beginPath(); ctx.moveTo(pts[a][0],pts[a][1]); for(var i=a+1;i<=b;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
   function dab(cells,pts,i,w){ ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1], rad(cells[i],w),0,6.2832); ctx.fill(); }
 
-  function solidPass(color,width){        // one flat colour for ALL legs -> overlaps merge into one silhouette
-    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineJoin="round"; ctx.lineCap="round";
-    legs.forEach(function(L){ var pts=L.cells.map(P); if(pts.length>1) line(pts,0,pts.length-1); for(var i=0;i<pts.length;i++) dab(L.cells,pts,i,width); });
+  function silhouette(cx,width){          // one flat silhouette for ALL legs -> overlaps merge into one shape
+    cx.lineWidth=width; cx.lineJoin="round"; cx.lineCap="round";
+    legs.forEach(function(L){ var pts=L.cells.map(P);
+      if(pts.length>1){ cx.beginPath(); cx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) cx.lineTo(pts[i][0],pts[i][1]); cx.stroke(); }
+      for(var k=0;k<pts.length;k++){ cx.beginPath(); cx.arc(pts[k][0],pts[k][1], rad(L.cells[k],width),0,6.2832); cx.fill(); } });
   }
-  // 1 — shadow
-  ctx.save(); ctx.translate(s*0.03, s*0.045); solidPass("rgba(44,39,51,.26)", pipeInk); ctx.restore();
-  // 2 — ink silhouette
-  solidPass("#2c2733", pipeInk);
+  // 1 — shadow: render the silhouette OPAQUE offscreen, then stamp ONCE with alpha at an offset,
+  //     so overlapping strokes/dabs never stack into dark circles at cell centres
+  if(shadowCanvas.width!==canvas.width){ shadowCanvas.width=canvas.width; shadowCanvas.height=canvas.height; }
+  sctx.setTransform(dpr,0,0,dpr,0,0); sctx.clearRect(0,0,W,H);
+  sctx.strokeStyle=sctx.fillStyle="#2c2733"; silhouette(sctx, pipeInk);
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=0.24;
+  ctx.drawImage(shadowCanvas, Math.round(s*0.03*dpr), Math.round(s*0.05*dpr)); ctx.restore();
+  // 2 — ink silhouette (opaque: overlaps are fine)
+  ctx.strokeStyle="#2c2733"; ctx.fillStyle="#2c2733"; silhouette(ctx, pipeInk);
   // 3 — colour (gradient into the blend on a feeder's final segment)
   ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
   legs.forEach(function(L){
