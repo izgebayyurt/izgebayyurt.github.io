@@ -45,7 +45,6 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .gcell{ position:absolute; }
 .gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.12; }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
-.dot::after{ content:""; position:absolute; top:14%; left:16%; width:34%; height:22%; border-radius:50%; background:rgba(255,255,255,.4); }
 .dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
 .dot.ci{ border-radius:50%; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
@@ -343,8 +342,8 @@ function checkWin(){
 function renderDots(){
   var s=cs(), h="";
   function dot(col,r,c,shape,star){
-    var sz=s*0.84, off=(s-sz)/2, rot=(jhash(r,c,li*13+5)-0.5)*9;   // ±4.5° tilt — the tileset's hand-placed feel
-    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+';transform:rotate('+rot.toFixed(2)+'deg)">'+(star?'<span class="st">✦</span>':'')+'</div>';
+    var sz=s*0.84, off=(s-sz)/2;
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+'</div>';
   }
   ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"sq",false); });
   tgts.forEach(function(T){ h+=dot(T.sec,T.r,T.c,"ci",true); });
@@ -360,7 +359,7 @@ function renderPaths(){
   var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-  var pipeW=s*0.42, pipeInk=pipeW+s*0.115, jP=s*0.06, jR=s*0.045;
+  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=s*0.06, jR=s*0.045;
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
   function rad(cell, w){ return w/2 + jbump(cell[0],cell[1])*jR; }
 
@@ -399,14 +398,6 @@ function renderPaths(){
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
   });
-  // 4 — gloss (a marker sheen, nudged up-left like the tile streaks)
-  ctx.strokeStyle="rgba(255,255,255,.24)"; ctx.lineWidth=pipeW*0.24; ctx.lineJoin="round"; ctx.lineCap="round";
-  legs.forEach(function(L){
-    var pts=L.cells.map(function(c){ var p=P(c); return [p[0]-pipeW*0.15, p[1]-pipeW*0.18]; });
-    if(pts.length>1) line(pts,0,pts.length-1);
-    else { ctx.fillStyle="rgba(255,255,255,.24)"; ctx.beginPath(); ctx.arc(pts[0][0],pts[0][1], pipeW*0.15,0,6.2832); ctx.fill(); }
-  });
-
   covEl.textContent=coverage()+"/"+(N*N)+" painted";
   var dots=dotL.querySelectorAll(".dot");
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
