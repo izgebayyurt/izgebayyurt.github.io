@@ -289,19 +289,21 @@ function splashAt(r,c,col){
 }
 
 /* ---------- metaball goo merge (ported from the level game) ---------- */
-var GOO_MS=240, goo=null;
+var GOO_MS=210, goo=null;
 function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
 function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
 function placeRect(el,cx,cy,half,rad,rr,fill){ el.setAttribute("x",(cx-half).toFixed(1)); el.setAttribute("y",(cy-half).toFixed(1)); el.setAttribute("width",(half*2).toFixed(1)); el.setAttribute("height",(half*2).toFixed(1)); var rq=Math.min(rad,half).toFixed(1); el.setAttribute("rx",rq); el.setAttribute("ry",rq); el.setAttribute("transform","rotate("+rr.toFixed(1)+" "+cx.toFixed(1)+" "+cy.toFixed(1)+")"); if(fill) el.setAttribute("fill",fill); }
 function bcenter(r,c){ var cw=board.clientWidth/W, ch=board.clientHeight/H; return { x:c*cw+cw/2, y:r*ch+ch/2, s:Math.min(cw,ch) }; }
-function playGoo(from,to,colA,colB,blend){
+function hideTileAt(r,c){ var el=board.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"] .tile'); if(el) el.style.visibility="hidden"; }
+function playGoo(from,to,colA,colB,blend,done){
   if(goo && goo.raf) cancelAnimationFrame(goo.raf);
   var A=bcenter(from.r,from.c), B=bcenter(to.r,to.c);
-  goo={ from:from, to:to, ax:A.x, ay:A.y, bx:B.x, by:B.y, s:B.s, colA:colA, colB:colB, blend:blend, p:0, last:performance.now() };
+  goo={ from:from, to:to, ax:A.x, ay:A.y, bx:B.x, by:B.y, s:B.s, colA:colA, colB:colB, blend:blend, p:0, last:performance.now(), done:done };
   drawGoo();
   goo.raf=requestAnimationFrame(gooTick);
 }
-function gooTick(now){ if(!goo) return; goo.p=Math.min(1, goo.p+(now-goo.last)/GOO_MS); goo.last=now; drawGoo(); if(goo.p>=1){ mixfx.style.display="none"; goo=null; return; } goo.raf=requestAnimationFrame(gooTick); }
+function gooTick(now){ if(!goo) return; goo.p=Math.min(1, goo.p+(now-goo.last)/GOO_MS); goo.last=now; drawGoo(); if(goo.p>=1){ endGoo(); return; } goo.raf=requestAnimationFrame(gooTick); }
+function endGoo(){ if(!goo) return; if(goo.raf) cancelAnimationFrame(goo.raf); var d=goo.done; mixfx.style.display="none"; goo=null; if(d) d(); }
 function drawGoo(){
   if(!goo) return;
   var BW=board.clientWidth, BH=board.clientHeight;
@@ -390,18 +392,29 @@ function doJackpot(){
 
 /* commit an action: from cell (r,c) toward dir [dr,dc] */
 function act(r,c,dr,dc){
+  if(busy) return;
   if(phase!=="idle" && phase!=="hang") return;
   var tr=r+dr, tc=c+dc;
   if(!inb(tr,tc)) return;
   var a=grid[r][c], b=grid[tr][tc];
   if(!a||!b) return;
   if(isPrim(a)){
-    // MIX: primary onto a DIFFERENT primary -> blend at target
+    // MIX: primary onto a DIFFERENT primary -> blend at target. The goo owns the
+    // transition: show the blend cell but HIDE its tile so only the fusing blob is
+    // visible, lock input, and defer pop/gravity until the fuse lands.
     if(isPrim(b) && b!==a){
       var blend=mix(a,b);
-      playGoo({r:r,c:c},{r:tr,c:tc}, HEX[a], HEX[b], HEX[blend]);   // blobby fuse overlay
       grid[tr][tc]=blend; grid[r][c]=null;
-      afterAction(tr+","+tc);
+      draw(); hideTileAt(tr,tc);
+      busy=true;
+      playGoo({r:r,c:c},{r:tr,c:tc}, HEX[a], HEX[b], HEX[blend], function(){
+        busy=false;
+        if(phase==="over") return;
+        var res=findLines();
+        if(res.cells.length){ popCells(res.cells, res.maxRun); }        // fuse completed a line -> pop
+        else if(phase==="hang"){ draw(null, tr+","+tc); renderHUD(); }   // frozen combo: reveal the blend with a little settle
+        else { settleBoard(); }                                         // idle: reveal + gravity
+      });
     } else nope(r,c);
   } else {
     // SWAP: secondary onto neighbour, only if it makes a line
@@ -452,7 +465,7 @@ function advance(dtMs){
   if(phase==="pre"||phase==="over") return;
   var rate = phase==="hang" ? HANG_RATE : 1;
   timeLeft -= (dtMs/1000)*rate;
-  if(phase==="hang"){
+  if(phase==="hang" && !busy){   // a fusing goo pauses the freeze window so it can't lapse mid-merge
     hangLeft -= dtMs;
     if(hangLeft<=WARN_LEAD && hangLeft>0 && !warned){ warned=true; sfxWarn(); }   // one warn ping as it starts trembling
     if(hangLeft<=0){ settleBoard(); }
@@ -473,7 +486,8 @@ function loop(now){
 requestAnimationFrame(loop);
 
 function gameOver(){
-  phase="over"; board.classList.remove("warnshake"); combometerEl.classList.remove("show");
+  phase="over"; busy=false; if(goo&&goo.raf) cancelAnimationFrame(goo.raf); goo=null; mixfx.style.display="none";
+  board.classList.remove("warnshake"); combometerEl.classList.remove("show");
   if(score>best){ best=score; localStorage.setItem("hm_blitz_best",""+best); }
   document.getElementById("finalScore").textContent=score;
   document.getElementById("stBest").textContent=best;
@@ -487,6 +501,7 @@ function startGame(){
   ensureAudio();
   score=0; jackpots=0; chain=0; topChain=0; bars={O:0,G:0,P:0}; timeLeft=START_TIME; hangLeft=0; warned=false; lastWholeSec=99;
   board.classList.remove("warnshake"); combometerEl.classList.remove("show");
+  busy=false; if(goo&&goo.raf) cancelAnimationFrame(goo.raf); goo=null; mixfx.style.display="none";
   newGrid(); phase="idle";
   document.getElementById("ovStart").classList.remove("show");
   document.getElementById("ovOver").classList.remove("show");
@@ -509,6 +524,8 @@ window.__blitz={
   findLines:findLines,
   setBars:function(o){ bars=Object.assign({O:0,G:0,P:0},o); renderBars(); },
   gooFrame:function(from,to,colA,colB,blend,p){ playGoo(from,to,colA,colB,blend); if(goo&&goo.raf) cancelAnimationFrame(goo.raf); goo.p=p; drawGoo(); },
+  finishGoo:function(){ endGoo(); },
+  gooActive:function(){ return { busy:busy, gooOn:!!goo, mixfx:mixfx.style.display }; },
   cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), cw=rect.width/W, chh=rect.height/H; return {x:rect.left+c*cw+cw/2, y:rect.top+r*chh+chh/2}; }
 };
 })();
