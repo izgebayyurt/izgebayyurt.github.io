@@ -49,6 +49,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot.ci{ border-radius:50%; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
+@keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
+.dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
+@keyframes starSpin{ to{ transform:rotate(360deg) } }
+.dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
+@keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+.dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
 .toast{
   position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
   background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
@@ -236,6 +242,7 @@ function sfxWin(){ [0,110,220,400].forEach(function(t,i){ setTimeout(function(){
 /* ---------- level state ---------- */
 function applyLevel(L){
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
+  blooms=[]; sweeps=[]; confetti=[]; drawSteps=0;
   ems=L.ems.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.tgts.map(function(t){ return {sec:t[0], r:t[1], c:t[2], done:false}; });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
@@ -334,6 +341,7 @@ board.addEventListener("pointerdown", function(e){
   var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
   var o=occAt(cell[0],cell[1]);
   if(!o) return;
+  drawSteps=0;
   if(o.t==="jun"){
     var J=junctions[o.i]; J.leg=[J.cell.slice()];
     var tj=tgtFor(J.sec); if(tj) tj.done=false;
@@ -389,10 +397,10 @@ function step(cell){
   var leg=legOf(drag); if(!leg){ drag=null; return; }
   var head=leg[leg.length-1];
   if(same(cell,head)) return;
-  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); reconcileAndFixDrag(); renderPaths(); return; }
+  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return; }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   var o=occAt(cell[0],cell[1]);
-  if(!o){ leg.push(cell); renderPaths(); return; }
+  if(!o){ leg.push(cell); penTick(true); renderPaths(); return; }
 
   if(drag.t==="jun" && o.t==="em" && ems[o.e].legs[o.l] && ems[o.e].legs[o.l].jun===drag.i){
     // swiped back from the junction onto one of ITS feeder pipes -> separate the merge
@@ -414,13 +422,18 @@ function step(cell){
       junctions.push(J);
       myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
       drag={t:"jun", i:junctions.length-1};
+      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0;
       sfxJun(); renderPaths(); return;
     }
   }
   if(drag.t==="jun" && o.t==="tgt"){
     var T=tgts[o.i], J3=junctions[drag.i];
     if(T.sec===J3.sec && !T.done){
-      J3.leg.push(cell); T.done=true; drag=null;
+      J3.leg.push(cell); T.done=true;
+      addBloom(cell[0],cell[1], HEX[T.sec], 760); addSweep(J3.leg.slice(), "#fff", 0, 480);
+      var rd=[].slice.call(dotL.querySelectorAll(".dot")).filter(function(d){ return +d.dataset.dr===T.r && +d.dataset.dc===T.c; })[0];
+      if(rd){ rd.classList.remove("bounce"); void rd.offsetWidth; rd.classList.add("bounce"); }
+      drag=null;
       sfxDone(); renderPaths(); checkWin(); return;
     }
   }
@@ -439,20 +452,20 @@ function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
   var cov=coverage();
   if(cov<N*N){ toast("All blended — now paint every cell!"); return; }
-  solved=true; sfxWin();
+  solved=true; sfxWin(); playWinCascade();
   var wn=document.getElementById("btnWinNext");
   if(isTut){
     document.querySelector("#ovWin h2").textContent="You've got it! ✦";
     document.getElementById("winMsg").textContent="That's the whole game. Ready for Level 1?";
     wn.style.display=""; wn.textContent="Start ✦";
-    setTimeout(function(){ ovWin.classList.add("show"); }, 350);
+    setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
     return;
   }
   document.querySelector("#ovWin h2").textContent="Solved! ✦";
   var done=JSON.parse(localStorage.getItem("hm_flow_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow_done", JSON.stringify(done));
   document.getElementById("winMsg").textContent = "Every cell painted."+(li+1<LEVELS.length ? "" : " That's all the levels — for now!");
   wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
-  setTimeout(function(){ ovWin.classList.add("show"); }, 350);
+  setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
 }
 
 /* ---------- render: marker-style SVG pipes with blend gradients ---------- */
@@ -466,11 +479,30 @@ function renderDots(){
   tgts.forEach(function(T){ h+=dot(T.sec,T.r,T.c,"ci",true); });
   dotL.innerHTML=h;
 }
+/* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
+function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
+var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[];
+var PENTA=[523.25,587.33,659.25,783.99,880.00,1046.5], drawSteps=0;
+function penTick(up){ if(up){ var f=PENTA[Math.min(drawSteps,PENTA.length-1)]; beep(f,0.055,"triangle",0.03); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); beep(PENTA[Math.min(drawSteps,PENTA.length-1)]*0.75,0.05,"triangle",0.022); } }
+function addBloom(r,c,color,dur){ blooms.push({r:r,c:c,color:color,t0:nowMs(),dur:dur||600}); }
+function polyCum(pts){ var cum=[0],tot=0; for(var i=1;i<pts.length;i++){ tot+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); cum.push(tot); } return {cum:cum,total:tot}; }
+function ptAtLen(pts,cum,len){ if(pts.length===1) return pts[0]; if(len<=0) return pts[0]; for(var i=1;i<pts.length;i++){ if(cum[i]>=len){ var seg=(cum[i]-cum[i-1])||1,t=(len-cum[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; }
+function addSweep(cells,color,delay,dur){ var s=cs(); var pts=cells.map(function(c){ return [c[1]*s+s/2, c[0]*s+s/2]; }); var m=polyCum(pts); sweeps.push({pts:pts,cum:m.cum,total:m.total,t0:nowMs()+(delay||0),dur:dur||520,color:color}); }
+function paintedSet(){ var set={}; ems.forEach(function(E){ set[E.r+","+E.c]=1; E.legs.forEach(function(Lg){ Lg.cells.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); }); junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); tgts.forEach(function(T){ set[T.r+","+T.c]=1; }); return set; }
+function roundRect(cx,x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function spawnConfetti(){ var W=board.clientWidth,H=board.clientHeight,cols=[HEX.O,HEX.G,HEX.P,HEX.R,HEX.Y,HEX.B],sz=Math.min(W,H)/N*0.17; for(var i=0;i<52;i++){ confetti.push({ x:W*(0.15+Math.random()*0.7), y:H*0.4+Math.random()*30, vx:(Math.random()-0.5)*260, vy:-120-Math.random()*220, rot:Math.random()*6.28, vr:(Math.random()-0.5)*12, color:cols[(Math.random()*cols.length)|0], t0:nowMs(), life:1500+Math.random()*1100, sz:sz }); } }
+function playWinCascade(){
+  var legList=[]; ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.cells.length>1) legList.push(Lg.cells); }); }); junctions.forEach(function(J){ if(J.leg.length>1) legList.push(J.leg); });
+  legList.forEach(function(cells,i){ addSweep(cells,"#fff", i*100, 560); });
+  dotL.querySelectorAll(".dot.ci").forEach(function(d){ d.classList.add("winspin"); });
+  spawnConfetti();
+}
+
 /* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
    thickness (~half an emitter), round-capped strokes bridge consecutive circles — opaque overlap =
-   smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Per-cell
-   jitter wobbles the line for hand-drawn whimsy; a junction's feeder segments gradient into the
-   blend colour so the paint is never cut. Passes: shadow, ink silhouette, colour, gloss. */
+   smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Living paint
+   glosses travel the pipes; a junction blooms on merge; delivery pulses; the win sweeps the whole
+   tree. Passes: shadow, ink, colour, living gloss + sweeps (clipped), blooms, shimmer, confetti. */
 function renderPaths(){
   var s=cs(); if(!s) return;
   var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
@@ -522,11 +554,43 @@ function renderPaths(){
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
   });
+  // 4 — living paint + delivery/win sweeps, CLIPPED to the pipes via source-atop so light flows INSIDE them
+  ctx.save(); ctx.globalCompositeOperation="source-atop";
+  legs.forEach(function(L,idx){
+    var pts=L.cells.map(P); if(!pts.length) return; var m=polyCum(pts); if(m.total<=0) return;
+    var travel=m.total+s*1.5, speed=s*2.5, off=((idx*0.41)%1)*travel;
+    var pos=(((animT/1000)*speed+off)%travel);
+    if(pos<=m.total){ var pt=ptAtLen(pts,m.cum,pos); var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.6);
+      rg.addColorStop(0,"rgba(255,255,255,0.28)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.6,0,6.2832); ctx.fill(); }
+  });
+  sweeps=sweeps.filter(function(sw){ return nowMs()-sw.t0<sw.dur; });
+  sweeps.forEach(function(sw){ var age=(nowMs()-sw.t0)/sw.dur; if(age<0||age>1) return; var pt=ptAtLen(sw.pts,sw.cum,age*sw.total);
+    var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.95); rg.addColorStop(0,"rgba(255,255,255,0.9)"); rg.addColorStop(0.55,"rgba(255,255,255,0.45)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.95,0,6.2832); ctx.fill(); });
+  ctx.restore();
+  // 5 — junction / delivery blooms (expanding ring + flash, on top)
+  blooms=blooms.filter(function(b){ return nowMs()-b.t0<b.dur; });
+  blooms.forEach(function(b){ var age=(nowMs()-b.t0)/b.dur, pt=P([b.r,b.c]), radius=pipeW*0.45+age*s*0.85;
+    ctx.save(); ctx.globalAlpha=(1-age)*0.75; ctx.strokeStyle=b.color; ctx.lineWidth=Math.max(1.5,(1-age)*s*0.13); ctx.beginPath(); ctx.arc(pt[0],pt[1],radius,0,6.2832); ctx.stroke();
+    if(age<0.4){ ctx.globalAlpha=(0.4-age)/0.4*0.6; ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.55*(1-age),0,6.2832); ctx.fill(); } ctx.restore(); });
+  // 6 — coverage shimmer: all blends delivered but board not full -> unpainted cells breathe
+  if(!solved && tgts.length && tgts.every(function(t){ return t.done; })){
+    var ps=paintedSet(), pulse=0.5+0.5*Math.sin(animT/330);
+    ctx.save(); ctx.fillStyle="#b7a883";
+    for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
+    ctx.restore();
+  }
+  // 7 — win confetti (marker chips, on top of everything)
+  confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
+  if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle="#2c2733"; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
   covEl.textContent=coverage()+"/"+(N*N)+" painted";
   var dots=dotL.querySelectorAll(".dot");
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
 }
 window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
+/* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti */
+function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
 
 /* ---------- level picker & controls ---------- */
 function renderPicker(){
@@ -590,7 +654,10 @@ window.__flow={
     tgts:tgts.map(function(t){ return {sec:t.sec, done:t.done}; }),
     junctions:junctions.map(function(j){ return {sec:j.sec, cell:j.cell, legLen:j.leg.length}; }),
     ems:ems.map(function(E){ return {col:E.col, legs:E.legs.map(function(l){ return {len:l.cells.length, jun:l.jun, root:l.cells[0]}; })}; }) }; },
-  cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), s=cs(); return {x:rect.left+c*s+s/2, y:rect.top+r*s+s/2}; }
+  cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), s=cs(); return {x:rect.left+c*s+s/2, y:rect.top+r*s+s/2}; },
+  winFx:function(){ playWinCascade(); },
+  fx:function(){ return {blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
+  render:function(){ renderPaths(); }
 };
 })();
 </script>
