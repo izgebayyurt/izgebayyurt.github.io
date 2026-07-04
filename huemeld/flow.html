@@ -100,7 +100,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   <div class="boardwrap">
     <div class="board" id="board">
       <div class="gridlayer" id="gridlayer"></div>
-      <svg class="pathlayer" id="pathsvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <canvas class="pathlayer" id="pathcanvas"></canvas>
       <div class="dotlayer" id="dotlayer"></div>
     </div>
     <div class="toast" id="toast"></div>
@@ -159,7 +159,7 @@ var LEVELS=[
     tgts:[["O",0,0],["G",2,1],["P",5,3]] }
 ];
 
-var board=document.getElementById("board"), svg=document.getElementById("pathsvg"),
+var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
     dotL=document.getElementById("dotlayer"),
     gridL=document.getElementById("gridlayer"), covEl=document.getElementById("cov"),
     lvNameEl=document.getElementById("lvName"), toastEl=document.getElementById("toast"),
@@ -199,8 +199,11 @@ function buildGrid(){
   for(var r=0;r<N;r++) for(var c=0;c<N;c++)
     h+='<div class="gcell" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
   gridL.innerHTML=h;
-  svg.setAttribute("viewBox","0 0 "+(N*100)+" "+(N*100));
 }
+/* seeded per-cell wobble — stable within a level, different each level (echoes the tiles' random tilt) */
+function jhash(a,b,salt){ var h=Math.imul(((a+11)*374761397) ^ ((b+7)*668265263) ^ ((salt+3)*2246822519), 2654435761)>>>0; h^=h>>>15; h=Math.imul(h,2246822519)>>>0; h^=h>>>13; return (h>>>0)/4294967295; }
+function jvec(r,c){ return [ (jhash(r,c,li*13+1)-0.5)*2, (jhash(r,c,li*13+2)-0.5)*2 ]; }
+function jbump(r,c){ return (jhash(r,c,li*13+3)-0.5)*2; }
 
 function occAt(r,c){
   for(var j=0;j<junctions.length;j++){ if(same(junctions[j].cell,[r,c])) return {t:"jun", i:j}; }
@@ -340,83 +343,70 @@ function checkWin(){
 function renderDots(){
   var s=cs(), h="";
   function dot(col,r,c,shape,star){
-    var sz=s*0.84, off=(s-sz)/2;
-    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+'</div>';
+    var sz=s*0.84, off=(s-sz)/2, rot=(jhash(r,c,li*13+5)-0.5)*9;   // ±4.5° tilt — the tileset's hand-placed feel
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+';transform:rotate('+rot.toFixed(2)+'deg)">'+(star?'<span class="st">✦</span>':'')+'</div>';
   }
   ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"sq",false); });
   tgts.forEach(function(T){ h+=dot(T.sec,T.r,T.c,"ci",true); });
   dotL.innerHTML=h;
 }
-/* pipes = chains of FUSED TILES: every covered cell is a fat rounded tile (game-tile proportions,
-   streak and all); seams between consecutive cells are filled so a leg reads as ONE outlined blob.
-   The junction is a circle tile INLINE in the chain — feeders' gradients flow through the seam
-   into it, the blend flows out. Nothing is overlaid; pipe colour is never cut. */
+/* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
+   thickness (~half an emitter), round-capped strokes bridge consecutive circles — opaque overlap =
+   smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Per-cell
+   jitter wobbles the line for hand-drawn whimsy; a junction's feeder segments gradient into the
+   blend colour so the paint is never cut. Passes: shadow, ink silhouette, colour, gloss. */
 function renderPaths(){
-  var u=100, T=78, TI=92, RAD=24, RADI=30;             // colour tile size / ink tile size / corner radii
-  var offT=(u-T)/2, offI=(u-TI)/2;
-  function ctr(cell){ return [cell[1]*u+u/2, cell[0]*u+u/2]; }
-  var junSet={};
-  junctions.forEach(function(J,j){ junSet[J.cell[0]+","+J.cell[1]]=j; });
-  var defs="", shadow="", inkS="", colS="", streaks="";
-  function cellRect(cell, big, fill, extra){
-    var sz=big?TI:T, off=big?offI:offT, r=big?RADI:RAD;
-    return '<rect x="'+(cell[1]*u+off)+'" y="'+(cell[0]*u+off)+'" width="'+sz+'" height="'+sz+'" rx="'+r+'" fill="'+fill+'"'+(extra||"")+'/>';
-  }
-  function seamRect(a, b, big, fill, extra){
-    var sz=big?TI:T, off=big?offI:offT;
-    var x, y, w, h;
-    if(a[0]===b[0]){ x=Math.min(a[1],b[1])*u+u/2; y=a[0]*u+off; w=u; h=sz; }
-    else { x=a[1]*u+off; y=Math.min(a[0],b[0])*u+u/2; w=sz; h=u; }
-    return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+fill+'"'+(extra||"")+'/>';
-  }
-  function junCircle(cell, big, fill, extra){
-    var p=ctr(cell), r=big?(TI/2+2):(T/2+2);
-    return '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+fill+'"'+(extra||"")+'/>';
-  }
-  function streak(cell){
-    return '<ellipse cx="'+(cell[1]*u+offT+T*0.33)+'" cy="'+(cell[0]*u+offT+T*0.26)+'" rx="'+(T*0.16)+'" ry="'+(T*0.10)+'" fill="rgba(255,255,255,.34)"/>';
-  }
-  function paintLeg(cells, colour, grad){
-    if(!cells || !cells.length) return;
-    var sh="", ik="", co="";
-    for(var i=0;i<cells.length;i++){
-      var cell=cells[i], isJ=junSet.hasOwnProperty(cell[0]+","+cell[1]);
-      if(!isJ){
-        sh+=cellRect(cell,true,"rgba(44,39,51,.3)",' transform="translate(3,4)"');
-        ik+=cellRect(cell,true,"#2c2733");
-        var lastBeforeJ = grad && i===cells.length-2 && junSet.hasOwnProperty(cells[cells.length-1][0]+","+cells[cells.length-1][1]);
-        co+=cellRect(cell,false, lastBeforeJ?("url(#"+grad.id+")"):colour);
-        streaks+=streak(cell);
-      }
-      if(i>0){
-        var prev=cells[i-1];
-        sh+=seamRect(prev,cell,true,"rgba(44,39,51,.3)",' transform="translate(3,4)"');
-        ik+=seamRect(prev,cell,true,"#2c2733");
-        var seamGrad = grad && i===cells.length-1 && isJ;
-        co+=seamRect(prev,cell,false, seamGrad?("url(#"+grad.id+")"):colour);
-      }
-    }
-    shadow+=sh; inkS+=ik; colS+=co;
-    if(grad){
-      var a=ctr(cells[cells.length-2]||cells[0]), b=ctr(cells[cells.length-1]);
-      defs+='<linearGradient id="'+grad.id+'" gradientUnits="userSpaceOnUse" x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'"><stop offset="0%" stop-color="'+grad.from+'"/><stop offset="92%" stop-color="'+grad.to+'"/></linearGradient>';
-    }
-  }
-  ems.forEach(function(E,e){ E.legs.forEach(function(Lg,l){
-    var grad=null;
-    if(Lg.jun>=0 && junctions[Lg.jun]) grad={id:"gr"+e+"_"+l, from:HEX[E.col], to:HEX[junctions[Lg.jun].sec]};
-    paintLeg(Lg.cells, HEX[E.col], grad);
+  var s=cs(); if(!s) return;
+  var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
+  if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  var pipeW=s*0.42, pipeInk=pipeW+s*0.115, jP=s*0.06, jR=s*0.045;
+  function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
+  function rad(cell, w){ return w/2 + jbump(cell[0],cell[1])*jR; }
+
+  var legs=[];
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){
+    legs.push({cells:Lg.cells, color:HEX[E.col], blend:(Lg.jun>=0&&junctions[Lg.jun])?HEX[junctions[Lg.jun].sec]:null});
   }); });
-  junctions.forEach(function(J){ paintLeg(J.leg, HEX[J.sec], null); });
-  // the junction itself: a circle tile fused into the chain (drawn once, over the seams, under the streaks)
-  junctions.forEach(function(J){
-    shadow+=junCircle(J.cell,true,"rgba(44,39,51,.3)",' transform="translate(3,4)"');
-    inkS+=junCircle(J.cell,true,"#2c2733");
-    colS+=junCircle(J.cell,false,HEX[J.sec]);
-    var p=ctr(J.cell);
-    streaks+='<ellipse cx="'+(p[0]-T*0.17)+'" cy="'+(p[1]-T*0.20)+'" rx="'+(T*0.17)+'" ry="'+(T*0.11)+'" fill="rgba(255,255,255,.4)"/>';
+  junctions.forEach(function(J){ legs.push({cells:J.leg, color:HEX[J.sec], blend:null}); });
+
+  function line(pts,a,b){ ctx.beginPath(); ctx.moveTo(pts[a][0],pts[a][1]); for(var i=a+1;i<=b;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
+  function dab(cells,pts,i,w){ ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1], rad(cells[i],w),0,6.2832); ctx.fill(); }
+
+  function solidPass(color,width){        // one flat colour for ALL legs -> overlaps merge into one silhouette
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineJoin="round"; ctx.lineCap="round";
+    legs.forEach(function(L){ var pts=L.cells.map(P); if(pts.length>1) line(pts,0,pts.length-1); for(var i=0;i<pts.length;i++) dab(L.cells,pts,i,width); });
+  }
+  // 1 — shadow
+  ctx.save(); ctx.translate(s*0.03, s*0.045); solidPass("rgba(44,39,51,.26)", pipeInk); ctx.restore();
+  // 2 — ink silhouette
+  solidPass("#2c2733", pipeInk);
+  // 3 — colour (gradient into the blend on a feeder's final segment)
+  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+  legs.forEach(function(L){
+    var pts=L.cells.map(P), last=pts.length-1;
+    if(L.blend && pts.length>=2){
+      ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
+      if(last-1>=1) line(pts,0,last-1);
+      for(var k=0;k<last;k++) dab(L.cells,pts,k,pipeW);
+      var a=pts[last-1], b=pts[last], g=ctx.createLinearGradient(a[0],a[1],b[0],b[1]);
+      g.addColorStop(0,L.color); g.addColorStop(0.92,L.blend);
+      ctx.strokeStyle=g; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+      ctx.fillStyle=L.blend; dab(L.cells,pts,last,pipeW);
+    } else {
+      ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
+      if(pts.length>1) line(pts,0,last);
+      for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
+    }
   });
-  svg.innerHTML="<defs>"+defs+"</defs><g>"+shadow+"</g><g>"+inkS+"</g><g>"+colS+"</g><g>"+streaks+"</g>";
+  // 4 — gloss (a marker sheen, nudged up-left like the tile streaks)
+  ctx.strokeStyle="rgba(255,255,255,.24)"; ctx.lineWidth=pipeW*0.24; ctx.lineJoin="round"; ctx.lineCap="round";
+  legs.forEach(function(L){
+    var pts=L.cells.map(function(c){ var p=P(c); return [p[0]-pipeW*0.15, p[1]-pipeW*0.18]; });
+    if(pts.length>1) line(pts,0,pts.length-1);
+    else { ctx.fillStyle="rgba(255,255,255,.24)"; ctx.beginPath(); ctx.arc(pts[0][0],pts[0][1], pipeW*0.15,0,6.2832); ctx.fill(); }
+  });
+
   covEl.textContent=coverage()+"/"+(N*N)+" painted";
   var dots=dotL.querySelectorAll(".dot");
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
