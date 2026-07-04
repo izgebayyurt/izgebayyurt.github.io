@@ -99,8 +99,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
 /* demo "ghost hand" + caption banner + skip */
 .ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1); }
-.demoban{ position:absolute; left:8px; right:8px; top:12px; z-index:9; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:16px; opacity:0; transition:opacity .25s; pointer-events:none; box-shadow:0 3px 0 var(--shadow); text-align:center; }
-.demoban.show{ opacity:1; }
+.demoban{ width:min(94vw,420px); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
+.demoban.show{ display:flex; }
 .demoskip{ display:none; margin:10px auto 0; }
 .demoskip.show{ display:block; }
 </style>
@@ -118,6 +118,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div style="text-align:center"><div class="lvname" id="lvName">Level 1</div><div class="cov" id="cov">0/25 painted</div></div>
     <button class="mkk" id="btnNext">→</button>
   </div>
+  <div class="demoban" id="demoban"></div>
   <div class="boardwrap">
     <div class="board" id="board">
       <div class="gridlayer" id="gridlayer"></div>
@@ -141,7 +142,6 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       </div>
     </div>
     <div class="ghost" id="ghost"></div>
-    <div class="demoban" id="demoban"></div>
   </div>
   <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
 
@@ -313,11 +313,11 @@ var ghostEl=document.getElementById("ghost"), demoBanEl=document.getElementById(
    from its square (stroke 5) — so the demo shows both. */
 var DEMO_STROKES=[
   { cap:"Drag a colour out of its square", cells:[[2,3],[2,2],[3,2]] },
-  { cap:"Lead another colour in — they MIX", cap2:"…now carry the blend to its ✦", cap2At:1, cells:[[3,3],[3,2],[3,1],[2,1]] },
-  { cap:"Each colour is used TWICE — here, BRANCH a 2nd line off the first", cells:[[2,2],[1,2],[1,1],[1,0]] },
+  { cap:"Lead another colour in. They mix!", cap2:"Now carry the blend to its ✦", cap2At:1, cells:[[3,3],[3,2],[3,1],[2,1]] },
+  { cap:"Each colour is used twice. Branch a 2nd line off the first,", cells:[[2,2],[1,2],[1,1],[1,0]] },
   { cap:"", cells:[[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1],[0,2]] },
-  { cap:"…or FORK the 2nd line straight from the square", cells:[[3,3],[3,4]] },
-  { cap:"", cells:[[4,4],[3,4],[2,4],[1,4],[1,3],[0,3],[0,4]] }
+  { cap:"or fork the 2nd line straight from the square.", cells:[[3,3],[3,4]] },
+  { cap:"Every square must be filled to win", cells:[[4,4],[3,4],[2,4],[1,4],[1,3],[0,3],[0,4]] }
 ];
 function moveGhost(cell){ var s=cs(); ghostEl.style.left=(cell[1]*s+s/2)+"px"; ghostEl.style.top=(cell[0]*s+s/2)+"px"; }
 function banner(msg){ if(!msg) return; demoBanEl.textContent=msg; demoBanEl.classList.add("show"); }
@@ -547,7 +547,7 @@ function checkWin(){
   if(demoing) return;   // the demo drives its own celebration + hand-off
   if(!tgts.every(function(t){ return t.done; })) return;
   var cov=coverage();
-  if(cov<N*N){ toast("All blended — now paint every cell!"); return; }
+  if(cov<N*N){ toast("All blended. Now fill every square!"); return; }
   solved=true; sfxWin(); playWinCascade();
   var wn=document.getElementById("btnWinNext");
   if(isTut){
@@ -559,7 +559,7 @@ function checkWin(){
   }
   document.querySelector("#ovWin h2").textContent="Solved! ✦";
   var done=JSON.parse(localStorage.getItem("hm_flow_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow_done", JSON.stringify(done));
-  document.getElementById("winMsg").textContent = "Every cell painted."+(li+1<LEVELS.length ? "" : " That's all the levels — for now!");
+  document.getElementById("winMsg").textContent = "Every cell painted."+(li+1<LEVELS.length ? "" : " That's all the levels, for now!");
   wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
   setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
 }
