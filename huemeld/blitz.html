@@ -70,8 +70,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
 @keyframes hmDrop{ from{ transform:translateY(-16px) rotate(var(--rot,0deg)); opacity:.2 } to{ transform:translateY(0) rotate(var(--rot,0deg)); opacity:1 } }
 @keyframes hmMix{ 0%{ transform:rotate(var(--rot,0deg)) scale(.6) } 55%{ transform:rotate(0deg) scale(1.25) } 100%{ transform:rotate(var(--rot,0deg)) scale(1) } }
 @keyframes hmNope{ 0%,100%{ transform:rotate(var(--rot,0deg)) translateX(0) } 25%{ transform:rotate(var(--rot,0deg)) translateX(-4px) } 75%{ transform:rotate(var(--rot,0deg)) translateX(4px) } }
+/* the metaball goo overlay: two blurred, alpha-thresholded blobs fuse with a liquid neck (attribute-based SVG so Safari animates it) */
+.mixfx{ position:absolute; left:0; top:0; display:none; pointer-events:none; z-index:6; overflow:visible; }
+.fxlayer{ position:absolute; inset:0; pointer-events:none; z-index:7; overflow:visible; }
 /* pop splash */
-.splash{ position:absolute; pointer-events:none; z-index:5; border-radius:50%; border:3px solid var(--line); }
+.splash{ position:absolute; pointer-events:none; z-index:7; border-radius:50%; border:3px solid var(--line); }
 .splash.go{ animation:hmSplash .42s var(--pop) forwards; }
 @keyframes hmSplash{ 0%{ transform:scale(.5); opacity:1 } 60%{ transform:scale(1.3); opacity:.9 } 100%{ transform:scale(1.7); opacity:0 } }
 /* combo callout */
@@ -132,8 +135,16 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
       <div class="timenum" id="timenum">60</div>
       <div class="timebar" id="timebar"><div class="timefill" id="timefill"></div></div>
     </div>
-    <div class="boardwrap">
+    <div class="boardwrap" id="boardwrap">
       <div class="board" id="board"></div>
+      <svg class="mixfx" id="mixfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <filter id="goo"><feGaussianBlur id="gooBlur" in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/></filter>
+        </defs>
+        <g filter="url(#goo)"><rect id="gtgtInk" fill="#2c2733"/><rect id="gsrcInk" fill="#2c2733"/></g>
+        <g filter="url(#goo)"><rect id="gtgt"/><rect id="gsrc"/></g>
+      </svg>
+      <div class="fxlayer" id="fxlayer"></div>
       <div class="combometer" id="combometer"><div class="cfill" id="cfill"></div></div>
       <div class="jflash" id="jflash"></div>
       <div class="burst" id="burst"></div>
@@ -186,6 +197,10 @@ var lastTE=0;
 document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-lastTE<300 && !e.target.closest("button")) e.preventDefault(); lastTE=now; }, {passive:false});
 
 var board=document.getElementById("board"), burstEl=document.getElementById("burst"),
+    fxlayer=document.getElementById("fxlayer"),
+    mixfx=document.getElementById("mixfx"), gooBlur=document.getElementById("gooBlur"),
+    gtgt=document.getElementById("gtgt"), gsrc=document.getElementById("gsrc"),
+    gtgtInk=document.getElementById("gtgtInk"), gsrcInk=document.getElementById("gsrcInk"),
     combometerEl=document.getElementById("combometer"), cfillEl=document.getElementById("cfill"),
     jflashEl=document.getElementById("jflash"), barsEl=document.getElementById("bars"),
     scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"),
@@ -268,9 +283,40 @@ function splashAt(r,c,col){
   var sz=cw*0.7;
   s.style.width=sz+"px"; s.style.height=sz+"px"; s.style.left=(c*cw+cw/2-sz/2)+"px"; s.style.top=(r*ch+ch/2-sz/2)+"px";
   s.style.background=HEX[col];
-  board.appendChild(s);
+  fxlayer.appendChild(s);   // a layer OVER the board so draw()'s innerHTML rebuild can't wipe it
   requestAnimationFrame(function(){ s.classList.add("go"); });
   setTimeout(function(){ s.remove(); }, 460);
+}
+
+/* ---------- metaball goo merge (ported from the level game) ---------- */
+var GOO_MS=240, goo=null;
+function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
+function placeRect(el,cx,cy,half,rad,rr,fill){ el.setAttribute("x",(cx-half).toFixed(1)); el.setAttribute("y",(cy-half).toFixed(1)); el.setAttribute("width",(half*2).toFixed(1)); el.setAttribute("height",(half*2).toFixed(1)); var rq=Math.min(rad,half).toFixed(1); el.setAttribute("rx",rq); el.setAttribute("ry",rq); el.setAttribute("transform","rotate("+rr.toFixed(1)+" "+cx.toFixed(1)+" "+cy.toFixed(1)+")"); if(fill) el.setAttribute("fill",fill); }
+function bcenter(r,c){ var cw=board.clientWidth/W, ch=board.clientHeight/H; return { x:c*cw+cw/2, y:r*ch+ch/2, s:Math.min(cw,ch) }; }
+function playGoo(from,to,colA,colB,blend){
+  if(goo && goo.raf) cancelAnimationFrame(goo.raf);
+  var A=bcenter(from.r,from.c), B=bcenter(to.r,to.c);
+  goo={ from:from, to:to, ax:A.x, ay:A.y, bx:B.x, by:B.y, s:B.s, colA:colA, colB:colB, blend:blend, p:0, last:performance.now() };
+  drawGoo();
+  goo.raf=requestAnimationFrame(gooTick);
+}
+function gooTick(now){ if(!goo) return; goo.p=Math.min(1, goo.p+(now-goo.last)/GOO_MS); goo.last=now; drawGoo(); if(goo.p>=1){ mixfx.style.display="none"; goo=null; return; } goo.raf=requestAnimationFrame(gooTick); }
+function drawGoo(){
+  if(!goo) return;
+  var BW=board.clientWidth, BH=board.clientHeight;
+  mixfx.style.width=BW+"px"; mixfx.style.height=BH+"px";
+  mixfx.setAttribute("viewBox","0 0 "+BW+" "+BH);
+  var e=0.35+0.65*goo.p, R=goo.s*0.40;    // start ~1/3 fused — the merge already committed
+  gooBlur.setAttribute("stdDeviation",(R*(0.30+0.34*e)).toFixed(1));    // liquid neck grows as they fuse
+  var sx=goo.ax+(goo.bx-goo.ax)*e, sy=goo.ay+(goo.by-goo.ay)*e;
+  var colS=lerpHex(goo.colA, goo.blend, e), colT=lerpHex(goo.colB, goo.blend, e);
+  var rr=R*(0.26+0.74*e);   // both are primaries: square -> circle as they fuse
+  placeRect(gtgtInk, goo.bx,goo.by, R+3, rr+3, rot(goo.to.r,goo.to.c), "#2c2733");
+  placeRect(gsrcInk, sx,sy, R+3, rr+3, rot(goo.from.r,goo.from.c), "#2c2733");
+  placeRect(gtgt, goo.bx,goo.by, R, rr, rot(goo.to.r,goo.to.c), colT);
+  placeRect(gsrc, sx,sy, R, rr, rot(goo.from.r,goo.from.c), colS);
+  mixfx.style.display="block";
 }
 function renderBars(){
   var h="";
@@ -352,7 +398,9 @@ function act(r,c,dr,dc){
   if(isPrim(a)){
     // MIX: primary onto a DIFFERENT primary -> blend at target
     if(isPrim(b) && b!==a){
-      grid[tr][tc]=mix(a,b); grid[r][c]=null;
+      var blend=mix(a,b);
+      playGoo({r:r,c:c},{r:tr,c:tc}, HEX[a], HEX[b], HEX[blend]);   // blobby fuse overlay
+      grid[tr][tc]=blend; grid[r][c]=null;
       afterAction(tr+","+tc);
     } else nope(r,c);
   } else {
@@ -460,6 +508,7 @@ window.__blitz={
   advance:advance,
   findLines:findLines,
   setBars:function(o){ bars=Object.assign({O:0,G:0,P:0},o); renderBars(); },
+  gooFrame:function(from,to,colA,colB,blend,p){ playGoo(from,to,colA,colB,blend); if(goo&&goo.raf) cancelAnimationFrame(goo.raf); goo.p=p; drawGoo(); },
   cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), cw=rect.width/W, chh=rect.height/H; return {x:rect.left+c*cw+cw/2, y:rect.top+r*chh+chh/2}; }
 };
 })();
