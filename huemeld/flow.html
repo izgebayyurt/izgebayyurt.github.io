@@ -413,17 +413,22 @@ function step(cell){
   }
   if(drag.t==="em" && o.t==="em" && o.e!==drag.e){
     var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
-    var isHead=(o.idx===oleg.cells.length-1);
     var sec=mixOf(me.col, other.col);
     var myLeg=me.legs[drag.l];
-    if(isHead && sec && myLeg.jun<0 && oleg.jun<0 && tgtFor(sec) && !tgtFor(sec).done){
+    if(sec && myLeg.jun<0 && oleg.jun<0 && tgtFor(sec) && !tgtFor(sec).done){
+      // tap into the other pipe ANYWHERE (o.idx, not just its tip): the junction forms there,
+      // and everything on that pipe BEYOND the tap becomes the blend leg (recoloured to the blend)
       myLeg.cells.push(cell);
-      var J={cell:cell.slice(), sec:sec, leg:[cell.slice()]};
+      var excess=oleg.cells.slice(o.idx+1);
+      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); })};
+      oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
       junctions.push(J);
       myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
-      drag={t:"jun", i:junctions.length-1};
-      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0;
-      sfxJun(); renderPaths(); return;
+      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun();
+      // tip merge (no excess): keep drawing the blend. Mid merge: the excess IS the blend leg — end
+      // the drag so the finger doesn't fight the far-away head; grab the junction to reroute.
+      drag = excess.length ? null : {t:"jun", i:junctions.length-1};
+      renderPaths(); return;
     }
   }
   if(drag.t==="jun" && o.t==="tgt"){
