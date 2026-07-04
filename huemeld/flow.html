@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f3ead6" />
+<title>Huemeld Flow (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  --font-d:'Fredoka',sans-serif; --font-u:'Nunito',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.055) 1.2px, transparent 1.3px);
+  background-size:22px 22px;
+  font-family:var(--font-u); color:var(--ink);
+  display:flex; flex-direction:column; align-items:center;
+  overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+}
+.top{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 8px; }
+.brand{ display:flex; align-items:baseline; gap:8px; }
+.brand a{ text-decoration:none; color:var(--ink); }
+h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
+.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--ink); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
+.lvbar{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.lvbar .mkk{ width:42px; height:38px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:16px; cursor:pointer; font-family:var(--font-d); }
+.lvbar .mkk:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.lvname{ font-family:var(--font-d); font-weight:700; font-size:17px; }
+.cov{ font-size:11.5px; font-weight:800; color:var(--ink-soft); letter-spacing:.5px; }
+.boardwrap{ position:relative; width:min(94vw,420px); }
+.board{
+  position:relative; width:100%; aspect-ratio:1;
+  background:var(--card); border:3px solid var(--line); border-radius:18px;
+  box-shadow:0 5px 0 var(--shadow); overflow:hidden; touch-action:none;
+}
+.gridlayer,.pathlayer,.dotlayer{ position:absolute; inset:0; pointer-events:none; }
+.gcell{ position:absolute; }
+.gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.12; }
+/* path pieces */
+.pb{ position:absolute; border-radius:38%; }
+.pc{ position:absolute; }
+.jun{ position:absolute; border:3px solid var(--line); border-radius:50%; box-shadow:1.5px 2px 0 var(--shadow); z-index:3; animation:junPop .3s cubic-bezier(.3,1.5,.6,1); }
+@keyframes junPop{ 0%{transform:scale(.4)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
+/* dots */
+.dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
+.dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
+.dot.ci{ border-radius:50%; }
+.dot .st{ color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
+.dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
+.toast{
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
+  background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
+  padding:7px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.toast.show{ opacity:1; }
+.ov{
+  position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+  background:rgba(243,234,214,.9); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.ov.show{ opacity:1; pointer-events:auto; }
+.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 26px; text-align:center; max-width:86%; }
+.panel h2{ font-family:var(--font-d); font-weight:700; font-size:26px; margin-bottom:6px; }
+.panel p{ font-size:13px; font-weight:700; color:var(--ink-soft); line-height:1.5; }
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:#ffd15c; border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); height:46px; padding:0 28px; font-size:16px; margin-top:13px;
+  transition:transform .08s, box-shadow .08s; touch-action:manipulation;
+}
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
+.tip b{ color:var(--ink); }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">FLOW</span></div>
+    <button class="mkk lvbar-reset mkk" id="btnReset" style="width:auto;padding:0 14px" title="Reset level">↻ reset</button>
+  </div>
+  <div class="lvbar">
+    <button class="mkk" id="btnPrev">←</button>
+    <div style="text-align:center"><div class="lvname" id="lvName">Level 1</div><div class="cov" id="cov">0/25 painted</div></div>
+    <button class="mkk" id="btnNext">→</button>
+  </div>
+  <div class="boardwrap">
+    <div class="board" id="board">
+      <div class="gridlayer" id="gridlayer"></div>
+      <div class="pathlayer" id="pathlayer"></div>
+      <div class="dotlayer" id="dotlayer"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="ov" id="ovWin">
+      <div class="panel">
+        <h2>Solved! ✦</h2>
+        <p id="winMsg">Every cell painted.</p>
+        <button class="mk" id="btnWinNext">Next →</button>
+      </div>
+    </div>
+  </div>
+  <p class="tip">drag <b>squares</b> (paints) — join two that <b>mix</b>, then carry the blend to its <b>✦ circle</b> · connect matching pairs · <b>paint every cell</b></p>
+
+<script>
+(function(){
+"use strict";
+var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6"};
+var MIXMAP={RY:"O",BR:"P",BY:"G"};
+function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
+function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
+
+/* iOS zoom guards */
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+var lastTE=0;
+document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-lastTE<300 && !e.target.closest("button")) e.preventDefault(); lastTE=now; }, {passive:false});
+
+/* ---------- hand-crafted levels (each verified to have a full-coverage solution) ----------
+   srcs: primary paint dots (draggable squares). tgts: mix targets (✦ circles — need a junction
+   of their two constituents, then the blended line carried home). pipes: plain matched pairs. */
+var LEVELS=[
+  { name:"First blend", n:5,
+    srcs:[["R",0,0],["Y",1,0]],
+    tgts:[["O",0,4]],
+    pipes:[["B",1,4,2,0],["G",3,0,4,0]] },
+  { name:"Green means go", n:5,
+    srcs:[["Y",4,0],["B",4,2]],
+    tgts:[["G",0,2]],
+    pipes:[["R",1,1,0,3],["O",2,2,4,3]] },
+  { name:"Shared yellow", n:6,
+    srcs:[["R",0,0],["Y",3,0],["Y",5,0],["B",5,2]],
+    tgts:[["O",0,1],["G",2,1]],
+    pipes:[["P",0,2,5,3]] },
+  { name:"Blue is busy", n:6,
+    srcs:[["R",0,5],["B",2,5],["B",3,5],["Y",5,5]],
+    tgts:[["P",0,0],["G",5,3]],
+    pipes:[["O",1,0,5,1]] },
+  { name:"The full palette", n:7,
+    srcs:[["R",0,0],["Y",1,0],["Y",2,0],["B",3,0],["R",4,0],["B",5,0]],
+    tgts:[["O",1,4],["G",3,4],["P",6,0]],
+    pipes:[] }
+];
+
+var board=document.getElementById("board"), pathL=document.getElementById("pathlayer"),
+    dotL=document.getElementById("dotlayer"), gridL=document.getElementById("gridlayer"),
+    covEl=document.getElementById("cov"), lvNameEl=document.getElementById("lvName"),
+    toastEl=document.getElementById("toast"), ovWin=document.getElementById("ovWin");
+
+var li=Math.min(+(localStorage.getItem("hm_flow_i")||0), LEVELS.length-1);
+var N=5, srcs=[], tgts=[], pipes=[], junctions=[], drag=null, solved=false, toastTid=0;
+
+/* ---------- audio ---------- */
+var actx=null;
+function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
+function beep(f,d,t,g){ if(!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
+function sfxJun(){ beep(430,0.08,"triangle",0.05); setTimeout(function(){ beep(650,0.1,"triangle",0.045); },60); }
+function sfxDone(){ beep(520,0.09,"triangle",0.05); setTimeout(function(){ beep(780,0.12,"triangle",0.045); },70); }
+function sfxWin(){ [0,110,220,400].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.15,"triangle",0.05); },t); }); }
+
+/* ---------- level state ---------- */
+function loadLevel(i){
+  li=Math.max(0, Math.min(LEVELS.length-1, i));
+  localStorage.setItem("hm_flow_i",""+li);
+  var L=LEVELS[li];
+  N=L.n; drag=null; solved=false; junctions=[];
+  srcs=L.srcs.map(function(s){ return {col:s[0], r:s[1], c:s[2], leg:[[s[1],s[2]]], jun:-1}; });
+  tgts=L.tgts.map(function(t){ return {sec:t[0], r:t[1], c:t[2], done:false}; });
+  pipes=L.pipes.map(function(p){ return {col:p[0], a:[p[1],p[2]], b:[p[3],p[4]], path:[], done:false}; });
+  lvNameEl.textContent=(li+1)+". "+L.name;
+  ovWin.classList.remove("show");
+  buildGrid(); renderDots(); renderPaths();
+}
+function cs(){ return board.clientWidth/N; }
+function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
+function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
+
+function buildGrid(){
+  var h="", s=100/N;
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++)
+    h+='<div class="gcell" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
+  gridL.innerHTML=h;
+}
+
+/* what occupies a cell? (dots are static; legs/paths are dynamic) */
+function occAt(r,c){
+  for(var j=0;j<junctions.length;j++){ if(same(junctions[j].cell,[r,c])) return {t:"jun", i:j}; }
+  for(var i=0;i<srcs.length;i++){ var idx=indexIn(srcs[i].leg,r,c); if(idx>=0) return {t:"src", i:i, idx:idx}; }
+  for(var j2=0;j2<junctions.length;j2++){ var jd=indexIn(junctions[j2].leg,r,c); if(jd>=0) return {t:"jleg", i:j2, idx:jd}; }
+  for(var p=0;p<pipes.length;p++){
+    if(same(pipes[p].a,[r,c])||same(pipes[p].b,[r,c])) return {t:"pipedot", i:p};
+    var pi=indexIn(pipes[p].path,r,c); if(pi>=0) return {t:"pipe", i:p, idx:pi};
+  }
+  for(var t2=0;t2<tgts.length;t2++){ if(tgts[t2].r===r && tgts[t2].c===c) return {t:"tgt", i:t2}; }
+  return null;
+}
+function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) return i; return -1; }
+
+function destroyJunction(j){
+  var J=junctions[j];
+  if(!J) return;
+  srcs[J.sA].jun=-1; srcs[J.sB].jun=-1;
+  // the leg that extended INTO the junction keeps the cell as its head; pop it so both heads separate
+  [J.sA,J.sB].forEach(function(si){ var lg=srcs[si].leg; if(lg.length>1 && same(lg[lg.length-1], J.cell) && !(srcs[si].r===J.cell[0]&&srcs[si].c===J.cell[1])){ /* keep — the head IS the junction cell for one leg */ } });
+  var t=tgtFor(J.sec); if(t && t.done){ t.done=false; }
+  junctions.splice(j,1);
+  // reindex src.jun
+  for(var s=0;s<srcs.length;s++){ if(srcs[s].jun>j) srcs[s].jun--; }
+}
+function tgtFor(sec){ for(var i=0;i<tgts.length;i++) if(tgts[i].sec===sec) return tgts[i]; return null; }
+
+/* ---------- input ---------- */
+function cellAt(x,y){
+  var rect=board.getBoundingClientRect(), s=cs();
+  var c=Math.floor((x-rect.left)/s), r=Math.floor((y-rect.top)/s);
+  if(!inb(r,c)) return null;
+  return [r,c];
+}
+board.addEventListener("pointerdown", function(e){
+  if(!e.isPrimary || solved) return; ensureAudio();
+  var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
+  var o=occAt(cell[0],cell[1]);
+  if(!o) return;
+  if(o.t==="jun"){                             // redraw the blended line from the junction
+    var J=junctions[o.i]; J.leg=[J.cell.slice()];
+    var tj=tgtFor(J.sec); if(tj) tj.done=false;
+    drag={t:"jun", i:o.i};
+  } else if(o.t==="src"){
+    var S=srcs[o.i];
+    if(S.jun>=0) destroyJunction(S.jun);
+    S.leg=S.leg.slice(0, o.idx+1);             // truncate to the grabbed cell (dot = restart)
+    if(o.idx===0) S.leg=[[S.r,S.c]];
+    drag={t:"src", i:o.i};
+  } else if(o.t==="jleg"){
+    var J2=junctions[o.i]; J2.leg=J2.leg.slice(0,o.idx+1);
+    var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
+    drag={t:"jun", i:o.i};
+  } else if(o.t==="pipedot"){
+    var P=pipes[o.i]; P.done=false;
+    P.path=[ same(P.a,cell) ? P.a.slice() : P.b.slice() ];
+    drag={t:"pipe", i:o.i};
+  } else if(o.t==="pipe"){
+    var P2=pipes[o.i]; P2.done=false; P2.path=P2.path.slice(0,o.idx+1);
+    drag={t:"pipe", i:o.i};
+  } else return;
+  try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+  renderPaths();
+});
+board.addEventListener("pointermove", function(e){
+  if(!drag || !e.isPrimary) return;
+  var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
+  step(cell);
+});
+board.addEventListener("pointerup", function(){ drag=null; });
+board.addEventListener("pointercancel", function(){ drag=null; });
+board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+function legOf(d){ return d.t==="src" ? srcs[d.i].leg : (d.t==="jun" ? junctions[d.i].leg : pipes[d.i].path); }
+function colOf(d){ return d.t==="src" ? srcs[d.i].col : (d.t==="jun" ? junctions[d.i].sec : pipes[d.i].col); }
+
+function step(cell){
+  var leg=legOf(drag), head=leg[leg.length-1];
+  if(same(cell,head)) return;
+  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); renderPaths(); return; }   // drag back = undo
+  if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;                       // orthogonal steps only
+  var o=occAt(cell[0],cell[1]);
+  if(!o){ leg.push(cell); renderPaths(); return; }                                          // empty — extend
+
+  if(drag.t==="src" && o.t==="src" && o.i!==drag.i){
+    var me=srcs[drag.i], other=srcs[o.i];
+    var otherHead=other.leg[other.leg.length-1];
+    var sec=mixOf(me.col, other.col);
+    if(same(cell, otherHead) && sec && me.jun<0 && other.jun<0 && tgtFor(sec) && !tgtFor(sec).done){
+      me.leg.push(cell);                                                                     // heads meet — THE BLEND
+      var J={cell:cell.slice(), sec:sec, sA:drag.i, sB:o.i, leg:[cell.slice()]};
+      junctions.push(J);
+      me.jun=junctions.length-1; other.jun=junctions.length-1;
+      drag={t:"jun", i:junctions.length-1};                                                  // keep dragging — now in the blended colour
+      sfxJun(); renderPaths(); return;
+    }
+  }
+  if(drag.t==="jun" && o.t==="tgt"){
+    var T=tgts[o.i], J3=junctions[drag.i];
+    if(T.sec===J3.sec && !T.done){
+      J3.leg.push(cell); T.done=true; drag=null;
+      sfxDone(); renderPaths(); checkWin(); return;
+    }
+  }
+  if(drag.t==="pipe" && o.t==="pipedot" && o.i===drag.i){
+    var P3=pipes[drag.i], start=P3.path[0];
+    var otherEnd = same(start,P3.a) ? P3.b : P3.a;
+    if(same(cell,otherEnd)){
+      P3.path.push(cell); P3.done=true; drag=null;
+      sfxDone(); renderPaths(); checkWin(); return;
+    }
+  }
+  /* blocked otherwise */
+}
+
+/* ---------- coverage & win ---------- */
+function coverage(){
+  var set={};
+  srcs.forEach(function(S){ S.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); });
+  junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); });
+  pipes.forEach(function(P){ P.path.forEach(function(c){ set[c[0]+","+c[1]]=1; }); set[P.a[0]+","+P.a[1]]=1; set[P.b[0]+","+P.b[1]]=1; });
+  tgts.forEach(function(T){ set[T.r+","+T.c]=1; });
+  return Object.keys(set).length;
+}
+function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
+function checkWin(){
+  var flowsDone = tgts.every(function(t){ return t.done; }) && pipes.every(function(p){ return p.done; });
+  if(!flowsDone) return;
+  var cov=coverage();
+  if(cov<N*N){ toast("All connected — now paint every cell!"); return; }
+  solved=true; sfxWin();
+  var done=JSON.parse(localStorage.getItem("hm_flow_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow_done", JSON.stringify(done));
+  document.getElementById("winMsg").textContent = "Every cell painted."+(li+1<LEVELS.length ? "" : " That's all the levels — for now!");
+  document.getElementById("btnWinNext").style.display = li+1<LEVELS.length ? "" : "none";
+  setTimeout(function(){ ovWin.classList.add("show"); }, 350);
+}
+
+/* ---------- render ---------- */
+function renderDots(){
+  var s=cs(), h="";
+  function dot(col,r,c,shape,star){
+    var sz=s*0.68, off=(s-sz)/2;
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+'</div>';
+  }
+  srcs.forEach(function(S){ h+=dot(S.col,S.r,S.c,"sq",false); });
+  tgts.forEach(function(T){ h+=dot(T.sec,T.r,T.c,"ci",true); });
+  pipes.forEach(function(P){ var sh=isPrim(P.col)?"sq":"ci"; h+=dot(P.col,P.a[0],P.a[1],sh,false); h+=dot(P.col,P.b[0],P.b[1],sh,false); });
+  dotL.innerHTML=h;
+}
+function renderPaths(){
+  var s=cs(), h="", bw=s*0.34, bb=s*0.5;
+  function seg(list,color){
+    for(var i=0;i<list.length;i++){
+      var r=list[i][0], c=list[i][1];
+      h+='<div class="pb" style="left:'+(c*s+(s-bb)/2)+'px;top:'+(r*s+(s-bb)/2)+'px;width:'+bb+'px;height:'+bb+'px;background:'+color+'"></div>';
+      if(i>0){
+        var pr=list[i-1][0], pc=list[i-1][1];
+        var x1=pc*s+s/2, y1=pr*s+s/2, x2=c*s+s/2, y2=r*s+s/2;
+        if(pr===r) h+='<div class="pc" style="left:'+(Math.min(x1,x2))+'px;top:'+(y1-bw/2)+'px;width:'+(Math.abs(x2-x1))+'px;height:'+bw+'px;background:'+color+'"></div>';
+        else h+='<div class="pc" style="left:'+(x1-bw/2)+'px;top:'+(Math.min(y1,y2))+'px;width:'+bw+'px;height:'+(Math.abs(y2-y1))+'px;background:'+color+'"></div>';
+      }
+    }
+  }
+  srcs.forEach(function(S){ seg(S.leg, HEX[S.col]); });
+  pipes.forEach(function(P){ seg(P.path, HEX[P.col]); });
+  junctions.forEach(function(J){ seg(J.leg, HEX[J.sec]); });
+  junctions.forEach(function(J){
+    var jz=s*0.62, jo=(s-jz)/2;
+    h+='<div class="jun" style="left:'+(J.cell[1]*s+jo)+'px;top:'+(J.cell[0]*s+jo)+'px;width:'+jz+'px;height:'+jz+'px;background:'+HEX[J.sec]+'"></div>';
+  });
+  pathL.innerHTML=h;
+  covEl.textContent=coverage()+"/"+(N*N)+" painted";
+  // glow satisfied targets
+  var dots=dotL.querySelectorAll(".dot");
+  tgts.forEach(function(T){ dots.forEach(function(d){ if(+d.dataset.dr===T.r && +d.dataset.dc===T.c) d.classList.toggle("donept", T.done); }); });
+}
+window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
+
+/* ---------- controls ---------- */
+document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); loadLevel(li-1); });
+document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); loadLevel(li+1); });
+document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); loadLevel(li); });
+document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); loadLevel(li+1); });
+
+loadLevel(li);
+
+/* debug hooks for automated testing */
+window.__flow={
+  load:loadLevel,
+  state:function(){ return { li:li, n:N, solved:solved, coverage:coverage(),
+    tgts:tgts.map(function(t){ return {sec:t.sec, done:t.done}; }),
+    pipes:pipes.map(function(p){ return {col:p.col, done:p.done, len:p.path.length}; }),
+    junctions:junctions.map(function(j){ return {sec:j.sec, cell:j.cell, legLen:j.leg.length}; }),
+    srcs:srcs.map(function(s){ return {col:s.col, legLen:s.leg.length, jun:s.jun}; }) }; },
+  cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), s=cs(); return {x:rect.left+c*s+s/2, y:rect.top+r*s+s/2}; }
+};
+})();
+</script>
+</body>
+</html>
