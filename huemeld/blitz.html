@@ -398,26 +398,25 @@ function act(r,c,dr,dc){
   if(!inb(tr,tc)) return;
   var a=grid[r][c], b=grid[tr][tc];
   if(!a||!b) return;
-  if(isPrim(a)){
+  if(isPrim(a) && isPrim(b) && b!==a){
     // MIX: primary onto a DIFFERENT primary -> blend at target. The goo owns the
     // transition: show the blend cell but HIDE its tile so only the fusing blob is
     // visible, lock input, and defer pop/gravity until the fuse lands.
-    if(isPrim(b) && b!==a){
-      var blend=mix(a,b);
-      grid[tr][tc]=blend; grid[r][c]=null;
-      draw(); hideTileAt(tr,tc);
-      busy=true;
-      playGoo({r:r,c:c},{r:tr,c:tc}, HEX[a], HEX[b], HEX[blend], function(){
-        busy=false;
-        if(phase==="over") return;
-        var res=findLines();
-        if(res.cells.length){ popCells(res.cells, res.maxRun); }        // fuse completed a line -> pop
-        else if(phase==="hang"){ draw(null, tr+","+tc); renderHUD(); }   // frozen combo: reveal the blend with a little settle
-        else { settleBoard(); }                                         // idle: reveal + gravity
-      });
-    } else nope(r,c);
+    var blend=mix(a,b);
+    grid[tr][tc]=blend; grid[r][c]=null;
+    draw(); hideTileAt(tr,tc);
+    busy=true;
+    playGoo({r:r,c:c},{r:tr,c:tc}, HEX[a], HEX[b], HEX[blend], function(){
+      busy=false;
+      if(phase==="over") return;
+      var res=findLines();
+      if(res.cells.length){ popCells(res.cells, res.maxRun); }        // fuse completed a line -> pop
+      else if(phase==="hang"){ draw(null, tr+","+tc); renderHUD(); }   // frozen combo: reveal the blend with a little settle
+      else { settleBoard(); }                                         // idle: reveal + gravity
+    });
   } else {
-    // SWAP: secondary onto neighbour, only if it makes a line
+    // SWAP (either direction): swap the two tiles; keep it only if it makes a line.
+    // A match needs a secondary, so this is a no-op between two primaries.
     grid[r][c]=b; grid[tr][tc]=a;
     var res=findLines();
     if(res.cells.length){ afterAction(null); }
