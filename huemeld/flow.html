@@ -98,10 +98,10 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .coachmix .sw{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:1px 1.5px 0 var(--shadow); }
 .coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
 /* demo "ghost hand" + caption banner + skip */
-.ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .32s cubic-bezier(.4,0,.2,1), top .32s cubic-bezier(.4,0,.2,1); }
-.demoban{ position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:9; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:14px; padding:8px 18px; border-radius:999px; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; box-shadow:0 3px 0 var(--shadow); max-width:92%; text-align:center; }
+.ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1); }
+.demoban{ position:absolute; left:8px; right:8px; top:12px; z-index:9; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:16px; opacity:0; transition:opacity .25s; pointer-events:none; box-shadow:0 3px 0 var(--shadow); text-align:center; }
 .demoban.show{ opacity:1; }
-.demoskip{ position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:9; display:none; }
+.demoskip{ display:none; margin:10px auto 0; }
 .demoskip.show{ display:block; }
 </style>
 </head>
@@ -142,8 +142,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     </div>
     <div class="ghost" id="ghost"></div>
     <div class="demoban" id="demoban"></div>
-    <button class="mkk demoskip" id="demoskip">Skip ▸</button>
   </div>
+  <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
   <p class="tip">each paint must reach <b>two</b> blends — drag from the dot twice, or grab its line to <b>branch</b> · join two paints that <b>mix</b>, carry the blend to its <b>✦</b> · <b>paint every cell</b></p>
 
 <script>
@@ -333,7 +333,7 @@ function startDemo(){
   stopDemo(); demoing=true; ensureAudio(); applyLevel(TUTORIAL);
   demoStrokes=DEMO_STROKES; demoSI=0; demoCI=0; moveGhost(demoStrokes[0].cells[0]);
   ghostEl.style.display="block"; demoSkipEl.classList.add("show");
-  demoTid=setTimeout(demoNext, 600);
+  demoTid=setTimeout(demoNext, 850);
 }
 function demoNext(){
   if(!demoing) return;
@@ -343,12 +343,12 @@ function demoNext(){
     var cell=stroke.cells[demoCI];
     if(stroke.cap2 && demoCI===stroke.cap2At) banner(stroke.cap2);
     moveGhost(cell);
-    if(demoCI===0){ banner(stroke.cap); demoCI++; demoTid=setTimeout(function(){ fireDemo("pointerdown",stroke.cells[0]); demoTid=setTimeout(demoNext,300); }, 360); return; }
+    if(demoCI===0){ banner(stroke.cap); demoCI++; demoTid=setTimeout(function(){ fireDemo("pointerdown",stroke.cells[0]); demoTid=setTimeout(demoNext,520); }, 560); return; }
     fireDemo("pointermove",cell); demoCI++;
-    demoTid=setTimeout(demoNext, 285);
+    demoTid=setTimeout(demoNext, 500);
   } else {
     fireDemo("pointerup", stroke.cells[stroke.cells.length-1]);
-    demoSI++; demoCI=0; demoTid=setTimeout(demoNext, 560);
+    demoSI++; demoCI=0; demoTid=setTimeout(demoNext, 950);
   }
 }
 function finishDemo(){
