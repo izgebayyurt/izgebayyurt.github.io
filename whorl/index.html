@@ -130,7 +130,8 @@ body{
       <span class="k">R</span>+<span class="k">B</span> = a secondary · <span class="k">R</span>+<span class="k">R</span> = level&nbsp;up (more power).<br>
       <b style="color:var(--ink)">Cast</b> — sweep across <b>3 in a row</b>. Colours pick the spell; levels set the power.<br>
       Merges and casts cost <b>1 action</b> each — but one <b>level-up merge per turn is free</b>.<br>
-      Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.
+      Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.<br>
+      Impure or repeated casts weaken — read the ring, vary your spells.
     </div>
     <div class="row"><button class="mk accent" id="btnStart" style="flex:1;height:52px;font-size:18px;">Begin</button></div>
     <div class="credit"><a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a></div>
@@ -164,7 +165,7 @@ body{
 var CFG = {
   slots: 12,
   actions: 3,          // base actions per turn
-  hp: 20,
+  hp: 24,
   lanes: 4,
   rungs: 6,
   wardMult: 2,         // matching-colour hits multiply by this
@@ -174,8 +175,8 @@ var CFG = {
 };
 
 /* colours ---------------------------------------------------------------- */
-var HEX = { R:"#ef4a5a", Y:"#f6c445", B:"#3d8bdf", O:"#f2913d", G:"#57c268", P:"#9b62d6" };
-var NAME = { R:"Red", Y:"Yellow", B:"Blue", O:"Orange", G:"Green", P:"Purple" };
+var HEX = { R:"#ef4a5a", Y:"#f6c445", B:"#3d8bdf", O:"#f2913d", G:"#57c268", P:"#9b62d6", H:"#b9b2a6" };
+var NAME = { R:"Red", Y:"Yellow", B:"Blue", O:"Orange", G:"Green", P:"Purple", H:"Husk" };
 var PRIM = { R:1, Y:1, B:1 };
 function isPrim(c){ return !!PRIM[c]; }
 function mix(a,b){
@@ -236,7 +237,8 @@ function newGame(){
     id:gameId, hp:CFG.hp, maxhp:CFG.hp, wave:0,
     actions:CFG.actions, maxActions:CFG.actions, freeMerge:true,
     dial:[], enemies:[], fx:[], dmgs:[], scorch:[], shake:0,
-    busy:false, phase:null, over:false, toast:null, hubInfo:null, boonN:{}
+    busy:false, phase:null, over:false, toast:null, hubInfo:null, boonN:{},
+    lastSpell:null, repeatN:0                       // stale-cast tracking (per wave)
   };
   for(var i=0;i<CFG.slots;i++) S.dial.push(freshBall());
   nextWave();
@@ -248,41 +250,64 @@ function freshBall(){
 function now(){ return performance.now(); }
 function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
 
-/* ---------- waves (rebalanced: count cap 8, HP 4+4w, wards O/G/P only) ---------- */
+/* ---------- waves (rebalanced: count cap 9, HP 4+4w, wards O/G/P only) ----------
+   type mix: brutes as before; of the rest ~20% armored (wave 3+), ~20% leech (wave 4+,
+   max 2), one healer per wave at ~35% (wave 4+, deepest rung). every 5th wave trades
+   two normal spawns for one ELITE. */
 function nextWave(){
   var st=S;
   st.wave++;
   st.enemies = [];
+  st.lastSpell=null; st.repeatN=0;        // a new wave forgives old habits
   var w=st.wave;
-  var count = Math.min(8, 2 + w);
+  var elite = (w%5===0);                  // elite cadence: 5, 10, 15...
+  var count = Math.min(9, 2 + w) - (elite?2:0);
   var wardChance = Math.min(0.65, 0.15 + w*0.08);
-  var baseDmg = 2 + Math.ceil(w/3);
+  var baseDmg = 2 + Math.ceil(w/4);
   var spread = w>=5 ? 3 : 2;              // deeper spawn rungs from wave 5
   var used = {};
-  for(var k=0;k<count;k++){
+  var total = count + (elite?1:0);
+  var wantHealer = w>=4 && Math.random()<0.35;   // at most 1 healer per wave
+  var leechN = 0;                                 // max 2 leeches per wave
+  for(var k=0;k<total;k++){
+    var isElite = elite && k===0;
+    var isHealer = !isElite && wantHealer && k===total-1;
     var lane, rung, key, tries=0;
-    do { lane=(Math.random()*CFG.lanes)|0; rung=CFG.rungs-1-((Math.random()*spread)|0); key=lane+"_"+rung; tries++; }
+    do { lane=(Math.random()*CFG.lanes)|0;
+      rung = isHealer? CFG.rungs-1 : CFG.rungs-1-((Math.random()*spread)|0);   // healer hides at the back
+      key=lane+"_"+rung; tries++; }
     while(used[key] && tries<40);
     used[key]=1;
-    var brute = w>=2 && Math.random()<0.14+w*0.02;
-    var warded = !brute && Math.random()<wardChance;
-    var ward = warded ? ["O","G","P"][(Math.random()*3)|0] : null;
-    var hp = brute ? (16+8*w) : (4+4*w);
+    var brute = !isElite && !isHealer && w>=2 && Math.random()<0.14+w*0.02;
+    var armored=false, leech=false;
+    if(!isElite && !isHealer && !brute){
+      var roll=Math.random();
+      if(w>=4 && leechN<2 && roll<0.2){ leech=true; leechN++; }
+      else if(w>=3 && roll>=0.2 && roll<0.4){ armored=true; }
+    }
+    var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
+    var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
+    var hp = isElite ? Math.round((16+8*w)*2.1) : brute ? (16+8*w) : (4+3*w);
     st.enemies.push({
       lane:lane, rung:rung, x:laneX(lane), y:rungY(rung),
-      hp:hp, maxhp:hp, ward:ward, brute:brute,
-      dmg: brute? baseDmg*2 : baseDmg,
+      hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
+      elite:isElite, armored:armored, healer:isHealer, leech:leech,
+      dmg: isHealer? 0 : isElite? baseDmg*3 : brute? baseDmg*2 : baseDmg,
       freeze:0, frImm:0, poison:0, burn:0,
-      slow: brute?1:0, slowT:0,
+      slow: (brute&&!isElite)?1:0, slowT:0,   // elites march every turn — sim showed slowed elites never reach the wall
       seed: (lane*7+k*13)%97, jit: ((k*29)%9)-4,
       spawn: now()+k*80, hit:0, dotT:0, stepT:0, dead:false, deadAt:0
     });
-    (function(e,delay){ setTimeout(function(){ if(S===st&&!st.over){ boom(e.x,e.y,"#c9c1b4",.45); beep(300+e.lane*40,.06,"sine",.03); } }, delay); })(st.enemies[k], k*80);
+    (function(e,delay){ setTimeout(function(){ if(S===st&&!st.over){
+      boom(e.x,e.y,"#c9c1b4", e.elite?1.6:.45);                       // heavier boom for the elite
+      beep(e.elite?150:300+e.lane*40, e.elite?.14:.06,"sine", e.elite?.06:.03);
+    } }, delay); })(st.enemies[k], k*80);
   }
   st.actions = st.maxActions = CFG.actions + CFG.maxActionsUp;
   st.freeMerge = true;
   sHorn();
   toast("Wave "+st.wave, 950, "#2c2733", "mid");
+  if(elite){ setTimeout(function(){ if(S===st&&!st.over){ toast("ELITE!", 1100, "#2c2733", "mid", true); sEliteHorn(); } }, 1000); }
   syncHud();
 }
 
@@ -295,7 +320,7 @@ function beep(f,d,type,g){ var a=ac(); if(!a) return; try{ var o=a.createOscilla
   o.start(t); o.stop(t+d+.02);}catch(e){} }
 function sMerge(l){ beep(360+l*70,.08,"triangle",.05); setTimeout(function(){beep(520+l*80,.08,"triangle",.04);},50);
   if(l>=3) setTimeout(function(){beep(760+l*60,.1,"triangle",.045);},110); }
-function sCast(tl){ var steps=Math.min(8, 2+Math.round(tl/2)), base=280+Math.min(tl,12)*12;
+function sCast(tl,hi){ var steps=Math.min(8, 2+Math.round(tl/2)), base=(280+Math.min(tl,12)*12)*(hi?1.3:1);
   for(var i=0;i<steps;i++){ (function(i){ setTimeout(function(){ beep(base*Math.pow(2,i*3/12),.11,"triangle",.05); }, i*50); })(i); } }
 function sFizzle(){ beep(200,.18,"sawtooth",.04); setTimeout(function(){beep(150,.15,"sawtooth",.03);},110); }
 function sHit(amt,crit){ beep(160+Math.min(amt,20)*6,.09,"square",.04); if(crit) beep(520,.06,"triangle",.04); }
@@ -306,23 +331,47 @@ function sCancel(){ beep(250,.08,"sine",.04); }
 function sThunk(){ beep(120,.1,"sine",.05); }
 function sBoon(){ beep(520,.1,"triangle",.05); setTimeout(function(){beep(780,.14,"triangle",.05);},90); }
 function sHorn(){ beep(220,.2,"triangle",.05); setTimeout(function(){beep(330,.22,"triangle",.05);},140); }
+function sEliteHorn(){ beep(140,.3,"triangle",.06); setTimeout(function(){beep(105,.35,"triangle",.06);},180); setTimeout(function(){beep(210,.28,"triangle",.05);},340); }
+function sClank(){ beep(190,.05,"square",.05); setTimeout(function(){beep(120,.06,"square",.04);},45); }   // armored bounce
+function sChime(){ beep(660,.12,"sine",.035); setTimeout(function(){beep(880,.15,"sine",.03);},85); }      // healer pulse
+function sDrain(){ beep(240,.14,"sawtooth",.035); setTimeout(function(){beep(170,.16,"sawtooth",.03);},90); }
 function sWin(){ [0,110,220,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,.16,"triangle",.05); },t); }); }
 function vib(p){ if(navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
 
 /* ===================== spellbook ===================== */
+/* recipe purity: each spell has a colour FAMILY; junk balls in the sweep dilute it.
+   3/3 in family = pure (x1.0), 2/3 = diluted (x0.7), 1/3 = weak (x0.4).
+   diluted-or-worse casts can't carry status payloads (< 0.7 drops them). */
+var FAM = {
+  Blast:{O:1,R:1,Y:1}, Lance:{P:1,R:1,B:1}, Venom:{G:1,Y:1,B:1},
+  Ember:{R:1}, Frost:{B:1}, Sunburst:{Y:1}, Prism:{R:1,Y:1,B:1}
+};
 function resolveSpell(balls){
   var set = {}; balls.forEach(function(b){ set[b.c]=(set[b.c]||0)+1; });
-  var TL = balls.reduce(function(s,b){return s+b.lvl;},0) + CFG.castLevelBonus;
+  /* husks (H) are inert: no family, no set match, and zero towards TL */
+  var TL = Math.max(1, balls.reduce(function(s,b){return s+(b.c==="H"?0:b.lvl);},0)) + CFG.castLevelBonus;
   var P = CFG.spellPow;
-  function d(n){ return Math.max(1, Math.round(n*P)); }
-  if(set.O) return { name:"Blast", el:"O", kind:"splash", dmg:d(3*TL), burn:2, tl:TL, tint:HEX.O };
-  if(set.P) return { name:"Lance", el:"P", kind:"lane",   dmg:d(4*TL), tl:TL, tint:HEX.P };
-  if(set.G) return { name:"Venom", el:"G", kind:"cluster",dmg:d(2*TL), poison:3, tl:TL, tint:HEX.G };
-  if(set.R===3) return { name:"Ember", el:"R", kind:"single", dmg:d(4*TL), burn:2, tl:TL, tint:HEX.R };
-  if(set.B===3) return { name:"Frost", el:"B", kind:"all", dmg:d(1*TL), freeze:1, tl:TL, tint:HEX.B };
-  if(set.Y===3) return { name:"Sunburst", el:"Y", kind:"all", dmg:d(2*TL), tl:TL, tint:HEX.Y };
-  if(set.R&&set.Y&&set.B) return { name:"Prism", el:"*", kind:"all", dmg:d(3*TL), tl:TL, tint:"#fff" };
-  return { name:"Fizzle", el:null, kind:"single", dmg:d(1*Math.max(2,TL)), tl:TL, tint:"#b9b2a6", fizzle:true };
+  var sp = null;
+  if(set.O) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };
+  else if(set.P) sp = { name:"Lance", el:"P", kind:"lane",   coeff:4, tint:HEX.P };
+  else if(set.G) sp = { name:"Venom", el:"G", kind:"cluster",coeff:2, poison:3, tint:HEX.G };
+  else if(set.R===3) sp = { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
+  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:2, freeze:1, tint:HEX.B };
+  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:3, tint:HEX.Y };
+  else if(set.R&&set.Y&&set.B) sp = { name:"Prism", el:"*", kind:"all", coeff:3, tint:"#fff" };
+  if(!sp) return fizzleOf(balls);
+  var fam=FAM[sp.name], inFam=0;
+  balls.forEach(function(b){ if(fam[b.c]) inFam++; });
+  sp.pot = inFam>=3 ? 1 : (inFam===2 ? 0.7 : 0.4);
+  sp.tl = TL;
+  sp.dmg = Math.max(1, Math.round(sp.coeff*TL*sp.pot*P));
+  if(sp.pot<0.7){ delete sp.burn; delete sp.poison; delete sp.freeze; }   // too dilute to carry a payload
+  return sp;
+}
+/* the standard fizzle — also what a collapsed weave slumps into */
+function fizzleOf(balls){
+  var TL = Math.max(1, balls.reduce(function(s,b){return s+(b.c==="H"?0:b.lvl);},0)) + CFG.castLevelBonus;
+  return { name:"Fizzle", el:null, kind:"single", dmg:Math.max(1,Math.round(Math.max(2,TL)*CFG.spellPow)), tl:TL, pot:1, tint:"#b9b2a6", fizzle:true };
 }
 
 /* ===================== combat ===================== */
@@ -331,11 +380,18 @@ function nearest(){
   alive().forEach(function(e){ if(!best || e.rung<best.rung || (e.rung===best.rung && e.lane<best.lane)) best=e; });
   return best;
 }
-/* ward rework: matching colour x2 (x3 with Weakness), any other element halved, Prism neutral */
+/* ward rework: matching colour x2 (x3 with Weakness), any other element halved, Prism neutral.
+   elites shrug off Prism (25%, rounded up); armored plate bounces any final hit under 5. */
 function applyDmg(e, amt, el){
+  if(e.elite && el==="*") amt = Math.ceil(amt*0.35);
   if(e.ward){
     if(el===e.ward) amt = Math.round(amt*CFG.wardMult);
     else if(el!=="*") amt = Math.ceil(amt*0.5);
+  }
+  if(e.armored && amt<5){
+    e.hit = now(); sClank();
+    spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false);
+    return;
   }
   var crit = e.ward && el===e.ward;
   e.hp -= amt; e.hit = now();
@@ -357,6 +413,30 @@ function targetsFor(sp, tgt){
   if(sp.kind==="cluster") return alive().filter(function(e){ return Math.abs(e.lane-tgt.lane)<=1 && e.rung<=tgt.rung+1; });
   return [tgt];
 }
+/* stale casts: repeating the same spell this wave dulls it; switching sharpens it.
+   Fizzle wipes the streak either way. shared by single casts and each weave link. */
+function applyStale(st, sp){
+  if(sp.fizzle){ st.lastSpell=null; st.repeatN=0; return; }
+  if(st.lastSpell===sp.name){
+    st.repeatN++;
+    sp.stale = true;
+    sp.dmg = Math.max(1, Math.round(sp.dmg*(st.repeatN>=2 ? 0.3 : 0.5)));
+  } else {
+    if(st.lastSpell) sp.dmg = Math.max(1, Math.round(sp.dmg*1.25));   // freshness bonus
+    st.lastSpell = sp.name; st.repeatN = 0;
+  }
+}
+/* one resolved spell landing: damage, payloads, shake */
+function impactSpell(sp, hits){
+  var per = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
+  hits.forEach(function(e){
+    applyDmg(e, per, sp.el);
+    if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
+    if(sp.poison) e.poison += sp.poison;
+    if(sp.burn) e.burn = Math.max(e.burn, sp.burn);
+  });
+  S.shake = Math.min(16, 4 + sp.tl*1.1 + (sp.tl>=6?4:0));
+}
 /* anticipation -> impact: balls flash+shrink (150ms) -> beam -> damage (230ms) -> refill (300ms) */
 function cast(idxs){
   if(S.busy||S.actions<=0) return;
@@ -364,8 +444,9 @@ function cast(idxs){
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
   var sp = resolveSpell(balls);
+  applyStale(st, sp);
   st.busy=true; st.phase="cast";
-  idxs.forEach(function(i){ st.dial[i].castT=now(); });
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib(sp.fizzle?[8,60,8]:(sp.tl>=6?[30,40,70]:25));
   var tgt = nearest(), hits = targetsFor(sp, tgt);
   setTimeout(function(){ if(S!==st||st.over) return;
@@ -373,16 +454,12 @@ function cast(idxs){
     castFx(sp, tgt, hits.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    var per = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
-    hits.forEach(function(e){
-      applyDmg(e, per, sp.el);
-      if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
-      if(sp.poison) e.poison += sp.poison;
-      if(sp.burn) e.burn = Math.max(e.burn, sp.burn);
-    });
-    S.shake = Math.min(16, 4 + sp.tl*1.1 + (sp.tl>=6?4:0));
-    var label = sp.tl>=6 ? "L"+sp.tl+" "+sp.name.toUpperCase()+"!" : sp.name+(sp.tl>3?" · L"+sp.tl:"");
-    toast(label, 1000, sp.tint==="#fff"?"#2c2733":sp.tint, "low", sp.tl>=6);
+    impactSpell(sp, hits);
+    if(sp.stale){ toast("Stale...", 1000, "#6b6472", "low"); }
+    else {
+      var label = sp.tl>=6 ? "L"+sp.tl+" "+sp.name.toUpperCase()+"!" : sp.name+(sp.tl>3?" · L"+sp.tl:"");
+      toast(label, 1000, sp.tint==="#fff"?"#2c2733":sp.tint, "low", sp.tl>=6);
+    }
   },230);
   setTimeout(function(){ if(S!==st||st.over) return;
     idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
@@ -391,20 +468,96 @@ function cast(idxs){
     st.phase=null; st.busy=false; spend();
   },400);
 }
+/* the DOUBLECAST: sweep past three and weave two spells into ONE action.
+   both triples must be true spells — a short weave or a fizzled link collapses. */
+function castWeave(idxs){
+  if(S.busy||S.actions<=0) return;
+  var st=S;
+  var balls = idxs.map(function(i){ return st.dial[i]; });
+  if(balls.some(function(b){return !b;})) return;
+  var spA=null, spB=null;
+  if(idxs.length===6){ spA=resolveSpell(balls.slice(0,3)); spB=resolveSpell(balls.slice(3,6)); }
+  if(!spA || spA.fizzle || spB.fizzle){ weaveCollapse(idxs, balls); return; }
+  /* chain bookkeeping: A checks the wave streak, B checks A */
+  applyStale(st, spA); applyStale(st, spB);
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
+  vib([30,40,30,40,70]);
+  var tgtA = nearest(), hitsA = targetsFor(spA, tgtA);
+  var hitsB = [];   // aimed after A lands — a kill re-points the second spell
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(spA.tl);
+    castFx(spA, tgtA, hitsA.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    impactSpell(spA, hitsA);
+    S.shake += 5;                                            // doublecast spectacle
+    toast("DOUBLECAST!", 1200, "#b9791a", "mid", true);      // one banner — spell toasts skipped
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    var tgtB = nearest(); hitsB = targetsFor(spB, tgtB);
+    sCast(spB.tl, true);                                     // second arpeggio pitched up
+    castFx(spB, tgtB, hitsB.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
+  },350);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    impactSpell(spB, hitsB);
+  },430);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },520);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; spend();
+  },650);
+}
+/* 4-5 balls, or a fizzle in either triple: no partial credit — one weak fizzle,
+   every swept slot consumed. */
+function weaveCollapse(idxs, balls){
+  var st=S;
+  var sp = fizzleOf(balls.slice(0,3));
+  applyStale(st, sp);
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
+  vib([8,60,8]);
+  var tgt = nearest(), hits = targetsFor(sp, tgt);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(sp.tl); sFizzle();
+    castFx(sp, tgt, hits.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    impactSpell(sp, hits);
+    toast("The weave collapses...", 1000, "#6b6472", "low");
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; spend();
+  },400);
+}
+function mergeLegal(A,B){
+  return !!(A&&B && A.c!=="H" && B.c!=="H" && A.lvl===B.lvl &&
+    (A.c===B.c || (isPrim(A.c)&&isPrim(B.c)&&mix(A.c,B.c))));
+}
 function tryMerge(a,b){
   if(S.busy||S.actions<=0) return false;
   var A=S.dial[a], B=S.dial[b];
-  if(!A||!B || A.lvl!==B.lvl) return false;
+  if(!mergeLegal(A,B)) return false;   // husks are inert — cast them away
   var res=null, levelUp=false;
   if(A.c===B.c){ res={ c:A.c, lvl:A.lvl+1 }; levelUp=true; }
-  else if(isPrim(A.c)&&isPrim(B.c)){ var m=mix(A.c,B.c); if(m) res={ c:m, lvl:A.lvl }; }
-  if(!res) return false;
+  else { res={ c:mix(A.c,B.c), lvl:A.lvl }; }
   var free = levelUp && S.freeMerge;
-  S.dial[b] = { c:res.c, lvl:res.lvl, born:now(), pop:1, fly:{from:a, t:now()} };
-  S.dial[a] = freshBall(); S.dial[a].born = now()+180;
-  sMerge(res.lvl);
-  vib(levelUp?[10,30,25]:15);
-  var g=geo.slots[b]; boom(g.x,g.y, HEX[res.c], .6);
+  /* goo join: A slides into B as one liquid blob (drawn in drawDial), then the
+     union squashes and pops to the result at contact — born is set to contact time */
+  S.dial[b] = { c:res.c, lvl:res.lvl, born:now()+GOO_TRAVEL, pop:1,
+    goo:{ from:a, t:now(), colA:HEX[A.c], colB:HEX[B.c], colN:avgHex(HEX[A.c],HEX[B.c]),
+      rA:geo.ballR*(0.78+Math.min(A.lvl-1,3)*0.06), rB:geo.ballR*(0.78+Math.min(B.lvl-1,3)*0.06) } };
+  S.dial[a] = freshBall(); S.dial[a].born = now()+GOO_TRAVEL+120;
+  var st=S;
+  setTimeout(function(){ if(S!==st||st.over) return;      // contact: sound + boom land with the pop
+    sMerge(res.lvl);
+    vib(levelUp?[10,30,25]:15);
+    var gs=geo.slots[b]; boom(gs.x,gs.y, HEX[res.c], .6);
+  }, GOO_TRAVEL);
   if(free){ S.freeMerge=false; toast("Free merge!", 800, "#2c2733", "low"); syncHud(); }
   else spend();
   return true;
@@ -426,10 +579,45 @@ function enemyPhase(){
   live.forEach(function(e){
     if(e.poison>0||e.burn>0){ later(t, function(){ dotTick(e); }); t+=110; }
   });
+  // support acts before the march: healers mend the horde, leeches gnaw the dial
+  live.forEach(function(e){
+    if(e.healer){ later(t, function(){ healPulse(e); }); t+=110; }
+  });
+  live.forEach(function(e){
+    if(e.leech){ later(t, function(){ leechDrain(e); }); t+=110; }
+  });
   live.slice().sort(function(a,b){ return a.rung-b.rung; }).forEach(function(e){
     later(t, function(){ stepEnemy(e); }); t+=120;
   });
   later(t+250, endEnemyPhase);
+}
+/* healer: tops up every OTHER living enemy; never itself */
+function healPulse(h){
+  if(h.dead) return;
+  var amt = 3 + Math.floor(S.wave/3), any=false;
+  h.dotT = now();
+  alive().forEach(function(e){
+    if(e===h || e.hp>=e.maxhp) return;
+    e.hp = Math.min(e.maxhp, e.hp+amt);
+    spawnDmg(e.x, e.y-geo.ballR*0.9, amt, false, false, true);
+    any=true;
+  });
+  if(any) sChime();
+}
+/* leech: close enough (rung <= 3) it siphons a dial ball into a dead husk and fattens up */
+function leechDrain(L){
+  if(L.dead || L.rung>3) return;
+  var opts=[], i;
+  for(i=0;i<CFG.slots;i++){ var b=S.dial[i]; if(b && b.c!=="H") opts.push(i); }
+  if(!opts.length) return;
+  var pick=opts[(Math.random()*opts.length)|0];
+  S.dial[pick] = { c:"H", lvl:1, born:now() };
+  L.hp = Math.min(L.maxhp, L.hp+3);
+  L.dotT = now();
+  S.fx.push({ drain:true, to:{x:L.x,y:L.y}, t:now() });
+  spawnDmg(L.x, L.y-geo.ballR*0.9, 3, false, false, true);
+  toast("Leech drains!", 900, "#6b6472", "low");
+  sDrain(); vib(12);
 }
 function dotTick(e){
   if(e.dead) return;
@@ -443,6 +631,7 @@ function stepEnemy(e){
   if(e.freeze>0){ e.freeze--; if(e.freeze<=0) e.frImm=1; return; }   // thaw grants 1-turn immunity
   if(e.slow){ e.slowT=(e.slowT+1)%2; if(e.slowT===1) return; }
   if(e.rung<=0){
+    if(e.dmg<=0) return;                  // the healer just sits at the wall, mending
     /* at the wall: attack every turn, PERSIST (no kamikaze farming) */
     S.hp -= e.dmg; S.shake=Math.max(S.shake,10);
     sBreach(); vib([90,60,90]); flashGate();
@@ -477,11 +666,11 @@ function waveClear(){
 
 /* ===================== boons (capped; Mend only when hurt) ===================== */
 var ALL_UP = [
-  { k:"quick", sym:"+1", bg:"#ffd15c", t:"Quicken",   d:"+1 action every turn",      max:1, apply:function(){ CFG.maxActionsUp++; } },
+  { k:"quick", sym:"+1", bg:"#ffd15c", t:"Quicken",   d:"+1 action every turn",      max:2, apply:function(){ CFG.maxActionsUp++; } },
   { k:"bulw",  sym:"+6", bg:"#ef4a5a", t:"Bulwark",   d:"+6 max HP, healed now",     max:2, apply:function(){ S.maxhp+=6; S.hp+=6; } },
   { k:"attn",  sym:"25%", bg:"#9b62d6", t:"Attune",    d:"All spells +25% power",     max:2, apply:function(){ CFG.spellPow+=0.25; } },
   { k:"weak",  sym:"×3", bg:"#f2913d", t:"Weakness",  d:"Shield-colour hits do 3×",  max:1, apply:function(){ CFG.wardMult=3; } },
-  { k:"over",  sym:"+1L", bg:"#3d8bdf", t:"Overcharge",d:"Every cast counts +1 level",max:1, apply:function(){ CFG.castLevelBonus++; } },
+  { k:"over",  sym:"+1L", bg:"#3d8bdf", t:"Overcharge",d:"Every cast counts +1 level",max:2, apply:function(){ CFG.castLevelBonus++; } },
   { k:"mend",  sym:"♥", bg:"#57c268", t:"Mend",      d:"Heal to full now",          max:99, apply:function(){ S.hp=S.maxhp; } }
 ];
 function showReward(){
@@ -513,7 +702,7 @@ function gameOver(){
 }
 
 /* ===================== effects ===================== */
-function spawnDmg(x,y,amt,crit,gate){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate }); }
+function spawnDmg(x,y,amt,crit,gate,heal){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal }); }
 function boom(x,y,col,scale){ S.fx.push({ ring:true, x:x,y:y, col:col, t:now(), max:(geo.ballR||20)*(scale||1.6) }); }
 function confetti(x,y,col){
   for(var i=0;i<7;i++){
@@ -541,7 +730,6 @@ function toast(txt,ms,col,pos,big){ S.toast={ txt:txt, t:now(), ms:ms||900, col:
 
 /* ===================== render helpers ===================== */
 function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-function rr4(x,y,w,h,r1,r2,r3,r4){ ctx.beginPath(); ctx.moveTo(x+r1,y); ctx.arcTo(x+w,y,x+w,y+h,r2); ctx.arcTo(x+w,y+h,x,y+h,r3); ctx.arcTo(x,y+h,x,y,r4); ctx.arcTo(x,y,x+w,y,r1); ctx.closePath(); }
 function blobPath(pr, seed){
   ctx.beginPath();
   for(var k=0;k<=24;k++){
@@ -556,6 +744,63 @@ function inkShadow(pathFn, dy){
   ctx.save(); ctx.translate(0, dy||3);
   pathFn(); ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill();
   ctx.restore();
+}
+
+/* ---------- analytic metaball goo (canvas-only, no filters) ----------
+   the classic two-circle connector: four anchor points on the circles' rims,
+   joined by two cubic beziers that bow toward the midpoint. neck + both
+   circles filled together (nonzero winding) read as ONE liquid blob. */
+var GOO_TRAVEL=240, GOO_SQUASH=120, CAST_GOO=180;
+var PARENT={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a secondary remembers its primaries
+function avgHex(a,b){
+  var r=(parseInt(a.substr(1,2),16)+parseInt(b.substr(1,2),16))>>1,
+      g=(parseInt(a.substr(3,2),16)+parseInt(b.substr(3,2),16))>>1,
+      c=(parseInt(a.substr(5,2),16)+parseInt(b.substr(5,2),16))>>1;
+  return "rgb("+r+","+g+","+c+")";
+}
+var NECK={ok:false,p1x:0,p1y:0,p2x:0,p2y:0,p3x:0,p3y:0,p4x:0,p4y:0,
+          h1x:0,h1y:0,h2x:0,h2y:0,h3x:0,h3y:0,h4x:0,h4y:0};
+function neckCalc(x1,y1,r1,x2,y2,r2,v){
+  NECK.ok=false;
+  if(r1<=0||r2<=0) return false;
+  var dx=x2-x1, dy=y2-y1, d=Math.hypot(dx,dy);
+  if(d<0.5 || d<=Math.abs(r1-r2) || d>r1+r2*2.5) return false;
+  var u1=0,u2=0;
+  if(d<r1+r2){
+    u1=Math.acos((r1*r1+d*d-r2*r2)/(2*r1*d));
+    u2=Math.acos((r2*r2+d*d-r1*r1)/(2*r2*d));
+  }
+  var ab=Math.atan2(dy,dx), ms=Math.acos(Math.max(-1,Math.min(1,(r1-r2)/d)));
+  var a1=ab+u1+(ms-u1)*v, a2=ab-u1-(ms-u1)*v;
+  var a3=ab+Math.PI-u2-(Math.PI-u2-ms)*v, a4=ab-Math.PI+u2+(Math.PI-u2-ms)*v;
+  NECK.p1x=x1+Math.cos(a1)*r1; NECK.p1y=y1+Math.sin(a1)*r1;
+  NECK.p2x=x1+Math.cos(a2)*r1; NECK.p2y=y1+Math.sin(a2)*r1;
+  NECK.p3x=x2+Math.cos(a3)*r2; NECK.p3y=y2+Math.sin(a3)*r2;
+  NECK.p4x=x2+Math.cos(a4)*r2; NECK.p4y=y2+Math.sin(a4)*r2;
+  var totR=r1+r2, HPI=Math.PI/2;
+  var hd=Math.min(v*2.4, Math.hypot(NECK.p3x-NECK.p1x,NECK.p3y-NECK.p1y)/totR)*Math.min(1,d*2/totR);
+  var hr1=r1*hd, hr2=r2*hd;
+  NECK.h1x=NECK.p1x+Math.cos(a1-HPI)*hr1; NECK.h1y=NECK.p1y+Math.sin(a1-HPI)*hr1;
+  NECK.h2x=NECK.p2x+Math.cos(a2+HPI)*hr1; NECK.h2y=NECK.p2y+Math.sin(a2+HPI)*hr1;
+  NECK.h3x=NECK.p3x+Math.cos(a3+HPI)*hr2; NECK.h3y=NECK.p3y+Math.sin(a3+HPI)*hr2;
+  NECK.h4x=NECK.p4x+Math.cos(a4-HPI)*hr2; NECK.h4y=NECK.p4y+Math.sin(a4-HPI)*hr2;
+  NECK.ok=true; return true;
+}
+/* the neck quad as a subpath, wound the same way as ctx.arc so nonzero fill = union */
+function neckSubpath(){
+  ctx.moveTo(NECK.p2x,NECK.p2y);
+  ctx.bezierCurveTo(NECK.h2x,NECK.h2y, NECK.h4x,NECK.h4y, NECK.p4x,NECK.p4y);
+  ctx.lineTo(NECK.p3x,NECK.p3y);
+  ctx.bezierCurveTo(NECK.h3x,NECK.h3y, NECK.h1x,NECK.h1y, NECK.p1x,NECK.p1y);
+  ctx.closePath();
+}
+/* the whole blob silhouette (circle + neck + circle), radii expanded by e —
+   filling the e=3 version in ink UNDER the colour fakes a clean compound outline */
+function gooUnionPath(x1,y1,r1,x2,y2,r2,v,e){
+  ctx.beginPath();
+  ctx.moveTo(x1+r1+e,y1); ctx.arc(x1,y1,r1+e,0,7);
+  ctx.moveTo(x2+r2+e,y2); ctx.arc(x2,y2,r2+e,0,7);
+  if(neckCalc(x1,y1,r1+e,x2,y2,r2+e,v)) neckSubpath();
 }
 
 /* ===================== render ===================== */
@@ -641,7 +886,7 @@ function drawEnemies(t){
     if(t<e.spawn) return;
     if(e.dead && t-e.deadAt>220) return;
     e.x += ((laneX(e.lane)+e.jit)-e.x)*0.2; e.y += (rungY(e.rung)-e.y)*0.2;
-    var r=baseR*(e.brute?1.3:1);
+    var r=baseR*(e.elite?1.45:(e.brute?1.3:1));
     var pop=Math.min(1,(t-e.spawn)/260); var pr=r*(0.5+0.5*pop);
     if(e.dead){ var dk=(t-e.deadAt)/220; pr*=Math.max(0,1-dk); }
     var hitK=e.hit? Math.max(0,1-(t-e.hit)/220):0;
@@ -670,6 +915,11 @@ function drawEnemies(t){
       }
       ctx.lineWidth=6.5; ctx.strokeStyle="#2c2733"; ctx.stroke();
       ctx.lineWidth=3.5; ctx.strokeStyle=HEX[e.ward]; ctx.stroke();
+    }
+    // armored: flat ink plate strapped across the upper body (art pass will polish)
+    if(e.armored && !e.dead){
+      ctx.fillStyle="#4a4454"; rr(-pr*0.85,-pr*0.66,pr*1.7,pr*0.36,pr*0.14); ctx.fill();
+      ctx.lineWidth=2.5; ctx.strokeStyle="#2c2733"; ctx.stroke();
     }
     // brute cracks + angry brows
     if(e.brute){
@@ -700,6 +950,19 @@ function drawEnemies(t){
     } else {
       ctx.beginPath(); ctx.arc(-pr*.32+ex,-pr*.12+ey,pr*.13,0,7); ctx.arc(pr*.32+ex,-pr*.12+ey,pr*.13,0,7); ctx.fill();
     }
+    // healer: small white cross on the belly
+    if(e.healer && !e.dead){
+      ctx.strokeStyle="#fffdf6"; ctx.lineWidth=3.5;
+      ctx.beginPath(); ctx.moveTo(0,pr*0.15); ctx.lineTo(0,pr*0.55); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-pr*0.2,pr*0.35); ctx.lineTo(pr*0.2,pr*0.35); ctx.stroke();
+    }
+    // leech: two small ink fangs under the eyes
+    if(e.leech && !e.dead){
+      ctx.fillStyle="#2c2733";
+      [-1,1].forEach(function(s){
+        ctx.beginPath(); ctx.moveTo(s*pr*.22-3,pr*.12); ctx.lineTo(s*pr*.22+3,pr*.12); ctx.lineTo(s*pr*.22,pr*.36); ctx.closePath(); ctx.fill();
+      });
+    }
     ctx.restore();
     if(e.dead) return;
     // status chips stacked to the right
@@ -721,14 +984,14 @@ function drawEnemies(t){
     }
     // intent: drawn ink triangle (advance) or red damage badge (attacking the wall)
     if(e.freeze>0){ /* frozen: chip says it */ }
-    else if(e.rung<=0){
+    else if(e.rung<=0 && e.dmg>0){
       var byy=e.y+bob-pr-22;
       ctx.fillStyle="rgba(44,39,51,.9)"; ctx.beginPath(); ctx.arc(e.x,byy+2,9.5,0,7); ctx.fill();
       ctx.fillStyle="#ef4a5a"; ctx.beginPath(); ctx.arc(e.x,byy,9.5,0,7); ctx.fill();
       ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
       ctx.fillStyle="#fff"; ctx.font="700 11px Fredoka, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(e.dmg, e.x, byy+0.5); ctx.textBaseline="alphabetic";
-    } else {
+    } else if(e.rung>0){
       var ty=(e.hp<e.maxhp? by:e.y+bob-pr-8)-8;
       ctx.fillStyle="rgba(44,39,51,.6)";
       ctx.beginPath(); ctx.moveTo(e.x-5,ty-5); ctx.lineTo(e.x+5,ty-5); ctx.lineTo(e.x,ty+2); ctx.closePath(); ctx.fill();
@@ -757,19 +1020,33 @@ function drawDial(t){
     var b=S.dial[i], p=g.slots[i];
     if(!b || t<b.born){ ctx.beginPath(); ctx.arc(p.x,p.y,g.ballR*0.45,0,7); ctx.fillStyle="rgba(44,39,51,.12)"; ctx.fill(); continue; }
     var px=p.x, py=p.y;
-    // merge fly-in: result lerps from source slot
-    if(b.fly){ var fk=Math.min(1,(t-b.fly.t)/140); var fp=g.slots[b.fly.from];
-      px=fp.x+(p.x-fp.x)*fk; py=fp.y+(p.y-fp.y)*fk; if(fk>=1) b.fly=null; }
+    // casting: the ball goos into the hub like liquid being drunk (staggered)
+    if(b.castT){
+      var ck=(t-b.castT)/CAST_GOO;
+      if(ck>=1) continue;                       // drunk
+      if(ck>=0){ drawCastGoo(b, i, t, ck); continue; }
+      /* ck<0: waiting its turn in the slurp — falls through to a normal draw */
+    }
+    // merge goo: the travelling blob rides on top (post-pass); contact squash lands here
+    if(b.goo && !b.castT){
+      var gk=(t-b.goo.t)/GOO_TRAVEL;
+      if(gk<1) continue;                        // travel phase drawn after the loop
+      var k2=(t-b.goo.t-GOO_TRAVEL)/GOO_SQUASH;
+      if(k2<1){                                  // squash along the travel axis, then pop
+        var fps=g.slots[b.goo.from], e2=1-k2;
+        var ang=Math.atan2(p.y-fps.y, p.x-fps.x);
+        var pop2=Math.max(0, 1-(t-b.born)/240);
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(ang);
+        ctx.scale(1+0.25*e2, 1-0.2*e2);
+        ctx.rotate(-ang); ctx.translate(-p.x,-p.y);
+        drawBall(b, p.x, p.y, i, t, 1+pop2*0.25, false, false);
+        ctx.restore();
+        continue;
+      }
+      b.goo=null;
+    }
     var vis = gesture && gesture.visited.indexOf(i)>=0;
     var isLast = gesture && gesture.visited[gesture.visited.length-1]===i;
-    // casting: flash white and shrink toward the hub
-    if(b.castT){ var ck=(t-b.castT)/150;
-      if(ck<1){ var hx=g.cx-px, hy=g.cy-py, hl=Math.hypot(hx,hy)||1;
-        px+=hx/hl*ck*22; py+=hy/hl*ck*22;
-        drawBall(b, px, py, i, t, (1-ck*0.85), vis, true);
-      }
-      continue;
-    }
     // drag response: last visited leans toward the finger
     if(isLast && gesture){
       var ddx=gesture.x-px, ddy=gesture.y-py, dd=Math.hypot(ddx,ddy)||1;
@@ -780,6 +1057,38 @@ function drawDial(t){
     var breathe = vis? 0 : 0.02*Math.sin(t/650+i*1.7);
     var scale=1 + pop*0.25 + (isLast?0.18:(vis?0.08:0)) + breathe;
     drawBall(b, px, py, i, t, scale, vis, false);
+  }
+  // anticipatory goo: two mergeable neighbours grow a liquid film that thickens
+  // as the finger closes in — clipped to the waist gap so it bridges the rims
+  if(gesture && gesture.visited.length===2 && !S.busy){
+    var gA=S.dial[gesture.visited[0]], gB=S.dial[gesture.visited[1]];
+    if(mergeLegal(gA,gB)){
+      var pa=g.slots[gesture.visited[0]], pb=g.slots[gesture.visited[1]];
+      var span=Math.hypot(pb.x-pa.x,pb.y-pa.y)||1;
+      var prox=Math.max(0, 1-Math.hypot(gesture.x-pb.x,gesture.y-pb.y)/span);
+      // match the drawn scales (visited 1.08, grabbed 1.18 + finger lean) so the film meets the rims
+      var raa=g.ballR*(0.78+Math.min(gA.lvl-1,3)*0.06)*1.08;
+      var rbb=g.ballR*(0.78+Math.min(gB.lvl-1,3)*0.06)*1.18;
+      var ldx=gesture.x-pb.x, ldy=gesture.y-pb.y, ldd=Math.hypot(ldx,ldy)||1, ln=Math.min(12,ldd*0.18);
+      var pbx=pb.x+ldx/ldd*ln, pby=pb.y+ldy/ldd*ln;
+      var vv=0.2+0.45*prox;
+      if(neckCalc(pa.x,pa.y,raa,pbx,pby,rbb,vv)){
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0,0,W,H);                 // everything OUTSIDE the two balls
+        ctx.moveTo(pa.x+raa-2,pa.y); ctx.arc(pa.x,pa.y,raa-2,0,7);
+        ctx.moveTo(pbx+rbb-2,pby); ctx.arc(pbx,pby,rbb-2,0,7);
+        ctx.clip("evenodd");
+        ctx.globalAlpha=0.4;
+        if(neckCalc(pa.x,pa.y,raa+3,pbx,pby,rbb+3,vv)){ ctx.beginPath(); neckSubpath(); ctx.fillStyle="#2c2733"; ctx.fill(); }
+        if(neckCalc(pa.x,pa.y,raa,pbx,pby,rbb,vv)){ ctx.beginPath(); neckSubpath(); ctx.fillStyle=avgHex(HEX[gA.c],HEX[gB.c]); ctx.fill(); }
+        ctx.restore();
+      }
+    }
+  }
+  // travelling merge blob drawn over the ring so the neck never hides behind neighbours
+  for(var gi=0;gi<CFG.slots;gi++){
+    var gb=S.dial[gi];
+    if(gb && gb.goo && !gb.castT && t-gb.goo.t<GOO_TRAVEL) drawMergeGoo(gb, gi, t);
   }
   if(dimmed) ctx.globalAlpha=1;
 
@@ -796,23 +1105,40 @@ function drawDial(t){
 function drawBall(b, px, py, i, t, scale, vis, casting){
   var g=geo;
   var lvl=b.lvl;
-  var rr0=g.ballR*(0.78 + Math.min(lvl-1,3)*0.06)*scale;
+  var husk=b.c==="H";
+  var rr0=g.ballR*(0.78 + Math.min(lvl-1,3)*0.06)*scale*(husk?0.88:1);   // husks sit deflated
   var wob=((((i*7)%5)-2) + (vis?0:1.2*Math.sin(t/900+i)))*Math.PI/180;
   ctx.save(); ctx.translate(px,py); ctx.rotate(wob);
   if(lvl>=2 && !casting){ ctx.beginPath(); ctx.arc(0,0,rr0+5,0,7); ctx.fillStyle="rgba(255,209,92,"+(0.1*Math.min(lvl,4))+")"; ctx.fill(); }
   function shape(){
-    if(isPrim(b.c)){
-      var q=rr0*0.42;
-      rr4(-rr0,-rr0,rr0*2,rr0*2, q*(0.8+0.25*((i*13)%3)/2), q*(0.8+0.25*((i*13+7)%3)/2), q*(0.8+0.25*((i*13+14)%3)/2), q*(0.8+0.25*((i*13+21)%3)/2));
-    } else { ctx.beginPath(); ctx.arc(0,0,rr0,0,7); }
+    if(husk){ ctx.beginPath(); ctx.ellipse(0,0,rr0,rr0*0.88,0,0,7); }   // slumped, airless
+    else { ctx.beginPath(); ctx.arc(0,0,rr0,0,7); }
   }
   inkShadow(shape, 3);
   shape();
   ctx.fillStyle= casting? "#fffdf6" : HEX[b.c]; ctx.fill();
+  // secondaries wear their recipe: two soft marble crescents, one per parent primary
+  if(!casting && !husk && !isPrim(b.c) && PARENT[b.c]){
+    var par=PARENT[b.c], j=((i*13)%5)*0.09;      // per-slot hand-drawn variance
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0,0,rr0-1.2,0,7); ctx.clip();
+    ctx.globalAlpha=0.35; ctx.lineWidth=rr0*0.44;
+    ctx.strokeStyle=HEX[par[0]];
+    ctx.beginPath(); ctx.arc(rr0*0.30, rr0*0.26, rr0*0.62, Math.PI*0.72+j, Math.PI*1.42+j); ctx.stroke();
+    ctx.strokeStyle=HEX[par[1]];
+    ctx.beginPath(); ctx.arc(-rr0*0.26, -rr0*0.22, rr0*0.58, -Math.PI*0.28+j, Math.PI*0.46+j); ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.restore();
+  }
+  shape();
   ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
   if(!casting){
     ctx.beginPath(); ctx.ellipse(-rr0*0.3,-rr0*0.38, rr0*0.3, rr0*0.17, -0.4, 0, 7);
-    ctx.fillStyle="rgba(255,255,255,.4)"; ctx.fill();
+    ctx.fillStyle=husk?"rgba(255,255,255,.15)":"rgba(255,255,255,.4)"; ctx.fill();
+    if(husk){ // a dead ball wears its crack
+      ctx.strokeStyle="rgba(44,39,51,.5)"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(-rr0*0.05,-rr0*0.6); ctx.lineTo(rr0*0.18,-rr0*0.12); ctx.lineTo(-rr0*0.1,rr0*0.35); ctx.stroke();
+    }
     if(lvl>=2){
       ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2;
       var n=Math.min(lvl,4), pw=7, gap=3, tot=n*pw+(n-1)*gap, sxx=-tot/2;
@@ -823,23 +1149,82 @@ function drawBall(b, px, py, i, t, scale, vis, casting){
   ctx.restore();
 }
 
+/* the merge blob mid-travel: A slides into B, neck thickening as they close.
+   ink coherence: sticker shadow of the FULL silhouette, then an ink union
+   expanded ~3px (the fake compound outline), then the colour layers. */
+function drawMergeGoo(b, i, t){
+  var g=geo, go=b.goo;
+  var fp=g.slots[go.from], p=g.slots[i];
+  var k=Math.min(1,(t-go.t)/GOO_TRAVEL);
+  var ek=k*k;                                                // suction: slow peel, snap at contact
+  var ax=fp.x+(p.x-fp.x)*ek, ay=fp.y+(p.y-fp.y)*ek;
+  var rA=go.rA*(1-0.45*ek), rB=go.rB*(1+0.10*ek), v=0.55;
+  ctx.save(); ctx.translate(0,3);                            // sticker shadow first
+  gooUnionPath(ax,ay,rA,p.x,p.y,rB,v,3);
+  ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill();
+  ctx.restore();
+  gooUnionPath(ax,ay,rA,p.x,p.y,rB,v,3);                     // ink outline layer
+  ctx.fillStyle="#2c2733"; ctx.fill();
+  if(neckCalc(ax,ay,rA,p.x,p.y,rB,v)){                       // neck in the averaged colour
+    ctx.beginPath(); neckSubpath(); ctx.fillStyle=go.colN; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(p.x,p.y,rB,0,7); ctx.fillStyle=go.colB; ctx.fill();
+  if(k>0.75) ctx.globalAlpha=Math.max(0,(1-k)/0.25);         // A dissolves into B at the end
+  ctx.beginPath(); ctx.arc(ax,ay,rA,0,7); ctx.fillStyle=go.colA; ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.4)";                      // shared streak material
+  ctx.beginPath(); ctx.ellipse(ax-rA*0.3,ay-rA*0.38, rA*0.28, rA*0.15, -0.4, 0, 7); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.fillStyle="rgba(255,255,255,.4)";
+  ctx.beginPath(); ctx.ellipse(p.x-rB*0.3,p.y-rB*0.38, rB*0.3, rB*0.17, -0.4, 0, 7); ctx.fill();
+}
+
+/* cast slurp: the ball necks onto the hub rim and is drunk inward.
+   the hub side is a small phantom droplet riding the rim (radius capped at the
+   ball's own radius) so the neck never flares across the big hub circle. */
+function drawCastGoo(b, i, t, k){
+  var g=geo, p=g.slots[i];
+  var nx=(p.x-g.cx)/g.dialR, ny=(p.y-g.cy)/g.dialR;          // unit: hub -> slot
+  var r0=g.ballR*(0.78+Math.min(b.lvl-1,3)*0.06);
+  var ek=k*k;                                                // ease-in: sucked
+  var ex=g.cx+nx*(g.hubR+2), ey=g.cy+ny*(g.hubR+2);
+  var bx=p.x+(ex-p.x)*ek, by=p.y+(ey-p.y)*ek;
+  var end=k>0.8 ? (1-k)/0.2 : 1;                             // last sip collapses to nothing
+  if(end<0.05) return;
+  var r1=r0*(1-0.8*ek)*end;
+  var w=Math.sin(Math.min(1,k)*Math.PI);
+  var rPh=Math.min(r0, r0*(0.35+0.45*w))*end;                // droplet swells then relaxes
+  var phx=g.cx+nx*(g.hubR-rPh*0.3), phy=g.cy+ny*(g.hubR-rPh*0.3);
+  var vv=0.35+0.3*k;
+  ctx.save();
+  ctx.save(); ctx.translate(0,3);
+  gooUnionPath(bx,by,r1,phx,phy,rPh,vv,3);
+  ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill();
+  ctx.restore();
+  gooUnionPath(bx,by,r1,phx,phy,rPh,vv,3);
+  ctx.fillStyle="#2c2733"; ctx.fill();
+  gooUnionPath(bx,by,r1,phx,phy,rPh,vv,0);
+  ctx.fillStyle=HEX[b.c]; ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.4)";
+  ctx.beginPath(); ctx.ellipse(bx-r1*0.3,by-r1*0.38, r1*0.3, r1*0.17, -0.4, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
 function drawHub(t){
   var g=geo;
   ctx.textAlign="center"; ctx.textBaseline="middle";
   var preview=gesturePreview();
   if(preview){
-    ctx.fillStyle=preview.col; ctx.font="700 24px Fredoka, sans-serif";
+    ctx.fillStyle=preview.col; ctx.font="700 "+(preview.small?17:24)+"px Fredoka, sans-serif";
     ctx.fillText(preview.big, g.cx, g.cy-16);
-    ctx.fillStyle="#6b6472"; ctx.font="700 11px Nunito, sans-serif";
+    ctx.fillStyle="#6b6472"; ctx.font="700 "+(preview.sub.length>34?9:11)+"px Nunito, sans-serif";
     ctx.fillText(preview.sub, g.cx, g.cy+6);
-    // the swept recipe as little colour chips
+    // the swept recipe as little colour chips (shrunk when a weave needs six)
     if(preview.chips){
-      var n=preview.chips.length, cw=17, tot=n*cw+(n-1)*7, x0=g.cx-tot/2+cw/2;
+      var n=preview.chips.length, cs=n>3?0.72:1, cw=17*cs, gp=7*cs, tot=n*cw+(n-1)*gp, x0=g.cx-tot/2+cw/2;
       preview.chips.forEach(function(c,k){
-        ctx.save(); ctx.translate(x0+k*(cw+7), g.cy+26);
+        ctx.save(); ctx.translate(x0+k*(cw+gp), g.cy+26); ctx.scale(cs,cs);
         ctx.fillStyle="rgba(44,39,51,.9)";
-        if(isPrim(c)){ rr(-7,-7+2,14,14,4); ctx.fill(); rr(-7,-7,14,14,4); }
-        else { ctx.beginPath(); ctx.arc(0,2,7.5,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(0,0,7.5,0,7); }
+        ctx.beginPath(); ctx.arc(0,2,7.5,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(0,0,7.5,0,7);
         ctx.fillStyle=HEX[c]; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
         ctx.restore();
       });
@@ -904,6 +1289,12 @@ function drawFx(t){
       ctx.strokeStyle="#2c2733"; ctx.lineWidth=7; ctx.beginPath(); ctx.arc(geo.cx,wy0,rad,Math.PI,Math.PI*2); ctx.stroke();
       ctx.strokeStyle=f.tint; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(geo.cx,wy0,rad,Math.PI,Math.PI*2); ctx.stroke();
       ctx.globalAlpha=1;
+    } else if(f.drain){ var dnk=age/380; if(dnk>=1){ S.fx.splice(i,1); continue; }
+      // leech siphon: dashed ink thread from the dial hub to the leech
+      ctx.globalAlpha=(1-dnk)*0.85; ctx.setLineDash([5,7]); ctx.lineDashOffset=-age/14;
+      ctx.strokeStyle="#2c2733"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(geo.cx,geo.cy); ctx.lineTo(f.to.x,f.to.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineDashOffset=0; ctx.globalAlpha=1;
     } else if(f.star){ var sk=age/170; if(sk>=1){ S.fx.splice(i,1); continue; }
       ctx.save(); ctx.translate(f.x,f.y); ctx.rotate(sk*0.8);
       ctx.globalAlpha=1-sk; ctx.fillStyle=f.tint; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2;
@@ -919,10 +1310,11 @@ function drawDmgs(t){
     if(k>=1){ S.dmgs.splice(i,1); continue; }
     ctx.globalAlpha=1-k; ctx.textAlign="center";
     ctx.font=(d.crit?"700 22px ":"700 16px ")+"Fredoka, sans-serif";
-    ctx.fillStyle = d.gate? "#ef4a5a" : (d.crit? "#ffd15c":"#fffdf6");
+    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.crit? "#ffd15c":"#fffdf6"));
     ctx.strokeStyle="#2c2733"; ctx.lineWidth=3;
     var yy=Math.max(d.y-40*k, geo.fieldTop-24);
-    ctx.strokeText((d.gate?"-":"")+d.amt, d.x, yy); ctx.fillText((d.gate?"-":"")+d.amt, d.x, yy);
+    var txt=(d.gate?"-":(d.heal?"+":""))+d.amt;
+    ctx.strokeText(txt, d.x, yy); ctx.fillText(txt, d.x, yy);
     ctx.globalAlpha=1;
   }
 }
@@ -939,22 +1331,54 @@ function drawToast(t){
 }
 
 /* hub preview for the live gesture */
+function greyTint(hex){
+  /* pull a hex colour ~55% toward husk-grey — a diluted spell looks the part */
+  var r=parseInt(hex.substr(1,2),16), g=parseInt(hex.substr(3,2),16), b=parseInt(hex.substr(5,2),16);
+  r=Math.round(r+(185-r)*0.55); g=Math.round(g+(178-g)*0.55); b=Math.round(b+(166-b)*0.55);
+  return "rgb("+r+","+g+","+b+")";
+}
 function gesturePreview(){
   if(!gesture) return null;
   var v=gesture.visited;
   if(v.length===2){
     var A=S.dial[v[0]], B=S.dial[v[1]];
     if(A&&B){
-      if(A.lvl===B.lvl){
+      if(A.lvl===B.lvl && A.c!=="H" && B.c!=="H"){
         if(A.c===B.c) return { big:NAME[A.c]+" L"+(A.lvl+1), sub:S.freeMerge?"level up · FREE":"level up", col:HEX[A.c], chips:[A.c,B.c] };
         if(isPrim(A.c)&&isPrim(B.c)){ var m=mix(A.c,B.c); if(m) return { big:NAME[m], sub:"mix", col:HEX[m], chips:[A.c,B.c] }; }
       }
       return { big:"✕", sub:"won't merge — keep sweeping to cast", col:"#b9b2a6", chips:[A.c,B.c] };
     }
-  } else if(v.length>=3){
+  } else if(v.length===3){
     var balls=v.slice(0,3).map(function(i){return S.dial[i];});
     if(balls.every(Boolean)){ var sp=resolveSpell(balls);
-      return { big:sp.name, sub:"L"+sp.tl+" cast — release!", col:sp.tint==="#fff"?"#2c2733":sp.tint, chips:balls.map(function(b){return b.c;}) }; }
+      var sub="L"+sp.tl+" cast — release!";
+      var col=sp.tint==="#fff"?"#2c2733":sp.tint;
+      if(!sp.fizzle){
+        if(sp.pot>=1) sub+=" · pure";
+        else if(sp.pot>=0.7){ sub+=" · diluted"; col=greyTint(col); }
+        else { sub+=" · weak"; col=greyTint(col); }
+        if(S.lastSpell){
+          if(sp.name===S.lastSpell) sub += (S.repeatN>=1 ? " · exhausted" : " · stale");
+          else sub += " · fresh";
+        }
+      }
+      sub += " — or keep weaving…";
+      return { big:sp.name, sub:sub, col:col, chips:balls.map(function(b){return b.c;}) }; }
+  } else if(v.length>=4){
+    /* the weave: 4-5 balls is a dangling (dangerous) chain, 6 is a doublecast */
+    var wb=v.slice(0,6).map(function(i){return S.dial[i];});
+    if(wb.every(Boolean)){
+      var chips=wb.map(function(b){return b.c;});
+      var sA=resolveSpell(wb.slice(0,3));
+      if(v.length<6){
+        var cA=sA.tint==="#fff"?"#2c2733":sA.tint;
+        return { big:sA.name+" + ?", small:true, sub:"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
+      }
+      var sB=resolveSpell(wb.slice(3,6));
+      if(sA.fizzle||sB.fizzle) return { big:"✕ collapse", sub:"a weave must be two true spells", col:"#b9b2a6", chips:chips };
+      return { big:sA.name+" + "+sB.name, small:true, sub:"DOUBLECAST — release!", col:"#ffd15c", chips:chips };
+    }
   }
   return null;
 }
@@ -973,7 +1397,7 @@ function slotAt(x,y,forDown){
 function adj(a,b){ var d=Math.abs(a-b); return d===1 || d===CFG.slots-1; }
 function tryVisit(s){
   if(gesture.visited.indexOf(s)>=0) return false;
-  if(gesture.visited.length>=3) return false;
+  if(gesture.visited.length>=6) return false;   // 3 = cast, 6 = doublecast weave
   gesture.visited.push(s);
   beep(430+gesture.visited.length*60,.05,"sine",.03);
   return true;
@@ -1014,11 +1438,13 @@ function up(){
   if(!gesture) return;
   var v=gesture.visited; gesture=null;
   if(v.length===2){ if(!tryMerge(v[0],v[1])){ beep(180,.1,"sine",.04); } }
-  else if(v.length>=3){ cast(v.slice(0,3)); }
+  else if(v.length===3){ cast(v); }
+  else if(v.length>3){ castWeave(v); }                          // 4-6 = weave (or collapse)
   else if(v.length===1){ ballInfo(v[0]); }                      // tap = identify
 }
 function ballInfo(i){
   var b=S.dial[i]; if(!b) return;
+  if(b.c==="H"){ S.hubInfo={ l1:"Husk · drained", l2:"won't merge — cast it away to refill", l3:null, col:HEX.H, until:now()+1400 }; return; }
   var l2, l3=null;
   if(isPrim(b.c)){
     var others={"R":["Y","B"],"Y":["R","B"],"B":["R","Y"]}[b.c];
