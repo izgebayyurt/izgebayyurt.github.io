@@ -321,7 +321,7 @@ function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ s
 /* ---------- level state ---------- */
 function applyLevel(L){
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
-  blooms=[]; sweeps=[]; confetti=[]; drawSteps=0;
+  blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
   ems=L.sq.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
   walls=(L.walls||[]).map(function(w){ return [w[0],w[1]]; });
@@ -507,7 +507,9 @@ function step(cell){
     var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
     var sec=mixOf(me.col, other.col);
     var myLeg=me.legs[drag.l];
-    if(sec && myLeg.jun<0 && oleg.jun<0 && tgtFor(sec) && !tgtFor(sec).done){
+    var oHead=oleg.cells[oleg.cells.length-1];
+    var oDelivered=!!tgtAt(oHead[0],oHead[1]);   // the other pipe already delivers to a circle — it isn't free to hijack
+    if(sec && myLeg.jun<0 && oleg.jun<0 && !oDelivered && tgtFor(sec) && !tgtFor(sec).done){
       // tap into the other pipe ANYWHERE (o.idx, not just its tip): the junction forms there,
       // and everything on that pipe BEYOND the tap becomes the blend leg (recoloured to the blend)
       myLeg.cells.push(cell);
@@ -522,6 +524,7 @@ function step(cell){
       drag = excess.length ? null : {t:"jun", i:junctions.length-1};
       renderPaths(); return;
     }
+    rejectMix(cell); return;   // an illegal mix (blend already made, or the other pipe already feeds a circle)
   }
   // DIRECT delivery: a primary line reaches a same-colour circle (no mixing)
   if(drag.t==="em" && o.t==="tgt"){
@@ -590,9 +593,20 @@ function renderDots(){
 }
 /* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
 function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
-var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[];
+var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
 var drawSteps=0;
 function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
+/* illegal-mix feedback: a haptic buzz + a red X on the contested cell (debounced so a
+   held finger doesn't machine-gun it). "the blue can't mix into a delivered red line." */
+function rejectMix(cell){
+  var key=cell[0]+","+cell[1], now=nowMs();
+  if(key===lastReject.key && now-lastReject.t<600) return;
+  lastReject={key:key, t:now};
+  rejects.push({r:cell[0], c:cell[1], t0:now});
+  try{ if(navigator.vibrate) navigator.vibrate(60); }catch(_e){}
+  try{ voice(180,0.16,{type:"triangle", to:120, gl:0.12, lp:900, g:0.05, atk:0.004}); }catch(_e){}  // a soft "nope" thud
+  renderPaths();
+}
 function addBloom(r,c,color,dur){ blooms.push({r:r,c:c,color:color,t0:nowMs(),dur:dur||600}); }
 function polyCum(pts){ var cum=[0],tot=0; for(var i=1;i<pts.length;i++){ tot+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); cum.push(tot); } return {cum:cum,total:tot}; }
 function ptAtLen(pts,cum,len){ if(pts.length===1) return pts[0]; if(len<=0) return pts[0]; for(var i=1;i<pts.length;i++){ if(cum[i]>=len){ var seg=(cum[i]-cum[i-1])||1,t=(len-cum[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; }
@@ -686,6 +700,20 @@ function renderPaths(){
   blooms.forEach(function(b){ var age=(nowMs()-b.t0)/b.dur, pt=P([b.r,b.c]), radius=pipeW*0.45+age*s*0.85;
     ctx.save(); ctx.globalAlpha=(1-age)*0.75; ctx.strokeStyle=b.color; ctx.lineWidth=Math.max(1.5,(1-age)*s*0.13); ctx.beginPath(); ctx.arc(pt[0],pt[1],radius,0,6.2832); ctx.stroke();
     if(age<0.4){ ctx.globalAlpha=(0.4-age)/0.4*0.6; ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.55*(1-age),0,6.2832); ctx.fill(); } ctx.restore(); });
+  // 5b — illegal-mix red X: a pop-in cross on the contested cell (that colour can't go there).
+  // White backing disc + dark-outlined red X so it reads on ANY pipe colour (incl. red).
+  var REJ_MS=700; rejects=rejects.filter(function(x){ return nowMs()-x.t0<REJ_MS; });
+  rejects.forEach(function(x){ var age=(nowMs()-x.t0)/REJ_MS, pt=P([x.r,x.c]);
+    var pop=age<0.22? age/0.22 : 1-Math.max(0,(age-0.75)/0.25)*0.12, arm=s*0.17*(0.5+0.5*pop), a=age<0.7?1:(1-(age-0.7)/0.3);
+    ctx.save(); ctx.globalAlpha=Math.max(0,a);
+    ctx.fillStyle="rgba(253,248,236,0.92)"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.028;
+    ctx.beginPath(); ctx.arc(pt[0],pt[1],s*0.27,0,6.2832); ctx.fill(); ctx.stroke();
+    ctx.lineCap="round"; ctx.lineJoin="round";
+    ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.14;   // dark halo behind the cross
+    ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
+    ctx.strokeStyle="#e23b45"; ctx.lineWidth=s*0.085;
+    ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
+    ctx.restore(); });
   // 6 — coverage shimmer: all blends delivered but board not full -> unpainted cells breathe
   if(!solved && tgts.length && tgts.every(function(t){ return t.done; })){
     var ps=paintedSet(), pulse=0.5+0.5*Math.sin(animT/330);
@@ -749,7 +777,7 @@ window.__flow={
     ems:ems.map(function(E){ return {col:E.col, legs:E.legs.map(function(l){ return {len:l.cells.length, jun:l.jun, root:l.cells[0]}; })}; }) }; },
   cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), s=cs(); return {x:rect.left+c*s+s/2, y:rect.top+r*s+s/2}; },
   winFx:function(){ playWinCascade(); },
-  fx:function(){ return {blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
+  fx:function(){ return {rejects:rejects.length, blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
   render:function(){ renderPaths(); }
 };
 })();
