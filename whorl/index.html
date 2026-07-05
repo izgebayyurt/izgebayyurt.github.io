@@ -119,6 +119,12 @@ body{
   box-shadow:0 2px 0 var(--shadow); background:#b9b2a6; }
 .recipe i.any{ background:var(--card); }
 .recipe i.sil{ background:#8a8390; opacity:.55; box-shadow:0 2px 0 rgba(44,39,51,.5); }
+.recipe i.prism{ background:
+  radial-gradient(circle at 32% 30%, #fff 0 30%, transparent 55%),
+  conic-gradient(from 210deg, #ef4a5a, #f6c445, #3d8bdf, #ef4a5a);
+  position:relative; }
+.recipe i.prism::after{ content:"✦"; position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; font-size:8px; color:#fffdf6; line-height:1; }
 .bmeta{ flex:1; min-width:0; text-align:left; }
 .bmeta b{ font-family:var(--font-d); font-weight:600; font-size:15.5px; display:block; line-height:1.12; }
 .bmeta span{ font-weight:700; font-size:11.5px; color:var(--ink-soft); }
@@ -214,8 +220,8 @@ var CFG = {
 };
 
 /* colours ---------------------------------------------------------------- */
-var HEX = { R:"#ef4a5a", Y:"#f6c445", B:"#3d8bdf", O:"#f2913d", G:"#57c268", P:"#9b62d6", H:"#b9b2a6" };
-var NAME = { R:"Red", Y:"Yellow", B:"Blue", O:"Orange", G:"Green", P:"Purple", H:"Husk" };
+var HEX = { R:"#ef4a5a", Y:"#f6c445", B:"#3d8bdf", O:"#f2913d", G:"#57c268", P:"#9b62d6", H:"#b9b2a6", W:"#f4f0ff" };
+var NAME = { R:"Red", Y:"Yellow", B:"Blue", O:"Orange", G:"Green", P:"Purple", H:"Husk", W:"Prism" };
 var PRIM = { R:1, Y:1, B:1 };
 function isPrim(c){ return !!PRIM[c]; }
 function mix(a,b){
@@ -225,6 +231,12 @@ function mix(a,b){
   if(s==="BR") return "P";
   return null;
 }
+/* colour-set utilities shared by the recipe grammar and its previews */
+function countOf(arr){ var s={}; arr.forEach(function(c){ s[c]=(s[c]||0)+1; }); return s; }
+/* the WILDCARD echo: every W becomes a copy of the FIRST non-W colour in sweep order
+   (colour only — each W keeps its own level). all-W has no source and stays W (→ Whorl). */
+function echoSrc(cols){ for(var i=0;i<cols.length;i++){ if(cols[i]!=="W") return cols[i]; } return null; }
+function echoColors(cols){ var src=echoSrc(cols); return src===null ? cols.slice() : cols.map(function(c){ return c==="W"?src:c; }); }
 
 /* ===================== canvas ===================== */
 var cv = document.getElementById("c"), ctx = cv.getContext("2d");
@@ -246,8 +258,8 @@ function layout(){
   var dialR = Math.min(W*0.37, 156);      // slightly smaller so End-turn owns its corner
   var ballR = dialR*0.27;
   var cx = W/2;
-  var cy = H - dialR - ballR - 26;
-  var gateY = cy - dialR - ballR - 20;
+  var cy = H - dialR - ballR - 8;
+  var gateY = cy - dialR - ballR - 14;
   geo = {
     cx:cx, cy:cy, dialR:dialR, ballR:ballR,
     gateY:gateY, fieldTop:topPad + 6,
@@ -391,16 +403,21 @@ function sInscribe(){ [523,659,880].forEach(function(f,i){ setTimeout(function()
    localStorage "wh_book": { spellName:{ n:lifetime casts, dc:times woven in a doublecast } }.
    a spell is DISCOVERED once its name is a key; Fizzle is pre-seeded so it never triggers one.
    the book PERSISTS across death / new game — it is the first thing that carries between runs. */
-var SPELL_ORDER = ["Blast","Lance","Venom","Ember","Frost","Sunburst","Prism","Fizzle"];
+var SPELL_ORDER = ["Blast","Lance","Venom","Ember","Frost","Sunburst","Pyre","Overgrowth","Eclipse","Void","Whorl","Prism","Fizzle"];
 var BOOK_INFO = {
-  Blast:   { recipe:["O","any","any"], desc:"splash · burns",          hint:"any orange in the weave" },
-  Lance:   { recipe:["P","any","any"], desc:"pierces a lane",          hint:"any purple in the weave" },
-  Venom:   { recipe:["G","any","any"], desc:"hits a cluster · poisons", hint:"any green in the weave" },
-  Ember:   { recipe:["R","R","R"],     desc:"single hit · burns",       hint:"three of one colour, hot" },
-  Frost:   { recipe:["B","B","B"],     desc:"hits all · freezes",       hint:"three of one colour, cold" },
-  Sunburst:{ recipe:["Y","Y","Y"],     desc:"hits all",                 hint:"three of one colour, bright" },
-  Prism:   { recipe:["R","Y","B"],     desc:"hits all · pierces wards",  hint:"one of each primary" },
-  Fizzle:  { recipe:["any","any","any"],desc:"a cast that won't cohere",  hint:"a cast that won't cohere" }
+  Blast:     { recipe:["O","R","Y"],     desc:"splash · burns",          hint:"orange with red & yellow" },
+  Lance:     { recipe:["P","R","B"],     desc:"pierces a lane",          hint:"purple with red & blue" },
+  Venom:     { recipe:["G","Y","B"],     desc:"hits a cluster · poisons", hint:"green with yellow & blue" },
+  Ember:     { recipe:["R","R","R"],     desc:"single hit · burns",       hint:"three reds, hot" },
+  Frost:     { recipe:["B","B","B"],     desc:"hits all · freezes",       hint:"three blues, cold" },
+  Sunburst:  { recipe:["Y","Y","Y"],     desc:"hits all",                 hint:"three yellows, bright" },
+  Pyre:      { recipe:["O","O","O"],     desc:"wide splash · deep burn",  hint:"three of the warmest craft" },
+  Overgrowth:{ recipe:["G","G","G"],     desc:"hits all · heavy poison",  hint:"three of the living craft" },
+  Eclipse:   { recipe:["P","P","P"],     desc:"hits all · ignores wards", hint:"three of the royal craft" },
+  Void:      { recipe:["O","G","P"],     desc:"true strike · the strongest foe", hint:"the crafted colours, cancelled" },
+  Whorl:     { recipe:["W","W","W"],     desc:"true storm · hits all",    hint:"three lights, woven" },
+  Prism:     { recipe:["R","Y","B"],     desc:"fuse one wildcard light",  hint:"one of each primary" },
+  Fizzle:    { recipe:["any","any","any"],desc:"a cast that won't cohere",  hint:"a cast that won't cohere" }
 };
 var BOOK = loadBook();
 function loadBook(){
@@ -410,11 +427,15 @@ function loadBook(){
   return b;
 }
 function saveBook(){ try{ localStorage.setItem("wh_book", JSON.stringify(BOOK)); }catch(e){} }
-/* every cast passes through here: tally it, and fire the INSCRIBED moment the first time */
+/* the two LEGENDARIES stay hidden in the book until first cast — everything else is a
+   known recipe from launch (the book is the player's cookbook). */
+var LEGEND = { Void:1, Whorl:1 };
+/* every cast passes through here: tally it, and fire the INSCRIBED moment only for a
+   legendary's first casting. */
 function recordSpell(sp, isDouble){
   if(!sp || !sp.name) return;
   var name=sp.name;
-  if(!BOOK[name]){ BOOK[name]={ n:0, dc:0 }; if(!sp.fizzle) inscribe(name); }
+  if(!BOOK[name]){ BOOK[name]={ n:0, dc:0 }; if(LEGEND[name]) inscribe(name); }
   BOOK[name].n++;
   if(isDouble) BOOK[name].dc++;
   saveBook();
@@ -438,6 +459,7 @@ function openBook(){
     var chips=info.recipe.map(function(c){
       if(!has) return '<i class="sil"></i>';                      // undiscovered: silhouettes
       if(c==="any") return '<i class="any"></i>';
+      if(c==="W") return '<i class="prism"></i>';                 // wildcard: white-with-sparkle
       return '<i style="background:'+HEX[c]+'"></i>';
     }).join("");
     var nm = has? name : "???";
@@ -448,45 +470,77 @@ function openBook(){
       '<div class="bn">'+cnt+'</div>';
     box.appendChild(row);
   });
-  document.getElementById("bookSub").textContent = disc+" of 7 spells inscribed";
+  document.getElementById("bookSub").textContent = disc+" of "+(SPELL_ORDER.length-1)+" spells inscribed";
   show("vBook");
 }
 function closeBook(){ hide("vBook"); bookOpen=false; }
 
-/* ===================== spellbook (recipe potency) ===================== */
-/* recipe purity: each spell has a colour FAMILY; junk balls in the sweep dilute it.
-   3/3 in family = pure (x1.0), 2/3 = diluted (x0.7), 1/3 = weak (x0.4).
-   diluted-or-worse casts can't carry status payloads (< 0.7 drops them). */
-var FAM = {
-  Blast:{O:1,R:1,Y:1}, Lance:{P:1,R:1,B:1}, Venom:{G:1,Y:1,B:1},
-  Ember:{R:1}, Frost:{B:1}, Sunburst:{Y:1}, Prism:{R:1,Y:1,B:1}
-};
-function resolveSpell(balls){
-  var set = {}; balls.forEach(function(b){ set[b.c]=(set[b.c]||0)+1; });
-  /* husks (H) are inert: no family, no set match, and zero towards TL */
-  var TL = Math.max(1, balls.reduce(function(s,b){return s+(b.c==="H"?0:b.lvl);},0)) + CFG.castLevelBonus;
-  var P = CFG.spellPow;
-  var sp = null;
-  if(set.O) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };
-  else if(set.P) sp = { name:"Lance", el:"P", kind:"lane",   coeff:4, tint:HEX.P };
-  else if(set.G) sp = { name:"Venom", el:"G", kind:"cluster",coeff:2, poison:3, tint:HEX.G };
-  else if(set.R===3) sp = { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
-  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:2, freeze:1, tint:HEX.B };
-  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:3, tint:HEX.Y };
-  else if(set.R&&set.Y&&set.B) sp = { name:"Prism", el:"*", kind:"all", coeff:3, tint:"#fff" };
-  if(!sp) return fizzleOf(balls);
-  var fam=FAM[sp.name], inFam=0;
-  balls.forEach(function(b){ if(fam[b.c]) inFam++; });
-  sp.pot = inFam>=3 ? 1 : (inFam===2 ? 0.7 : 0.4);
-  sp.tl = TL;
-  sp.dmg = Math.max(1, Math.round(sp.coeff*TL*sp.pot*P));
-  if(sp.pot<0.7){ delete sp.burn; delete sp.poison; delete sp.freeze; }   // too dilute to carry a payload
+/* ===================== spell grammar (EXACT RECIPES + the wildcard Prism) =====================
+   every valid cast is FULL power: dmg = coeff · TL · spellPow (× stale/fresh applied later).
+   a triple casts ONLY if — after the wildcard echo — its colour multiset is an exact recipe:
+     RRR Ember · YYY Sunburst · BBB Frost · OOO Pyre · GGG Overgrowth · PPP Eclipse
+     secondary+both parents (O+R+Y / P+R+B / G+Y+B) → Blast / Lance / Venom
+     secondary PAIR + any third (OOx / PPx / GGx) → that secondary's spell (triples checked first)
+     WWW → Whorl (the ultimate).
+   TRUE-ball-only specials (no wildcard present): R+Y+B → Transmute (mints a Prism, not a cast),
+     O+G+P → Void (true assassin strike). Anything else → Fizzle. */
+function tlOf(balls){ return Math.max(1, balls.reduce(function(s,b){return s+(b.c==="H"?0:b.lvl);},0)) + CFG.castLevelBonus; }
+function mkSpell(sp, TL, usedW){
+  sp.tl = TL; sp.usedW = !!usedW;
+  sp.dmg = Math.max(1, Math.round(sp.coeff*TL*CFG.spellPow));
   return sp;
+}
+function resolveSpell(balls){
+  var cols = balls.map(function(b){ return b.c; });
+  var TL = tlOf(balls);
+  var hasW = cols.indexOf("W")>=0;
+  /* specials require TRUE balls — pre-echo, only when no wildcard is present */
+  if(!hasW && balls.length===3){
+    var oset = countOf(cols);
+    if(oset.R===1 && oset.Y===1 && oset.B===1)
+      return { name:"Prism", transmute:true, tl:TL, tint:HEX.W };            // R+Y+B → mint a Prism
+    if(oset.O===1 && oset.G===1 && oset.P===1)
+      return mkSpell({ name:"Void", el:null, kind:"assassin", coeff:6, trueDamage:true, tint:"#2c2733" }, TL, false);
+  }
+  /* the wildcard resolves first, then the recipe runs on the echoed colours */
+  var echoed = echoColors(cols), set = countOf(echoed);
+  var sp = null;
+  if(set.W===3)      sp = { name:"Whorl", el:null, kind:"all", coeff:4, trueDamage:true, whorl:true, tint:"#ffd15c" };
+  else if(set.R===3) sp = { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
+  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:3, tint:HEX.Y };
+  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:2, freeze:1, tint:HEX.B };
+  else if(set.O===3) sp = { name:"Pyre", el:"O", kind:"splash", radius:2, coeff:5, burn:3, tint:HEX.O };
+  else if(set.G===3) sp = { name:"Overgrowth", el:"G", kind:"all", coeff:2, poison:4, tint:HEX.G };
+  else if(set.P===3) sp = { name:"Eclipse", el:"P", kind:"all", coeff:3, eclipsePierce:true, tint:HEX.P };
+  else if(set.O===1&&set.R===1&&set.Y===1) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };
+  else if(set.P===1&&set.R===1&&set.B===1) sp = { name:"Lance", el:"P", kind:"lane", coeff:4, tint:HEX.P };
+  else if(set.G===1&&set.Y===1&&set.B===1) sp = { name:"Venom", el:"G", kind:"cluster", coeff:2, poison:3, tint:HEX.G };
+  else if(set.O===2) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };      // pair road
+  else if(set.P===2) sp = { name:"Lance", el:"P", kind:"lane", coeff:4, tint:HEX.P };
+  else if(set.G===2) sp = { name:"Venom", el:"G", kind:"cluster", coeff:2, poison:3, tint:HEX.G };
+  if(!sp) return fizzleOf(balls);
+  return mkSpell(sp, TL, hasW);
+}
+/* a one-line recipe nudge for a fizzle, read off the ECHOED colours (echo runs first) */
+function fizzleHint(echoed){
+  var set = countOf(echoed);
+  var secs = ["O","G","P"].filter(function(c){ return set[c]; });
+  if(secs.length===1 && set[secs[0]]===1) return NAME[secs[0]]+" wants its parents";   // lone secondary, wrong companions
+  var prims = ["R","Y","B"].filter(function(c){ return set[c]; });
+  for(var i=0;i<prims.length;i++){
+    if(set[prims[i]]===2){                                                              // raw primary pair XXy
+      var other = prims.filter(function(c){ return c!==prims[i]; })[0];
+      if(other){ var m=mix(prims[i],other); if(m) return prims[i]+" + "+other+" want to be "+NAME[m]; }
+    }
+  }
+  return null;
 }
 /* the standard fizzle — also what a collapsed weave slumps into */
 function fizzleOf(balls){
-  var TL = Math.max(1, balls.reduce(function(s,b){return s+(b.c==="H"?0:b.lvl);},0)) + CFG.castLevelBonus;
-  return { name:"Fizzle", el:null, kind:"single", dmg:Math.max(1,Math.round(Math.max(2,TL)*CFG.spellPow)), tl:TL, pot:1, tint:"#b9b2a6", fizzle:true };
+  var cols = balls.map(function(b){ return b.c; });
+  var TL = tlOf(balls);
+  return { name:"Fizzle", el:null, kind:"single", dmg:Math.max(1,Math.round(Math.max(2,TL)*CFG.spellPow)),
+    tl:TL, tint:"#b9b2a6", fizzle:true, usedW:cols.indexOf("W")>=0, hint:fizzleHint(echoColors(cols)) };
 }
 
 /* ===================== combat ===================== */
@@ -495,20 +549,27 @@ function nearest(){
   alive().forEach(function(e){ if(!best || e.rung<best.rung || (e.rung===best.rung && e.lane<best.lane)) best=e; });
   return best;
 }
-/* ward rework: matching colour x2 (x3 with Weakness), any other element halved, Prism neutral.
-   elites shrug off Prism (25%, rounded up); armored plate bounces any final hit under 5. */
-function applyDmg(e, amt, el){
-  if(e.elite && el==="*") amt = Math.ceil(amt*0.35);
-  if(e.ward){
-    if(el===e.ward) amt = Math.round(amt*CFG.wardMult);
-    else if(el!=="*") amt = Math.ceil(amt*0.5);
+/* ward: matching colour x2 (x3 with Weakness), any other element halved.
+   elites shatter light — a cast whose swept triple held a Prism does x0.65 (opts.usedW),
+   except true damage. armored plate bounces any final hit under 5.
+   opts.trueDamage → skip ward math + armored bounce + elite shatter (Void, Whorl).
+   opts.eclipsePierce → skip ward math only. */
+function applyDmg(e, amt, el, opts){
+  opts = opts || {};
+  var trueDmg = opts.trueDamage, pierce = opts.eclipsePierce;
+  if(!trueDmg){
+    if(e.elite && opts.usedW) amt = Math.ceil(amt*0.65);
+    if(e.ward && !pierce){
+      if(el===e.ward) amt = Math.round(amt*CFG.wardMult);
+      else amt = Math.ceil(amt*0.5);
+    }
+    if(e.armored && amt<5){
+      e.hit = now(); sClank();
+      spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false);
+      return;
+    }
   }
-  if(e.armored && amt<5){
-    e.hit = now(); sClank();
-    spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false);
-    return;
-  }
-  var crit = e.ward && el===e.ward;
+  var crit = !trueDmg && !pierce && e.ward && el===e.ward;
   e.hp -= amt; e.hit = now();
   sHit(amt, crit);
   spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit);
@@ -526,15 +587,26 @@ function applyDmg(e, amt, el){
     beep(700, .09, "sine", .045);    // squeak
   }
 }
+/* Void's "assassin" seeks the toughest foe alive (highest maxhp) — ignores tgt */
 function targetsFor(sp, tgt){
+  if(sp.kind==="assassin"){
+    var best=null; alive().forEach(function(e){ if(!best || e.maxhp>best.maxhp) best=e; });
+    return best ? [best] : [];
+  }
   if(!tgt) return [];
   if(sp.kind==="single") return [tgt];
   if(sp.kind==="all") return alive();
   if(sp.kind==="lane") return alive().filter(function(e){ return e.lane===tgt.lane; });
-  if(sp.kind==="splash") return alive().filter(function(e){ return Math.abs(e.lane-tgt.lane)<=1 && Math.abs(e.rung-tgt.rung)<=1; });
+  if(sp.kind==="splash"){ var rad=sp.radius||1; return alive().filter(function(e){ return Math.abs(e.lane-tgt.lane)<=rad && Math.abs(e.rung-tgt.rung)<=rad; }); }
   if(sp.kind==="cluster") return alive().filter(function(e){ return Math.abs(e.lane-tgt.lane)<=1 && e.rung<=tgt.rung+1; });
   return [tgt];
 }
+/* pick the aiming target + the hit set for a resolved spell (assassin ignores nearest) */
+function aimSpell(sp){
+  if(sp.kind==="assassin"){ var h=targetsFor(sp); return { tgt:h[0]||null, hits:h }; }
+  var tgt=nearest(); return { tgt:tgt, hits:targetsFor(sp,tgt) };
+}
+function hitPt(e){ return { x:e.x, y:e.y, lane:e.lane }; }
 /* stale casts: repeating the same spell this wave dulls it; switching sharpens it.
    Fizzle wipes the streak either way. shared by single casts and each weave link. */
 function applyStale(st, sp){
@@ -548,42 +620,45 @@ function applyStale(st, sp){
     st.lastSpell = sp.name; st.repeatN = 0;
   }
 }
-/* one resolved spell landing: damage, payloads, shake */
+/* one resolved spell landing: damage, payloads (always apply on a valid cast), shake */
 function impactSpell(sp, hits){
   var per = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
+  var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW };
   hits.forEach(function(e){
-    applyDmg(e, per, sp.el);
+    applyDmg(e, per, sp.el, opts);
     if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
     if(sp.poison) e.poison += sp.poison;
     if(sp.burn) e.burn = Math.max(e.burn, sp.burn);
   });
-  S.shake = Math.min(16, 4 + sp.tl*1.1 + (sp.tl>=6?4:0));
+  S.shake = Math.min(20, 4 + sp.tl*1.1 + (sp.tl>=6?4:0) + (sp.whorl?6:0));
 }
 /* anticipation -> impact: balls flash+shrink (150ms) -> beam -> damage (230ms) -> refill (300ms) */
 function cast(idxs){
   if(S.busy) return;
-  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
-  else if(S.actions<=0) return;
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
-  if(CFG.realtime) startCool();
   var sp = resolveSpell(balls);
+  if(sp.transmute){ transmute(idxs); return; }                 // R+Y+B → craft a Prism, not a cast
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
+  else if(S.actions<=0) return;
+  if(CFG.realtime) startCool();
   applyStale(st, sp);
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
-  vib(sp.fizzle?[8,60,8]:(sp.tl>=6?[30,40,70]:25));
-  var tgt = nearest(), hits = targetsFor(sp, tgt);
+  vib(sp.fizzle?[8,60,8]:(sp.whorl?[40,50,90]:(sp.tl>=6?[30,40,70]:25)));
+  var aim = aimSpell(sp), tgt = aim.tgt, hits = aim.hits;
   setTimeout(function(){ if(S!==st||st.over) return;
-    sCast(sp.tl); if(sp.fizzle) sFizzle();
-    castFx(sp, tgt, hits.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
+    sCast(sp.tl, sp.whorl); if(sp.whorl) sCast(sp.tl+4, true); if(sp.fizzle) sFizzle();
+    castFx(sp, tgt, hits.map(hitPt));
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
     impactSpell(sp, hits);
-    if(sp.stale){ toast("Stale...", 1000, "#6b6472", "low"); }
+    if(sp.whorl){ toast("W H O R L !", 1400, "#b9791a", "mid", true); S.shake=Math.min(24,S.shake+8); vib([60,40,60,40,90]); }
+    else if(sp.stale){ toast("Stale...", 1000, "#6b6472", "low"); }
     else {
       var label = sp.tl>=6 ? "L"+sp.tl+" "+sp.name.toUpperCase()+"!" : sp.name+(sp.tl>3?" · L"+sp.tl:"");
-      toast(label, 1000, sp.tint==="#fff"?"#2c2733":sp.tint, "low", sp.tl>=6);
+      toast(label, 1000, sp.tint==="#ffd15c"?"#b9791a":sp.tint, "low", sp.tl>=6);
     }
     recordSpell(sp, false);   // journal it — a first cast fires the INSCRIBED moment, overriding the label
   },230);
@@ -594,47 +669,90 @@ function cast(idxs){
     st.phase=null; st.busy=false; postAction();
   },400);
 }
+/* TRANSMUTE: R+Y+B collapse into ONE Prism (W) in the MIDDLE swept slot; the other two
+   refill fresh. Costs an action in Turns; a free craft in Flow (no cast cooldown). It does
+   NOT touch lastSpell / stale, and records the Prism discovery. */
+function transmuteFx(slot){
+  var gs=geo.slots[slot];
+  boom(gs.x, gs.y, "#ffffff", 1.6);                       // white flash
+  confetti(gs.x, gs.y, "#f4f0ff");
+  S.fx.push({ star:true, x:gs.x, y:gs.y, t:now(), tint:"#ffd15c" });
+  S.fx.push({ ring:true, x:gs.x, y:gs.y, col:"#9b62d6", t:now(), max:(geo.ballR||20)*1.9 });
+  beep(760,.1,"triangle",.05); setTimeout(function(){ beep(1180,.14,"sine",.05); },70);
+}
+function transmute(idxs){
+  var st=S;
+  if(!CFG.realtime && st.actions<=0) return;              // Turns: needs a spare action
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // fuse: the three are drunk together
+  vib([15,30,15,30,40]);
+  var mid = idxs[1];
+  setTimeout(function(){ if(S!==st||st.over) return;
+    transmuteFx(mid);
+    toast("✨ TRANSMUTED", 1000, "#9b62d6", "low");
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){
+      if(i===mid) st.dial[i] = { c:"W", lvl:1, born:now() };            // the Prism lands in the middle
+      else { st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; }
+    });
+    recordSpell({ name:"Prism", fizzle:false, tint:HEX.W }, false);     // Prism is discoverable
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false;
+    if(CFG.realtime){ if(alive().length===0) setTimeout(waveClear, 300); }   // craft: no cooldown, no action
+    else spend();                                                            // Turns: costs one action
+  },400);
+}
 /* the DOUBLECAST: sweep past three and weave two spells into ONE action.
    both triples must be true spells — a short weave or a fizzled link collapses. */
+/* banner for a woven pair — transmute links name themselves */
+function weaveBanner(a,b){
+  if(!a.transmute && !b.transmute) return "DOUBLECAST!";
+  return (a.transmute?"Transmute":a.name)+" + "+(b.transmute?"Transmute":b.name)+"!";
+}
 function castWeave(idxs){
   if(S.busy) return;
-  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
-  else if(S.actions<=0) return;
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
-  if(CFG.realtime) startCool();     // doublecast and collapse both share the one cooldown
   var spA=null, spB=null;
   if(idxs.length===6){ spA=resolveSpell(balls.slice(0,3)); spB=resolveSpell(balls.slice(3,6)); }
   if(!spA || spA.fizzle || spB.fizzle){ weaveCollapse(idxs, balls); return; }
-  /* chain bookkeeping: A checks the wave streak, B checks A */
-  applyStale(st, spA); applyStale(st, spB);
+  /* a transmute link is a valid (non-fizzle) weave step: it mints a Prism instead of striking.
+     a pure-transmute weave is a craft (no cooldown); any real spell arms the cast cooldown. */
+  var anyReal = !spA.transmute || !spB.transmute;
+  if(CFG.realtime){ if(anyReal){ if(S.cool>0){ coolReject(); return; } startCool(); } }
+  else if(S.actions<=0) return;
+  if(!spA.transmute) applyStale(st, spA);                   // transmute never touches the streak
+  if(!spB.transmute) applyStale(st, spB);
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib([30,40,30,40,70]);
-  var tgtA = nearest(), hitsA = targetsFor(spA, tgtA);
-  var hitsB = [];   // aimed after A lands — a kill re-points the second spell
+  var minted={};                                            // W-minted slots survive the refill
+  var aimA = spA.transmute ? null : aimSpell(spA), aimB=null;
   setTimeout(function(){ if(S!==st||st.over) return;
-    sCast(spA.tl);
-    castFx(spA, tgtA, hitsA.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
+    if(spA.transmute){ transmuteFx(idxs[1]); }
+    else { sCast(spA.tl, spA.whorl); castFx(spA, aimA.tgt, aimA.hits.map(hitPt)); }
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    impactSpell(spA, hitsA);
+    if(spA.transmute){ st.dial[idxs[1]]={ c:"W", lvl:1, born:now() }; minted[idxs[1]]=true;
+      recordSpell({ name:"Prism", fizzle:false, tint:HEX.W }, true); }
+    else { impactSpell(spA, aimA.hits); recordSpell(spA, true); }
     S.shake += 5;                                            // doublecast spectacle
-    toast("DOUBLECAST!", 1200, "#b9791a", "mid", true);      // one banner — spell toasts skipped
-    recordSpell(spA, true);                                  // both woven spells count (dc++)
+    toast(weaveBanner(spA,spB), 1200, "#b9791a", "mid", true);   // one banner — spell toasts skipped
   },230);
   setTimeout(function(){ if(S!==st||st.over) return;
-    var tgtB = nearest(); hitsB = targetsFor(spB, tgtB);
-    sCast(spB.tl, true);                                     // second arpeggio pitched up
-    castFx(spB, tgtB, hitsB.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
+    if(spB.transmute){ transmuteFx(idxs[4]); }
+    else { aimB=aimSpell(spB); sCast(spB.tl, true); castFx(spB, aimB.tgt, aimB.hits.map(hitPt)); }
   },350);
   setTimeout(function(){ if(S!==st||st.over) return;
-    impactSpell(spB, hitsB);
-    recordSpell(spB, true);
+    if(spB.transmute){ st.dial[idxs[4]]={ c:"W", lvl:1, born:now() }; minted[idxs[4]]=true;
+      recordSpell({ name:"Prism", fizzle:false, tint:HEX.W }, true); }
+    else { impactSpell(spB, aimB.hits); recordSpell(spB, true); }
   },430);
   setTimeout(function(){ if(S!==st||st.over) return;
-    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+    idxs.forEach(function(i,k){ if(minted[i]) return; st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
   },520);
   setTimeout(function(){ if(S!==st||st.over) return;
     st.phase=null; st.busy=false; postAction();
@@ -643,6 +761,8 @@ function castWeave(idxs){
 /* 4-5 balls, or a fizzle in either triple: no partial credit — one weak fizzle,
    every swept slot consumed. */
 function weaveCollapse(idxs, balls){
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }   // shares the one cooldown
+  else if(S.actions<=0) return;
   var st=S;
   var sp = fizzleOf(balls.slice(0,3));
   applyStale(st, sp);
@@ -1567,35 +1687,47 @@ function gesturePreview(){
     }
   } else if(v.length===3){
     var balls=v.slice(0,3).map(function(i){return S.dial[i];});
-    if(balls.every(Boolean)){ var sp=resolveSpell(balls);
-      var sub="L"+sp.tl+" cast — release!";
-      var col=sp.tint==="#fff"?"#2c2733":sp.tint;
-      if(!sp.fizzle){
-        if(sp.pot>=1) sub+=" · pure";
-        else if(sp.pot>=0.7){ sub+=" · diluted"; col=greyTint(col); }
-        else { sub+=" · weak"; col=greyTint(col); }
-        if(S.lastSpell){
-          if(sp.name===S.lastSpell) sub += (S.repeatN>=1 ? " · exhausted" : " · stale");
-          else sub += " · fresh";
-        }
+    if(balls.every(Boolean)){
+      var sp=resolveSpell(balls);
+      var chips=balls.map(function(b){return b.c;});
+      if(sp.transmute){   // flow: transmute is a craft — never "cooling"
+        return { big:"✨ Prism", small:true, sub:"transmute · one of each primary — release!", col:"#9b62d6", chips:chips };
+      }
+      var col = sp.fizzle ? "#b9b2a6" : (sp.tint==="#ffd15c" ? "#b9791a" : sp.tint);
+      var sub;
+      if(sp.fizzle) sub = sp.hint || "won't cohere";
+      else if(sp.whorl) sub = "the ultimate";
+      else if(sp.kind==="assassin") sub = "true strike";
+      else if(sp.usedW){ var src=echoSrc(chips); sub = src ? "Prism echoes "+NAME[src] : "L"+sp.tl+" cast"; }
+      else sub = "L"+sp.tl+" cast";
+      if(!sp.fizzle && S.lastSpell){
+        if(sp.name===S.lastSpell) sub += (S.repeatN>=1 ? " · exhausted" : " · stale");
+        else sub += " · fresh";
       }
       sub += " — or keep weaving…";
       if(CFG.realtime && S.cool>0){ sub="cooling..."; col=greyTint(col); }
-      return { big:sp.name, sub:sub, col:col, chips:balls.map(function(b){return b.c;}) }; }
+      return { big:sp.name, sub:sub, small:sp.name.length>9, col:col, chips:chips };
+    }
   } else if(v.length>=4){
     /* the weave: 4-5 balls is a dangling (dangerous) chain, 6 is a doublecast */
     var wb=v.slice(0,6).map(function(i){return S.dial[i];});
     if(wb.every(Boolean)){
       var chips=wb.map(function(b){return b.c;});
-      var cooling = CFG.realtime && S.cool>0;
       var sA=resolveSpell(wb.slice(0,3));
+      var nameA = sA.transmute?"Transmute":sA.name;
       if(v.length<6){
-        var cA=sA.tint==="#fff"?"#2c2733":sA.tint;
-        return { big:sA.name+" + ?", small:true, sub:cooling?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
+        var cA = sA.fizzle?"#b9b2a6":(sA.transmute?"#9b62d6":(sA.tint==="#ffd15c"?"#b9791a":sA.tint));
+        var coolingD = CFG.realtime && S.cool>0;
+        return { big:nameA+" + ?", small:true, sub:coolingD?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
       }
       var sB=resolveSpell(wb.slice(3,6));
       if(sA.fizzle||sB.fizzle) return { big:"✕ collapse", sub:"a weave must be two true spells", col:"#b9b2a6", chips:chips };
-      return { big:sA.name+" + "+sB.name, small:true, sub:cooling?"cooling...":"DOUBLECAST — release!", col:cooling?greyTint("#ffd15c"):"#ffd15c", chips:chips };
+      var nameB = sB.transmute?"Transmute":sB.name;
+      var bothReal = !sA.transmute && !sB.transmute;
+      var cooling = CFG.realtime && S.cool>0 && (!sA.transmute || !sB.transmute);   // pure-transmute weave = craft
+      return { big:nameA+" + "+nameB, small:true,
+        sub:cooling?"cooling...":((bothReal?"DOUBLECAST":"weave")+" — release!"),
+        col:cooling?greyTint("#ffd15c"):"#ffd15c", chips:chips };
     }
   }
   return null;
@@ -1666,6 +1798,7 @@ function up(){
 function ballInfo(i){
   var b=S.dial[i]; if(!b) return;
   if(b.c==="H"){ S.hubInfo={ l1:"Husk · drained", l2:"won't merge — cast it away to refill", l3:null, col:HEX.H, until:now()+1400 }; return; }
+  if(b.c==="W"){ S.hubInfo={ l1:"Prism · L"+b.lvl, l2:"echoes the first colour you sweep", l3:"merge with another Prism to level up", col:"#9b62d6", until:now()+1400 }; return; }
   var l2, l3=null;
   if(isPrim(b.c)){
     var others={"R":["Y","B"],"Y":["R","B"],"B":["R","Y"]}[b.c];
