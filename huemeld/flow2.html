@@ -44,6 +44,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pathlayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .gcell{ position:absolute; }
 .gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.12; }
+.gcell.wall::before{ display:none; }
+.gcell.wall::after{ content:""; position:absolute; left:9%; top:9%; width:82%; height:82%; border-radius:22% 26% 24% 28% / 26% 22% 28% 24%; background:#4a4353; border:2.5px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 5px, rgba(0,0,0,.06) 5px 10px); }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
 .dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
 .dot.ci{ border-radius:50%; }
@@ -146,7 +148,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>How to play</h2>
         <div class="coachmix" id="helpMix"></div>
-        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b> (a source). A square can send out up to <b>4 lines</b>. A line reaches a same colour <b>✦</b> directly, or <b>meets a different colour</b> at a junction to mix and carry that blend to its <b>✦</b>. Feed <b>every circle</b>, leave <b>no loose ends</b>, and <b>fill every square</b> to win.</p>
+        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b> (a source). A square can send out up to <b>4 lines</b>. A line reaches a same colour <b>✦</b> directly, or <b>meets a different colour</b> at a junction to mix and carry that blend to its <b>✦</b>. Feed <b>every circle</b>, leave <b>no loose ends</b>, and <b>fill every open square</b> to win. Dark <b>blocked</b> tiles can't be crossed or filled.</p>
         <button class="mk" id="btnHelpClose">Got it</button>
       </div>
     </div>
@@ -222,7 +224,32 @@ var LEVELS=[
   { n:6, sq:[["Y",1,3],["R",4,0]], ci:[["Y",3,4],["Y",3,3],["O",5,3],["O",0,0]] },
   { n:6, sq:[["R",4,3],["Y",1,1]], ci:[["O",0,5],["R",3,0],["O",1,3],["R",0,0]] },
   { n:6, sq:[["B",2,1],["R",3,1],["Y",3,5]], ci:[["B",0,2],["O",5,0],["B",1,2],["P",0,5],["Y",5,4]] },
-  { n:6, sq:[["Y",0,2],["B",4,3],["R",0,5]], ci:[["G",2,3],["B",3,1],["P",3,5],["B",3,0],["R",1,4]] }
+  { n:6, sq:[["Y",0,2],["B",4,3],["R",0,5]], ci:[["G",2,3],["B",3,1],["P",3,5],["B",3,0],["R",1,4]] },
+  { n:5, sq:[["R",3,0],["Y",1,1],["B",0,1]], ci:[["O",0,3],["B",2,2]], walls:[[2,0],[1,0],[0,0]] },
+  { n:5, sq:[["Y",0,4],["B",3,4],["R",3,0]], ci:[["Y",0,0],["P",2,0]], walls:[[4,2],[4,3],[4,4]] },
+  { n:5, sq:[["Y",4,2],["B",0,0]], ci:[["Y",3,0],["G",2,2]], walls:[[1,4],[0,4],[2,4]] },
+  { n:5, sq:[["Y",4,4],["R",3,3]], ci:[["Y",3,0],["O",0,1]], walls:[[2,3],[2,2],[1,3]] },
+  { n:5, sq:[["Y",3,1],["B",4,4]], ci:[["G",2,4],["B",2,1]], walls:[[0,0],[0,1],[0,2]] },
+  { n:5, sq:[["B",4,0],["R",2,4]], ci:[["P",1,3],["B",2,1]], walls:[[0,0],[1,0],[2,0]] },
+  { n:5, sq:[["Y",0,0],["B",4,4]], ci:[["G",0,4],["B",1,4]], walls:[[1,0],[2,0],[1,1]] },
+  { n:6, sq:[["Y",5,3],["B",3,3],["R",2,0]], ci:[["Y",5,2],["Y",3,4],["P",0,2]], walls:[[5,1],[5,0],[4,0],[3,0]] },
+  { n:6, sq:[["Y",1,1],["B",2,3],["R",2,2]], ci:[["G",4,5],["R",1,5],["B",5,0]], walls:[[5,1],[5,2],[4,1],[4,2]] },
+  { n:6, sq:[["B",0,2],["R",4,5],["Y",1,4]], ci:[["P",5,0],["B",3,4],["Y",0,3]], walls:[[5,2],[5,1],[5,3],[4,2]] },
+  { n:6, sq:[["R",0,0],["B",1,2]], ci:[["R",1,3],["B",1,4],["P",3,0]], walls:[[5,5],[5,4],[4,5],[4,4]] },
+  { n:6, sq:[["Y",0,2],["B",5,5]], ci:[["G",4,1],["B",0,3],["Y",3,1]], walls:[[3,3],[2,3],[2,2],[3,2]] },
+  { n:6, sq:[["R",3,3],["Y",2,0]], ci:[["R",4,0],["O",0,2],["Y",2,3]], walls:[[5,0],[5,1],[5,2],[5,3]] },
+  { n:6, sq:[["R",3,4],["Y",5,0]], ci:[["R",2,4],["R",0,5],["O",0,0]], walls:[[5,4],[5,5],[4,5],[4,4]] },
+  { n:5, sq:[["Y",1,2],["R",2,2]], ci:[["Y",0,2],["O",4,2],["O",2,0]], walls:[[0,4],[1,4],[0,3]] },
+  { n:5, sq:[["R",3,1],["B",0,3]], ci:[["R",0,0],["P",2,2],["P",4,0]], walls:[[4,4],[4,3],[3,4]] },
+  { n:5, sq:[["Y",3,2],["B",1,2]], ci:[["G",4,0],["Y",3,3],["G",2,3]], walls:[[0,0],[0,1],[0,2]] },
+  { n:6, sq:[["R",2,4],["Y",0,0],["B",0,5]], ci:[["R",4,3],["O",5,5],["G",4,2]], walls:[[5,0],[4,0],[3,0],[2,0]] },
+  { n:6, sq:[["Y",2,1],["B",5,3],["R",4,4]], ci:[["G",0,0],["O",2,4],["R",0,5]], walls:[[5,1],[5,0],[5,2],[4,0]] },
+  { n:6, sq:[["R",4,4],["Y",3,0],["B",2,2]], ci:[["O",2,3],["Y",5,3],["P",0,1]], walls:[[0,5],[1,5],[2,5],[0,4]] },
+  { n:6, sq:[["R",1,2],["B",1,0],["Y",0,0]], ci:[["R",2,3],["P",5,3],["O",5,5]], walls:[[3,2],[4,2],[3,3],[4,3]] },
+  { n:6, sq:[["Y",4,4],["B",3,3],["R",4,1]], ci:[["G",1,4],["B",2,2],["P",0,1]], walls:[[4,0],[5,0],[5,1],[5,2]] },
+  { n:6, sq:[["B",3,2],["R",5,0],["Y",1,4]], ci:[["P",5,2],["Y",5,5],["Y",1,2],["P",4,2]], walls:[[1,0],[0,0],[1,1],[0,1]] },
+  { n:6, sq:[["B",1,2],["R",3,4]], ci:[["B",0,3],["P",4,5],["P",0,4],["R",4,3]], walls:[[4,0],[4,1],[5,0],[5,1]] },
+  { n:6, sq:[["B",3,3],["Y",5,3],["R",5,0]], ci:[["B",0,3],["B",4,4],["G",4,2],["P",5,2]], walls:[[2,5],[1,5],[0,5],[0,2],[1,2],[1,3]] },
 ];
 
 var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
@@ -234,6 +261,7 @@ var board=document.getElementById("board"), canvas=document.getElementById("path
 
 var li=Math.min(+(localStorage.getItem("hm_flow2_i")||0), LEVELS.length-1);
 var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
+var walls=[], wallSet={};
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
@@ -296,6 +324,8 @@ function applyLevel(L){
   blooms=[]; sweeps=[]; confetti=[]; drawSteps=0;
   ems=L.sq.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
+  walls=(L.walls||[]).map(function(w){ return [w[0],w[1]]; });
+  wallSet={}; walls.forEach(function(w){ wallSet[w[0]+","+w[1]]=1; });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
   buildGrid(); renderDots(); renderPaths();
 }
@@ -313,6 +343,8 @@ function loadTutorial(){ document.getElementById("ovHelp").classList.add("show")
 function cs(){ return board.clientWidth/N; }
 function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
 function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
+function isWall(r,c){ return !!wallSet[r+","+c]; }
+function paintTarget(){ return N*N - walls.length; }
 function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) return i; return -1; }
 /* a circle of this colour that still needs feeding (prefer an undone one; else any) */
 function tgtFor(col){ var any=null; for(var i=0;i<tgts.length;i++) if(tgts[i].col===col){ if(!tgts[i].done) return tgts[i]; any=any||tgts[i]; } return any; }
@@ -322,7 +354,7 @@ function bounceDot(r,c){ var rd=[].slice.call(dotL.querySelectorAll(".dot")).fil
 function buildGrid(){
   var h="", s=100/N;
   for(var r=0;r<N;r++) for(var c=0;c<N;c++)
-    h+='<div class="gcell" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
+    h+='<div class="gcell'+(wallSet[r+","+c]?" wall":"")+'" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
   gridL.innerHTML=h;
 }
 /* seeded per-cell wobble — stable within a level, different each level (echoes the tiles' random tilt) */
@@ -452,6 +484,7 @@ function step(cell){
   if(same(cell,head)) return;
   if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return; }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
+  if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
   var o=occAt(cell[0],cell[1]);
   if(!o){ leg.push(cell); penTick(true); renderPaths(); return; }
 
@@ -533,7 +566,7 @@ function noDangling(){
 }
 function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
-  if(coverage()<N*N){ toast("Fill every square to finish!"); return; }
+  if(coverage()<paintTarget()){ toast("Fill every square to finish!"); return; }
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
   solved=true; sfxWin(); playWinCascade();
   var wn=document.getElementById("btnWinNext");
@@ -657,14 +690,14 @@ function renderPaths(){
   if(!solved && tgts.length && tgts.every(function(t){ return t.done; })){
     var ps=paintedSet(), pulse=0.5+0.5*Math.sin(animT/330);
     ctx.save(); ctx.fillStyle="#b7a883";
-    for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
+    for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]||wallSet[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
     ctx.restore();
   }
   // 7 — win confetti (marker chips, on top of everything)
   confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
   if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
     ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle="#2c2733"; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
-  covEl.textContent=coverage()+"/"+(N*N)+" painted";
+  covEl.textContent=coverage()+"/"+paintTarget()+" painted";
   var dots=dotL.querySelectorAll(".dot");
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
 }
@@ -710,7 +743,7 @@ window.__flow={
   load:loadLevel,
   tut:loadTutorial,
   count:LEVELS.length,
-  state:function(){ return { li:li, n:N, solved:solved, coverage:coverage(),
+  state:function(){ return { li:li, n:N, solved:solved, coverage:coverage(), target:paintTarget(), walls:walls.length,
     tgts:tgts.map(function(t){ return {col:t.col, r:t.r, c:t.c, done:t.done}; }),
     junctions:junctions.map(function(j){ return {sec:j.sec, cell:j.cell, legLen:j.leg.length}; }),
     ems:ems.map(function(E){ return {col:E.col, legs:E.legs.map(function(l){ return {len:l.cells.length, jun:l.jun, root:l.cells[0]}; })}; }) }; },
