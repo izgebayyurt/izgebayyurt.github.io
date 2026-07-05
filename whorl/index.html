@@ -165,7 +165,7 @@ body{
 var CFG = {
   slots: 12,
   actions: 3,          // base actions per turn
-  hp: 20,
+  hp: 24,
   lanes: 4,
   rungs: 6,
   wardMult: 2,         // matching-colour hits multiply by this
@@ -263,7 +263,7 @@ function nextWave(){
   var elite = (w%5===0);                  // elite cadence: 5, 10, 15...
   var count = Math.min(9, 2 + w) - (elite?2:0);
   var wardChance = Math.min(0.65, 0.15 + w*0.08);
-  var baseDmg = 2 + Math.ceil(w/3);
+  var baseDmg = 2 + Math.ceil(w/4);
   var spread = w>=5 ? 3 : 2;              // deeper spawn rungs from wave 5
   var used = {};
   var total = count + (elite?1:0);
@@ -287,14 +287,14 @@ function nextWave(){
     }
     var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
     var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
-    var hp = isElite ? Math.round((16+8*w)*1.5) : brute ? (16+8*w) : (4+4*w);
+    var hp = isElite ? Math.round((16+8*w)*2.1) : brute ? (16+8*w) : (4+3*w);
     st.enemies.push({
       lane:lane, rung:rung, x:laneX(lane), y:rungY(rung),
       hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
       elite:isElite, armored:armored, healer:isHealer, leech:leech,
-      dmg: isHealer? 0 : (brute||isElite)? baseDmg*2 : baseDmg,
+      dmg: isHealer? 0 : isElite? baseDmg*3 : brute? baseDmg*2 : baseDmg,
       freeze:0, frImm:0, poison:0, burn:0,
-      slow: (brute||isElite)?1:0, slowT:0,
+      slow: (brute&&!isElite)?1:0, slowT:0,   // elites march every turn — sim showed slowed elites never reach the wall
       seed: (lane*7+k*13)%97, jit: ((k*29)%9)-4,
       spawn: now()+k*80, hit:0, dotT:0, stepT:0, dead:false, deadAt:0
     });
@@ -356,8 +356,8 @@ function resolveSpell(balls){
   else if(set.P) sp = { name:"Lance", el:"P", kind:"lane",   coeff:4, tint:HEX.P };
   else if(set.G) sp = { name:"Venom", el:"G", kind:"cluster",coeff:2, poison:3, tint:HEX.G };
   else if(set.R===3) sp = { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
-  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:1, freeze:1, tint:HEX.B };
-  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:2, tint:HEX.Y };
+  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:2, freeze:1, tint:HEX.B };
+  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:3, tint:HEX.Y };
   else if(set.R&&set.Y&&set.B) sp = { name:"Prism", el:"*", kind:"all", coeff:3, tint:"#fff" };
   if(!sp) return fizzleOf(balls);
   var fam=FAM[sp.name], inFam=0;
@@ -383,7 +383,7 @@ function nearest(){
 /* ward rework: matching colour x2 (x3 with Weakness), any other element halved, Prism neutral.
    elites shrug off Prism (25%, rounded up); armored plate bounces any final hit under 5. */
 function applyDmg(e, amt, el){
-  if(e.elite && el==="*") amt = Math.ceil(amt*0.25);
+  if(e.elite && el==="*") amt = Math.ceil(amt*0.35);
   if(e.ward){
     if(el===e.ward) amt = Math.round(amt*CFG.wardMult);
     else if(el!=="*") amt = Math.ceil(amt*0.5);
@@ -420,9 +420,9 @@ function applyStale(st, sp){
   if(st.lastSpell===sp.name){
     st.repeatN++;
     sp.stale = true;
-    sp.dmg = Math.max(1, Math.round(sp.dmg*(st.repeatN>=2 ? 0.3 : 0.6)));
+    sp.dmg = Math.max(1, Math.round(sp.dmg*(st.repeatN>=2 ? 0.3 : 0.5)));
   } else {
-    if(st.lastSpell) sp.dmg = Math.max(1, Math.round(sp.dmg*1.15));   // freshness bonus
+    if(st.lastSpell) sp.dmg = Math.max(1, Math.round(sp.dmg*1.25));   // freshness bonus
     st.lastSpell = sp.name; st.repeatN = 0;
   }
 }
@@ -594,7 +594,7 @@ function enemyPhase(){
 /* healer: tops up every OTHER living enemy; never itself */
 function healPulse(h){
   if(h.dead) return;
-  var amt = 2 + Math.floor(S.wave/4), any=false;
+  var amt = 3 + Math.floor(S.wave/3), any=false;
   h.dotT = now();
   alive().forEach(function(e){
     if(e===h || e.hp>=e.maxhp) return;
@@ -666,11 +666,11 @@ function waveClear(){
 
 /* ===================== boons (capped; Mend only when hurt) ===================== */
 var ALL_UP = [
-  { k:"quick", sym:"+1", bg:"#ffd15c", t:"Quicken",   d:"+1 action every turn",      max:1, apply:function(){ CFG.maxActionsUp++; } },
+  { k:"quick", sym:"+1", bg:"#ffd15c", t:"Quicken",   d:"+1 action every turn",      max:2, apply:function(){ CFG.maxActionsUp++; } },
   { k:"bulw",  sym:"+6", bg:"#ef4a5a", t:"Bulwark",   d:"+6 max HP, healed now",     max:2, apply:function(){ S.maxhp+=6; S.hp+=6; } },
   { k:"attn",  sym:"25%", bg:"#9b62d6", t:"Attune",    d:"All spells +25% power",     max:2, apply:function(){ CFG.spellPow+=0.25; } },
   { k:"weak",  sym:"×3", bg:"#f2913d", t:"Weakness",  d:"Shield-colour hits do 3×",  max:1, apply:function(){ CFG.wardMult=3; } },
-  { k:"over",  sym:"+1L", bg:"#3d8bdf", t:"Overcharge",d:"Every cast counts +1 level",max:1, apply:function(){ CFG.castLevelBonus++; } },
+  { k:"over",  sym:"+1L", bg:"#3d8bdf", t:"Overcharge",d:"Every cast counts +1 level",max:2, apply:function(){ CFG.castLevelBonus++; } },
   { k:"mend",  sym:"♥", bg:"#57c268", t:"Mend",      d:"Heal to full now",          max:99, apply:function(){ S.hp=S.maxhp; } }
 ];
 function showReward(){
