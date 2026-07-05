@@ -359,7 +359,9 @@ function newGame(){
     lastSpell:null, repeatN:0,                      // stale-cast tracking (per wave)
     // ---- the Bazaar economy (all run-scoped; nothing persists) ----
     motes:0,                                        // in-run currency, drops off the dead
-    exotics:[], reagents:{},                        // owned exotic names (max 3) + reagent flags
+    exotics:[], reagents:{},                        // owned SIGIL names + reagent flags
+    rituals:[],                                     // owned RITUAL names — share the 3-slot cap with exotics
+    creations:[], pyre:null,                        // standing friendly entities (monuments) + the wave-scoped Pyre Ground zone
     pendingDouble:0, pendingDoubleT:0,              // Mordant: counter — next N casts fire twice (N=2)
     gildNext:false,                                 // Gilding: next merge free + +1 level
     aurumSpent:false, firstTransmuteUsed:false,     // Aurum: once/wave · Catalyst: only 1st transmute/turn is free
@@ -394,6 +396,7 @@ function nextWave(){
   st.enemies = [];
   st.lastSpell=null; st.repeatN=0;        // a new wave forgives old habits
   st.aurumSpent=false;                    // Aurum: rechargeable once per wave
+  st.pyre=null;                           // Pyre Ground is wave-scoped (creations persist — they're monuments)
   st.firstTransmuteUsed=false;            // Catalyst: first free transmute resets each wave/turn
   var w=st.wave;
   var elite = (w>=8 && (w-8)%4===0);      // elite cadence: 8, 12, 16, 20...
@@ -647,7 +650,7 @@ function applyDmg(e, amt, el, opts){
     }
     if(e.armored && amt<5){
       e.hit = now(); sClank();
-      spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false);
+      spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false, false, false, opts.friend);
       return;
     }
   }
@@ -655,7 +658,7 @@ function applyDmg(e, amt, el, opts){
   var crit = !trueDmg && !pierce && e.ward && el===e.ward;
   e.hp -= amt; e.hit = now();
   sHit(amt, crit);
-  spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit);
+  spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit, false, false, opts.friend);
   if(e.hp<=0 && !e.dead){
     e.dead=true; e.deadAt=now();
     boom(e.x,e.y, e.ward?HEX[e.ward]:"#c9c1b4", 1.4);
@@ -842,10 +845,13 @@ function castWeave(idxs){
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
-  // a 4-5 sweep first offers itself to the owned exotics (exact ordered colour match)
+  // a 4-5 sweep first offers itself to the owned SIGILS (exact ordered match), then to RITUALS (multiset)
   if(idxs.length>=4 && idxs.length<=5){
-    var ex=matchExotic(balls.map(function(b){ return b.c; }));
-    if(ex){ castExotic(idxs, ex); return; }
+    var cols=balls.map(function(b){ return b.c; });
+    var ex=matchExotic(cols);
+    if(ex){ castExotic(idxs, ex); return; }                    // sigils win any tie with a ritual
+    var ri=matchRitual(cols);
+    if(ri){ castRitual(idxs, ri); return; }
   }
   var spA=null, spB=null;
   if(idxs.length===6){ spA=resolveSpell(balls.slice(0,3)); spB=resolveSpell(balls.slice(3,6)); }
@@ -984,6 +990,62 @@ function ringHasSeq(recipe){
     if(ok) return true; } }
   return false;
 }
+
+/* ===================== RITUALS (run-scoped, ORDER-AGNOSTIC MULTISET, length 4-5) =====================
+   "sigils are verbs, rituals are nouns — you assemble ingredients and make a thing that stays." A 4-5
+   sweep offers itself to sigils FIRST (exact ordered match), THEN rituals (the swept colours as a BAG
+   equal the recipe bag, any order). Any W in the sweep voids a ritual match — a Prism is not an ingredient.
+   Owned rituals share the same 3-slot cap as exotics. Casting a ritual is a normal action/cooldown but
+   it is NOT a spell: stale/fresh never apply, it never touches lastSpell. Its make() raises a thing —
+   a standing creation, a wave-scoped zone, or an instant wall mend. Stats scale by the swept TL. */
+var RITUAL = [
+  { key:"golem",    name:"Golem",    recipe:["G","G","R","R"],     price:26, bg:"#a38661", kind:"golem",
+    desc:"Raise a paint golem in the most-threatened lane — it holds the ground it stands on.",
+    make:function(st,TL){ summonCreation(st,"golem",TL); } },
+  { key:"sentry",   name:"Sentry",   recipe:["P","P","Y","Y"],     price:26, bg:"#8f7fa8", kind:"sentry",
+    desc:"Plant a ward-stone at the wall — it bolts the nearest foe in its lane and shields the gate.",
+    make:function(st,TL){ summonCreation(st,"sentry",TL); } },
+  { key:"pyre",     name:"Pyre Ground", recipe:["O","O","B","B"],  price:26, bg:"#f2913d", kind:"zone",
+    desc:"Set the middle of a lane ablaze for the wave — any foe on it takes fire and a deep burn.",
+    make:function(st,TL){ layPyre(st,TL); } },
+  { key:"colossus", name:"Colossus", recipe:["G","G","R","R","R"], price:30, bg:"#7fae5a", kind:"colossus",
+    desc:"A greater golem — it strikes the front foe in its own AND both flanking lanes.",
+    make:function(st,TL){ summonCreation(st,"colossus",TL); } },
+  { key:"beacon",   name:"Beacon",   recipe:["P","P","Y","Y","Y"], price:30, bg:"#b18be0", kind:"beacon",
+    desc:"A greater ward-stone — every phase it fires at the front foe in every lane at once.",
+    make:function(st,TL){ summonCreation(st,"beacon",TL); } },
+  { key:"bastion",  name:"Bastion",  recipe:["O","O","B","B","B"], price:30, bg:"#ef4a5a", kind:"instant",
+    desc:"Re-lay the wall on the spot: +8 HP now and +4 to its maximum.",
+    make:function(st,TL){ raiseBastion(st,TL); } }
+];
+var RITUAL_BY_NAME={}; RITUAL.forEach(function(r){ RITUAL_BY_NAME[r.name]=r; });
+/* the swept colours as a BAG vs owned ritual recipes — order-agnostic; any W = no match (Prism is no ingredient) */
+function matchRitual(cols){
+  if(!cols || cols.indexOf("W")>=0) return null;
+  var bag=countOf(cols);
+  for(var i=0;i<S.rituals.length;i++){
+    var ri=RITUAL_BY_NAME[S.rituals[i]]; if(!ri || ri.recipe.length!==cols.length) continue;
+    var need=countOf(ri.recipe), same=true, c;
+    for(c in need){ if(bag[c]!==need[c]){ same=false; break; } }
+    if(same) for(c in bag){ if(bag[c]!==need[c]){ same=false; break; } }
+    if(same) return ri;
+  }
+  return null;
+}
+/* is a ritual's bag sittable in ANY consecutive window on the ring? (order-agnostic glow; W voids a window) */
+function ringHasMultiset(recipe){
+  var n=CFG.slots, L=recipe.length, need=countOf(recipe);
+  for(var s=0;s<n;s++){
+    var bag={}, ok=true, k;
+    for(k=0;k<L;k++){ var b=S.dial[(s+k)%n]; if(!b || b.c==="W"){ ok=false; break; } bag[b.c]=(bag[b.c]||0)+1; }
+    if(!ok) continue;
+    var same=true, c;
+    for(c in need){ if(bag[c]!==need[c]){ same=false; break; } }
+    if(same) for(c in bag){ if(bag[c]!==need[c]){ same=false; break; } }
+    if(same) return true;
+  }
+  return false;
+}
 function exoticCastFx(ex){
   var ty=geo.cy-geo.dialR-geo.ballR;
   boom(geo.cx, ty, ex.bg, 1.6);
@@ -1020,6 +1082,193 @@ function castExotic(idxs, ex){
   setTimeout(function(){ if(S!==st||st.over) return;
     st.phase=null; st.busy=false; postAction();
   },400);
+}
+
+/* an owned RITUAL assembling off a 4-5 sweep: same anticipation cadence as a cast, but it is not a
+   spell — it never touches lastSpell / stale, it just raises its thing. Normal action / cooldown. */
+function ritualCastFx(ri){
+  var ty=geo.cy-geo.dialR-geo.ballR;
+  boom(geo.cx, ty, ri.bg, 1.6);
+  S.fx.push({ star:true, x:geo.cx, y:ty, t:now(), tint:ri.bg });
+}
+function castRitual(idxs, ri){
+  if(S.busy) return;
+  var st=S;
+  var balls=idxs.map(function(i){ return st.dial[i]; });
+  if(balls.some(function(b){ return !b; })) return;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
+  else if(S.actions<=0) return;
+  var TL=tlOf(balls);
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // a ritual never touches lastSpell/stale
+  vib([20,40,20,40,60]);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(TL,true); ritualCastFx(ri);
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    ri.make(st, TL);
+    S.shake=Math.min(20, 6+TL*0.8);
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; postAction();
+  },400);
+}
+
+/* ===================== CREATION ENTITIES (golems, colossi, sentries, beacons) =====================
+   friendly blobs that occupy (lane,rung) on the field and persist ACROSS waves — they are monuments.
+   Max 2 standing at once; a third assembly crumbles the oldest. Golem-types hold a lane each; ranged
+   ward-stones sit at the wall. Blocking + fighting are woven into the staggered enemy phase. */
+var CREATION_LOOK = {
+  golem:    { fill:"#b9895f", fill2:"#8a6a4a", cap:"#57c268", label:"Golem",    big:false, tint:"#a38661" },
+  colossus: { fill:"#a88a4e", fill2:"#7a6236", cap:"#57c268", label:"Colossus", big:true,  tint:"#7fae5a" },
+  sentry:   { fill:"#8f7fa8", fill2:"#6a5c86", cap:"#f6c445", label:"Sentry",   big:false, tint:"#9b62d6" },
+  beacon:   { fill:"#a48fc6", fill2:"#7c67a4", cap:"#ffd15c", label:"Beacon",   big:true,  tint:"#b18be0" }
+};
+function creationTint(kind){ return (CREATION_LOOK[kind]||{}).tint || "#a38661"; }
+function creationStats(kind, TL){
+  if(kind==="colossus") return { hp:7*TL, attack:TL };
+  if(kind==="sentry")   return { hp:3*TL, attack:Math.ceil(TL*0.75) };
+  if(kind==="beacon")   return { hp:4*TL, attack:Math.ceil(TL*0.6) };
+  return { hp:4*TL, attack:Math.ceil(TL/2) };                 // golem
+}
+function liveCreations(){ return S.creations.filter(function(c){ return !c.dead; }); }
+function creationAt(lane, rung){
+  for(var i=0;i<S.creations.length;i++){ var c=S.creations[i]; if(!c.dead && c.lane===lane && c.rung===rung) return c; }
+  return null;
+}
+/* the lowest (most-forward) rung any live foe holds in a lane; Infinity if the lane is clear */
+function laneThreat(lane){ var m=Infinity; alive().forEach(function(e){ if(e.lane===lane && e.rung<m) m=e.rung; }); return m; }
+/* most-threatened lane (lowest-rung foe; tie → leftmost), optionally skipping some lanes */
+function pickThreatLane(exclude){
+  var best=-1, bestR=Infinity;
+  for(var l=0;l<CFG.lanes;l++){
+    if(exclude && exclude.indexOf(l)>=0) continue;
+    var r=laneThreat(l);
+    if(best<0 || r<bestR){ best=l; bestR=r; }              // strict < keeps ties leftmost
+  }
+  if(best<0){ for(var l2=0;l2<CFG.lanes;l2++){ if(!exclude || exclude.indexOf(l2)<0){ best=l2; break; } } }
+  return best<0?0:best;
+}
+/* least-defended lane for a ward-stone: fewest standing creations; tie → most threatened; tie → leftmost */
+function leastDefendedLane(){
+  var best=-1, bestScore=Infinity;
+  for(var l=0;l<CFG.lanes;l++){
+    var cnt=0; liveCreations().forEach(function(c){ if(c.lane===l) cnt++; });
+    var r=laneThreat(l); var score=cnt*100 + (r===Infinity?99:r);   // fewer defenders first, then more threat
+    if(best<0 || score<bestScore){ best=l; bestScore=score; }
+  }
+  return best<0?0:best;
+}
+function summonCreation(st, kind, TL){
+  var golemType = (kind==="golem"||kind==="colossus");
+  var lane;
+  if(golemType){
+    // cap crumble FIRST so a freed lane can be retargeted
+    if(liveCreations().length>=2) crumbleOldest(st);
+    var occ=[]; liveCreations().forEach(function(c){ if(c.kind==="golem"||c.kind==="colossus") occ.push(c.lane); });
+    lane=pickThreatLane(occ);
+  } else {
+    if(liveCreations().length>=2) crumbleOldest(st);
+    lane=leastDefendedLane();
+  }
+  var rung = golemType?1:0;
+  var stt = creationStats(kind, TL);
+  var c={ kind:kind, lane:lane, rung:rung, hp:stt.hp, maxhp:stt.hp, attack:stt.attack, tl:TL,
+    x:laneX(lane), y:rungY(rung), born:now(), hit:0, sq:0, act:0, dead:false, deadAt:0 };
+  st.creations.push(c);
+  boom(c.x, c.y, creationTint(kind), CREATION_LOOK[kind].big?2.0:1.6);   // pop-in + summon boom
+  confetti(c.x, c.y, creationTint(kind));
+  S.fx.push({ star:true, x:c.x, y:c.y, t:now(), tint:creationTint(kind) });
+  S.shake=Math.min(20, S.shake+ (CREATION_LOOK[kind].big?8:5));
+  sBoon(); beep(160,.16,"sine",.06); vib([20,30,40]);
+  return c;
+}
+function crumbleOldest(st){
+  var live=liveCreations(); if(!live.length) return;
+  killCreation(live[0]);                                     // insertion order → [0] is the oldest still standing
+  toast("The old form crumbles...", 1100, "#6b6472", "mid");
+}
+function hitCreation(c, amt){
+  if(c.dead) return;
+  c.hp-=amt; c.hit=now(); c.sq=now();
+  spawnDmg(c.x, c.y-geo.ballR*0.9, amt, false);
+  sHit(amt,false);
+  if(c.hp<=0) killCreation(c);
+}
+function killCreation(c){
+  if(c.dead) return;
+  c.dead=true; c.deadAt=now();
+  boom(c.x, c.y, creationTint(c.kind), 1.5);
+  confetti(c.x, c.y, creationTint(c.kind)); confetti(c.x, c.y, "#2c2733");
+  sDeath(); vib([30,40,60]);
+}
+/* an enemy blocked by a creation strikes it instead of advancing */
+function enemyStrikeCreation(e, c){
+  hitCreation(c, e.dmg);
+  e.stepT=now(); sThunk(); vib(10);
+}
+/* the creation's own turn during the enemy-phase stagger */
+function frontEnemyInLane(lane, nearRung){
+  var best=null;
+  alive().forEach(function(e){
+    if(e.lane!==lane) return;
+    if(nearRung!=null && Math.abs(e.rung-nearRung)>1) return;
+    if(!best || e.rung<best.rung || (e.rung===best.rung && e.lane<best.lane)) best=e;
+  });
+  return best;
+}
+function creationStrike(c, e){
+  if(!e || e.dead) return;
+  applyDmg(e, c.attack, null, { friend:true });
+  S.fx.push({ arc:true, from:{x:c.x,y:c.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:creationTint(c.kind) });
+  S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:creationTint(c.kind) });
+  c.act=now(); sHit(c.attack,false); beep(300,.05,"triangle",.04);
+}
+function creationBolt(c, e){
+  if(!e || e.dead) return;
+  applyDmg(e, c.attack, null, { friend:true });
+  S.fx.push({ beam:true, tgt:{x:e.x,y:e.y}, t:now(), tint:creationTint(c.kind), from:{x:c.x,y:c.y-geo.ballR*0.5} });
+  S.fx.push({ star:true, x:e.x, y:e.y, t:now()+50, tint:creationTint(c.kind) });
+  c.act=now(); beep(520,.07,"sine",.04);
+}
+function creationAct(c){
+  if(c.dead) return;
+  if(c.kind==="golem"){
+    creationStrike(c, frontEnemyInLane(c.lane, c.rung));
+  } else if(c.kind==="colossus"){
+    [c.lane-1, c.lane, c.lane+1].forEach(function(l){
+      if(l<0 || l>=CFG.lanes) return;
+      creationStrike(c, frontEnemyInLane(l, c.rung));
+    });
+  } else if(c.kind==="sentry"){
+    creationBolt(c, frontEnemyInLane(c.lane, null));
+  } else if(c.kind==="beacon"){
+    for(var l=0;l<CFG.lanes;l++) creationBolt(c, frontEnemyInLane(l, null));
+  }
+}
+/* ---------- Pyre Ground: a wave-scoped burning zone on a lane's middle rung (rung 2) ---------- */
+function layPyre(st, TL){
+  var lane=pickThreatLane(null);
+  st.pyre={ lane:lane, rung:2, t:now(), TL:TL };
+  var px=laneX(lane), py=rungY(2);
+  boom(px, py, HEX.O, 1.8); confetti(px, py, HEX.O);
+  S.fx.push({ laneFlash:true, lane:lane, t:now(), tint:HEX.O });
+  sCast(TL,false); vib([20,40,40]);
+}
+function applyPyre(e){
+  if(!S.pyre || e.dead) return;
+  if(e.lane===S.pyre.lane && e.rung===S.pyre.rung){ applyDmg(e, 2, "O"); applyBurn(e, 2); }
+}
+/* ---------- Bastion: instant wall re-lay ---------- */
+function raiseBastion(st, TL){
+  st.maxhp+=4; st.hp=Math.min(st.maxhp, st.hp+8);
+  st.masonFlash=now();                                        // reuse the gate re-lay flourish (staggered blocks)
+  boom(geo.cx, geo.gateY, "#ffd15c", 2.0);
+  confetti(geo.cx, geo.gateY, "#ffd15c");
+  sWin(); vib([30,20,30,20,40]); syncHud();
 }
 
 function mergeLegal(A,B){
@@ -1095,6 +1344,10 @@ function enemyPhase(){
   syncHud();
   var t=430, live=alive();
   function later(ms, fn){ setTimeout(function(){ if(S===st && !st.over) fn(); }, ms); }
+  // Pyre Ground bites any foe that STARTS the phase standing on it (entering is handled in stepEnemy)
+  live.forEach(function(e){
+    if(st.pyre && e.lane===st.pyre.lane && e.rung===st.pyre.rung){ later(t, function(){ applyPyre(e); }); t+=110; }
+  });
   live.forEach(function(e){
     if(e.poison>0||e.burn>0){ later(t, function(){ dotTick(e); }); t+=110; }
   });
@@ -1107,6 +1360,10 @@ function enemyPhase(){
   });
   live.slice().sort(function(a,b){ return a.rung-b.rung; }).forEach(function(e){
     later(t, function(){ stepEnemy(e); }); t+=120;
+  });
+  // the standing creations take their turn after the march (same beat, staggered like the horde)
+  liveCreations().forEach(function(c){
+    later(t, function(){ creationAct(c); }); t+=110;
   });
   later(t+250, endEnemyPhase);
 }
@@ -1151,6 +1408,9 @@ function stepEnemy(e){
   if(e.freeze>0){ e.freeze--; if(e.freeze<=0) e.frImm=1; return; }   // thaw grants 1-turn immunity
   if(e.slow){ e.slowT=(e.slowT+1)%2; if(e.slowT===1) return; }
   if(e.rung<=0){
+    // a ward-stone at the wall (rung 0) is a shield — foes strike it INSTEAD of the gate
+    var guard = creationAt(e.lane, 0);
+    if(guard && e.dmg>0){ enemyStrikeCreation(e, guard); return; }
     if(e.dmg<=0) return;                  // the healer just sits at the wall, mending
     /* at the wall: attack every turn, PERSIST (no kamikaze farming) */
     S.hp -= e.dmg; S.shake=Math.max(S.shake,10);
@@ -1160,8 +1420,12 @@ function stepEnemy(e){
     syncHud();
     if(S.hp<=0) gameOver();
   } else {
+    // BLOCKING: a creation in the destination cell is attacked instead of stepped past
+    var dest = creationAt(e.lane, e.rung-1);
+    if(dest){ enemyStrikeCreation(e, dest); return; }
     e.rung--; e.stepT=now();
     sAdvance(); vib(8);
+    applyPyre(e);                          // Pyre Ground bites a foe ENTERING its cell
   }
 }
 function endEnemyPhase(){
@@ -1251,29 +1515,37 @@ function renderReagentBar(){
 /* ===================== the Bazaar ===================== */
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0, t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function makeExoticOffer(ex){ return { type:"exotic", key:ex.key, name:ex.name, price:ex.price, desc:ex.desc, bg:ex.bg, recipe:ex.recipe, sold:false }; }
+function makeRitualOffer(ri){ return { type:"ritual", key:ri.key, name:ri.name, price:ri.price, desc:ri.desc, bg:ri.bg, recipe:ri.recipe, sold:false }; }
 function makeReagentOffer(r){ return { type:"reagent", key:r.key, name:r.name, price:reagentPrice(r), desc:reagentDesc(r), bg:r.bg, recommended:!!r.recommended, sold:false }; }
-/* roll three priced offers: 2 exotics + 1 reagent, no dupes of what's owned. At the 3-exotic cap
-   the shelf turns to all reagents. Short pools fall back to whatever's left. */
+/* the arcane slots (sigils + rituals) share one 3-item cap */
+function arcaneOwned(){ return S.exotics.length + S.rituals.length; }
+/* roll three priced offers: 1 SIGIL + 1 RITUAL + 1 REAGENT, no dupes of what's owned. When the shared
+   3-slot arcane cap is full the shelf turns to all reagents. Short pools fall back to whatever's left. */
 function rollBazaar(){
   var offers=[];
   var exAvail=shuffle(EXOTIC.filter(function(x){ return S.exotics.indexOf(x.name)<0; }));
+  var riAvail=shuffle(RITUAL.filter(function(x){ return S.rituals.indexOf(x.name)<0; }));
   var rgAvail=shuffle(REAGENT.filter(function(x){ return !S.reagents[x.key]; }));
   // THE CASUAL MERCY: pity-pin Catalyst into the reagent slot on waves 1-6 until the player owns it
   if(S.wave<=6 && !S.reagents.catalyst){
     var ci=-1; for(var q=0;q<rgAvail.length;q++){ if(rgAvail[q].key==="catalyst"){ ci=q; break; } }
     if(ci>=0){ var cat=rgAvail.splice(ci,1)[0]; rgAvail.unshift(cat); }
   }
-  var wantEx = S.exotics.length<3 ? 2 : 0;
-  for(var i=0;i<wantEx && exAvail.length;i++) offers.push(makeExoticOffer(exAvail.shift()));
-  while(offers.length<3 && rgAvail.length) offers.push(makeReagentOffer(rgAvail.shift()));
-  while(offers.length<3 && exAvail.length && S.exotics.length<3) offers.push(makeExoticOffer(exAvail.shift()));
+  var room = 3 - arcaneOwned();                              // how many arcane items may still be sold
+  if(room>0 && exAvail.length){ offers.push(makeExoticOffer(exAvail.shift())); room--; }   // 1 sigil
+  if(room>0 && riAvail.length){ offers.push(makeRitualOffer(riAvail.shift())); room--; }    // 1 ritual
+  while(offers.length<3 && rgAvail.length) offers.push(makeReagentOffer(rgAvail.shift()));  // reagent slot(s)
+  // backfill a thin shelf: more arcane within the shared cap, then whatever remains
+  while(offers.length<3 && room>0 && exAvail.length){ offers.push(makeExoticOffer(exAvail.shift())); room--; }
+  while(offers.length<3 && room>0 && riAvail.length){ offers.push(makeRitualOffer(riAvail.shift())); room--; }
   S.bazaarOffers=offers;
 }
 function buyOffer(o){
   if(o.sold || S.motes<o.price) return;
   S.motes-=o.price; moteHudSet();
   o.sold=true;
-  if(o.type==="exotic"){ if(S.exotics.indexOf(o.name)<0 && S.exotics.length<3) S.exotics.push(o.name); S.dialSig=""; }
+  if(o.type==="exotic"){ if(S.exotics.indexOf(o.name)<0 && arcaneOwned()<3) S.exotics.push(o.name); S.dialSig=""; }
+  else if(o.type==="ritual"){ if(S.rituals.indexOf(o.name)<0 && arcaneOwned()<3) S.rituals.push(o.name); S.dialSig=""; }
   else applyReagent(o.key);
   sBoon(); vib(15);
   renderShop();   // re-price the rest of the stall against the lighter purse
@@ -1284,10 +1556,14 @@ function renderShop(){
     var afford = !o.sold && S.motes>=o.price;
     var el=document.createElement("div");
     el.className="rcard offer"+(o.sold?" sold":(afford?"":" cant"));
-    var icon = o.type==="exotic" ? "✦" : REAGENT_BY_KEY[o.key].ic;
-    var tagHtml = o.type==="exotic"
+    var icon = o.type==="exotic" ? "✦" : o.type==="ritual" ? "◈" : REAGENT_BY_KEY[o.key].ic;
+    var dotsHtml = (o.type==="exotic"||o.type==="ritual")
       ? o.recipe.map(function(c){ return '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+HEX[c]+';border:1.5px solid #2c2733;vertical-align:middle;margin-right:2px;"></span>'; }).join('')
       : "Reagent · passive";
+    // rituals wear an "any order" tag next to their (unordered) recipe dots
+    var tagHtml = o.type==="ritual"
+      ? dotsHtml+'<span style="display:inline-block;margin-left:4px;font-size:8px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#8a5a12;background:#ffe6a8;padding:1px 5px;border-radius:7px;border:1.5px solid #2c2733;vertical-align:middle;">Ritual · any order</span>'
+      : dotsHtml;
     var recBadge = o.recommended ? '<span class="rec-badge" style="display:inline-block;margin-left:5px;font-size:8px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#2c2733;background:#ffd15c;padding:1px 5px;border-radius:7px;border:1.5px solid #2c2733;vertical-align:middle;">★ recommended</span>' : '';
     el.innerHTML='<div class="ic" style="background:'+o.bg+'">'+icon+'</div>'+
       '<div style="flex:1;min-width:0;"><b>'+o.name+'</b>'+recBadge+
@@ -1340,7 +1616,7 @@ function gameOver(){
 }
 
 /* ===================== effects ===================== */
-function spawnDmg(x,y,amt,crit,gate,heal){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal }); }
+function spawnDmg(x,y,amt,crit,gate,heal,friend){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal, friend:friend }); }
 function boom(x,y,col,scale){ S.fx.push({ ring:true, x:x,y:y, col:col, t:now(), max:(geo.ballR||20)*(scale||1.6) }); }
 function confetti(x,y,col){
   for(var i=0;i<7;i++){
@@ -1466,7 +1742,9 @@ function draw(){
 
   if(S){
     drawField(t);
+    drawPyre(t);
     drawEnemies(t);
+    drawCreations(t);
     drawGate(t);
     drawDial(t);
     drawExoticStrip(t);
@@ -1502,31 +1780,176 @@ function drawField(t){
   });
 }
 
-/* the owned exotics as a strip of little recipe pillboxes, docked in the band between the wall
-   and the dial. Each glows with an accent halo when its exact sequence is sweepable on the ring. */
+/* Pyre Ground: flickering flame scallops laid over the middle-rung dots of its lane */
+function drawPyre(t){
+  if(!S.pyre) return;
+  var lane=S.pyre.lane, cx=laneX(lane), cy=rungY(S.pyre.rung), pitch=rungPitch();
+  var wgt=Math.min(geo.laneW*0.5, pitch*0.5);
+  // a soft ember glow pooled on the cell
+  var gl=0.16+0.06*Math.sin(t/180);
+  ctx.fillStyle="rgba(242,145,61,"+gl+")";
+  ctx.beginPath(); ctx.ellipse(cx, cy, wgt, pitch*0.34, 0, 0, 7); ctx.fill();
+  // flame scallops: a row of little licking tongues, phase-flickering
+  var n=5, span=wgt*1.5;
+  for(var k=0;k<n;k++){
+    var fx=cx-span/2 + (k+0.5)*(span/n);
+    var flick=0.6+0.4*Math.sin(t/120 + k*1.7);
+    var fh=(pitch*0.30)*flick, fw=(span/n)*0.5;
+    ctx.beginPath();
+    ctx.moveTo(fx-fw, cy+3);
+    ctx.quadraticCurveTo(fx-fw*0.5, cy-fh*0.5, fx, cy-fh);
+    ctx.quadraticCurveTo(fx+fw*0.5, cy-fh*0.5, fx+fw, cy+3);
+    ctx.closePath();
+    ctx.fillStyle="rgba(44,39,51,.9)"; ctx.save(); ctx.translate(0,2); ctx.fill(); ctx.restore();
+    ctx.fillStyle= k%2? "#f6c445":"#f2913d"; ctx.fill();
+    ctx.lineWidth=1.6; ctx.strokeStyle="#2c2733"; ctx.stroke();
+    // inner hot core
+    ctx.beginPath(); ctx.moveTo(fx, cy+2); ctx.quadraticCurveTo(fx+fw*0.2, cy-fh*0.4, fx, cy-fh*0.62);
+    ctx.quadraticCurveTo(fx-fw*0.2, cy-fh*0.4, fx, cy+2); ctx.closePath();
+    ctx.fillStyle="rgba(255,240,180,.75)"; ctx.fill();
+  }
+}
+
+/* the standing creations: house-style FRIENDLY blobs — ink outline, sticker shadow, dot eyes looking
+   UP-FIELD at the horde, clay/stone body tinted from their recipe, a level-pip row, squash + confetti. */
+function drawCreations(t){
+  var pitch=rungPitch();
+  var baseR=Math.min(geo.ballR*1.02, pitch*0.5);
+  // reap creations whose deflate has finished
+  for(var i=S.creations.length-1;i>=0;i--){ var cc=S.creations[i]; if(cc.dead && t-cc.deadAt>460) S.creations.splice(i,1); }
+  S.creations.forEach(function(c){
+    var look=CREATION_LOOK[c.kind]||CREATION_LOOK.golem;
+    c.x += (laneX(c.lane)-c.x)*0.25; c.y += (rungY(c.rung)-c.y)*0.25;
+    var r=baseR*(look.big?1.32:1.06);
+    var pop=Math.min(1,(t-c.born)/300); var pr=r*(0.4+0.6*(pop<1?(1.7*pop-0.7*pop*pop):1));  // bouncy pop-in
+    var dk=0;
+    if(c.dead){ dk=(t-c.deadAt)/460; pr*=Math.max(0,1-dk); }              // deflate on death
+    if(pr<=0.5) return;
+    var bob=1.4*Math.sin(t/620+c.lane*1.3);
+    var sqK=0; if(c.sq){ var sq=(t-c.sq)/220; if(sq>0&&sq<1) sqK=Math.sin(sq*Math.PI)*0.26; }  // hit squash
+    var actK=c.act? Math.max(0,1-(t-c.act)/200):0;                        // attack lunge (up-field)
+    ctx.save(); ctx.translate(c.x, c.y+bob - actK*4);
+    ctx.scale(1+sqK, 1-sqK*1.1);
+    // body: a rounded clay/stone block for golems, a tall rounded ward-stone for sentries
+    function bodyPath(){
+      if(c.kind==="sentry"||c.kind==="beacon"){
+        var wd=pr*1.5, ht=pr*2.05; rr(-wd/2, -ht*0.62, wd, ht, wd*0.42);   // obelisk-ish rounded stone
+      } else {
+        var s=pr*1.02; rr(-s, -s*0.98, s*2, s*1.96, s*0.5);                // fat rounded clay block
+      }
+    }
+    inkShadow(bodyPath, 3.5);
+    bodyPath();
+    // vertical two-tone fill so it reads as sculpted material
+    var grd=ctx.createLinearGradient(0,-pr,0,pr*1.3);
+    grd.addColorStop(0, look.fill); grd.addColorStop(1, look.fill2);
+    ctx.fillStyle=grd; ctx.fill();
+    var hitK=c.hit? Math.max(0,1-(t-c.hit)/220):0;
+    if(hitK>0){ ctx.fillStyle="rgba(255,255,255,"+(hitK*0.7)+")"; ctx.fill(); }
+    ctx.lineWidth=3.2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+    // a glowing cap gem (ward-stones) or clay seam (golems) — the recipe accent
+    if(c.kind==="sentry"||c.kind==="beacon"){
+      var gy=-pr*1.35, gr=pr*(look.big?0.5:0.4);
+      var pulse=0.6+0.4*Math.sin(t/260+c.lane);
+      ctx.beginPath(); ctx.arc(0,gy,gr+3,0,7); ctx.fillStyle="rgba("+ (c.kind==="beacon"?"255,209,92":"246,196,69") +","+(0.25*pulse)+")"; ctx.fill();
+      inkShadow(function(){ ctx.beginPath(); ctx.arc(0,gy,gr,0,7); }, 2);
+      ctx.beginPath(); ctx.arc(0,gy,gr,0,7); ctx.fillStyle=look.cap; ctx.fill();
+      ctx.lineWidth=2.4; ctx.strokeStyle="#2c2733"; ctx.stroke();
+      ctx.beginPath(); ctx.arc(-gr*0.3,gy-gr*0.3,gr*0.3,0,7); ctx.fillStyle="rgba(255,255,255,.7)"; ctx.fill();
+    } else {
+      ctx.strokeStyle="rgba(44,39,51,.35)"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(-pr*0.5,-pr*0.1); ctx.lineTo(-pr*0.1,pr*0.05); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pr*0.15,-pr*0.35); ctx.lineTo(pr*0.42,-pr*0.2); ctx.stroke();
+    }
+    // sticker streak highlight (shared material language with the dial balls)
+    ctx.beginPath(); ctx.ellipse(-pr*0.34,-pr*0.5, pr*0.34, pr*0.18, -0.4, 0, 7);
+    ctx.fillStyle="rgba(255,255,255,.4)"; ctx.fill();
+    // FRIENDLY FACE — big white dot eyes with pupils looking UP-FIELD (toward the horde, i.e. upward)
+    var eyeY=-pr*0.16, eyeDX=pr*0.36, eyeR=pr*0.24;
+    if(c.dead){
+      ctx.strokeStyle="#2c2733"; ctx.lineWidth=2.4;
+      [-1,1].forEach(function(s){
+        ctx.beginPath(); ctx.moveTo(s*eyeDX-3,eyeY-3); ctx.lineTo(s*eyeDX+3,eyeY+3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(s*eyeDX+3,eyeY-3); ctx.lineTo(s*eyeDX-3,eyeY+3); ctx.stroke();
+      });
+    } else {
+      [-1,1].forEach(function(s){
+        ctx.beginPath(); ctx.arc(s*eyeDX,eyeY,eyeR,0,7); ctx.fillStyle="#fffdf6"; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+        ctx.beginPath(); ctx.arc(s*eyeDX,eyeY-eyeR*0.42,eyeR*0.5,0,7); ctx.fillStyle="#2c2733"; ctx.fill();  // pupil up
+        ctx.beginPath(); ctx.arc(s*eyeDX-eyeR*0.16,eyeY-eyeR*0.62,eyeR*0.16,0,7); ctx.fillStyle="#fffdf6"; ctx.fill();
+      });
+      // a small friendly smile
+      ctx.strokeStyle="#2c2733"; ctx.lineWidth=2.2; ctx.beginPath();
+      ctx.arc(0, eyeY+eyeR*1.15, pr*0.3, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
+    }
+    // level-pip tier row along the base
+    if(!c.dead){
+      var np=Math.max(1,Math.min(5, Math.round(c.tl/3))), pw=4.2, gp=2.4, tot=np*pw+(np-1)*gp, sxx=-tot/2, py=pr*(c.kind==="sentry"||c.kind==="beacon"?1.15:0.78);
+      for(var k=0;k<np;k++){ ctx.beginPath(); ctx.arc(sxx+pw/2+k*(pw+gp), py, pw/2,0,7);
+        ctx.fillStyle=look.cap; ctx.fill(); ctx.lineWidth=1.4; ctx.strokeStyle="#2c2733"; ctx.stroke(); }
+    }
+    ctx.restore();
+    if(c.dead) return;
+    // slim hp bar once damaged
+    if(c.hp<c.maxhp){
+      var bw=r*1.9, bh=6, bx=c.x-bw/2, byy=c.y+bob-pr*(look.big?1.5:1.35)-12;
+      ctx.fillStyle="rgba(44,39,51,.9)"; rr(bx,byy+2,bw,bh,3); ctx.fill();
+      ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; rr(bx,byy,bw,bh,3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=look.cap; rr(bx+1.5,byy+1.5,(bw-3)*Math.max(0,c.hp/c.maxhp),bh-3,2); ctx.fill();
+    }
+  });
+}
+
+/* recipe dots packed into a tight two-row CLUSTER (a ritual reads "assemble, any order") */
+function drawClusterDots(cx, cy, cols, dotR){
+  var n=cols.length, top=Math.ceil(n/2), bot=n-top, sp=dotR*2-1;
+  function row(list, ry){ var rw=(list.length-1)*sp, sx=cx-rw/2;
+    list.forEach(function(c,k){ var dx=sx+k*sp;
+      ctx.beginPath(); ctx.arc(dx,ry,dotR,0,7); ctx.fillStyle=HEX[c]; ctx.fill();
+      ctx.lineWidth=1.3; ctx.strokeStyle="#2c2733"; ctx.stroke(); }); }
+  row(cols.slice(0,top), cy - (bot?dotR*0.72:0));
+  if(bot) row(cols.slice(top), cy + dotR*0.72);
+}
+/* the little "any-order" swirl a ritual pillbox wears instead of an ordered arrow */
+function drawSwirlMark(cx, cy, r){
+  ctx.strokeStyle="#8a5a12"; ctx.lineWidth=1.4; ctx.beginPath();
+  for(var a=0;a<=Math.PI*3;a+=0.3){ var rr2=0.6+a*(r/9), wx=cx+Math.cos(a)*rr2, wy=cy+Math.sin(a)*rr2;
+    if(a===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy); }
+  ctx.stroke();
+}
+/* the owned SIGILS + RITUALS as a strip of recipe pillboxes, docked between the wall and the dial.
+   A sigil shows its ordered recipe in a row; a ritual shows its bag CLUSTERED with an any-order swirl.
+   Each glows when castable — a sigil when its exact sequence is on the ring (ringHasSeq), a ritual
+   when its multiset sits in any consecutive window (ringHasMultiset). */
 function drawExoticStrip(t){
-  if(!S.exotics.length) return;
+  var items=[];
+  S.exotics.forEach(function(nm){ var ex=EXOTIC_BY_NAME[nm]; if(ex) items.push({ cls:"sigil", ex:ex, name:nm, recipe:ex.recipe, key:ex.key }); });
+  S.rituals.forEach(function(nm){ var ri=RITUAL_BY_NAME[nm]; if(ri) items.push({ cls:"ritual", ri:ri, name:nm, recipe:ri.recipe, key:ri.key }); });
+  if(!items.length) return;
   var sig=S.dial.map(function(b){ return b?b.c:"-"; }).join("");   // recompute glow only on a ring change
   if(sig!==S.dialSig){ S.dialSig=sig; S.exoticGlow={};
-    S.exotics.forEach(function(nm){ var ex=EXOTIC_BY_NAME[nm]; if(ex) S.exoticGlow[nm]=ringHasSeq(ex.recipe); }); }
+    S.exotics.forEach(function(nm){ var ex=EXOTIC_BY_NAME[nm]; if(ex) S.exoticGlow[nm]=ringHasSeq(ex.recipe); });
+    S.rituals.forEach(function(nm){ var ri=RITUAL_BY_NAME[nm]; if(ri) S.exoticGlow[nm]=ringHasMultiset(ri.recipe); }); }
   var g=geo;
   var blockBot=g.gateY+7, dialTop=g.cy-g.dialR-g.ballR*0.85;
   var y=(blockBot+dialTop)/2 + 1;
-  var h=15, chipR=4, chipGap=3, pad=6, nameFont=9;
+  var h=17, chipR=4, chipGap=3, pad=6, nameFont=9;
   ctx.textBaseline="middle";
-  var boxes=S.exotics.map(function(nm){
-    var ex=EXOTIC_BY_NAME[nm];
+  var boxes=items.map(function(it){
     ctx.font="700 "+nameFont+"px Nunito, sans-serif";
-    var nameW=ctx.measureText(ex.name).width;
-    var chipsW=ex.recipe.length*(chipR*2)+(ex.recipe.length-1)*chipGap;
-    return { ex:ex, w:pad+chipsW+5+nameW+pad };
+    var nameW=ctx.measureText(it.name).width;
+    var artW = it.cls==="ritual"
+      ? Math.ceil(it.recipe.length/2)*(chipR*2-1)+2 + 9        // cluster footprint + swirl
+      : it.recipe.length*(chipR*2)+(it.recipe.length-1)*chipGap;
+    return { it:it, w:pad+artW+5+nameW+pad };
   });
   var gap=8, tot=boxes.reduce(function(s,b){ return s+b.w; },0)+(boxes.length-1)*gap;
   var x=g.cx-tot/2;
   boxes.forEach(function(bx){
-    var ex=bx.ex;
-    var spent = (ex.key==="aurum" && S.aurumSpent);        // Aurum spent this wave — greyed until it recharges
-    var glow = S.exoticGlow[ex.name] && !spent;
+    var it=bx.it, ritual=it.cls==="ritual";
+    var spent = (it.key==="aurum" && S.aurumSpent);        // Aurum spent this wave — greyed until it recharges
+    var glow = S.exoticGlow[it.name] && !spent;
     if(spent) ctx.globalAlpha = 0.42;
     if(glow){
       var pk=0.5+0.5*Math.sin(t/300);
@@ -1534,16 +1957,26 @@ function drawExoticStrip(t){
       ctx.lineWidth=3.5; ctx.strokeStyle="rgba(255,209,92,"+(0.45+0.4*pk)+")"; ctx.stroke();
     }
     ctx.save(); ctx.translate(0,2); rr(x,y-h/2,bx.w,h,8); ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill(); ctx.restore();
-    rr(x,y-h/2,bx.w,h,8); ctx.fillStyle=spent?"#e6e1d6":(glow?"#fffdf6":"#fbf5e6"); ctx.fill();
+    rr(x,y-h/2,bx.w,h,8);
+    ctx.fillStyle=spent?"#e6e1d6":(glow?"#fffdf6":(ritual?"#f7efe0":"#fbf5e6")); ctx.fill();
     ctx.lineWidth=2.2; ctx.strokeStyle="#2c2733"; ctx.stroke();
-    var cxp=x+pad+chipR;
-    ex.recipe.forEach(function(c){
-      ctx.beginPath(); ctx.arc(cxp,y,chipR,0,7); ctx.fillStyle=HEX[c]; ctx.fill();
-      ctx.lineWidth=1.4; ctx.strokeStyle="#2c2733"; ctx.stroke();
-      cxp += chipR*2+chipGap;
-    });
+    var cxp;
+    if(ritual){
+      var clW=Math.ceil(it.recipe.length/2)*(chipR*2-1);
+      drawClusterDots(x+pad+clW/2, y, it.recipe, chipR);
+      drawSwirlMark(x+pad+clW+6, y, 4.5);
+      cxp = x+pad+clW+11;
+    } else {
+      cxp=x+pad+chipR;
+      it.recipe.forEach(function(c){
+        ctx.beginPath(); ctx.arc(cxp,y,chipR,0,7); ctx.fillStyle=HEX[c]; ctx.fill();
+        ctx.lineWidth=1.4; ctx.strokeStyle="#2c2733"; ctx.stroke();
+        cxp += chipR*2+chipGap;
+      });
+      cxp -= chipGap;
+    }
     ctx.textAlign="left"; ctx.font="700 "+nameFont+"px Nunito, sans-serif"; ctx.fillStyle=spent?"#8a8578":"#2c2733";
-    ctx.fillText(ex.name, cxp+2, y+0.5);
+    ctx.fillText(it.name, cxp+3, y+0.5);
     if(spent) ctx.globalAlpha = 1;
     x += bx.w+gap;
   });
@@ -2104,7 +2537,7 @@ function drawDmgs(t){
     if(k>=1){ S.dmgs.splice(i,1); continue; }
     ctx.globalAlpha=1-k; ctx.textAlign="center";
     ctx.font=(d.crit?"700 22px ":"700 16px ")+"Fredoka, sans-serif";
-    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.crit? "#ffd15c":"#fffdf6"));
+    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.friend? "#8fd0ff" : (d.crit? "#ffd15c":"#fffdf6")));
     ctx.strokeStyle="#2c2733"; ctx.lineWidth=3;
     var yy=Math.max(d.y-40*k, geo.fieldTop-24);
     var txt=(d.gate?"-":(d.heal?"+":""))+d.amt;
@@ -2177,9 +2610,12 @@ function gesturePreview(){
       var sA=resolveSpell(wb.slice(0,3));
       var nameA = sA.transmute?"Transmute":sA.name;
       if(v.length<6){
-        var exM=matchExotic(chips);                 // an owned exotic answers the 4-5 sweep
+        var exM=matchExotic(chips);                 // an owned SIGIL answers the 4-5 sweep (checked first)
         if(exM) return { big:"✦ "+exM.name, small:true,
           sub:(CFG.realtime&&S.cool>0)?"cooling...":"exotic · release!", col:"#b9791a", chips:chips };
+        var riM=matchRitual(chips);                  // then an owned RITUAL (order-agnostic)
+        if(riM) return { big:"◈ "+riM.name, small:true,
+          sub:(CFG.realtime&&S.cool>0)?"cooling...":"assemble!", col:"#8a5a12", chips:chips };
         var cA = sA.fizzle?"#b9b2a6":(sA.transmute?"#9b62d6":(sA.tint==="#ffd15c"?"#b9791a":sA.tint));
         var coolingD = CFG.realtime && S.cool>0;
         return { big:nameA+" + ?", small:true, sub:coolingD?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
@@ -2220,10 +2656,26 @@ function cancelGesture(){
   if(!gesture) return;
   gesture=null; sCancel();
 }
+/* tap-target a standing creation on the field (outside the ring) */
+function creationAtPoint(x,y){
+  var pitch=rungPitch(), rad=Math.min(geo.ballR*1.3, pitch*0.6);
+  for(var i=0;i<S.creations.length;i++){ var c=S.creations[i];
+    if(!c.dead && Math.hypot(x-c.x, y-c.y)<=rad+8) return c; }
+  return null;
+}
+function creationInfo(c){
+  var look=CREATION_LOOK[c.kind]||CREATION_LOOK.golem;
+  var role = (c.kind==="sentry"||c.kind==="beacon") ? "ward-stone · bolts foes" : "golem · holds the line";
+  S.hubInfo={ l1:look.label+" · L"+c.tl, l2:"hp "+Math.max(0,Math.ceil(c.hp))+"/"+c.maxhp+" · atk "+c.attack,
+    l3:role, col:look.tint, until:now()+1600 };
+  beep(300,.06,"sine",.04);
+}
 function down(x,y){
   ac();
   if(bookOpen) return;             // spellbook is open — play input is paused
   if(!S || S.over) return;
+  var ci=creationAtPoint(x,y);     // a tap on a friendly entity opens its readout (never starts a sweep)
+  if(ci){ creationInfo(ci); return; }
   if(CFG.realtime){
     if(S.paused || S.busy) return; // flow: cooldown never blocks the START of a sweep (merges stay open)
   } else if(S.busy || S.actions<=0){
@@ -2372,7 +2824,9 @@ window.__wh = function(){
     cool: +S.cool.toFixed(3), coolMax: S.coolMax, castCd: CFG.castCd,
     beatT: +S.beatT.toFixed(3), beatMax: S.beatMax,
     paused: S.paused, busy: S.busy, phase: S.phase, over: S.over, wave: S.wave, hp: S.hp,
-    motes: S.motes, exotics: S.exotics.slice(), reagents: Object.keys(S.reagents),
+    motes: S.motes, exotics: S.exotics.slice(), rituals: S.rituals.slice(), reagents: Object.keys(S.reagents),
+    creations: S.creations.filter(function(c){ return !c.dead; }).map(function(c){ return { kind:c.kind, lane:c.lane, rung:c.rung, hp:c.hp, maxhp:c.maxhp, attack:c.attack, tl:c.tl }; }),
+    pyre: S.pyre ? { lane:S.pyre.lane, rung:S.pyre.rung } : null,
     pendingDouble: S.pendingDouble, gildNext: S.gildNext,
     enemies: live.length,
     rungSum: live.reduce(function(s,e){ return s+e.rung; }, 0),
