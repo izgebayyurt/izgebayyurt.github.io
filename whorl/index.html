@@ -360,8 +360,9 @@ function newGame(){
     // ---- the Bazaar economy (all run-scoped; nothing persists) ----
     motes:0,                                        // in-run currency, drops off the dead
     exotics:[], reagents:{},                        // owned exotic names (max 3) + reagent flags
-    pendingDouble:false, pendingDoubleT:0,          // Mordant: next cast fires twice
+    pendingDouble:0, pendingDoubleT:0,              // Mordant: counter — next N casts fire twice (N=2)
     gildNext:false,                                 // Gilding: next merge free + +1 level
+    aurumSpent:false, firstTransmuteUsed:false,     // Aurum: once/wave · Catalyst: only 1st transmute/turn is free
     bazaarOffers:[], boonPicked:false,              // rolled at wave clear; boon locks per visit
     dialSig:"", exoticGlow:{}, masonFlash:0,        // strip-glow cache + Mason gate flourish
     // ---- FLOW MODE clocks (delta-accumulated; only advance while unpaused) ----
@@ -392,6 +393,8 @@ function nextWave(){
   st.wave++;
   st.enemies = [];
   st.lastSpell=null; st.repeatN=0;        // a new wave forgives old habits
+  st.aurumSpent=false;                    // Aurum: rechargeable once per wave
+  st.firstTransmuteUsed=false;            // Catalyst: first free transmute resets each wave/turn
   var w=st.wave;
   var elite = (w>=8 && (w-8)%4===0);      // elite cadence: 8, 12, 16, 20...
   var count = Math.min(9, 2 + w) - (elite?2:0);
@@ -662,7 +665,7 @@ function applyDmg(e, amt, el, opts){
     if(S.reagents.mold && e.poison>0){                // Creeping Mold: poison leaps to the nearest survivor
       var near=null, bd=Infinity;
       alive().forEach(function(x){ var dd=Math.hypot(x.x-e.x,x.y-e.y); if(dd<bd){ bd=dd; near=x; } });
-      if(near){ near.poison += e.poison; near.dotT=now(); spawnDmg(near.x, near.y-geo.ballR*0.9, e.poison, false, false, true); }
+      if(near){ near.poison = Math.min(POISON_CAP, near.poison + e.poison); near.dotT=now(); spawnDmg(near.x, near.y-geo.ballR*0.9, e.poison, false, false, true); }
     }
   } else if(e.healer && !e.dead){
     // SKITTISH: a healer that survives a hit bolts one rung deeper and spends its next
@@ -708,6 +711,8 @@ function applyStale(st, sp){
 }
 /* burn application funnels through here so Cinder Wick can stretch every ignition by a tick */
 function applyBurn(e, val){ e.burn = Math.max(e.burn, val + (S.reagents && S.reagents.cinder?1:0)); }
+/* poison stacks are capped so doubling/jumps can't runaway */
+var POISON_CAP = 12;
 
 /* ---------- pigment motes: the in-run currency the horde sheds ---------- */
 function moteValue(e){ return e.elite?8 : e.brute?3 : (e.armored||e.healer||e.leech)?2 : 1; }
@@ -742,7 +747,7 @@ function impactSpell(sp, hits){
   hits.forEach(function(e){
     applyDmg(e, per, sp.el, opts);
     if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
-    if(sp.poison) e.poison += sp.poison;
+    if(sp.poison) e.poison = Math.min(POISON_CAP, e.poison + sp.poison);   // poison stacks cap at 12
     if(sp.burn) applyBurn(e, sp.burn);
   });
   S.shake = Math.min(20, 4 + sp.tl*1.1 + (sp.tl>=6?4:0) + (sp.whorl?6:0));
@@ -759,7 +764,7 @@ function cast(idxs){
   else if(S.actions<=0) return;
   if(CFG.realtime) startCool();
   applyStale(st, sp);
-  var dbl = (!sp.fizzle && doublePending()); if(dbl) S.pendingDouble=false;   // Mordant: this cast fires twice
+  var dbl = (!sp.fizzle && doublePending()); if(dbl) S.pendingDouble--;   // Mordant: this cast fires twice (counter down)
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib(sp.fizzle?[8,60,8]:(sp.whorl?[40,50,90]:(sp.tl>=6?[30,40,70]:25)));
@@ -800,7 +805,9 @@ function transmuteFx(slot){
 }
 function transmute(idxs){
   var st=S;
-  if(!CFG.realtime && !st.reagents.catalyst && st.actions<=0) return;   // Turns: a spare action (Catalyst waives it)
+  // Catalyst waives the action only for the FIRST transmute each turn (Turns); after that it costs normally
+  var freeCat = !CFG.realtime && st.reagents.catalyst && !st.firstTransmuteUsed;
+  if(!CFG.realtime && !freeCat && st.actions<=0) return;   // Turns: needs a spare action
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // fuse: the three are drunk together
   vib([15,30,15,30,40]);
@@ -819,7 +826,7 @@ function transmute(idxs){
   setTimeout(function(){ if(S!==st||st.over) return;
     st.phase=null; st.busy=false;
     if(CFG.realtime){ if(alive().length===0) setTimeout(waveClear, 300); }   // craft: no cooldown, no action
-    else if(st.reagents.catalyst){ if(alive().length===0) setTimeout(waveClear, 300); }   // Catalyst: free craft in Turns too
+    else if(freeCat){ st.firstTransmuteUsed=true; if(alive().length===0) setTimeout(waveClear, 300); }   // Catalyst: 1st/turn is free
     else spend();                                                            // Turns: costs one action
   },400);
 }
@@ -916,27 +923,27 @@ function weaveCollapse(idxs, balls){
    voids all exotic matching — exotic recipes never contain W. Each is a real spell (stale/fresh by name;
    damage exotics scale by TL of the swept balls; Flow burns the cast cooldown, Turns spends 1 action). */
 var EXOTIC = [
-  { key:"quench", name:"Quench", recipe:["B","B","O","O"], price:22, bg:"#3d8bdf", dmg:true,
+  { key:"quench", name:"Quench", recipe:["B","B","R","R"], price:22, bg:"#3d8bdf", dmg:true,
     desc:"Consume all burn on the field; each burned foe takes 3× its ticks as damage.",
     cast:function(st,TL,mul){ var any=false;
       alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*3*mul)), "O"); any=true; } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.5); if(any) sHit(9,true); } },
-  { key:"mordant", name:"Mordant", recipe:["R","B","R","B"], price:28, bg:"#9b62d6",
-    desc:"Your next cast fires twice — the second at full power.",
-    cast:function(st){ st.pendingDouble=true; st.pendingDoubleT=now(); sChime(); } },
-  { key:"undertow", name:"Undertow", recipe:["B","B","P","P"], price:25, bg:"#3d8bdf",
+  { key:"mordant", name:"Mordant", recipe:["R","B","R","B"], price:24, bg:"#9b62d6",
+    desc:"Your next TWO casts each fire twice — both hits at full power.",
+    cast:function(st){ st.pendingDouble=2; st.pendingDoubleT=now(); sChime(); } },
+  { key:"undertow", name:"Undertow", recipe:["B","B","Y","Y"], price:25, bg:"#3d8bdf",
     desc:"Shove every foe back one rung; wall-huggers are washed off entirely.",
     cast:function(st){ alive().slice().forEach(function(e){
         if(e.rung<=0){ e.dead=true; e.deadAt=now(); boom(e.x,e.y,HEX.B,1.1); }
         else { e.rung=Math.min(CFG.rungs-1, e.rung+1); e.stepT=now(); } });
       S.fx.push({ wave:true, t:now(), tint:HEX.B }); } },
-  { key:"ferment", name:"Ferment", recipe:["G","Y","G","Y","G"], price:26, bg:"#57c268",
-    desc:"Double every poison stack on every foe.",
-    cast:function(st){ alive().forEach(function(e){ if(e.poison>0){ e.poison=Math.round(e.poison*2); e.dotT=now(); } }); sHit(6,false); } },
-  { key:"gilding", name:"Gilding", recipe:["Y","O","Y","O"], price:18, bg:"#f6c445",
+  { key:"ferment", name:"Ferment", recipe:["Y","B","Y","B","Y"], price:22, bg:"#57c268",
+    desc:"Double every poison stack on every foe (capped at 12).",
+    cast:function(st){ alive().forEach(function(e){ if(e.poison>0){ e.poison=Math.min(POISON_CAP, Math.round(e.poison*2)); e.dotT=now(); } }); sHit(6,false); } },
+  { key:"gilding", name:"Gilding", recipe:["Y","R","Y","R"], price:20, bg:"#f6c445",
     desc:"Your next merge is free and its result gains +1 level.",
     cast:function(st){ st.gildNext=true; S.fx.push({ star:true, x:geo.cx, y:geo.cy, t:now(), tint:"#ffd15c" }); } },
-  { key:"calcine", name:"Calcine", recipe:["R","R","O","R","R"], price:30, bg:"#f2913d", dmg:true,
+  { key:"calcine", name:"Calcine", recipe:["R","R","Y","R","R"], price:24, bg:"#f2913d", dmg:true,
     desc:"Scour the target lane: heavy fire damage plus a deep burn to everything in it.",
     cast:function(st,TL,mul){ var tgt=nearest(); if(!tgt) return;
       var dmg=Math.max(1,Math.round(5*TL*CFG.spellPow*mul));
@@ -945,16 +952,16 @@ var EXOTIC = [
   { key:"distill", name:"Distill", recipe:["B","Y","B","Y"], price:20, bg:"#3d8bdf",
     desc:"Purge every husk on the dial — fresh primaries take their slots.",
     cast:function(st){ for(var i=0;i<CFG.slots;i++){ if(st.dial[i] && st.dial[i].c==="H"){ st.dial[i]=freshBall(); st.dial[i].born=now(); var gs=geo.slots[i]; boom(gs.x,gs.y,"#ffffff",0.9); } } } },
-  { key:"sublimate", name:"Sublimate", recipe:["P","Y","P","Y","P"], price:27, bg:"#9b62d6",
+  { key:"sublimate", name:"Sublimate", recipe:["B","R","B","R","B"], price:20, bg:"#9b62d6",
     desc:"Shatter the ward from every warded foe this wave.",
     cast:function(st){ alive().forEach(function(e){ if(e.ward){ var c=HEX[e.ward]; e.ward=null; boom(e.x,e.y,c,1.4); confetti(e.x,e.y,c); } }); sChime(); } },
-  { key:"bellows", name:"Bellows", recipe:["R","O","R","O"], price:24, bg:"#f2913d", dmg:true,
+  { key:"bellows", name:"Bellows", recipe:["R","R","Y","Y"], price:24, bg:"#f2913d", dmg:true,
     desc:"Every burn tick fires at once at 2×; the burn is then spent.",
     cast:function(st,TL,mul){ alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*4*mul)), "O"); } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.7); } },
-  { key:"aurum", name:"Aurum", recipe:["Y","Y","O","Y","Y"], price:21, bg:"#f6c445",
-    desc:"Transmute the horde's light into coin: gain 2 motes per living foe.",
-    cast:function(st){ var n=alive().length; if(n>0) addMotes(2*n, geo.cx, geo.cy-geo.dialR-geo.ballR); sChime(); } }
+  { key:"aurum", name:"Aurum", recipe:["Y","Y","R","Y","Y"], price:21, bg:"#f6c445",
+    desc:"Once per wave: transmute the horde's light into coin — 2 motes per living foe.",
+    cast:function(st){ var n=alive().length; if(n>0) addMotes(2*n, geo.cx, geo.cy-geo.dialR-geo.ballR); st.aurumSpent=true; sChime(); } }
 ];
 var EXOTIC_BY_NAME={}; EXOTIC.forEach(function(x){ EXOTIC_BY_NAME[x.name]=x; });
 /* the swept colours (in sweep order) vs owned recipes — exact, order-sensitive; any W = no match */
@@ -962,6 +969,7 @@ function matchExotic(cols){
   if(!cols || cols.indexOf("W")>=0) return null;
   for(var i=0;i<S.exotics.length;i++){
     var ex=EXOTIC_BY_NAME[S.exotics[i]]; if(!ex || ex.recipe.length!==cols.length) continue;
+    if(ex.key==="aurum" && S.aurumSpent) continue;   // Aurum spent this wave — let the sweep collapse/fizzle instead
     var m=true; for(var k=0;k<cols.length;k++){ if(ex.recipe[k]!==cols[k]){ m=false; break; } }
     if(m) return ex;
   }
@@ -992,7 +1000,7 @@ function castExotic(idxs, ex){
   var mul=1;                                              // stale/fresh by the exotic's own name
   if(st.lastSpell===ex.name){ st.repeatN++; if(ex.dmg) mul = st.repeatN>=2?0.3:0.5; }
   else { if(st.lastSpell && ex.dmg) mul=1.25; st.lastSpell=ex.name; st.repeatN=0; }
-  var dbl = doublePending(); if(dbl) S.pendingDouble=false;   // Mordant can double an exotic too
+  var dbl = doublePending(); if(dbl) S.pendingDouble--;   // Mordant can double an exotic too (counter down)
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });
   vib([20,40,20,40,60]);
@@ -1068,7 +1076,7 @@ function coolReject(){ sThunk(); toast("cooling...", 700, "#6b6472", "low"); vib
 /* Mordant's charge, still live? (Flow lets it lapse after 6s) */
 function doublePending(){
   if(!S.pendingDouble) return false;
-  if(CFG.realtime && S.pendingDoubleT && now()-S.pendingDoubleT>6000){ S.pendingDouble=false; return false; }
+  if(CFG.realtime && S.pendingDoubleT && now()-S.pendingDoubleT>6000){ S.pendingDouble=0; return false; }
   return true;
 }
 /* both modes route the enemy phase through here; flow guards against overlapping beats */
@@ -1133,7 +1141,7 @@ function dotTick(e){
   if(e.dead) return;
   e.dotT = now();
   if(e.poison>0){ applyDmg(e, Math.max(1,Math.round(e.poison)), "G"); e.poison--; }
-  if(e.burn>0){ applyDmg(e, 2, "O"); e.burn--; }
+  if(e.burn>0){ applyDmg(e, (S.reagents && S.reagents.cinder)?3:2, "O"); e.burn--; }   // Cinder Wick: hotter ticks (3 vs 2)
 }
 function stepEnemy(e){
   if(e.dead) return;
@@ -1163,6 +1171,7 @@ function endEnemyPhase(){
   if(!CFG.realtime){
     st.actions = st.maxActions;
     st.freeMerge = true;
+    st.firstTransmuteUsed = false;   // Catalyst: a new turn re-arms the free transmute
     st.busy=false;
   }
   st.phase=null;
@@ -1193,14 +1202,13 @@ var ALL_UP = [
 ];
 /* ===================== reagents (run-scoped passives) ===================== */
 var REAGENT = [
-  { key:"quicksilver", name:"Quicksilver", bg:"#3d8bdf", ic:"Ag", price:35,
+  { key:"quicksilver", name:"Quicksilver", bg:"#3d8bdf", ic:"Ag", price:42,
     desc:function(){ return CFG.realtime ? "Cast cooldown −12%" : "+1 action every turn"; } },
-  { key:"catalyst", name:"Catalyst", bg:"#9b62d6", ic:"Cz",
-    price:function(){ return CFG.realtime ? 12 : 24; },   // Flow already crafts free — priced down
-    desc:function(){ return CFG.realtime ? "Transmutes stay free (already are)" : "Transmutes cost no action"; } },
+  { key:"catalyst", name:"Catalyst", bg:"#9b62d6", ic:"Cz", price:22, recommended:true,
+    desc:function(){ return CFG.realtime ? "Transmutes stay free (already are)" : "First transmute each turn costs no action"; } },
   { key:"buttress", name:"Buttress", bg:"#ef4a5a", ic:"Bt", price:22, desc:function(){ return "+8 max HP, healed now"; } },
   { key:"mason", name:"Mason", bg:"#f2913d", ic:"Ms", price:26, desc:function(){ return "Wall mends 1 HP each wave clear"; } },
-  { key:"cinder", name:"Cinder Wick", bg:"#f2913d", ic:"Cw", price:25, desc:function(){ return "Burn lasts +1 tick"; } },
+  { key:"cinder", name:"Cinder Wick", bg:"#f2913d", ic:"Cw", price:25, desc:function(){ return "Burn lasts +1 tick and bites for 3/tick"; } },
   { key:"mold", name:"Creeping Mold", bg:"#57c268", ic:"Md", price:28, desc:function(){ return "Poison leaps from the slain to the nearest foe"; } },
   { key:"shatterfrost", name:"Shatterfrost", bg:"#3d8bdf", ic:"Sf", price:27, desc:function(){ return "Frozen foes take +50% damage"; } },
   { key:"lens", name:"Lens", bg:"#9b62d6", ic:"Ln", price:30, desc:function(){ return "Minted Prisms arrive at level 2"; } }
@@ -1208,6 +1216,14 @@ var REAGENT = [
 var REAGENT_BY_KEY={}; REAGENT.forEach(function(r){ REAGENT_BY_KEY[r.key]=r; });
 function reagentPrice(r){ return typeof r.price==="function"?r.price():r.price; }
 function reagentDesc(r){ return typeof r.desc==="function"?r.desc():r.desc; }
+/* GLOBAL RULE — price floor: nothing in the Bazaar may be priced below 20 */
+var PRICE_FLOOR = 20;
+(function assertPriceFloor(){
+  var bad=[];
+  EXOTIC.forEach(function(x){ if(x.price<PRICE_FLOOR) bad.push(x.name+"="+x.price); });
+  REAGENT.forEach(function(r){ if(reagentPrice(r)<PRICE_FLOOR) bad.push(r.name+"="+reagentPrice(r)); });
+  if(bad.length) console.warn("Bazaar price-floor violation (<"+PRICE_FLOOR+"):", bad.join(", "));
+})();
 /* buying a reagent: flip its flag, and settle the "now" effects immediately */
 function applyReagent(key){
   S.reagents[key]=true;
@@ -1234,13 +1250,18 @@ function renderReagentBar(){
 /* ===================== the Bazaar ===================== */
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0, t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function makeExoticOffer(ex){ return { type:"exotic", key:ex.key, name:ex.name, price:ex.price, desc:ex.desc, bg:ex.bg, recipe:ex.recipe, sold:false }; }
-function makeReagentOffer(r){ return { type:"reagent", key:r.key, name:r.name, price:reagentPrice(r), desc:reagentDesc(r), bg:r.bg, sold:false }; }
+function makeReagentOffer(r){ return { type:"reagent", key:r.key, name:r.name, price:reagentPrice(r), desc:reagentDesc(r), bg:r.bg, recommended:!!r.recommended, sold:false }; }
 /* roll three priced offers: 2 exotics + 1 reagent, no dupes of what's owned. At the 3-exotic cap
    the shelf turns to all reagents. Short pools fall back to whatever's left. */
 function rollBazaar(){
   var offers=[];
   var exAvail=shuffle(EXOTIC.filter(function(x){ return S.exotics.indexOf(x.name)<0; }));
   var rgAvail=shuffle(REAGENT.filter(function(x){ return !S.reagents[x.key]; }));
+  // THE CASUAL MERCY: pity-pin Catalyst into the reagent slot on waves 1-6 until the player owns it
+  if(S.wave<=6 && !S.reagents.catalyst){
+    var ci=-1; for(var q=0;q<rgAvail.length;q++){ if(rgAvail[q].key==="catalyst"){ ci=q; break; } }
+    if(ci>=0){ var cat=rgAvail.splice(ci,1)[0]; rgAvail.unshift(cat); }
+  }
   var wantEx = S.exotics.length<3 ? 2 : 0;
   for(var i=0;i<wantEx && exAvail.length;i++) offers.push(makeExoticOffer(exAvail.shift()));
   while(offers.length<3 && rgAvail.length) offers.push(makeReagentOffer(rgAvail.shift()));
@@ -1266,8 +1287,9 @@ function renderShop(){
     var tagHtml = o.type==="exotic"
       ? o.recipe.map(function(c){ return '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+HEX[c]+';border:1.5px solid #2c2733;vertical-align:middle;margin-right:2px;"></span>'; }).join('')
       : "Reagent · passive";
+    var recBadge = o.recommended ? '<span class="rec-badge" style="display:inline-block;margin-left:5px;font-size:8px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#2c2733;background:#ffd15c;padding:1px 5px;border-radius:7px;border:1.5px solid #2c2733;vertical-align:middle;">★ recommended</span>' : '';
     el.innerHTML='<div class="ic" style="background:'+o.bg+'">'+icon+'</div>'+
-      '<div style="flex:1;min-width:0;"><b>'+o.name+'</b>'+
+      '<div style="flex:1;min-width:0;"><b>'+o.name+'</b>'+recBadge+
       '<span class="tag" style="text-transform:none;letter-spacing:0;">'+tagHtml+'</span>'+
       '<span>'+o.desc+'</span></div>'+
       '<div class="price"><i></i>'+o.price+'</div>'+
@@ -1501,14 +1523,17 @@ function drawExoticStrip(t){
   var gap=8, tot=boxes.reduce(function(s,b){ return s+b.w; },0)+(boxes.length-1)*gap;
   var x=g.cx-tot/2;
   boxes.forEach(function(bx){
-    var ex=bx.ex, glow=S.exoticGlow[ex.name];
+    var ex=bx.ex;
+    var spent = (ex.key==="aurum" && S.aurumSpent);        // Aurum spent this wave — greyed until it recharges
+    var glow = S.exoticGlow[ex.name] && !spent;
+    if(spent) ctx.globalAlpha = 0.42;
     if(glow){
       var pk=0.5+0.5*Math.sin(t/300);
       ctx.beginPath(); rr(x-3,y-h/2-3,bx.w+6,h+6,10);
       ctx.lineWidth=3.5; ctx.strokeStyle="rgba(255,209,92,"+(0.45+0.4*pk)+")"; ctx.stroke();
     }
     ctx.save(); ctx.translate(0,2); rr(x,y-h/2,bx.w,h,8); ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill(); ctx.restore();
-    rr(x,y-h/2,bx.w,h,8); ctx.fillStyle=glow?"#fffdf6":"#fbf5e6"; ctx.fill();
+    rr(x,y-h/2,bx.w,h,8); ctx.fillStyle=spent?"#e6e1d6":(glow?"#fffdf6":"#fbf5e6"); ctx.fill();
     ctx.lineWidth=2.2; ctx.strokeStyle="#2c2733"; ctx.stroke();
     var cxp=x+pad+chipR;
     ex.recipe.forEach(function(c){
@@ -1516,8 +1541,9 @@ function drawExoticStrip(t){
       ctx.lineWidth=1.4; ctx.strokeStyle="#2c2733"; ctx.stroke();
       cxp += chipR*2+chipGap;
     });
-    ctx.textAlign="left"; ctx.font="700 "+nameFont+"px Nunito, sans-serif"; ctx.fillStyle="#2c2733";
+    ctx.textAlign="left"; ctx.font="700 "+nameFont+"px Nunito, sans-serif"; ctx.fillStyle=spent?"#8a8578":"#2c2733";
     ctx.fillText(ex.name, cxp+2, y+0.5);
+    if(spent) ctx.globalAlpha = 1;
     x += bx.w+gap;
   });
   ctx.textAlign="center"; ctx.textBaseline="alphabetic";
