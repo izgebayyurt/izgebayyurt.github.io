@@ -317,9 +317,9 @@ function nextWave(){
   st.enemies = [];
   st.lastSpell=null; st.repeatN=0;        // a new wave forgives old habits
   var w=st.wave;
-  var elite = (w%5===0);                  // elite cadence: 5, 10, 15...
+  var elite = (w>=8 && (w-8)%4===0);      // elite cadence: 8, 12, 16, 20...
   var count = Math.min(9, 2 + w) - (elite?2:0);
-  var wardChance = Math.min(0.65, 0.15 + w*0.08);
+  var wardChance = Math.min(0.75, 0.05 + w*0.10);
   var baseDmg = 2 + Math.ceil(w/4);
   var spread = w>=5 ? 3 : 2;              // deeper spawn rungs from wave 5
   var used = {};
@@ -344,7 +344,7 @@ function nextWave(){
     }
     var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
     var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
-    var hp = isElite ? Math.round((16+8*w)*2.1) : brute ? (16+8*w) : (4+3*w);
+    var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : (4+3*w);
     st.enemies.push({
       lane:lane, rung:rung, x:laneX(lane), y:rungY(rung),
       hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
@@ -510,8 +510,8 @@ function resolveSpell(balls){
   var sp = null;
   if(set.W===3)      sp = { name:"Whorl", el:null, kind:"all", coeff:4, trueDamage:true, whorl:true, tint:"#ffd15c" };
   else if(set.R===3) sp = { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
-  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:3, tint:HEX.Y };
-  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:2, freeze:1, tint:HEX.B };
+  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:4, tint:HEX.Y };
+  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:3, freeze:1, tint:HEX.B };
   else if(set.O===3) sp = { name:"Pyre", el:"O", kind:"splash", radius:2, coeff:5, burn:3, tint:HEX.O };
   else if(set.G===3) sp = { name:"Overgrowth", el:"G", kind:"all", coeff:2, poison:4, tint:HEX.G };
   else if(set.P===3) sp = { name:"Eclipse", el:"P", kind:"all", coeff:3, eclipsePierce:true, tint:HEX.P };
@@ -542,7 +542,7 @@ function fizzleHint(echoed){
 function fizzleOf(balls){
   var cols = balls.map(function(b){ return b.c; });
   var TL = tlOf(balls);
-  return { name:"Fizzle", el:null, kind:"single", dmg:Math.max(1,Math.round(Math.max(2,TL)*CFG.spellPow)),
+  return { name:"Fizzle", el:null, kind:"single", dmg:Math.max(1,Math.round(Math.max(5,TL)*CFG.spellPow)),
     tl:TL, tint:"#b9b2a6", fizzle:true, usedW:cols.indexOf("W")>=0, hint:fizzleHint(echoColors(cols)) };
 }
 
@@ -1424,6 +1424,11 @@ function drawBall(b, px, py, i, t, scale, vis, casting){
   var wob=((((i*7)%5)-2) + (vis?0:1.2*Math.sin(t/900+i)))*Math.PI/180;
   ctx.save(); ctx.translate(px,py); ctx.rotate(wob);
   if(lvl>=2 && !casting){ ctx.beginPath(); ctx.arc(0,0,rr0+5,0,7); ctx.fillStyle="rgba(255,209,92,"+(0.1*Math.min(lvl,4))+")"; ctx.fill(); }
+  if(b.c==="W" && !casting){   // Prism: a soft iridescent halo so it reads as precious
+    var gl=0.14+0.06*Math.abs(Math.sin(t/520+i));
+    ctx.beginPath(); ctx.arc(0,0,rr0+6,0,7); ctx.fillStyle="rgba(255,246,214,"+gl+")"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,rr0+3.5,0,7); ctx.fillStyle="rgba(155,98,214,"+(gl*0.5)+")"; ctx.fill();
+  }
   function shape(){
     if(husk){ ctx.beginPath(); ctx.ellipse(0,0,rr0,rr0*0.88,0,0,7); }   // slumped, airless
     else { ctx.beginPath(); ctx.arc(0,0,rr0,0,7); }
