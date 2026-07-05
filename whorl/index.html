@@ -919,19 +919,20 @@ function weaveCollapse(idxs, balls){
 }
 /* ===================== EXOTIC SPELLS (run-scoped, ORDER-SENSITIVE, length 4-5) =====================
    Owned exotics (max 3) intercept a 4-5 ball sweep BEFORE the weave-collapse fallback: if the swept
-   colours are an exact ordered match for an owned recipe, that exotic casts. Prism (W) in the sweep
-   voids all exotic matching — exotic recipes never contain W. Each is a real spell (stale/fresh by name;
+   colours are an exact ordered match for an owned recipe, that exotic casts. Every recipe is a
+   PALINDROME — a sigil is a mirror, it reads the same from either end, so sweep direction never whiffs.
+   Prism (W) in the sweep voids all exotic matching — exotic recipes never contain W. Each is a real spell (stale/fresh by name;
    damage exotics scale by TL of the swept balls; Flow burns the cast cooldown, Turns spends 1 action). */
 var EXOTIC = [
-  { key:"quench", name:"Quench", recipe:["B","B","R","R"], price:22, bg:"#3d8bdf", dmg:true,
+  { key:"quench", name:"Quench", recipe:["B","R","R","B"], price:22, bg:"#3d8bdf", dmg:true,
     desc:"Consume all burn on the field; each burned foe takes 3× its ticks as damage.",
     cast:function(st,TL,mul){ var any=false;
       alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*3*mul)), "O"); any=true; } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.5); if(any) sHit(9,true); } },
-  { key:"mordant", name:"Mordant", recipe:["R","B","R","B"], price:24, bg:"#9b62d6",
+  { key:"mordant", name:"Mordant", recipe:["R","B","B","R"], price:24, bg:"#9b62d6",
     desc:"Your next TWO casts each fire twice — both hits at full power.",
     cast:function(st){ st.pendingDouble=2; st.pendingDoubleT=now(); sChime(); } },
-  { key:"undertow", name:"Undertow", recipe:["B","B","Y","Y"], price:25, bg:"#3d8bdf",
+  { key:"undertow", name:"Undertow", recipe:["B","Y","Y","B"], price:25, bg:"#3d8bdf",
     desc:"Shove every foe back one rung; wall-huggers are washed off entirely.",
     cast:function(st){ alive().slice().forEach(function(e){
         if(e.rung<=0){ e.dead=true; e.deadAt=now(); boom(e.x,e.y,HEX.B,1.1); }
@@ -940,7 +941,7 @@ var EXOTIC = [
   { key:"ferment", name:"Ferment", recipe:["Y","B","Y","B","Y"], price:22, bg:"#57c268",
     desc:"Double every poison stack on every foe (capped at 12).",
     cast:function(st){ alive().forEach(function(e){ if(e.poison>0){ e.poison=Math.min(POISON_CAP, Math.round(e.poison*2)); e.dotT=now(); } }); sHit(6,false); } },
-  { key:"gilding", name:"Gilding", recipe:["Y","R","Y","R"], price:20, bg:"#f6c445",
+  { key:"gilding", name:"Gilding", recipe:["Y","R","R","Y"], price:20, bg:"#f6c445",
     desc:"Your next merge is free and its result gains +1 level.",
     cast:function(st){ st.gildNext=true; S.fx.push({ star:true, x:geo.cx, y:geo.cy, t:now(), tint:"#ffd15c" }); } },
   { key:"calcine", name:"Calcine", recipe:["R","R","Y","R","R"], price:24, bg:"#f2913d", dmg:true,
@@ -949,13 +950,13 @@ var EXOTIC = [
       var dmg=Math.max(1,Math.round(5*TL*CFG.spellPow*mul));
       alive().slice().forEach(function(e){ if(e.lane===tgt.lane){ applyDmg(e,dmg,"O"); applyBurn(e,3); } });
       S.fx.push({ laneFlash:true, lane:tgt.lane, t:now(), tint:HEX.O }); } },
-  { key:"distill", name:"Distill", recipe:["B","Y","B","Y"], price:20, bg:"#3d8bdf",
+  { key:"distill", name:"Distill", recipe:["Y","B","B","Y"], price:20, bg:"#3d8bdf",
     desc:"Purge every husk on the dial — fresh primaries take their slots.",
     cast:function(st){ for(var i=0;i<CFG.slots;i++){ if(st.dial[i] && st.dial[i].c==="H"){ st.dial[i]=freshBall(); st.dial[i].born=now(); var gs=geo.slots[i]; boom(gs.x,gs.y,"#ffffff",0.9); } } } },
   { key:"sublimate", name:"Sublimate", recipe:["B","R","B","R","B"], price:20, bg:"#9b62d6",
     desc:"Shatter the ward from every warded foe this wave.",
     cast:function(st){ alive().forEach(function(e){ if(e.ward){ var c=HEX[e.ward]; e.ward=null; boom(e.x,e.y,c,1.4); confetti(e.x,e.y,c); } }); sChime(); } },
-  { key:"bellows", name:"Bellows", recipe:["R","R","Y","Y"], price:24, bg:"#f2913d", dmg:true,
+  { key:"bellows", name:"Bellows", recipe:["R","Y","Y","R"], price:24, bg:"#f2913d", dmg:true,
     desc:"Every burn tick fires at once at 2×; the burn is then spent.",
     cast:function(st,TL,mul){ alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*4*mul)), "O"); } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.7); } },
