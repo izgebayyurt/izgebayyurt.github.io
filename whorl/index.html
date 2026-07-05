@@ -133,11 +133,12 @@ body{
   <div class="chip hearts">♥<b id="hpN">20</b></div>
   <div class="chip wave"><small>Wave</small><b id="waveN">1</b></div>
   <div class="spacer"></div>
+  <button class="chip chipbtn" id="btnPause" aria-label="Pause" title="Pause" style="display:none;">⏸</button>
   <button class="chip chipbtn" id="btnBook" aria-label="Spellbook" title="Spellbook">✦</button>
-  <div class="chip"><small>Acts</small><div class="pips" id="pips"></div></div>
+  <div class="chip" id="chipActs"><small>Acts</small><div class="pips" id="pips"></div></div>
 </div>
 
-<div class="endwrap">
+<div class="endwrap" id="endwrap">
   <button class="mk end" id="btnEnd">End turn<small>advance</small></button>
 </div>
 
@@ -153,9 +154,13 @@ body{
       <b style="color:var(--ink)">Cast</b> — sweep across <b>3 in a row</b>. Colours pick the spell; levels set the power.<br>
       Merges and casts cost <b>1 action</b> each — but one <b>level-up merge per turn is free</b>.<br>
       Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.<br>
-      Impure or repeated casts weaken — read the ring, vary your spells.
+      Impure or repeated casts weaken — read the ring, vary your spells.<br>
+      <b style="color:var(--ink)">Turns</b> — actions &amp; End-turn. <b style="color:var(--ink)">Flow</b> — real-time: cast on a cooldown, the horde steps on a beat.
     </div>
-    <div class="row"><button class="mk accent" id="btnStart" style="flex:1;height:52px;font-size:18px;">Begin</button></div>
+    <div class="row">
+      <button class="mk" id="btnStart" style="flex:1;height:52px;font-size:18px;">Turns</button>
+      <button class="mk" id="btnFlow" style="flex:1;height:52px;font-size:18px;">Flow</button>
+    </div>
     <div class="credit"><a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a></div>
   </div>
 </div>
@@ -196,14 +201,16 @@ body{
 /* ===================== tuning ===================== */
 var CFG = {
   slots: 12,
-  actions: 3,          // base actions per turn
+  actions: 3,          // base actions per turn (turn mode only)
   hp: 24,
   lanes: 4,
   rungs: 6,
   wardMult: 2,         // matching-colour hits multiply by this
   spellPow: 1,
   castLevelBonus: 0,
-  maxActionsUp: 0
+  maxActionsUp: 0,
+  realtime: false,     // FLOW MODE: real-time variant (set by start-screen toggle)
+  castCd: 2.2          // flow: base cast cooldown, seconds (Haste boon lowers it)
 };
 
 /* colours ---------------------------------------------------------------- */
@@ -264,15 +271,21 @@ function rungPitch(){ return (geo.gateY-geo.fieldTop)/(CFG.rungs-1); }
 var S=null, gameId=0;
 function newGame(){
   gameId++;
-  CFG.spellPow=1; CFG.castLevelBonus=0; CFG.wardMult=2; CFG.maxActionsUp=0;
+  CFG.spellPow=1; CFG.castLevelBonus=0; CFG.wardMult=2; CFG.maxActionsUp=0; CFG.castCd=2.2;
   S = {
     id:gameId, hp:CFG.hp, maxhp:CFG.hp, wave:0,
     actions:CFG.actions, maxActions:CFG.actions, freeMerge:true,
     dial:[], enemies:[], fx:[], dmgs:[], scorch:[], shake:0,
     busy:false, phase:null, over:false, toast:null, hubInfo:null, boonN:{},
-    lastSpell:null, repeatN:0                       // stale-cast tracking (per wave)
+    lastSpell:null, repeatN:0,                      // stale-cast tracking (per wave)
+    // ---- FLOW MODE clocks (delta-accumulated; only advance while unpaused) ----
+    cool:0, coolMax:CFG.castCd, coolPulse:0,        // cast cooldown
+    beatT:0, beatMax:4.0,                           // metronome for the horde
+    paused:false, phaseRunning:false, phaseQueued:false
   };
   for(var i=0;i<CFG.slots;i++) S.dial.push(freshBall());
+  applyModeUI();
+  updatePauseBtn();
   nextWave();
 }
 function freshBall(){
@@ -337,6 +350,9 @@ function nextWave(){
   }
   st.actions = st.maxActions = CFG.actions + CFG.maxActionsUp;
   st.freeMerge = true;
+  // FLOW: the beat tightens each wave — 4.0s at wave 1, -0.1s/wave, floor 2.5s
+  st.beatMax = Math.max(2.5, 4.0 - (st.wave-1)*0.1);
+  st.beatT = 0;
   sHorn();
   toast("Wave "+st.wave, 950, "#2c2733", "mid");
   if(elite){ setTimeout(function(){ if(S===st&&!st.over){ toast("ELITE!", 1100, "#2c2733", "mid", true); sEliteHorn(); } }, 1000); }
@@ -545,10 +561,13 @@ function impactSpell(sp, hits){
 }
 /* anticipation -> impact: balls flash+shrink (150ms) -> beam -> damage (230ms) -> refill (300ms) */
 function cast(idxs){
-  if(S.busy||S.actions<=0) return;
+  if(S.busy) return;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
+  else if(S.actions<=0) return;
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
+  if(CFG.realtime) startCool();
   var sp = resolveSpell(balls);
   applyStale(st, sp);
   st.busy=true; st.phase="cast";
@@ -572,16 +591,19 @@ function cast(idxs){
     idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
   },300);
   setTimeout(function(){ if(S!==st||st.over) return;
-    st.phase=null; st.busy=false; spend();
+    st.phase=null; st.busy=false; postAction();
   },400);
 }
 /* the DOUBLECAST: sweep past three and weave two spells into ONE action.
    both triples must be true spells — a short weave or a fizzled link collapses. */
 function castWeave(idxs){
-  if(S.busy||S.actions<=0) return;
+  if(S.busy) return;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
+  else if(S.actions<=0) return;
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
+  if(CFG.realtime) startCool();     // doublecast and collapse both share the one cooldown
   var spA=null, spB=null;
   if(idxs.length===6){ spA=resolveSpell(balls.slice(0,3)); spB=resolveSpell(balls.slice(3,6)); }
   if(!spA || spA.fizzle || spB.fizzle){ weaveCollapse(idxs, balls); return; }
@@ -615,7 +637,7 @@ function castWeave(idxs){
     idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
   },520);
   setTimeout(function(){ if(S!==st||st.over) return;
-    st.phase=null; st.busy=false; spend();
+    st.phase=null; st.busy=false; postAction();
   },650);
 }
 /* 4-5 balls, or a fizzle in either triple: no partial credit — one weak fizzle,
@@ -641,7 +663,7 @@ function weaveCollapse(idxs, balls){
     idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
   },300);
   setTimeout(function(){ if(S!==st||st.over) return;
-    st.phase=null; st.busy=false; spend();
+    st.phase=null; st.busy=false; postAction();
   },400);
 }
 function mergeLegal(A,B){
@@ -649,7 +671,8 @@ function mergeLegal(A,B){
     (A.c===B.c || (isPrim(A.c)&&isPrim(B.c)&&mix(A.c,B.c))));
 }
 function tryMerge(a,b){
-  if(S.busy||S.actions<=0) return false;
+  if(S.busy) return false;
+  if(!CFG.realtime && S.actions<=0) return false;   // flow: no action economy — merges always free
   var A=S.dial[a], B=S.dial[b];
   if(!mergeLegal(A,B)) return false;   // husks are inert — cast them away
   var res=null, levelUp=false;
@@ -668,7 +691,8 @@ function tryMerge(a,b){
     vib(levelUp?[10,30,25]:15);
     var gs=geo.slots[b]; boom(gs.x,gs.y, HEX[res.c], .6);
   }, GOO_TRAVEL);
-  if(free){ S.freeMerge=false; toast("Free merge!", 800, "#2c2733", "low"); syncHud(); }
+  if(CFG.realtime){ /* every merge is free and instant in flow — the between-casts activity */ }
+  else if(free){ S.freeMerge=false; toast("Free merge!", 800, "#2c2733", "low"); syncHud(); }
   else spend();
   return true;
 }
@@ -676,14 +700,32 @@ function spend(){
   S.actions--;
   syncHud();
   if(alive().length===0){ setTimeout(waveClear, 300); return; }
-  if(S.actions<=0){ S.busy=true; syncHud(); setTimeout(enemyPhase, 420); }
+  if(S.actions<=0){ S.busy=true; syncHud(); setTimeout(triggerPhase, 420); }
+}
+/* after a resolved cast: turn mode spends an action; flow mode only checks for a wave clear */
+function postAction(){
+  if(CFG.realtime){
+    if(alive().length===0){ setTimeout(waveClear, 300); }
+    return;
+  }
+  spend();
+}
+/* FLOW: casting on cooldown — soft reject, no penalty, no balls consumed */
+function startCool(){ S.cool = CFG.castCd; S.coolMax = CFG.castCd; }
+function coolReject(){ sThunk(); toast("cooling...", 700, "#6b6472", "low"); vib(6); }
+/* both modes route the enemy phase through here; flow guards against overlapping beats */
+function triggerPhase(){
+  if(!S || S.over) return;
+  if(S.phaseRunning){ S.phaseQueued=true; return; }   // a beat landed mid-stagger — queue, don't drop
+  enemyPhase();
 }
 
 /* ---------- staggered enemy phase ---------- */
 function enemyPhase(){
   var st=S;
-  st.busy=true; st.phase="enemy"; syncHud();
-  toast("HORDE ADVANCES", 700, "#6b6472", "mid");
+  st.phaseRunning=true; st.phase="enemy";
+  if(!CFG.realtime){ st.busy=true; toast("HORDE ADVANCES", 700, "#6b6472", "mid"); }   // flow: input stays live, no per-beat banner
+  syncHud();
   var t=430, live=alive();
   function later(ms, fn){ setTimeout(function(){ if(S===st && !st.over) fn(); }, ms); }
   live.forEach(function(e){
@@ -758,11 +800,16 @@ function stepEnemy(e){
 function endEnemyPhase(){
   var st=S;
   st.enemies = st.enemies.filter(function(e){ return !e.dead; });
-  if(st.enemies.length===0){ st.phase=null; waveClear(); return; }
-  st.actions = st.maxActions;
-  st.freeMerge = true;
-  st.busy=false; st.phase=null;
-  syncHud(true);
+  st.phaseRunning=false;
+  if(st.enemies.length===0){ st.phase=null; st.phaseQueued=false; waveClear(); return; }
+  if(!CFG.realtime){
+    st.actions = st.maxActions;
+    st.freeMerge = true;
+    st.busy=false;
+  }
+  st.phase=null;
+  syncHud(!CFG.realtime);
+  if(st.phaseQueued){ st.phaseQueued=false; enemyPhase(); }   // a beat queued during the stagger — fire it now
 }
 
 function waveClear(){
@@ -777,7 +824,8 @@ function waveClear(){
 
 /* ===================== boons (capped; Mend only when hurt) ===================== */
 var ALL_UP = [
-  { k:"quick", sym:"+1", bg:"#ffd15c", t:"Quicken",   d:"+1 action every turn",      max:2, apply:function(){ CFG.maxActionsUp++; } },
+  { k:"quick", sym:"+1", bg:"#ffd15c", t:"Quicken",   d:"+1 action every turn",      max:2, apply:function(){ CFG.maxActionsUp++; },
+    fsym:"»", ft:"Haste", fd:"Cast cooldown −15%", fapply:function(){ CFG.castCd=Math.max(1.2, CFG.castCd*0.85); } },
   { k:"bulw",  sym:"+6", bg:"#ef4a5a", t:"Bulwark",   d:"+6 max HP, healed now",     max:2, apply:function(){ S.maxhp+=6; S.hp+=6; } },
   { k:"attn",  sym:"25%", bg:"#9b62d6", t:"Attune",    d:"All spells +25% power",     max:2, apply:function(){ CFG.spellPow+=0.25; } },
   { k:"weak",  sym:"×3", bg:"#f2913d", t:"Weakness",  d:"Shield-colour hits do 3×",  max:1, apply:function(){ CFG.wardMult=3; } },
@@ -794,11 +842,14 @@ function showReward(){
   for(var i=0;i<3 && pool.length;i++){ pick.push(pool.splice((Math.random()*pool.length)|0,1)[0]); }
   var box=document.getElementById("rwCards"); box.innerHTML="";
   pick.forEach(function(u){
+    // flow mode swaps the actions-based Quicken for cooldown-based Haste (same k, so cap accounting is shared)
+    var flow=CFG.realtime, sym=(flow&&u.fsym)||u.sym, ttl=(flow&&u.ft)||u.t, dsc=(flow&&u.fd)||u.d;
+    var doApply=(flow&&u.fapply)||u.apply;
     var el=document.createElement("div"); el.className="rcard";
-    el.innerHTML='<div class="ic" style="background:'+u.bg+'">'+u.sym+'</div><div><b>'+u.t+'</b><span>'+u.d+'</span></div>';
+    el.innerHTML='<div class="ic" style="background:'+u.bg+'">'+sym+'</div><div><b>'+ttl+'</b><span>'+dsc+'</span></div>';
     el.addEventListener("click", function(){
       S.boonN[u.k]=(S.boonN[u.k]||0)+1;
-      u.apply(); sBoon(); vib(20);
+      doApply(); sBoon(); vib(20);
       hide("vReward"); S.busy=false; S.phase=null; nextWave();
     });
     box.appendChild(el);
@@ -915,9 +966,24 @@ function gooUnionPath(x1,y1,r1,x2,y2,r2,v,e){
 }
 
 /* ===================== render ===================== */
+var lastFrame=now();
+/* FLOW clocks: accumulate real elapsed only while unpaused (never wall-clock diffs across a pause) */
+function flowPaused(){
+  return S.paused || bookOpen || document.getElementById("vReward").classList.contains("show");
+}
+function updateFlow(dt){
+  if(flowPaused()) return;
+  if(S.cool>0){ S.cool-=dt; if(S.cool<=0){ S.cool=0; S.coolPulse=now(); beep(880,.07,"sine",.04); } }
+  if(S.phase!=="clear"){                     // the horde holds its breath during a wave clear / draft
+    S.beatT+=dt;
+    if(S.beatT>=S.beatMax){ S.beatT-=S.beatMax; triggerPhase(); }
+  }
+}
 function draw(){
   var t=now();
+  var dt=Math.min(0.1,(t-lastFrame)/1000); lastFrame=t;   // clamp: no giant jumps after a stall
   ctx.clearRect(0,0,W,H);
+  if(S && CFG.realtime && !S.over) updateFlow(dt);
   var sx=0, sy=0;
   if(S && S.shake>0){ sx=(Math.random()*2-1)*S.shake; sy=(Math.random()*2-1)*S.shake; S.shake*=0.86; if(S.shake<0.4)S.shake=0; }
   ctx.save(); ctx.translate(sx,sy);
@@ -933,6 +999,13 @@ function draw(){
     if(!S.over && S.hp/S.maxhp<0.4 && t-lastBeat>1900){ lastBeat=t; beep(70,.1,"sine",.045); }
   }
   ctx.restore();
+  if(S && CFG.realtime && S.paused && !S.over){
+    ctx.fillStyle="rgba(240,230,207,.55)"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#2c2733"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="700 34px Fredoka, sans-serif"; ctx.fillText("PAUSED", W/2, H*0.4);
+    ctx.font="700 13px Nunito, sans-serif"; ctx.fillStyle="#6b6472"; ctx.fillText("tap ▶ to resume", W/2, H*0.4+30);
+    ctx.textBaseline="alphabetic";
+  }
   requestAnimationFrame(draw);
 }
 
@@ -1112,13 +1185,19 @@ function drawEnemies(t){
 
 function drawDial(t){
   var g=geo;
-  var dimmed = S.phase==="enemy";
+  var dimmed = S.phase==="enemy" && !CFG.realtime;   // flow keeps the ring live during a beat
   // backboard + hub with sticker shadows
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR,0,7);
   ctx.lineWidth=g.ballR*1.7; ctx.strokeStyle="rgba(251,245,230,.9)"; ctx.stroke();
   ctx.lineWidth=2.5; ctx.strokeStyle="rgba(44,39,51,.14)";
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR+g.ballR*0.85,0,7); ctx.stroke();
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR-g.ballR*0.85,0,7); ctx.stroke();
+  // FLOW: thin ink beat-progress arc around the OUTSIDE of the backboard — next horde step, at a glance
+  if(CFG.realtime){
+    var bf=S.beatMax>0?Math.max(0,Math.min(1,S.beatT/S.beatMax)):0;
+    ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR+g.ballR*1.35,-Math.PI/2,-Math.PI/2+Math.PI*2*bf);
+    ctx.lineWidth=3; ctx.strokeStyle="rgba(44,39,51,.30)"; ctx.stroke();
+  }
   inkShadow(function(){ ctx.beginPath(); ctx.arc(g.cx,g.cy,g.hubR,0,7); }, 4);
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.hubR,0,7);
   ctx.fillStyle="#fffdf6"; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
@@ -1205,7 +1284,8 @@ function drawDial(t){
 
   // gesture trail ON TOP of the balls + live tether to the finger
   if(gesture && gesture.visited.length>=1){
-    ctx.strokeStyle="rgba(44,39,51,.55)"; ctx.lineWidth=4; ctx.setLineDash([1,8]);
+    var cooling = CFG.realtime && S.cool>0 && gesture.visited.length>=3;   // dim a cast-sweep that can't fire yet
+    ctx.strokeStyle= cooling? "rgba(44,39,51,.20)" : "rgba(44,39,51,.55)"; ctx.lineWidth=4; ctx.setLineDash([1,8]);
     ctx.beginPath();
     gesture.visited.forEach(function(si,k){ var pp=g.slots[si]; if(k===0)ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y); });
     ctx.lineTo(gesture.x, gesture.y);
@@ -1346,13 +1426,35 @@ function drawHub(t){
     ctx.fillStyle="#6b6472"; ctx.font="700 10.5px Nunito, sans-serif";
     ctx.fillText(S.hubInfo.l2, g.cx, g.cy+8);
     if(S.hubInfo.l3) ctx.fillText(S.hubInfo.l3, g.cx, g.cy+24);
+  } else if(CFG.realtime){
+    // FLOW: the whorl doubles as the cast-cooldown gauge — arc-length = readiness (empty right after a cast)
+    var frac = S.coolMax>0 ? Math.max(0,Math.min(1, 1 - S.cool/S.coolMax)) : 1;
+    var pulseK = S.coolPulse ? Math.max(0,1-(t-S.coolPulse)/500) : 0;
+    ctx.save(); ctx.translate(g.cx, g.cy-14);
+    // faint full-spiral track so the empty state still reads as a whorl
+    ctx.strokeStyle="rgba(44,39,51,.14)"; ctx.lineWidth=2.5; ctx.beginPath();
+    for(var af=0;af<=Math.PI*5;af+=0.14){ var rf=2.5+af*2.1; if(af===0)ctx.moveTo(rf,0); else ctx.lineTo(Math.cos(af)*rf,Math.sin(af)*rf); }
+    ctx.stroke();
+    // readiness portion, solid; gold flash on the ready pulse
+    ctx.strokeStyle= pulseK>0 ? "rgba("+Math.round(224-40*(1-pulseK))+",160,32,1)" : "#2c2733";
+    ctx.lineWidth=3.2+2*pulseK; ctx.beginPath();
+    var amax=Math.PI*5*frac, st2=false;
+    for(var a=0;a<=amax;a+=0.14){ var r=2.5+a*2.1, wx=Math.cos(a)*r, wy=Math.sin(a)*r;
+      if(!st2){ ctx.moveTo(wx,wy); st2=true; } else ctx.lineTo(wx,wy); }
+    ctx.stroke();
+    if(pulseK>0){ ctx.strokeStyle="rgba(255,209,92,"+(pulseK*0.6)+")"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,14,0,7); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle="#6b6472"; ctx.font="700 11px Nunito, sans-serif";
+    ctx.fillText("swirl · merge · cast", g.cx, g.cy+22);
+    if(S.cool<=0 && !S.busy){ ctx.fillStyle="#b9791a"; ctx.font="700 10px Nunito, sans-serif";
+      ctx.fillText("cast ready", g.cx, g.cy+38); }
   } else {
     // the whorl mark: a hand-drawn spiral
     ctx.save(); ctx.translate(g.cx, g.cy-14);
     ctx.strokeStyle="#2c2733"; ctx.lineWidth=2.5; ctx.beginPath();
-    for(var a=0;a<=Math.PI*5;a+=0.14){
-      var r=2.5+a*2.1, wx=Math.cos(a+t/2400)*r, wy=Math.sin(a+t/2400)*r;
-      if(a===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy);
+    for(var a2=0;a2<=Math.PI*5;a2+=0.14){
+      var r2=2.5+a2*2.1, wx2=Math.cos(a2+t/2400)*r2, wy2=Math.sin(a2+t/2400)*r2;
+      if(a2===0) ctx.moveTo(wx2,wy2); else ctx.lineTo(wx2,wy2);
     }
     ctx.stroke(); ctx.restore();
     ctx.fillStyle="#6b6472"; ctx.font="700 11px Nunito, sans-serif";
@@ -1478,20 +1580,22 @@ function gesturePreview(){
         }
       }
       sub += " — or keep weaving…";
+      if(CFG.realtime && S.cool>0){ sub="cooling..."; col=greyTint(col); }
       return { big:sp.name, sub:sub, col:col, chips:balls.map(function(b){return b.c;}) }; }
   } else if(v.length>=4){
     /* the weave: 4-5 balls is a dangling (dangerous) chain, 6 is a doublecast */
     var wb=v.slice(0,6).map(function(i){return S.dial[i];});
     if(wb.every(Boolean)){
       var chips=wb.map(function(b){return b.c;});
+      var cooling = CFG.realtime && S.cool>0;
       var sA=resolveSpell(wb.slice(0,3));
       if(v.length<6){
         var cA=sA.tint==="#fff"?"#2c2733":sA.tint;
-        return { big:sA.name+" + ?", small:true, sub:"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
+        return { big:sA.name+" + ?", small:true, sub:cooling?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
       }
       var sB=resolveSpell(wb.slice(3,6));
       if(sA.fizzle||sB.fizzle) return { big:"✕ collapse", sub:"a weave must be two true spells", col:"#b9b2a6", chips:chips };
-      return { big:sA.name+" + "+sB.name, small:true, sub:"DOUBLECAST — release!", col:"#ffd15c", chips:chips };
+      return { big:sA.name+" + "+sB.name, small:true, sub:cooling?"cooling...":"DOUBLECAST — release!", col:cooling?greyTint("#ffd15c"):"#ffd15c", chips:chips };
     }
   }
   return null;
@@ -1524,7 +1628,9 @@ function down(x,y){
   ac();
   if(bookOpen) return;             // spellbook is open — play input is paused
   if(!S || S.over) return;
-  if(S.busy || S.actions<=0){
+  if(CFG.realtime){
+    if(S.paused || S.busy) return; // flow: cooldown never blocks the START of a sweep (merges stay open)
+  } else if(S.busy || S.actions<=0){
     if(!S.busy && S.actions<=0){ joltPips(); sThunk(); }
     return;
   }
@@ -1618,16 +1724,59 @@ function syncHud(refill){
 /* ===================== overlays ===================== */
 function show(id){ document.getElementById(id).classList.add("show"); }
 function hide(id){ document.getElementById(id).classList.remove("show"); }
-document.getElementById("btnStart").addEventListener("click", function(){ ac(); hide("vStart"); newGame(); });
+/* mode-dependent HUD: flow hides the action economy, shows the pause button */
+function applyModeUI(){
+  var rt=CFG.realtime;
+  document.getElementById("chipActs").style.display = rt?"none":"";
+  document.getElementById("endwrap").style.display  = rt?"none":"";
+  document.getElementById("btnPause").style.display = rt?"":"none";
+}
+function updatePauseBtn(){
+  var b=document.getElementById("btnPause");
+  var p = S && S.paused;
+  b.textContent = p?"▶":"⏸"; b.title = p?"Resume":"Pause";
+}
+function startMode(rt){
+  ac();
+  CFG.realtime=rt;
+  try{ localStorage.setItem("wh_mode", rt?"flow":"turns"); }catch(e){}
+  hide("vStart"); newGame();
+}
+document.getElementById("btnStart").addEventListener("click", function(){ startMode(false); });
+document.getElementById("btnFlow").addEventListener("click", function(){ startMode(true); });
 document.getElementById("btnRetry").addEventListener("click", function(){ hide("vOver"); newGame(); });
+document.getElementById("btnPause").addEventListener("click", function(){
+  if(!S||S.over||!CFG.realtime) return;
+  S.paused=!S.paused; updatePauseBtn(); beep(S.paused?300:520,.08,"sine",.04);
+});
+/* pre-highlight the last-chosen mode on the start panel */
+(function(){
+  var m="turns"; try{ m=localStorage.getItem("wh_mode")||"turns"; }catch(e){}
+  document.getElementById(m==="flow"?"btnFlow":"btnStart").classList.add("accent");
+})();
 document.getElementById("btnEnd").addEventListener("click", function(){
-  if(!S||S.busy||S.over) return;
-  S.busy=true; syncHud(); setTimeout(enemyPhase, 120);
+  if(!S||S.busy||S.over||CFG.realtime) return;
+  S.busy=true; syncHud(); setTimeout(triggerPhase, 120);
 });
 document.getElementById("btnBook").addEventListener("click", function(){ ac(); if(bookOpen){ closeBook(); return; } openBook(); });
 document.getElementById("btnBookClose").addEventListener("click", closeBook);
 
 /* ===================== boot ===================== */
+/* test/debug hook: a read-only snapshot of live state (used by the mjs suites) */
+window.__wh = function(){
+  if(!S) return null;
+  var live = alive();
+  return {
+    realtime: CFG.realtime, actions: S.actions, maxActions: S.maxActions,
+    cool: +S.cool.toFixed(3), coolMax: S.coolMax, castCd: CFG.castCd,
+    beatT: +S.beatT.toFixed(3), beatMax: S.beatMax,
+    paused: S.paused, busy: S.busy, phase: S.phase, over: S.over, wave: S.wave, hp: S.hp,
+    enemies: live.length,
+    rungSum: live.reduce(function(s,e){ return s+e.rung; }, 0),
+    minRung: live.length? Math.min.apply(null, live.map(function(e){return e.rung;})) : -1,
+    dial: S.dial.map(function(b){ return b? b.c+b.lvl : null; })
+  };
+};
 resize();
 requestAnimationFrame(draw);
 
