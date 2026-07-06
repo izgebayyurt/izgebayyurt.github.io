@@ -1467,8 +1467,8 @@ function tryMerge(a,b){
   var res=null, levelUp=false;
   if(A.c===B.c){ res={ c:A.c, lvl:A.lvl+1 }; levelUp=true; }
   else { res={ c:mix(A.c,B.c), lvl:A.lvl }; }
-  var gild = S.gildNext;               // Gilding: this merge is free and its result gains +1 level
-  if(gild){ res.lvl += 1; S.gildNext=false; }
+  var gild = S.gildNext;               // Gilding: this merge is free and its result gains +1 level (II: +2)
+  if(gild){ res.lvl += (isII("Gilding")?2:1); S.gildNext=false; }
   var free = (levelUp && S.freeMerge) || gild;
   /* goo join: A slides into B as one liquid blob (drawn in drawDial), then the
      union squashes and pops to the result at contact — born is set to contact time */
@@ -1721,7 +1721,7 @@ var RARITY = { common:{ word:"Common", border:"#2c2733" }, rare:{ word:"Rare", b
 var ITEM_META = {
   /* sigils (by name) */
   Gilding:{r:"common",t:["weave"]}, Distill:{r:"common",t:["weave"]}, Aurum:{r:"common",t:["economy"]}, Sublimate:{r:"common",t:["weave"]},
-  Quench:{r:"rare",t:["burn"]}, Bellows:{r:"rare",t:["burn"]}, Undertow:{r:"rare",t:["wall"]}, Ferment:{r:"rare",t:["poison"]},
+  Quench:{r:"rare",t:["burn"]}, Bellows:{r:"rare",t:["burn"]}, Undertow:{r:"rare",t:["wall"]}, Ferment:{r:"rare",t:[]},
   Mordant:{r:"epic",t:["weave"]}, Calcine:{r:"epic",t:["burn"]},
   /* rituals (by name) */
   Golem:{r:"rare",t:["summon"]}, Sentry:{r:"rare",t:["summon"]}, "Pyre Ground":{r:"rare",t:["burn"]},
@@ -1729,7 +1729,7 @@ var ITEM_META = {
   /* reagents (by key) */
   buttress:{r:"common",t:["wall"]}, catalyst:{r:"common",t:["economy"]}, mason:{r:"common",t:["wall"]},
   cinder:{r:"rare",t:["burn"]}, shatterfrost:{r:"rare",t:["freeze"]}, lens:{r:"rare",t:["economy"]},
-  quicksilver:{r:"epic",t:["weave"]}, mold:{r:"epic",t:["poison"]}
+  quicksilver:{r:"epic",t:["weave"]}, mold:{r:"epic",t:[]}   // Ferment/Mold carry no build tag (spec'd tag sets only)
 };
 /* concise tier-II upgrade blurbs — shown on a MERGE→II offer so the player knows what the merge buys */
 var II_DESC = {
