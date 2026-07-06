@@ -319,6 +319,7 @@ body{
       Merges and casts cost <b>1 action</b> each — but one <b>level-up merge per turn is free</b>.<br>
       Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.<br>
       A spell is its <b>exact recipe</b> — or a crafted pair. One of each primary weaves a <b>Prism</b>: it echoes the first colour you sweep.<br>
+      <b style="color:var(--ink)">Hold</b> a ball to lift and carry it — build the window you need.<br>
       <b style="color:var(--ink)">Turns</b> — actions &amp; End-turn. <b style="color:var(--ink)">Flow</b> — real-time: cast on a cooldown, the horde steps on a beat.
     </div>
     <div class="row">
@@ -493,6 +494,10 @@ function newGame(){
     tier2:{}, catFree:0,                             // MERGE→II ownership set + Catalyst free-transmute counter/turn
     retireN:0, retireMode:false, retireSel:null,    // Retire slot: escalating fee count + UI mode/selection
     dialSig:"", exoticGlow:{}, masonFlash:0,        // strip-glow cache + Mason gate flourish
+    // ---- THE LIVING RING: arrange + legibility suite ----
+    lastInputT:now(), wiggle:null, wiggleFireT:0,   // idle-hint clock + the current wiggle burst
+    arrangeGlow:null, arrangeBest:null,             // live castable-window glow + best-spell readout while arranging
+    oneAway:null, castSig:"", castWindows:null,     // one-away pulse targets + cached castable-window scan (gentle arcs / wiggle)
     // ---- FLOW MODE clocks (delta-accumulated; only advance while unpaused) ----
     cool:0, coolMax:CFG.castCd, coolPulse:0,        // cast cooldown
     chain:0, readyElapsed:0,                        // FLOW CHAINING: consecutive prompt-cast count + idle-since-ready timer
@@ -633,6 +638,7 @@ function sHorn(){ beep(220,.2,"triangle",.05); setTimeout(function(){beep(330,.2
 function sEliteHorn(){ beep(140,.3,"triangle",.06); setTimeout(function(){beep(105,.35,"triangle",.06);},180); setTimeout(function(){beep(210,.28,"triangle",.05);},340); }
 function sClank(){ beep(190,.05,"square",.05); setTimeout(function(){beep(120,.06,"square",.04);},45); }   // armored bounce
 function sChime(){ beep(660,.12,"sine",.035); setTimeout(function(){beep(880,.15,"sine",.03);},85); }      // healer pulse
+function sLift(){ beep(560,.06,"sine",.045); setTimeout(function(){ beep(860,.10,"sine",.04); },55); }     // ARRANGE: distinct "lift" chime
 function sChainChime(lvl){ beep(720+lvl*150,.06,"sine",.03); }                                             // flow chain: pitch rises with the chain
 function sDrain(){ beep(240,.14,"sawtooth",.035); setTimeout(function(){beep(170,.16,"sawtooth",.03);},90); }
 function sWin(){ [0,110,220,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,.16,"triangle",.05); },t); }); }
@@ -1229,6 +1235,60 @@ function ringHasMultiset(recipe){
   }
   return false;
 }
+/* ===================== LIVING RING: window scanning =====================
+   Scan every consecutive window on the ring for a valid RELEASE right now: 3 = a spell (or a Prism
+   transmute), 4-5 = an owned sigil (ordered) or ritual (multiset) → gold, 6 = a doublecast (both
+   halves true) → gold. Returns plain window descriptors {slots, tint, gold, name, score}. Pure over the
+   passed dial. Shared by the arrange live-glow, the gentle-mode always-on arcs, and the idle wiggle. */
+function scanWindows(dial){
+  var n=CFG.slots, out=[];
+  function ballsAt(s,L){ var a=[]; for(var k=0;k<L;k++){ var b=dial[(s+k)%n]; if(!b) return null; a.push(b); } return a; }
+  function slotsAt(s,L){ var a=[]; for(var k=0;k<L;k++) a.push((s+k)%n); return a; }
+  for(var s=0;s<n;s++){
+    var b3=ballsAt(s,3); if(!b3) continue;
+    var sp=resolveSpell(b3);
+    if(sp.transmute) out.push({ slots:slotsAt(s,3), tint:"#9b62d6", gold:false, name:"Prism", score:40 });
+    else if(!sp.fizzle) out.push({ slots:slotsAt(s,3), tint:(sp.tint==="#ffd15c"?"#ffd15c":sp.tint), gold:false, name:sp.name, score:50+(sp.dmg||0) });
+  }
+  if(S.exotics.length || S.rituals.length){
+    for(var L=4;L<=5;L++) for(var s2=0;s2<n;s2++){
+      var bl=ballsAt(s2,L); if(!bl) continue;
+      var cols=bl.map(function(b){ return b.c; });
+      var ex=matchExotic(cols);
+      if(ex){ out.push({ slots:slotsAt(s2,L), tint:"#ffd15c", gold:true, name:ex.name, score:200 }); continue; }
+      var ri=matchRitual(cols);
+      if(ri) out.push({ slots:slotsAt(s2,L), tint:"#ffd15c", gold:true, name:ri.name, score:190 });
+    }
+  }
+  for(var s3=0;s3<n;s3++){
+    var b6=ballsAt(s3,6); if(!b6) continue;
+    var A=resolveSpell(b6.slice(0,3)), B=resolveSpell(b6.slice(3,6));
+    if(!A.fizzle && !B.fizzle && !(A.transmute&&B.transmute)) out.push({ slots:slotsAt(s3,6), tint:"#ffd15c", gold:true, name:"Doublecast", score:150 });
+  }
+  return out;
+}
+function bestWindow(wins){ var b=null; wins.forEach(function(w){ if(!b||w.score>b.score) b=w; }); return b; }
+/* cached scan keyed by the dial signature — gentle arcs + idle wiggle recompute only on a ring change */
+function castWindowsCached(){
+  var sig=S.dial.map(function(b){ return b?(b.c+b.lvl):"-"; }).join("");
+  if(sig!==S.castSig){ S.castSig=sig; S.castWindows=scanWindows(S.dial); }
+  return S.castWindows;
+}
+/* ONE-AWAY: given a 2-ball sweep [a,b] (b last), the candidate continuation slots that would complete a
+   valid 3-recipe. Cheap — only the (at most two) neighbours of the last ball not already swept. */
+function oneAwayFor(v){
+  if(!v || v.length!==2) return [];
+  var a=v[0], b=v[1], n=CFG.slots, res=[];
+  [ (b+1)%n, (b+n-1)%n ].forEach(function(c){
+    if(v.indexOf(c)>=0) return;
+    var balls=[S.dial[a],S.dial[b],S.dial[c]];
+    if(balls.some(function(x){ return !x; })) return;
+    var sp=resolveSpell(balls);
+    if(sp.transmute || !sp.fizzle) res.push(c);
+  });
+  return res;
+}
+
 function exoticCastFx(ex){
   var ty=geo.cy-geo.dialR-geo.ballR;
   boom(geo.cx, ty, ex.bg, 1.6);
@@ -1487,6 +1547,7 @@ function tryMerge(a,b){
     sMerge(res.lvl);
     vib(levelUp?[10,30,25]:15);
     var gs=geo.slots[b]; boom(gs.x,gs.y, HEX[res.c], .6);
+    mergeShove(b, res.lvl);                                // MERGE-SHOVE: springy radial nudge to the neighbours
   }, GOO_TRAVEL);
   if(CFG.realtime){ /* every merge is free and instant in flow — the between-casts activity */ }
   else if(gild){ toast("Gilded merge!", 800, "#b9791a", "low"); syncHud(); }   // free, and freeMerge stays unspent
@@ -1647,6 +1708,7 @@ function endEnemyPhase(){
     st.freeMerge = true;
     st.firstTransmuteUsed = false; st.catFree = 0;   // Catalyst: a new turn re-arms the free transmute(s)
     st.busy=false;
+    st.lastInputT=now(); st.wiggle=null; st.wiggleFireT=0;   // fresh turn: restart the idle-hint clock
   }
   st.phase=null;
   syncHud(!CFG.realtime);
@@ -2180,7 +2242,21 @@ function inkShadow(pathFn, dy){
    joined by two cubic beziers that bow toward the midpoint. neck + both
    circles filled together (nonzero winding) read as ONE liquid blob. */
 var GOO_TRAVEL=240, GOO_SQUASH=120, CAST_GOO=180;
+var ARR_SLIDE=190, SHOVE_DUR=270;                       // ARRANGE bead-slide + MERGE-SHOVE burst durations
 var PARENT={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a secondary remembers its primaries
+/* MERGE-SHOVE (Suika steal): the just-merged ball elbows its neighbours out along the ring, radially,
+   and they spring back over ~SHOVE_DUR. Visual only — no slot changes. The burst scales with the
+   resulting level so a big level-up feels like a heavier thump. */
+function mergeShove(slot, lvl){
+  var g=geo, n=CFG.slots, base=g.ballR*(0.18+0.055*Math.min(lvl,5));
+  [[ (slot+1)%n, 1 ],[ (slot+n-1)%n, 1 ],[ (slot+2)%n, 0.5 ],[ (slot+n-2)%n, 0.5 ]].forEach(function(pr){
+    var idx=pr[0], w=pr[1], nb=S.dial[idx]; if(!nb) return;
+    var ps=g.slots[slot], pn=g.slots[idx];
+    var vx=pn.x-ps.x, vy=pn.y-ps.y, d=Math.hypot(vx,vy)||1;
+    nb.shove={ t:now(), dx:vx/d*base*w, dy:vy/d*base*w };
+  });
+  S.shake=Math.min(20, S.shake + 1.5 + lvl*0.6);
+}
 function avgHex(a,b){
   var r=(parseInt(a.substr(1,2),16)+parseInt(b.substr(1,2),16))>>1,
       g=(parseInt(a.substr(3,2),16)+parseInt(b.substr(3,2),16))>>1,
@@ -2257,6 +2333,7 @@ function draw(){
   ctx.save(); ctx.translate(sx,sy);
 
   if(S){
+    if(!S.over) maybeIdleWiggle(t);
     drawField(t);
     drawPyre(t);
     drawEnemies(t);
@@ -2703,6 +2780,17 @@ function drawEnemies(t){
   });
 }
 
+/* a soft ink arc laid UNDER a consecutive window of balls, tinted by the spell's family colour
+   (gold for owned sigils/rituals) — the arrange live-glow and the gentle-mode always-on hints. */
+function drawWindowArc(slots, tint, alpha){
+  var g=geo, n=CFG.slots;
+  var a0=-Math.PI/2 + slots[0]*(Math.PI*2/n);
+  var a1=a0 + (slots.length-1)*(Math.PI*2/n);   // windows are consecutive & increasing (mod n) by construction
+  var pad=0.085;
+  ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR, a0-pad, a1+pad);
+  ctx.lineWidth=g.ballR*1.35; ctx.strokeStyle=tint; ctx.globalAlpha=alpha;
+  ctx.lineCap="round"; ctx.stroke(); ctx.globalAlpha=1;
+}
 function drawDial(t){
   var g=geo;
   var dimmed = S.phase==="enemy" && !CFG.realtime;   // flow keeps the ring live during a beat
@@ -2723,6 +2811,14 @@ function drawDial(t){
   ctx.fillStyle="#fffdf6"; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
 
   drawHub(t);
+
+  // LIVING RING: soft window arcs under the balls — live glow while arranging, faint always-on on Gentle
+  if(gesture && gesture.mode==="arrange" && S.arrangeGlow){
+    var pkA=0.5+0.5*Math.sin(t/280);
+    S.arrangeGlow.forEach(function(w){ drawWindowArc(w.slots, w.gold?"#ffd15c":w.tint, (w.gold?0.30:0.20)+0.13*pkA); });
+  } else if(difficulty==="gentle" && !S.busy && S.phase!=="enemy"){
+    castWindowsCached().forEach(function(w){ drawWindowArc(w.slots, w.gold?"#ffd15c":w.tint, w.gold?0.16:0.10); });
+  }
 
   if(dimmed) ctx.globalAlpha=0.65;
   // balls
@@ -2755,8 +2851,23 @@ function drawDial(t){
       }
       b.goo=null;
     }
-    var vis = gesture && gesture.visited.indexOf(i)>=0;
-    var isLast = gesture && gesture.visited[gesture.visited.length-1]===i;
+    var arranging = gesture && gesture.mode==="arrange";
+    var lifted = arranging && i===gesture.cur;
+    var vis = !arranging && gesture && gesture.visited.indexOf(i)>=0;
+    var isLast = !arranging && gesture && gesture.visited[gesture.visited.length-1]===i;
+    // ARRANGE bead-slide: a shoved neighbour flows in from its old slot
+    if(b.arrT){ var ak=(t-b.arrT)/ARR_SLIDE; if(ak<1 && b.arrFrom!=null){ var afp=g.slots[b.arrFrom]; var ae=1-Math.pow(1-ak,3); px=afp.x+(p.x-afp.x)*ae; py=afp.y+(p.y-afp.y)*ae; } else { b.arrT=0; b.arrFrom=null; } }
+    // MERGE-SHOVE: a springy radial nudge that settles back
+    if(b.shove){ var sk=(t-b.shove.t)/SHOVE_DUR; if(sk<1){ var env=Math.sin(sk*Math.PI); px+=b.shove.dx*env; py+=b.shove.dy*env; } else b.shove=null; }
+    // IDLE WIGGLE: a subtle Candy-Crush shimmy on a castable window
+    if(S.wiggle && S.wiggle.slots.indexOf(i)>=0){ var wk=(t-S.wiggle.t)/WIGGLE_DUR; if(wk<1){ px+=Math.sin(wk*Math.PI*6)*(1-wk)*3.2; py+=Math.cos(wk*Math.PI*5)*(1-wk)*2.0; } }
+    if(lifted){
+      // the carried bead: rides the finger, popped + a soft breathe, gold ring
+      var liftPop=b.liftT?Math.min(1,(t-b.liftT)/160):1;
+      var lscale=1.20+0.14*liftPop + 0.03*Math.sin(t/180);
+      drawBall(b, gesture.x, gesture.y, i, t, lscale, true, false);
+      continue;
+    }
     // drag response: last visited leans toward the finger
     if(isLast && gesture){
       var ddx=gesture.x-px, ddy=gesture.y-py, dd=Math.hypot(ddx,ddy)||1;
@@ -2767,6 +2878,12 @@ function drawDial(t){
     var breathe = vis? 0 : 0.02*Math.sin(t/650+i*1.7);
     var scale=1 + pop*0.25 + (isLast?0.18:(vis?0.08:0)) + breathe;
     drawBall(b, px, py, i, t, scale, vis, false);
+    // ONE-AWAY PULSE: a candidate that would complete a valid 3-recipe glows softly
+    if(S.oneAway && S.oneAway.indexOf(i)>=0){
+      var op=0.5+0.5*Math.sin(t/160);
+      ctx.beginPath(); ctx.arc(p.x,p.y, g.ballR*0.95+4+op*2,0,7);
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(255,209,92,"+(0.32+0.42*op)+")"; ctx.stroke();
+    }
   }
   // anticipatory goo: two mergeable neighbours grow a liquid film that thickens
   // as the finger closes in — clipped to the waist gap so it bridges the rims
@@ -2802,8 +2919,8 @@ function drawDial(t){
   }
   if(dimmed) ctx.globalAlpha=1;
 
-  // gesture trail ON TOP of the balls + live tether to the finger
-  if(gesture && gesture.visited.length>=1){
+  // gesture trail ON TOP of the balls + live tether to the finger (not during an arrange walk)
+  if(gesture && gesture.mode!=="arrange" && gesture.visited.length>=1){
     var cooling = CFG.realtime && S.cool>0 && gesture.visited.length>=3;   // dim a cast-sweep that can't fire yet
     ctx.strokeStyle= cooling? "rgba(44,39,51,.20)" : "rgba(44,39,51,.55)"; ctx.lineWidth=4; ctx.setLineDash([1,8]);
     ctx.beginPath();
@@ -2962,6 +3079,28 @@ function drawHub(t){
   var g=geo;
   ctx.textAlign="center"; ctx.textBaseline="middle";
   var preview=gesturePreview();
+  if(gesture && gesture.mode==="arrange"){
+    if(gesture.tut){                                   // first-ever lift: the coach line, for the drag's duration
+      ctx.fillStyle="#2c2733"; ctx.font="700 15px Fredoka, sans-serif";
+      ctx.fillText("walk the ball", g.cx, g.cy-9);
+      ctx.fillText("around the ring", g.cx, g.cy+12);
+    } else if(S.arrangeBest){                           // live: the best available spell if released now
+      var bc = S.arrangeBest.gold ? "#b9791a" : (S.arrangeBest.tint==="#ffd15c" ? "#b9791a" : S.arrangeBest.tint);
+      ctx.fillStyle="#6b6472"; ctx.font="700 12px Nunito, sans-serif";
+      ctx.fillText("release:", g.cx, g.cy-16);
+      ctx.fillStyle=bc; ctx.font="700 "+(S.arrangeBest.name.length>9?17:21)+"px Fredoka, sans-serif";
+      ctx.fillText(S.arrangeBest.name, g.cx, g.cy+4);
+      ctx.fillStyle="#b9791a"; ctx.font="700 11px Nunito, sans-serif";
+      ctx.fillText("ready", g.cx, g.cy+22);
+    } else {
+      ctx.fillStyle="#8a8578"; ctx.font="700 14px Fredoka, sans-serif";
+      ctx.fillText("arranging…", g.cx, g.cy-2);
+      ctx.fillStyle="#a49e92"; ctx.font="700 11px Nunito, sans-serif";
+      ctx.fillText("shape a window", g.cx, g.cy+18);
+    }
+    ctx.textBaseline="alphabetic";
+    return;
+  }
   if(preview){
     ctx.fillStyle=preview.col; ctx.font="700 "+(preview.small?17:24)+"px Fredoka, sans-serif";
     ctx.fillText(preview.big, g.cx, g.cy-16);
@@ -3198,6 +3337,11 @@ function gesturePreview(){
 
 /* ===================== input ===================== */
 var gesture=null;
+var armTimer=null, ARM_MS=250;                                      // ARRANGE long-press: 250ms stationary hold arms the lift
+var IDLE_MS=4000, WIGGLE_DUR=800, WIGGLE_GAP=6000;                  // idle-hint wiggle cadence
+function clearArm(){ if(armTimer){ clearTimeout(armTimer); armTimer=null; } }
+/* any pointer activity resets the idle-hint clock and dismisses a live wiggle */
+function markInput(){ if(S){ S.lastInputT=now(); S.wiggle=null; S.wiggleFireT=0; } }
 /* wedge hit-testing: the whole ring band belongs to the nearest slot */
 function slotAt(x,y,forDown){
   var dx=x-geo.cx, dy=y-geo.cy, r=Math.hypot(dx,dy);
@@ -3217,7 +3361,79 @@ function tryVisit(s){
 }
 function cancelGesture(){
   if(!gesture) return;
-  gesture=null; sCancel();
+  if(gesture.mode==="arrange" && gesture.origDial){        // abandon a live arrange: restore the ring, no cost
+    for(var i=0;i<CFG.slots;i++){ S.dial[i]=gesture.origDial[i]; if(S.dial[i]){ S.dial[i].arrFrom=null; S.dial[i].arrT=0; } }
+  }
+  clearArm(); gesture=null;
+  S.arrangeGlow=null; S.arrangeBest=null; S.oneAway=null;
+  sCancel();
+}
+/* ===================== THE ARRANGE ===================== */
+/* long-press armed: lift the ball under the finger and enter rotary-insert mode */
+function armArrange(){
+  var g=gesture; if(!g) return;
+  g.arming=false; g.mode="arrange";
+  g.origin=g.visited[0]; g.cur=g.origin;
+  g.origDial=S.dial.slice();                    // remembered so a hub-cancel can flow the beads back home
+  g.lifted=S.dial[g.origin];
+  var firstTut=false;
+  try{ if(!localStorage.getItem("wh_arrangetut")){ firstTut=true; localStorage.setItem("wh_arrangetut","1"); } }catch(e){}
+  g.tut=firstTut;                               // first-ever lift shows the "walk the ball around the ring" coach line
+  if(g.lifted){ g.lifted.liftT=now(); g.lifted.arrFrom=null; g.lifted.arrT=0; }
+  sLift(); vib([12]);
+  arrangeRecompute();
+}
+/* WALK the lifted bead to a target slot: each slot it passes, that neighbour shifts one toward the
+   origin (a chain of adjacent swaps along the shorter arc) — beads flowing round a string. */
+function arrangeStep(target){
+  var g=gesture, n=CFG.slots, cur=g.cur, guard=0;
+  while(cur!==target && guard++<n){
+    var d=((target-cur)%n+n)%n, dir=(d<=n/2)?1:-1;
+    var nx=((cur+dir)%n+n)%n;
+    var tmp=S.dial[cur]; S.dial[cur]=S.dial[nx]; S.dial[nx]=tmp;
+    var disp=S.dial[cur]; if(disp){ disp.arrFrom=nx; disp.arrT=now(); }   // the shoved neighbour slides in from nx
+    cur=nx;
+  }
+  g.cur=cur;
+  if(g.lifted){ g.lifted.arrFrom=null; g.lifted.arrT=0; }   // lifted bead tracks the finger, no slide
+  beep(430+((g.cur*37)%9)*22,.03,"sine",.028);
+  arrangeRecompute();
+}
+/* recompute the live window-glow + best-spell readout — on each SLOT change, not per frame */
+function arrangeRecompute(){
+  var wins=scanWindows(S.dial);
+  S.arrangeGlow=wins; S.arrangeBest=bestWindow(wins);
+}
+/* into the hub while arranging = cancel: the ring flows back to its original order, no cost */
+function arrangeCancel(){ cancelGesture(); }
+/* release: the lifted bead settles where it sits. Moved from origin → 1 action (Turns) / free (Flow);
+   released at origin → free cancel. Arranging NEVER auto-merges — it is its own verb. */
+function arrangeSettle(){
+  var g=gesture; gesture=null;
+  clearArm(); markInput();
+  S.arrangeGlow=null; S.arrangeBest=null;
+  if(g.lifted){ g.lifted.liftT=0; }
+  if(g.cur===g.origin){ sCancel(); return; }   // never left home — free cancel
+  sThunk(); vib(10);
+  if(!CFG.realtime) spend();                    // Turns: an arrange that lands elsewhere costs 1 action (Flow: free)
+}
+/* ===================== IDLE HINT WIGGLE ===================== */
+/* after ~4s idle on the player's turn (Turns) or ~4s idle unpaused (Flow), one currently-castable
+   window's balls wiggle for ~0.8s, then again every ~6s. Disabled entirely on FIERCE. */
+function maybeIdleWiggle(t){
+  if(!S || S.over || difficulty==="fierce") return;
+  if(gesture || S.busy) return;
+  if(CFG.realtime){ if(flowPaused()) return; }
+  else if(S.phase==="enemy" || S.phase==="clear") return;      // Turns: only while it's your move
+  var idle=t-(S.lastInputT||0);
+  if(idle<IDLE_MS) return;
+  if(S.wiggle && t-S.wiggle.t<WIGGLE_DUR) return;              // one already shimmying
+  if(S.wiggleFireT && t-S.wiggleFireT<WIGGLE_GAP) return;      // hold the ~6s cadence
+  var threes=castWindowsCached().filter(function(w){ return w.slots.length===3; });
+  if(!threes.length){ S.wiggleFireT=t; return; }              // nothing castable — try again next cadence
+  var w=threes[(Math.random()*threes.length)|0];
+  S.wiggle={ slots:w.slots.slice(), t:t };
+  S.wiggleFireT=t;
 }
 /* tap-target a standing creation on the field (outside the ring) */
 function creationAtPoint(x,y){
@@ -3246,29 +3462,54 @@ function down(x,y){
     return;
   }
   var si=slotAt(x,y,true); if(si<0) return;
-  gesture={ visited:[si], x:x, y:y };
+  markInput();
+  gesture={ visited:[si], x:x, y:y, downX:x, downY:y, mode:null, arming:true };
+  // arm the long-press: a stationary finger for ARM_MS lifts the ball. A moving finger disarms (see move).
+  clearArm();
+  var gref=gesture;
+  armTimer=setTimeout(function(){ armTimer=null;
+    if(gesture!==gref || !gesture.arming || gesture.mode) return;
+    if(!S || S.over) return;
+    if(CFG.realtime ? (S.paused||S.busy) : S.busy) return;
+    armArrange();
+  }, ARM_MS);
 }
 function move(x,y){
   if(!gesture) return;
-  gesture.x=x; gesture.y=y;
+  if(gesture.mode==="arrange"){                                  // WALK the lifted bead around the ring
+    gesture.x=x; gesture.y=y; markInput();
+    var ra=Math.hypot(x-geo.cx, y-geo.cy);
+    if(ra < geo.dialR-geo.ballR*1.6){ arrangeCancel(); return; }  // into the hub = cancel, beads flow home
+    var sa=slotAt(x,y,false); if(sa<0) return;
+    if(sa!==gesture.cur) arrangeStep(sa);
+    return;
+  }
+  gesture.x=x; gesture.y=y; markInput();
+  // a moving finger never arms the long-press: once it travels past the slot, disarm → this is a sweep/merge
+  if(gesture.arming){
+    if(Math.hypot(x-gesture.downX, y-gesture.downY) > geo.ballR*0.55){ gesture.arming=false; clearArm(); }
+  }
   var r=Math.hypot(x-geo.cx, y-geo.cy);
   if(r < geo.dialR-geo.ballR*1.6){ cancelGesture(); return; }   // drag into the hub = cancel
   var si=slotAt(x,y,false); if(si<0) return;
   var v=gesture.visited, last=v[v.length-1];
-  if(si===last) return;
-  if(v.length>=2 && si===v[v.length-2]){ v.pop(); return; }     // backtrack un-visits
-  if(adj(si,last)){ tryVisit(si); return; }
+  if(si===last){ S.oneAway=oneAwayFor(v); return; }
+  if(v.length>=2 && si===v[v.length-2]){ v.pop(); S.oneAway=oneAwayFor(v); return; }   // backtrack un-visits
+  if(adj(si,last)){ tryVisit(si); S.oneAway=oneAwayFor(v); return; }
   // fast flick: walk the ring along the shorter arc so no slot is skipped
   var d=((si-last)%12+12)%12, dir = d<=6? 1 : -1, cur=last;
   for(var guard=0; guard<6; guard++){
     cur=((cur+dir)%12+12)%12;
-    if(!tryVisit(cur)) return;
-    if(cur===si) return;
+    if(!tryVisit(cur)){ S.oneAway=oneAwayFor(v); return; }
+    if(cur===si){ S.oneAway=oneAwayFor(v); return; }
   }
 }
 function up(){
   if(!gesture) return;
+  clearArm();
+  if(gesture.mode==="arrange"){ arrangeSettle(); return; }      // arrange settles on its own — never merges
   var v=gesture.visited; gesture=null;
+  markInput(); S.oneAway=null;
   if(v.length===2){ if(!tryMerge(v[0],v[1])){ beep(180,.1,"sine",.04); } }
   else if(v.length===3){ cast(v); }
   else if(v.length>3){ castWeave(v); }                          // 4-6 = weave (or collapse)
@@ -3414,6 +3655,11 @@ window.__wh = function(){
     creations: S.creations.filter(function(c){ return !c.dead; }).map(function(c){ return { kind:c.kind, lane:c.lane, rung:c.rung, hp:c.hp, maxhp:c.maxhp, attack:c.attack, tl:c.tl }; }),
     pyre: S.pyre ? { lane:S.pyre.lane, rung:S.pyre.rung } : null,
     pendingDouble: S.pendingDouble, gildNext: S.gildNext,
+    arrangeBest: S.arrangeBest ? { name:S.arrangeBest.name, gold:!!S.arrangeBest.gold } : null,
+    arrangeGlowN: S.arrangeGlow ? S.arrangeGlow.length : 0,
+    arranging: !!(gesture && gesture.mode==="arrange"),
+    oneAway: S.oneAway ? S.oneAway.slice() : [],
+    wiggle: S.wiggle ? { slots:S.wiggle.slots.slice() } : null,
     enemies: live.length,
     rungSum: live.reduce(function(s,e){ return s+e.rung; }, 0),
     minRung: live.length? Math.min.apply(null, live.map(function(e){return e.rung;})) : -1,
