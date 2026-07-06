@@ -323,6 +323,7 @@ body{
       Merges and casts cost <b>1 action</b> each — but one <b>level-up merge per turn is free</b>.<br>
       Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.<br>
       A spell is its <b>exact recipe</b> — or a crafted pair. One of each primary weaves a <b>Prism</b>: it echoes the first colour you sweep.<br>
+      A <b>mirror</b> of two primaries — <span class="k">R</span>·<span class="k">Y</span>·<span class="k">R</span> — summons a <b>Warrior</b> of their mix that holds a lane, then fades with the wave.<br>
       <b style="color:var(--ink)">Hold</b> a ball to lift and carry it — build the window you need.<br>
       <b style="color:var(--ink)">Turns</b> — actions &amp; End-turn. <b style="color:var(--ink)">Flow</b> — real-time: cast on a cooldown, the horde steps on a beat.
     </div>
@@ -491,6 +492,7 @@ function newGame(){
     exotics:[], reagents:{},                        // owned SIGIL names + reagent flags
     rituals:[],                                     // owned RITUAL names — share the 3-slot cap with exotics
     creations:[], pyre:null,                        // standing friendly entities (monuments) + the wave-scoped Pyre Ground zone
+    warriors:[],                                    // mirror-summoned WARRIORS — wave-scoped, cap 2, separate from creations
     pendingDouble:0, pendingDoubleT:0,              // Mordant: counter — next N casts fire twice (N=2)
     gildNext:false,                                 // Gilding: next merge free + +1 level
     aurumSpent:false, firstTransmuteUsed:false,     // Aurum: once/wave · Catalyst: only 1st transmute/turn is free
@@ -749,6 +751,13 @@ function openBook(){
       '<div class="bn">'+cnt+'</div>';
     box.appendChild(row);
   });
+  // WARRIORS — one visible row: a mirror of primaries gives form. "a mirror gives form".
+  var wrow=document.createElement("div"); wrow.className="rcard bookrow";
+  wrow.innerHTML='<div class="recipe">'+
+      '<i style="background:'+HEX.R+'"></i><i style="background:'+HEX.Y+'"></i><i style="background:'+HEX.R+'"></i></div>'+
+    '<div class="bmeta"><b>Warriors</b><span>a mirror of primaries summons a warrior of their mix — it fades with the wave</span></div>'+
+    '<div class="bn"></div>';
+  box.appendChild(wrow);
   // REACTIONS legend — a compact row of five, so combos are never a secret. Information is free.
   var lgHead=document.createElement("div");
   lgHead.className="reactrow-head";
@@ -810,8 +819,24 @@ function resolveSpell(balls){
   else if(set.O===2) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };      // pair road
   else if(set.P===2) sp = { name:"Lance", el:"P", kind:"lane", coeff:4, tint:HEX.P };
   else if(set.G===2) sp = { name:"Venom", el:"G", kind:"cluster", coeff:2, poison:3, tint:HEX.G };
-  if(!sp) return fizzleOf(balls);
-  return mkSpell(sp, TL, hasW);
+  if(sp) return mkSpell(sp, TL, hasW);
+  /* WARRIORS — "a mirror gives form": a palindromic A·B·A (post-echo), checked AFTER every canon
+     recipe and BEFORE fizzle. TWO flavours, distinguished by the heart (middle):
+       · primary wings + primary heart (different) → MIX warrior of mix(wings,heart)'s colour.
+       · primary wings + SECONDARY heart          → SPECIALIST of the heart's colour, wing-armed.
+     Secondary WINGS (e.g. G·R·G) are the pair rule and already cast above — canon outranks. */
+  if(balls.length===3 && echoed[0]===echoed[2] && echoed[0]!==echoed[1] && isPrim(echoed[0])){
+    var wing=echoed[0], heart=echoed[1];
+    if(isPrim(heart)){
+      var wc=mix(wing, heart);   // MIX warrior — two different primaries
+      if(wc) return { warrior:true, colour:wc, name:NAME[wc]+" Warrior", tint:HEX[wc], tl:TL, usedW:hasW };
+    } else if(heart==="O"||heart==="G"||heart==="P"){
+      // SPECIALIST — a crafted secondary heart, armed by its primary wing
+      return { warrior:true, specialist:true, colour:heart, wing:wing,
+               name:NAME[heart]+" Specialist", tint:HEX[heart], tl:TL, usedW:hasW };
+    }
+  }
+  return fizzleOf(balls);
 }
 /* a one-line recipe nudge for a fizzle, read off the ECHOED colours (echo runs first) */
 function fizzleHint(echoed){
@@ -1069,6 +1094,7 @@ function cast(idxs){
   if(balls.some(function(b){return !b;})) return;
   var sp = resolveSpell(balls);
   if(sp.transmute){ transmute(idxs); return; }                 // R+Y+B → craft a Prism, not a cast
+  if(sp.warrior){ summonWarrior(idxs, sp); return; }           // A·B·A mirror → summon a Warrior, not a cast
   if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
   else if(S.actions<=0) return;
   if(CFG.realtime) startCool();
@@ -1165,7 +1191,8 @@ function castWeave(idxs){
   }
   var spA=null, spB=null;
   if(idxs.length===6){ spA=resolveSpell(balls.slice(0,3)); spB=resolveSpell(balls.slice(3,6)); }
-  if(!spA || spA.fizzle || spB.fizzle){ weaveCollapse(idxs, balls); return; }
+  // a Warrior mirror is a summon, not a spell — it can't be a weave link (the weave collapses)
+  if(!spA || spA.fizzle || spB.fizzle || spA.warrior || spB.warrior){ weaveCollapse(idxs, balls); return; }
   if(S.stats) S.stats.doublecasts++;                        // a real weave landed — tally it for the death readout
   /* a transmute link is a valid (non-fizzle) weave step: it mints a Prism instead of striking.
      a pure-transmute weave is a craft (no cooldown); any real spell arms the cast cooldown. */
@@ -1376,6 +1403,7 @@ function scanWindows(dial){
     var b3=ballsAt(s,3); if(!b3) continue;
     var sp=resolveSpell(b3);
     if(sp.transmute) out.push({ slots:slotsAt(s,3), tint:"#9b62d6", gold:false, name:"Prism", score:40 });
+    else if(sp.warrior) out.push({ slots:slotsAt(s,3), tint:"#b9a76b", gold:false, warrior:true, name:sp.name, score:45 });   // soft grey-gold arc — a mirror window
     else if(!sp.fizzle) out.push({ slots:slotsAt(s,3), tint:(sp.tint==="#ffd15c"?"#ffd15c":sp.tint), gold:false, name:sp.name, score:50+(sp.dmg||0) });
   }
   if(S.exotics.length || S.rituals.length){
@@ -1391,7 +1419,7 @@ function scanWindows(dial){
   for(var s3=0;s3<n;s3++){
     var b6=ballsAt(s3,6); if(!b6) continue;
     var A=resolveSpell(b6.slice(0,3)), B=resolveSpell(b6.slice(3,6));
-    if(!A.fizzle && !B.fizzle && !(A.transmute&&B.transmute)) out.push({ slots:slotsAt(s3,6), tint:"#ffd15c", gold:true, name:"Doublecast", score:150 });
+    if(!A.fizzle && !B.fizzle && !A.warrior && !B.warrior && !(A.transmute&&B.transmute)) out.push({ slots:slotsAt(s3,6), tint:"#ffd15c", gold:true, name:"Doublecast", score:150 });
   }
   return out;
 }
@@ -1626,6 +1654,120 @@ function creationAct(c){
     for(var l=0;l<CFG.lanes;l++) creationBolt(c, frontEnemyInLane(l, null));
   }
 }
+/* ===================== WARRIORS (mirror-summoned, wave-scoped) =====================
+   A palindromic mirror of two primaries (A·B·A) gives FORM: a friendly Warrior of mix(A,B)'s
+   colour holds a lane, fights in the enemy phase, and dissolves when the wave clears ("the
+   reflection fades"). Cap 2, SEPARATE from the 2-monument creation cap; one per lane. Colour
+   identity feeds the reaction engine: orange hits burn, green hits poison, purple hits pierce
+   ward. BRUTES/ELITES trample a blocking warrior (kill + advance); the rest are blocked. */
+var WARR_FILL2 = { O:"#c46f26", G:"#3f9b53", P:"#7647b0" };   // darker shade for the sculpted-fill gradient
+function liveWarriors(){ return S.warriors.filter(function(w){ return !w.dead; }); }
+function warriorAt(lane, rung){
+  for(var i=0;i<S.warriors.length;i++){ var w=S.warriors[i]; if(!w.dead && w.lane===lane && w.rung===rung) return w; }
+  return null;
+}
+/* stats scale with TL. MIX warrior: hp = 2·TL. SPECIALIST: hp = 3·TL (costlier materials), plus a
+   B-wing rider adds +2·TL ice armor. attack = ceil(TL/2). Rung 1 of the most-threatened FREE lane. */
+function spawnWarrior(st, colour, TL, opts){
+  opts = opts || {};
+  if(liveWarriors().length>=2) dissolveOldestWarrior(st);        // cap 2 (shared) — the oldest reflection fades first
+  var occ=[]; liveWarriors().forEach(function(w){ occ.push(w.lane); });   // one warrior per lane — retarget like golems
+  var lane=pickThreatLane(occ);
+  var hp=(opts.specialist?3:2)*TL;
+  if(opts.wing==="B") hp += 2*TL;                                // B-wing rider: ice armor
+  var attack=Math.max(1, Math.ceil(TL/2));
+  var w={ warrior:true, specialist:!!opts.specialist, wing:opts.wing||null,
+    colour:colour, lane:lane, rung:1, hp:hp, maxhp:hp, attack:attack, tl:TL,
+    x:laneX(lane), y:rungY(1), born:now(), hit:0, sq:0, act:0, dead:false, deadAt:0, melt:0 };
+  st.warriors.push(w);
+  var tint=HEX[colour];
+  boom(w.x, w.y, tint, 1.4); confetti(w.x, w.y, tint);
+  S.fx.push({ star:true, x:w.x, y:w.y, t:now(), tint:tint });
+  S.shake=Math.min(20, S.shake+5);
+  sBoon(); beep(220,.14,"sine",.055); vib([18,28,38]);
+  return w;
+}
+function dissolveOldestWarrior(st){
+  var live=liveWarriors(); if(!live.length) return;
+  meltWarrior(live[0]);                                          // insertion order → [0] is the oldest still standing
+  toast("An old reflection fades...", 1000, "#8a7a5a", "mid");
+}
+/* the gentle wave-clear / cap melt — no confetti, just a soft sink-and-fade */
+function meltWarrior(w){
+  if(w.dead) return;
+  w.dead=true; w.deadAt=now(); w.melt=1;
+  boom(w.x, w.y, HEX[w.colour], 0.7);
+  beep(260,.18,"sine",.04);
+}
+/* a firmer combat death (struck down or stomped) — a pop, not a melt */
+function killWarrior(w){
+  if(w.dead) return;
+  w.dead=true; w.deadAt=now(); w.melt=0;
+  boom(w.x, w.y, HEX[w.colour], 1.3); confetti(w.x, w.y, HEX[w.colour]);
+  sDeath(); vib([20,30,40]);
+}
+function hitWarrior(w, amt){
+  if(w.dead) return;
+  w.hp-=amt; w.hit=now(); w.sq=now();
+  spawnDmg(w.x, w.y-geo.ballR*0.9, amt, false);
+  sHit(amt,false);
+  if(w.hp<=0) killWarrior(w);
+}
+function enemyStrikeWarrior(e, w){ hitWarrior(w, e.dmg); e.stepT=now(); sThunk(); vib(10); }
+/* TRAMPLE: a brute/elite crushes the blocking warrior and rolls on through the same step */
+function stompWarrior(e, w){
+  killWarrior(w);
+  boom(w.x, w.y, "#6b6472", 1.7);
+  S.fx.push({ conf:true, x:w.x, y:w.y, vx:0, vy:-1.4, col:"#6b6472", s:5, rot:0, t:now() });
+  S.shake=Math.min(20, S.shake+7);
+  sThunk(); vib([30,50,30]);
+}
+function warriorSummonFx(colour){
+  var ty=geo.cy-geo.dialR-geo.ballR;
+  boom(geo.cx, ty, HEX[colour], 1.5);
+  S.fx.push({ star:true, x:geo.cx, y:ty, t:now(), tint:HEX[colour] });
+}
+/* the warrior's turn in the staggered enemy phase — a melee strike carrying its colour identity.
+   the hit is a DIRECT friendly hit (reactable): orange (fire) can shatter/bloom, then applies burn;
+   green applies poison; purple pierces ward. its hits deliberately feed the reaction engine. */
+function warriorAct(w){
+  if(w.dead) return;
+  var e=frontEnemyInLane(w.lane, w.rung);
+  if(!e || e.dead) return;
+  var col=w.colour, opts={ friend:true, reactable:true };
+  if(col==="P") opts.eclipsePierce=true;                         // purple ignores ward resistance
+  applyDmg(e, w.attack, col, opts);                              // el = the warrior's colour (O/G/P)
+  if(col==="O" && !e.dead) applyBurn(e, 1);                       // orange warrior hits apply burn 1
+  if(col==="G" && !e.dead) e.poison=Math.min(POISON_CAP, e.poison+1);   // green warrior hits apply poison 1
+  S.fx.push({ arc:true, from:{x:w.x,y:w.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:HEX[col] });
+  S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:HEX[col] });
+  w.act=now(); sHit(w.attack,false); beep(320,.05,"triangle",.04);
+}
+/* summoning cadence mirrors a ritual: normal action/cooldown, and it NEVER touches lastSpell/stale. */
+function summonWarrior(idxs, sp){
+  if(S.busy) return;
+  var st=S;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
+  else if(S.actions<=0) return;
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // slurp the mirror into the hub (no stale)
+  vib([20,40,20,40,60]);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(sp.tl,true); warriorSummonFx(sp.colour);
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    spawnWarrior(st, sp.colour, sp.tl);
+    S.shake=Math.min(20, 6+sp.tl*0.8);
+    toast(sp.name+"!", 1000, HEX[sp.colour], "mid", true);
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; postAction();
+  },400);
+}
+
 /* ---------- Pyre Ground: a wave-scoped burning zone on a lane's middle rung (rung 2) ---------- */
 function layPyre(st, TL){
   var lane=pickThreatLane(null);
@@ -1649,9 +1791,16 @@ function raiseBastion(st, TL){
   sWin(); vib([30,20,30,20,40]); syncHud();
 }
 
+/* MERGE RULE (build 13): the same-LEVEL constraint is gone. ANY two same-colour balls merge —
+   result level = max(a,b)+1, capped at MERGE_CAP (4); a merge whose higher ball is already at
+   the cap is rejected (this subsumes the old cap+cap rejection). Different primaries still mix
+   into a secondary at level = max(a,b) (equal levels behave exactly as before: max === that level).
+   Husks stay inert. W (Prism) obeys the same-colour rule. */
+var MERGE_CAP=4;
 function mergeLegal(A,B){
-  return !!(A&&B && A.c!=="H" && B.c!=="H" && A.lvl===B.lvl &&
-    (A.c===B.c || (isPrim(A.c)&&isPrim(B.c)&&mix(A.c,B.c))));
+  if(!(A&&B) || A.c==="H" || B.c==="H") return false;
+  if(A.c===B.c) return Math.max(A.lvl,B.lvl) < MERGE_CAP;                 // any same-colour pair below the cap
+  return !!(isPrim(A.c)&&isPrim(B.c)&&mix(A.c,B.c));                      // any two different primaries mix
 }
 function tryMerge(a,b){
   if(S.busy) return false;
@@ -1659,8 +1808,8 @@ function tryMerge(a,b){
   var A=S.dial[a], B=S.dial[b];
   if(!mergeLegal(A,B)) return false;   // husks are inert — cast them away
   var res=null, levelUp=false;
-  if(A.c===B.c){ res={ c:A.c, lvl:A.lvl+1 }; levelUp=true; }
-  else { res={ c:mix(A.c,B.c), lvl:A.lvl }; }
+  if(A.c===B.c){ res={ c:A.c, lvl:Math.min(MERGE_CAP, Math.max(A.lvl,B.lvl)+1) }; levelUp=true; }
+  else { res={ c:mix(A.c,B.c), lvl:Math.max(A.lvl,B.lvl) }; }
   var gild = S.gildNext;               // Gilding: this merge is free and its result gains +1 level (II: +2)
   if(gild){ res.lvl += (isII("Gilding")?2:1); S.gildNext=false; }
   var free = (levelUp && S.freeMerge) || gild;
@@ -1759,6 +1908,10 @@ function enemyPhase(){
   liveCreations().forEach(function(c){
     later(t, function(){ creationAct(c); }); t+=110;
   });
+  // then the mirror-warriors strike — direct hits, so they can trigger reactions too
+  liveWarriors().forEach(function(w){
+    later(t, function(){ warriorAct(w); }); t+=110;
+  });
   later(t+250, endEnemyPhase);
 }
 /* healer: tops up every OTHER living enemy; never itself */
@@ -1827,6 +1980,12 @@ function stepEnemy(e){
     // BLOCKING: a creation in the destination cell is attacked instead of stepped past
     var dest = creationAt(e.lane, e.rung-1);
     if(dest){ enemyStrikeCreation(e, dest); return; }
+    // a WARRIOR in the destination cell blocks — but a BRUTE/ELITE tramples it and advances anyway
+    var wdest = warriorAt(e.lane, e.rung-1);
+    if(wdest){
+      if(e.brute || e.elite){ stompWarrior(e, wdest); }    // TRAMPLE — crush and keep coming this same step
+      else { enemyStrikeWarrior(e, wdest); return; }         // blocked — fight the warrior, don't advance
+    }
     e.rung--; e.stepT=now(); e.wallT=0;   // stepping resets the wall cadence for a clean arrival strike
     sAdvance(); vib(8);
     applyPyre(e);                          // Pyre Ground bites a foe ENTERING its cell
@@ -1855,6 +2014,8 @@ function waveClear(){
   if(S.stats) S.stats.waves++;                 // held one more wave — death readout
 
   if(S.reagents.mason){ S.hp=Math.min(S.maxhp, S.hp+(isII("mason")?3:1)); S.masonFlash=now(); syncHud(); }   // Mason re-lays a block (II: +3/wave)
+  // WARRIORS are wave-scoped — the reflection fades at wave clear (gentle melt, no confetti)
+  if(liveWarriors().length){ liveWarriors().forEach(meltWarrior); toast("The reflection fades…", 1000, "#8a7a5a", "low"); }
   sWin(); vib(20);
   toast("WAVE CLEAR!", 850, "#2c2733", "mid", true);
   boom(geo.cx, geo.cy-geo.dialR-geo.ballR, "#ffd15c", 2);
@@ -2484,6 +2645,7 @@ function draw(){
     drawPyre(t);
     drawEnemies(t);
     drawCreations(t);
+    drawWarriors(t);
     drawGate(t);
     drawDial(t);
     drawExoticStrip(t);
@@ -2637,6 +2799,66 @@ function drawCreations(t){
       ctx.fillStyle="rgba(44,39,51,.9)"; rr(bx,byy+2,bw,bh,3); ctx.fill();
       ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; rr(bx,byy,bw,bh,3); ctx.fill(); ctx.stroke();
       ctx.fillStyle=look.cap; rr(bx+1.5,byy+1.5,(bw-3)*Math.max(0,c.hp/c.maxhp),bh-3,2); ctx.fill();
+    }
+  });
+}
+/* WARRIORS — smaller round friendly blobs in the mix colour, up-facing eyes. A wave-clear/cap
+   dissolve plays a gentle downward melt (sink + flatten + fade); a combat death deflates. */
+function drawWarriors(t){
+  var pitch=rungPitch();
+  var baseR=Math.min(geo.ballR*1.02, pitch*0.5);
+  for(var i=S.warriors.length-1;i>=0;i--){ var ww=S.warriors[i]; if(ww.dead && t-ww.deadAt>(ww.melt?600:460)) S.warriors.splice(i,1); }
+  S.warriors.forEach(function(w){
+    var tint=HEX[w.colour];
+    w.x += (laneX(w.lane)-w.x)*0.25; w.y += (rungY(w.rung)-w.y)*0.25;
+    var r=baseR*0.78;                                            // SMALLER than golems — the size contrast reads
+    var pop=Math.min(1,(t-w.born)/300); var pr=r*(0.4+0.6*(pop<1?(1.7*pop-0.7*pop*pop):1));
+    var meltK=0;
+    if(w.dead){
+      if(w.melt){ meltK=Math.min(1,(t-w.deadAt)/600); }         // gentle melt
+      else { var dk=(t-w.deadAt)/460; pr*=Math.max(0,1-dk); }   // combat deflate
+    }
+    if(pr<=0.4 && !w.melt) return;
+    var bob=1.2*Math.sin(t/560+w.lane*1.7);
+    var sqK=0; if(w.sq){ var sq=(t-w.sq)/220; if(sq>0&&sq<1) sqK=Math.sin(sq*Math.PI)*0.26; }
+    var actK=w.act? Math.max(0,1-(t-w.act)/200):0;
+    ctx.save();
+    ctx.globalAlpha = meltK ? Math.max(0,1-meltK) : 1;
+    ctx.translate(w.x, w.y+bob - actK*4 + meltK*pr*0.5);
+    ctx.scale((1+sqK)*(1+meltK*0.35), Math.max(0.02,(1-sqK*1.1)*(1-meltK*0.8)));
+    function bodyPath(){ ctx.beginPath(); ctx.arc(0,0,pr,0,7); }
+    inkShadow(bodyPath, 3);
+    bodyPath();
+    var grd=ctx.createLinearGradient(0,-pr,0,pr*1.2);
+    grd.addColorStop(0, tint); grd.addColorStop(1, WARR_FILL2[w.colour]||tint);
+    ctx.fillStyle=grd; ctx.fill();
+    var hitK=w.hit? Math.max(0,1-(t-w.hit)/220):0;
+    if(hitK>0){ ctx.fillStyle="rgba(255,255,255,"+(hitK*0.7)+")"; ctx.fill(); }
+    ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
+    // sticker streak highlight (shared material language with the dial balls)
+    ctx.beginPath(); ctx.ellipse(-pr*0.32,-pr*0.42, pr*0.32, pr*0.16, -0.4, 0, 7);
+    ctx.fillStyle="rgba(255,255,255,.4)"; ctx.fill();
+    // FRIENDLY FACE — up-facing eyes toward the horde
+    if(meltK<0.5){
+      var eyeY=-pr*0.06, eyeDX=pr*0.34, eyeR=pr*0.23;
+      [-1,1].forEach(function(s){
+        ctx.beginPath(); ctx.arc(s*eyeDX,eyeY,eyeR,0,7); ctx.fillStyle="#fffdf6"; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+        ctx.beginPath(); ctx.arc(s*eyeDX,eyeY-eyeR*0.42,eyeR*0.5,0,7); ctx.fillStyle="#2c2733"; ctx.fill();  // pupil up
+        ctx.beginPath(); ctx.arc(s*eyeDX-eyeR*0.16,eyeY-eyeR*0.62,eyeR*0.16,0,7); ctx.fillStyle="#fffdf6"; ctx.fill();
+      });
+      if(!w.dead){ ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; ctx.beginPath();
+        ctx.arc(0, eyeY+eyeR*1.1, pr*0.26, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke(); }
+    }
+    ctx.restore();
+    ctx.globalAlpha=1;
+    if(w.dead) return;
+    // slim hp bar once damaged
+    if(w.hp<w.maxhp){
+      var bw=r*1.9, bh=5, bx=w.x-bw/2, byy=w.y+bob-pr*1.3-10;
+      ctx.fillStyle="rgba(44,39,51,.9)"; rr(bx,byy+2,bw,bh,3); ctx.fill();
+      ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; rr(bx,byy,bw,bh,3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=tint; rr(bx+1.5,byy+1.5,(bw-3)*Math.max(0,w.hp/w.maxhp),bh-3,2); ctx.fill();
     }
   });
 }
@@ -3509,9 +3731,13 @@ function gesturePreview(){
   if(v.length===2){
     var A=S.dial[v[0]], B=S.dial[v[1]];
     if(A&&B){
-      if(A.lvl===B.lvl && A.c!=="H" && B.c!=="H"){
-        if(A.c===B.c) return { big:NAME[A.c]+" L"+(A.lvl+1), sub:S.freeMerge?"level up · FREE":"level up", col:HEX[A.c], chips:[A.c,B.c] };
-        if(isPrim(A.c)&&isPrim(B.c)){ var m=mix(A.c,B.c); if(m) return { big:NAME[m], sub:"mix", col:HEX[m], chips:[A.c,B.c] }; }
+      if(A.c!=="H" && B.c!=="H"){
+        if(A.c===B.c){
+          if(Math.max(A.lvl,B.lvl)<MERGE_CAP)
+            return { big:NAME[A.c]+" L"+(Math.max(A.lvl,B.lvl)+1), sub:S.freeMerge?"level up · FREE":"level up", col:HEX[A.c], chips:[A.c,B.c] };
+          return { big:"✕", sub:"already at max level (L"+MERGE_CAP+")", col:"#b9b2a6", chips:[A.c,B.c] };
+        }
+        if(isPrim(A.c)&&isPrim(B.c)){ var m=mix(A.c,B.c); if(m) return { big:NAME[m]+" L"+Math.max(A.lvl,B.lvl), sub:"mix", col:HEX[m], chips:[A.c,B.c] }; }
       }
       return { big:"✕", sub:"won't merge — keep sweeping to cast", col:"#b9b2a6", chips:[A.c,B.c] };
     }
@@ -3522,6 +3748,10 @@ function gesturePreview(){
       var chips=balls.map(function(b){return b.c;});
       if(sp.transmute){   // flow: transmute is a craft — never "cooling"
         return { big:"✨ Prism", small:true, sub:"transmute · one of each primary — release!", col:"#9b62d6", chips:chips };
+      }
+      if(sp.warrior){     // a mirror of primaries — the hub preview announces the summon
+        var wsub = (CFG.realtime && S.cool>0) ? "cooling..." : "mirror · summon — release!";
+        return { big:sp.name, small:true, sub:wsub, col:HEX[sp.colour], chips:chips };
       }
       var col = sp.fizzle ? "#b9b2a6" : (sp.tint==="#ffd15c" ? "#b9791a" : sp.tint);
       var sub;
@@ -3544,7 +3774,7 @@ function gesturePreview(){
     if(wb.every(Boolean)){
       var chips=wb.map(function(b){return b.c;});
       var sA=resolveSpell(wb.slice(0,3));
-      var nameA = sA.transmute?"Transmute":sA.name;
+      var nameA = sA.transmute?"Transmute":(sA.warrior?"✕":sA.name);
       if(v.length<6){
         var exM=matchExotic(chips);                 // an owned SIGIL answers the 4-5 sweep (checked first)
         if(exM) return { big:"✦ "+exM.name, small:true,
@@ -3557,7 +3787,7 @@ function gesturePreview(){
         return { big:nameA+" + ?", small:true, sub:coolingD?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
       }
       var sB=resolveSpell(wb.slice(3,6));
-      if(sA.fizzle||sB.fizzle) return { big:"✕ collapse", sub:"a weave must be two true spells", col:"#b9b2a6", chips:chips };
+      if(sA.fizzle||sB.fizzle||sA.warrior||sB.warrior) return { big:"✕ collapse", sub:"a weave must be two true spells", col:"#b9b2a6", chips:chips };
       var nameB = sB.transmute?"Transmute":sB.name;
       var bothReal = !sA.transmute && !sB.transmute;
       var cooling = CFG.realtime && S.cool>0 && (!sA.transmute || !sB.transmute);   // pure-transmute weave = craft
@@ -3752,13 +3982,13 @@ function up(){
 function ballInfo(i){
   var b=S.dial[i]; if(!b) return;
   if(b.c==="H"){ S.hubInfo={ l1:"Husk · drained", l2:"won't merge — cast it away to refill", l3:null, col:HEX.H, until:now()+1400 }; return; }
-  if(b.c==="W"){ S.hubInfo={ l1:"Prism · L"+b.lvl, l2:"echoes the first colour you sweep", l3:"merge with another Prism to level up", col:"#9b62d6", until:now()+1400 }; return; }
-  var l2, l3=null;
+  if(b.c==="W"){ S.hubInfo={ l1:"Prism · L"+b.lvl, l2:"echoes the first colour you sweep", l3:b.lvl>=MERGE_CAP?"at max level (L"+MERGE_CAP+")":"merge with any Prism to level up", col:"#9b62d6", until:now()+1400 }; return; }
+  var atCap=b.lvl>=MERGE_CAP, l2, l3=null;
   if(isPrim(b.c)){
     var others={"R":["Y","B"],"Y":["R","B"],"B":["R","Y"]}[b.c];
-    l2="+"+NAME[b.c]+" = level up";
+    l2 = atCap ? "+"+NAME[b.c]+" = at max (L"+MERGE_CAP+")" : "+"+NAME[b.c]+" = level up";
     l3="+"+others[0]+" = "+NAME[mix(b.c,others[0])]+" · +"+others[1]+" = "+NAME[mix(b.c,others[1])];
-  } else l2="+"+NAME[b.c]+" = level up";
+  } else l2 = atCap ? "+"+NAME[b.c]+" = at max (L"+MERGE_CAP+")" : "+"+NAME[b.c]+" = level up";
   S.hubInfo={ l1:NAME[b.c]+" · L"+b.lvl, l2:l2, l3:l3, col:HEX[b.c], until:now()+1400 };
 }
 function joltPips(){
@@ -3919,6 +4149,23 @@ window.__whx = {
   impactSpell: function(sp, hits, mul){ return impactSpell(sp, hits, mul); },
   dotTick: function(e){ return dotTick(e); },
   stepEnemy: function(e){ return stepEnemy(e); },
+  /* ---- build-13 harness: resolve / warriors / merge / scanner ---- */
+  resolveCols: function(cols){ return resolveSpell(cols.map(function(c,i){ return { c:c, lvl:1 }; })); },
+  resolveBalls: function(balls){ return resolveSpell(balls.map(function(b){ return { c:b.c, lvl:b.lvl||1 }; })); },
+  MERGE_CAP: MERGE_CAP,
+  mergeLegal: function(A,B){ return mergeLegal(A,B); },
+  mergeResult: function(A,B){ if(!mergeLegal(A,B)) return null;
+    if(A.c===B.c) return { c:A.c, lvl:Math.min(MERGE_CAP, Math.max(A.lvl,B.lvl)+1) };
+    return { c:mix(A.c,B.c), lvl:Math.max(A.lvl,B.lvl) }; },
+  spawnWarrior: function(colour, TL){ return spawnWarrior(S, colour, TL); },
+  warriorAct: function(w){ return warriorAct(w); },
+  liveWarriors: function(){ return liveWarriors(); },
+  warriorAt: function(lane,rung){ return warriorAt(lane,rung); },
+  meltWarriorsForWaveClear: function(){ var live=liveWarriors(); live.forEach(meltWarrior); return live.length; },
+  clearWarriors: function(){ S.warriors=[]; },
+  scanWarriorWindows: function(){ return scanWindows(S.dial).filter(function(w){ return w.warrior; }); },
+  scanWindows: function(){ return scanWindows(S.dial); },
+  setDial: function(cols){ for(var i=0;i<CFG.slots && i<cols.length;i++){ S.dial[i]={ c:cols[i], lvl:1, born:now() }; } S.castSig=""; },
   applyReactions: function(e, amt, el, opts){ return applyReactions(e, amt, el, opts); },
   reactState: function(){ return { gold:_reactGold, banner:_reactBanner }; },
   triggerHitstop: function(ms){ triggerHitstop(ms); },
