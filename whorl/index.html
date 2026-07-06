@@ -184,6 +184,52 @@ body{
 .rcard.chosen{ background:var(--accent); }
 .rcard.chosen:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
 .cards.locked .rcard:not(.chosen){ opacity:.42; pointer-events:none; }
+
+/* ---------- NEXT WAVE readout (free intel — the Bazaar's scouting report) ---------- */
+.nextwave{ margin:2px 0 4px; padding:9px 10px 8px; background:var(--paper2);
+  border:2.5px solid var(--ink); border-radius:15px; box-shadow:0 3px 0 var(--shadow); }
+.nextwave:empty{ display:none; }
+.nw-label{ font-family:var(--font-d); font-weight:700; font-size:11px; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--ink-soft); text-align:left; margin:0 0 7px 1px; }
+.nw-ribbon{ display:block; font-family:var(--font-d); font-weight:700; font-size:13.5px; letter-spacing:.05em;
+  color:#fffdf6; background:#ef4a5a; border:2.5px solid var(--ink); border-radius:10px 10px 10px 2px;
+  box-shadow:0 2px 0 var(--shadow); padding:4px 8px; margin:0 0 9px; text-align:center; transform:rotate(-.9deg); }
+.nw-lanes{ display:flex; gap:6px; align-items:flex-start; }
+.nw-lane{ flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; min-height:22px; }
+.nw-lane .nw-ln{ font-family:var(--font-u); font-weight:800; font-size:8.5px; letter-spacing:.06em; color:rgba(44,39,51,.4); }
+.nw-lane.hot .nw-ln{ color:var(--ink); }
+.nw-chips{ display:flex; flex-direction:column; gap:5px; align-items:center; padding-top:1px; }
+.nw-empty{ width:9px; height:2px; border-radius:1px; background:rgba(44,39,51,.16); margin-top:5px; }
+.nw-sum{ text-align:left; font-weight:700; font-size:11px; color:var(--ink-soft); margin:9px 1px 0; line-height:1.45; }
+.nw-sum b{ color:var(--ink); }
+/* the drawn chips — one per incoming foe, in house shapes/colours */
+.nw-chip{ position:relative; width:18px; height:18px; box-sizing:border-box;
+  border:2px solid var(--ink); background:#cfc5b2; flex:none; }
+.nw-chip.normal{ border-radius:50%; }
+.nw-chip.brute{ border-radius:5px; background:#b7ad9a; }
+.nw-chip.armored{ border-radius:50%; }
+.nw-chip.armored::after{ content:""; position:absolute; left:1px; right:1px; top:5.5px; height:4px; background:#4a4454; }
+.nw-chip.healer{ border-radius:50%; }
+.nw-chip.healer::before{ content:""; position:absolute; left:50%; top:3.5px; width:2.5px; height:9px; background:#fffdf6; transform:translateX(-50%); }
+.nw-chip.healer::after{ content:""; position:absolute; left:4px; right:4px; top:7.5px; height:2.5px; background:#fffdf6; }
+.nw-chip.leech{ border-radius:50%; }
+.nw-chip.leech::after{ content:""; position:absolute; left:50%; bottom:2.5px; transform:translateX(-50%);
+  width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-top:5px solid var(--ink); }
+.nw-chip.elite{ width:23px; height:23px; border-radius:5px; border-width:2.5px; background:#8f8677; }
+.nw-chip.elite::after{ content:""; position:absolute; left:2.5px; top:2.5px; right:2.5px; bottom:2.5px; border:1.5px solid rgba(255,209,92,.55); border-radius:3px; }
+.nw-crown{ position:absolute; left:50%; top:-8px; transform:translateX(-50%); width:16px; height:8px; background:var(--accent);
+  clip-path:polygon(0 100%,0 42%,25% 72%,50% 12%,75% 72%,100% 42%,100% 100%); filter:drop-shadow(0 1.2px 0 rgba(44,39,51,.9)); }
+.nw-chip.warded{ box-shadow:0 0 0 1.5px var(--card), 0 0 0 3.5px var(--wardc,#f2913d); }
+
+/* ---------- death-screen run stats: failure reads as progress ---------- */
+.statcard{ text-align:left; margin:6px 0 2px; padding:11px 15px; background:var(--paper2);
+  border:2.5px solid var(--ink); border-radius:15px; box-shadow:0 3px 0 var(--shadow); }
+.statcard .srow{ display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+  font-weight:700; font-size:13px; padding:4px 0; border-bottom:1.5px dashed rgba(44,39,51,.14); }
+.statcard .srow:last-child{ border-bottom:0; }
+.statcard .srow .sk{ color:var(--ink-soft); }
+.statcard .srow .sv{ font-family:var(--font-d); font-weight:700; color:var(--ink); font-size:14px; white-space:nowrap; }
+.statcard .srow.hero .sv{ color:#b9791a; }
 </style>
 </head>
 <body>
@@ -233,6 +279,7 @@ body{
   <div class="panel bazaarpanel">
     <h2 id="rwTitle">The Bazaar</h2>
     <p id="rwSub" style="margin:2px 0 4px;">The stalls open between the fighting. Take a boon — then spend, if you like.</p>
+    <div class="nextwave" id="rwNext"></div>
     <div class="bazaarscroll">
       <div class="shopsec">
         <div class="seclabel">Take one</div>
@@ -261,8 +308,9 @@ body{
 <div class="veil" id="vOver">
   <div class="panel">
     <h2 id="ovTitle">The wall breaks</h2>
-    <p id="ovMsg"></p>
-    <div class="row"><button class="mk accent" id="btnRetry" style="flex:1;height:50px;font-size:17px;">Try again</button></div>
+    <p id="ovMsg" style="margin:8px 0 6px;"></p>
+    <div class="statcard" id="ovStats"></div>
+    <div class="row"><button class="mk accent" id="btnRetry" style="flex:1;height:50px;font-size:17px;">Run it back</button></div>
     <div class="credit"><a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a></div>
   </div>
 </div>
@@ -289,6 +337,7 @@ var CFG = {
 /* colours ---------------------------------------------------------------- */
 var HEX = { R:"#ef4a5a", Y:"#f6c445", B:"#3d8bdf", O:"#f2913d", G:"#57c268", P:"#9b62d6", H:"#b9b2a6", W:"#f4f0ff" };
 var NAME = { R:"Red", Y:"Yellow", B:"Blue", O:"Orange", G:"Green", P:"Purple", H:"Husk", W:"Prism" };
+var WARDNAME = { O:"orange", G:"green", P:"purple" };   // ward colours, lower-case for the readout summary
 var PRIM = { R:1, Y:1, B:1 };
 function isPrim(c){ return !!PRIM[c]; }
 function mix(a,b){
@@ -369,8 +418,13 @@ function newGame(){
     dialSig:"", exoticGlow:{}, masonFlash:0,        // strip-glow cache + Mason gate flourish
     // ---- FLOW MODE clocks (delta-accumulated; only advance while unpaused) ----
     cool:0, coolMax:CFG.castCd, coolPulse:0,        // cast cooldown
+    chain:0, readyElapsed:0,                        // FLOW CHAINING: consecutive prompt-cast count + idle-since-ready timer
     beatT:0, beatMax:4.0,                           // metronome for the horde
-    paused:false, phaseRunning:false, phaseQueued:false
+    paused:false, phaseRunning:false, phaseQueued:false,
+    // ---- PRE-WAVE READOUT: the next wave's spec, pre-rolled at wave clear (preview === spawn) ----
+    nextWaveSpec:null,
+    // ---- run stats (for the death-screen readout; only nonzero rows show) ----
+    stats:{ waves:0, bestCast:null, doublecasts:0, creations:0, motes:0, prisms:0 }
   };
   for(var i=0;i<CFG.slots;i++) S.dial.push(freshBall());
   renderReagentBar();
@@ -390,15 +444,10 @@ function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
    type mix: brutes as before; of the rest ~20% armored (wave 3+), ~20% leech (wave 4+,
    max 2), one healer per wave at ~35% (wave 4+, mid-field rung 2-3 & SKITTISH). every 5th
    wave trades two normal spawns for one ELITE. */
-function nextWave(){
-  var st=S;
-  st.wave++;
-  st.enemies = [];
-  st.lastSpell=null; st.repeatN=0;        // a new wave forgives old habits
-  st.aurumSpent=false;                    // Aurum: rechargeable once per wave
-  st.pyre=null;                           // Pyre Ground is wave-scoped (creations persist — they're monuments)
-  st.firstTransmuteUsed=false;            // Catalyst: first free transmute resets each wave/turn
-  var w=st.wave;
+/* rollWave(w) — the PURE spec generator. Given only a wave number it rolls the full spawn list
+   (types, lanes, rungs, wards, hp, dmg) as plain data. No side effects, no DOM, no now(): the SAME
+   spec drives both the Bazaar's NEXT-WAVE preview and the actual spawn, so they can never diverge. */
+function rollWave(w){
   var elite = (w>=8 && (w-8)%4===0);      // elite cadence: 8, 12, 16, 20...
   var count = Math.min(9, 2 + w) - (elite?2:0);
   var wardChance = Math.min(0.75, 0.05 + w*0.10);
@@ -408,6 +457,7 @@ function nextWave(){
   var total = count + (elite?1:0);
   var wantHealer = w>=4 && Math.random()<0.35;   // at most 1 healer per wave
   var leechN = 0;                                 // max 2 leeches per wave
+  var list = [];
   for(var k=0;k<total;k++){
     var isElite = elite && k===0;
     var isHealer = !isElite && wantHealer && k===total-1;
@@ -427,30 +477,58 @@ function nextWave(){
     var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
     var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
     var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : (4+3*w);
-    st.enemies.push({
-      lane:lane, rung:rung, x:laneX(lane), y:rungY(rung),
-      hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
+    list.push({
+      lane:lane, rung:rung, hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
       elite:isElite, armored:armored, healer:isHealer, leech:leech,
       dmg: isHealer? 0 : isElite? baseDmg*3 : brute? baseDmg*2 : baseDmg,
-      freeze:0, frImm:0, poison:0, burn:0,
-      slow: (brute&&!isElite)?1:0, slowT:0,   // elites march every turn — sim showed slowed elites never reach the wall
-      seed: (lane*7+k*13)%97, jit: ((k*29)%9)-4,
+      slow: (brute&&!isElite)?1:0,             // elites march every turn — sim showed slowed elites never reach the wall
+      seed: (lane*7+k*13)%97, jit: ((k*29)%9)-4
+    });
+  }
+  return { wave:w, elite:elite, enemies:list };
+}
+/* spawnWave(spec) — the CONSUMER. Turns a spec (from the preview or a fresh roll) into live enemies
+   on the field with their timing/booms, and starts the turn/beat clocks. */
+function spawnWave(spec){
+  var st=S;
+  st.wave = spec.wave;
+  st.enemies = [];
+  st.lastSpell=null; st.repeatN=0;        // a new wave forgives old habits
+  st.aurumSpent=false;                    // Aurum: rechargeable once per wave
+  st.pyre=null;                           // Pyre Ground is wave-scoped (creations persist — they're monuments)
+  st.firstTransmuteUsed=false;            // Catalyst: first free transmute resets each wave/turn
+  spec.enemies.forEach(function(es,k){
+    st.enemies.push({
+      lane:es.lane, rung:es.rung, x:laneX(es.lane), y:rungY(es.rung),
+      hp:es.hp, maxhp:es.maxhp, ward:es.ward, brute:es.brute,
+      elite:es.elite, armored:es.armored, healer:es.healer, leech:es.leech,
+      dmg:es.dmg, freeze:0, frImm:0, poison:0, burn:0,
+      slow:es.slow, slowT:0, seed:es.seed, jit:es.jit,
       spawn: now()+k*80, hit:0, dotT:0, stepT:0, dead:false, deadAt:0
     });
     (function(e,delay){ setTimeout(function(){ if(S===st&&!st.over){
       boom(e.x,e.y,"#c9c1b4", e.elite?1.6:.45);                       // heavier boom for the elite
       beep(e.elite?150:300+e.lane*40, e.elite?.14:.06,"sine", e.elite?.06:.03);
     } }, delay); })(st.enemies[k], k*80);
-  }
+  });
   st.actions = st.maxActions = CFG.actions + CFG.maxActionsUp + (st.reagents.quicksilver?1:0);   // Quicksilver: +1/turn
   st.freeMerge = true;
   // FLOW: the beat tightens each wave — 4.0s at wave 1, -0.1s/wave, floor 2.5s
   st.beatMax = Math.max(2.5, 4.0 - (st.wave-1)*0.1);
   st.beatT = 0;
+  st.chain = 0; st.readyElapsed = 0;      // a fresh wave resets the flow chain
   sHorn();
   toast("Wave "+st.wave, 950, "#2c2733", "mid");
-  if(elite){ setTimeout(function(){ if(S===st&&!st.over){ toast("ELITE!", 1100, "#2c2733", "mid", true); sEliteHorn(); } }, 1000); }
+  if(spec.elite){ setTimeout(function(){ if(S===st&&!st.over){ toast("ELITE!", 1100, "#2c2733", "mid", true); sEliteHorn(); } }, 1000); }
   syncHud();
+}
+/* nextWave — consume the pre-rolled spec if it's the right wave (preview === spawn), else roll fresh */
+function nextWave(){
+  var st=S;
+  var target=st.wave+1;
+  var spec=(st.nextWaveSpec && st.nextWaveSpec.wave===target) ? st.nextWaveSpec : rollWave(target);
+  st.nextWaveSpec=null;
+  spawnWave(spec);
 }
 
 /* ===================== audio ===================== */
@@ -476,6 +554,7 @@ function sHorn(){ beep(220,.2,"triangle",.05); setTimeout(function(){beep(330,.2
 function sEliteHorn(){ beep(140,.3,"triangle",.06); setTimeout(function(){beep(105,.35,"triangle",.06);},180); setTimeout(function(){beep(210,.28,"triangle",.05);},340); }
 function sClank(){ beep(190,.05,"square",.05); setTimeout(function(){beep(120,.06,"square",.04);},45); }   // armored bounce
 function sChime(){ beep(660,.12,"sine",.035); setTimeout(function(){beep(880,.15,"sine",.03);},85); }      // healer pulse
+function sChainChime(lvl){ beep(720+lvl*150,.06,"sine",.03); }                                             // flow chain: pitch rises with the chain
 function sDrain(){ beep(240,.14,"sawtooth",.035); setTimeout(function(){beep(170,.16,"sawtooth",.03);},90); }
 function sWin(){ [0,110,220,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,.16,"triangle",.05); },t); }); }
 function vib(p){ if(navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
@@ -520,6 +599,7 @@ function recordSpell(sp, isDouble){
   if(!BOOK[name]){ BOOK[name]={ n:0, dc:0 }; if(LEGEND[name]) inscribe(name); }
   BOOK[name].n++;
   if(isDouble) BOOK[name].dc++;
+  if(name==="Prism" && S && S.stats) S.stats.prisms++;   // every Prism mint routes through here — death readout
   saveBook();
 }
 function inscribe(name){
@@ -651,7 +731,7 @@ function applyDmg(e, amt, el, opts){
     if(e.armored && amt<5){
       e.hit = now(); sClank();
       spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false, false, false, opts.friend);
-      return;
+      return 0;                                    // plate bounced — no damage dealt
     }
   }
   if(e.freeze>0 && S.reagents && S.reagents.shatterfrost) amt = Math.round(amt*1.5);   // Shatterfrost: +50% on the frozen
@@ -678,6 +758,7 @@ function applyDmg(e, amt, el, opts){
     boom(e.x, e.y, "#c9c1b4", .5);   // dust boom as it scrambles back
     beep(700, .09, "sine", .045);    // squeak
   }
+  return amt;                        // damage actually dealt (post-ward/frost) — fed to the best-cast tally
 }
 /* Void's "assassin" seeks the toughest foe alive (highest maxhp) — ignores tgt */
 function targetsFor(sp, tgt){
@@ -729,6 +810,7 @@ function moteChipXY(){
 function addMotes(amt, x, y){
   if(!amt || amt<=0) return;
   S.motes += amt;
+  if(S.stats) S.stats.motes += amt;      // gross motes earned this run — death readout (not reduced by spending)
   moteHudSet();
   var tgt=moteChipXY(), dots=Math.min(3, Math.max(1, amt));
   for(var i=0;i<dots;i++){
@@ -747,13 +829,22 @@ function moteLand(){
 function impactSpell(sp, hits){
   var per = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
   var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW };
+  var dealt=0;
   hits.forEach(function(e){
-    applyDmg(e, per, sp.el, opts);
+    dealt += applyDmg(e, per, sp.el, opts) || 0;
     if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
     if(sp.poison) e.poison = Math.min(POISON_CAP, e.poison + sp.poison);   // poison stacks cap at 12
     if(sp.burn) applyBurn(e, sp.burn);
   });
+  recordCast(sp, dealt);   // best-cast tracking — each doublecast half lands here separately
   S.shake = Math.min(20, 4 + sp.tl*1.1 + (sp.tl>=6?4:0) + (sp.whorl?6:0));
+}
+/* best-cast bookkeeping: the single hardest-hitting spell landing this run (by total damage dealt).
+   doublecast halves and Mordant repeats each arrive as their own impactSpell, so each counts alone. */
+function recordCast(sp, dealt){
+  if(!S.stats || !sp || sp.fizzle || dealt<=0) return;
+  var b=S.stats.bestCast;
+  if(!b || dealt>b.dmg) S.stats.bestCast = { name:sp.name, dmg:dealt, tl:sp.tl||1 };
 }
 /* anticipation -> impact: balls flash+shrink (150ms) -> beam -> damage (230ms) -> refill (300ms) */
 function cast(idxs){
@@ -856,6 +947,7 @@ function castWeave(idxs){
   var spA=null, spB=null;
   if(idxs.length===6){ spA=resolveSpell(balls.slice(0,3)); spB=resolveSpell(balls.slice(3,6)); }
   if(!spA || spA.fizzle || spB.fizzle){ weaveCollapse(idxs, balls); return; }
+  if(S.stats) S.stats.doublecasts++;                        // a real weave landed — tally it for the death readout
   /* a transmute link is a valid (non-fizzle) weave step: it mints a Prism instead of striking.
      a pure-transmute weave is a craft (no cooldown); any real spell arms the cast cooldown. */
   var anyReal = !spA.transmute || !spB.transmute;
@@ -1179,6 +1271,7 @@ function summonCreation(st, kind, TL){
   var c={ kind:kind, lane:lane, rung:rung, hp:stt.hp, maxhp:stt.hp, attack:stt.attack, tl:TL,
     x:laneX(lane), y:rungY(rung), born:now(), hit:0, sq:0, act:0, dead:false, deadAt:0 };
   st.creations.push(c);
+  if(st.stats) st.stats.creations++;                                     // monument raised — death readout
   boom(c.x, c.y, creationTint(kind), CREATION_LOOK[kind].big?2.0:1.6);   // pop-in + summon boom
   confetti(c.x, c.y, creationTint(kind));
   S.fx.push({ star:true, x:c.x, y:c.y, t:now(), tint:creationTint(kind) });
@@ -1321,7 +1414,22 @@ function postAction(){
 /* FLOW: casting on cooldown — soft reject, no penalty, no balls consumed.
    Quicksilver shaves 12% off the cast cooldown. */
 function effCastCd(){ return CFG.castCd * (S && S.reagents.quicksilver ? 0.88 : 1); }
-function startCool(){ S.cool = effCastCd(); S.coolMax = S.cool; }
+/* FLOW CHAINING: casting within CHAIN_WINDOW of the spiral becoming ready shaves the NEXT cooldown
+   CHAIN_STEP per consecutive prompt cast (stacking to CHAIN_MAX), floored at CHAIN_FLOOR seconds.
+   Multiplicative with Haste + Quicksilver (both baked into effCastCd). Idling resets the chain. */
+var CHAIN_WINDOW=2.0, CHAIN_STEP=0.88, CHAIN_MAX=2, CHAIN_FLOOR=1.0;
+function startCool(){
+  if(CFG.realtime){
+    var prompt = S.readyElapsed <= CHAIN_WINDOW;                // cast fired promptly after ready?
+    S.chain = prompt ? Math.min(CHAIN_MAX, S.chain+1) : 0;      // extend the chain, or reset on a lazy cast
+    if(prompt && S.chain>=2) sChainChime(S.chain);              // pitch-up chime once the chain actually stacks
+  }
+  var f = CFG.realtime ? Math.pow(CHAIN_STEP, S.chain) : 1;     // 0.88^chain
+  S.cool = effCastCd()*f;
+  if(CFG.realtime) S.cool = Math.max(CHAIN_FLOOR, S.cool);      // never below 1.0s absolute
+  S.coolMax = S.cool;
+  S.readyElapsed = 0;
+}
 function coolReject(){ sThunk(); toast("cooling...", 700, "#6b6472", "low"); vib(6); }
 /* Mordant's charge, still live? (Flow lets it lapse after 6s) */
 function doublePending(){
@@ -1447,6 +1555,8 @@ function endEnemyPhase(){
 function waveClear(){
   if(S.over||S.phase==="clear") return;
   S.busy=true; S.phase="clear";
+  if(S.stats) S.stats.waves++;                 // held one more wave — death readout
+
   if(S.reagents.mason){ S.hp=Math.min(S.maxhp, S.hp+1); S.masonFlash=now(); syncHud(); }   // Mason re-lays a block
   sWin(); vib(20);
   toast("WAVE CLEAR!", 850, "#2c2733", "mid", true);
@@ -1576,7 +1686,56 @@ function renderShop(){
   });
 }
 /* the post-wave stall: free boon on top (pick one — then Continue), priced offers below */
+/* ---------- the free PRE-WAVE READOUT: pre-roll next wave & draw its scouting report ---------- */
+function renderNextWave(spec){
+  var box=document.getElementById("rwNext"); if(!box) return;
+  box.innerHTML="";
+  if(!spec){ return; }
+  var es=spec.enemies;
+  // ELITE ribbon across the top of the section
+  if(spec.elite){ var rib=document.createElement("div"); rib.className="nw-ribbon"; rib.textContent="⚑ ELITE APPROACHES"; box.appendChild(rib); }
+  var lbl=document.createElement("div"); lbl.className="nw-label"; lbl.textContent="Next wave"; box.appendChild(lbl);
+  // per-lane mini-columns, front foes (lowest rung) on top
+  var lanes=document.createElement("div"); lanes.className="nw-lanes";
+  for(var l=0;l<CFG.lanes;l++){
+    var col=document.createElement("div"); col.className="nw-lane";
+    var foes=es.filter(function(e){ return e.lane===l; }).sort(function(a,b){ return a.rung-b.rung; });
+    if(foes.length) col.classList.add("hot");
+    var ln=document.createElement("div"); ln.className="nw-ln"; ln.textContent=(l+1); col.appendChild(ln);
+    var chips=document.createElement("div"); chips.className="nw-chips";
+    if(!foes.length){ var em=document.createElement("div"); em.className="nw-empty"; chips.appendChild(em); }
+    foes.forEach(function(e){ chips.appendChild(makeFoeChip(e)); });
+    col.appendChild(chips); lanes.appendChild(col);
+  }
+  box.appendChild(lanes);
+  // terse summary line
+  var sum=document.createElement("div"); sum.className="nw-sum"; sum.innerHTML=waveSummary(spec); box.appendChild(sum);
+}
+/* one drawn CSS chip per foe, shape+colour per archetype, ward as a coloured ring */
+function makeFoeChip(e){
+  var chip=document.createElement("div"); chip.className="nw-chip ";
+  chip.className += e.elite?"elite" : e.brute?"brute" : e.armored?"armored" : e.healer?"healer" : e.leech?"leech" : "normal";
+  if(e.elite){ var cr=document.createElement("div"); cr.className="nw-crown"; chip.appendChild(cr); }
+  if(e.ward){ chip.classList.add("warded"); chip.style.setProperty("--wardc", HEX[e.ward]); }
+  return chip;
+}
+/* the count line: "5 foes · 1 armored · lane 3 warded orange" — terse, only what's notable */
+function waveSummary(spec){
+  var es=spec.enemies, n=es.length, parts=[];
+  parts.push("<b>"+n+"</b> foe"+(n===1?"":"s"));
+  if(spec.elite) parts.push("<b>1 elite</b>");
+  var cnt={ brute:0, armored:0, healer:0, leech:0 };
+  es.forEach(function(e){ if(e.elite) return; if(e.brute) cnt.brute++; else if(e.armored) cnt.armored++; else if(e.healer) cnt.healer++; else if(e.leech) cnt.leech++; });
+  ["brute","armored","healer","leech"].forEach(function(k){ if(cnt[k]) parts.push(cnt[k]+" "+k); });
+  var warded=es.filter(function(e){ return e.ward && !e.elite; });
+  if(warded.length===1) parts.push("lane "+(warded[0].lane+1)+" warded "+WARDNAME[warded[0].ward]);
+  else if(warded.length>1) parts.push(warded.length+" warded ("+warded.map(function(e){ return "L"+(e.lane+1)+" "+WARDNAME[e.ward]; }).join(", ")+")");
+  return parts.join(" · ");
+}
 function showReward(){
+  S.nextWaveSpec = rollWave(S.wave+1);      // pre-roll the NEXT wave now — preview and spawn share this exact spec
+  renderNextWave(S.nextWaveSpec);
+  if(S.nextWaveSpec.elite) setTimeout(function(){ if(S && !S.over) sEliteHorn(); }, 620);   // deeper horn sting, once, when the stall opens
   rollBazaar();
   S.boonPicked=false;
   var pool=ALL_UP.filter(function(u){
@@ -1609,9 +1768,19 @@ function showReward(){
   document.getElementById("rwSub").textContent = "Wave "+S.wave+" cleared. Take a boon, then spend your motes.";
   show("vReward");
 }
+/* the death screen reads as a run report, not a funeral — a tight card of what you pulled off. */
 function gameOver(){
   S.over=true; S.busy=true;
-  document.getElementById("ovMsg").innerHTML = "You held for <b>"+S.wave+"</b> wave"+(S.wave===1?"":"s")+". The colour fades — for now.";
+  document.getElementById("ovMsg").textContent = "The colour fades — for now.";
+  var st=S.stats||{}, rows=[];
+  function row(k, v, hero){ rows.push('<div class="srow'+(hero?" hero":"")+'"><span class="sk">'+k+'</span><span class="sv">'+v+'</span></div>'); }
+  row("Held for", st.waves+" wave"+(st.waves===1?"":"s"));   // always shown — the run's length
+  if(st.bestCast) row("Best cast", "L"+st.bestCast.tl+" "+st.bestCast.name.toUpperCase()+" — "+st.bestCast.dmg, true);
+  if(st.doublecasts) row("Doublecasts", st.doublecasts);
+  if(st.creations) row("Creations", st.creations);
+  if(st.prisms) row("Prisms minted", st.prisms);
+  if(st.motes) row("Motes earned", st.motes);
+  document.getElementById("ovStats").innerHTML = rows.join("");
   show("vOver");
 }
 
@@ -1725,7 +1894,8 @@ function flowPaused(){
 }
 function updateFlow(dt){
   if(flowPaused()) return;
-  if(S.cool>0){ S.cool-=dt; if(S.cool<=0){ S.cool=0; S.coolPulse=now(); beep(880,.07,"sine",.04); } }
+  if(S.cool>0){ S.cool-=dt; if(S.cool<=0){ S.cool=0; S.coolPulse=now(); S.readyElapsed=0; beep(880,.07,"sine",.04); } }
+  else { S.readyElapsed += dt; if(S.chain>0 && S.readyElapsed>CHAIN_WINDOW) S.chain=0; }   // idle past the window drops the chain (delta-accumulated → pause-safe)
   if(S.phase!=="clear"){                     // the horde holds its breath during a wave clear / draft
     S.beatT+=dt;
     if(S.beatT>=S.beatMax){ S.beatT-=S.beatMax; triggerPhase(); }
@@ -2127,6 +2297,28 @@ function drawEnemies(t){
       ctx.fillStyle = e.hp/e.maxhp>0.4? "#57c268" : "#ef4a5a";
       rr(bx+1.5,by+1.5,(bw-3)*Math.max(0,e.hp/e.maxhp),bh-3,2); ctx.fill();
     }
+    // THREAT GARNISH — armored: a small ink "plate" badge showing the bounce threshold (hits under 5 do 0)
+    if(e.armored && !e.dead){
+      var pbx=e.x - r*0.9 - 12, pby=by+3.5;
+      ctx.save(); ctx.translate(pbx,pby); ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillStyle="rgba(44,39,51,.9)"; rr(-8,-4,16,13,4); ctx.fill();          // sticker shadow
+      ctx.fillStyle="#4a4454"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; rr(-8,-6,16,13,4); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle="rgba(255,255,255,.28)"; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(-5,-2.5); ctx.lineTo(5,-2.5); ctx.stroke();
+      ctx.fillStyle="#fffdf6"; ctx.font="700 10px Fredoka, sans-serif"; ctx.fillText("5", 0, 1);
+      ctx.textBaseline="alphabetic"; ctx.restore();
+    }
+    // THREAT GARNISH — elite: a small gold crown badge above the bar
+    if(e.elite && !e.dead){
+      var crY=e.y+bob-pr-26;
+      ctx.save(); ctx.translate(e.x, crY);
+      function crown(off){ ctx.beginPath();
+        ctx.moveTo(-9,4+off); ctx.lineTo(-9,-2+off); ctx.lineTo(-4.5,2+off); ctx.lineTo(0,-5+off);
+        ctx.lineTo(4.5,2+off); ctx.lineTo(9,-2+off); ctx.lineTo(9,4+off); ctx.closePath(); }
+      crown(2); ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill();
+      crown(0); ctx.fillStyle="#ffd15c"; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+      ctx.fillStyle="#2c2733"; [-4.5,0,4.5].forEach(function(jx){ ctx.beginPath(); ctx.arc(jx,1.5,1.1,0,7); ctx.fill(); });
+      ctx.restore();
+    }
     // intent: drawn ink triangle (advance) or red damage badge (attacking the wall)
     if(e.freeze>0){ /* frozen: chip says it */ }
     else if(e.rung<=0 && e.dmg>0){
@@ -2440,19 +2632,23 @@ function drawHub(t){
     // FLOW: the whorl doubles as the cast-cooldown gauge — arc-length = readiness (empty right after a cast)
     var frac = S.coolMax>0 ? Math.max(0,Math.min(1, 1 - S.cool/S.coolMax)) : 1;
     var pulseK = S.coolPulse ? Math.max(0,1-(t-S.coolPulse)/500) : 0;
+    var chainK = S.chain||0;                         // 0..2 — the flow chain level tints the whorl
     ctx.save(); ctx.translate(g.cx, g.cy);           // caption gone — the spiral sits centred
     // faint full-spiral track so the empty state still reads as a whorl
     ctx.strokeStyle="rgba(44,39,51,.14)"; ctx.lineWidth=2.5; ctx.beginPath();
     for(var af=0;af<=Math.PI*5;af+=0.14){ var rf=2.5+af*2.1; if(af===0)ctx.moveTo(rf,0); else ctx.lineTo(Math.cos(af)*rf,Math.sin(af)*rf); }
     ctx.stroke();
-    // readiness portion, solid; gold flash on the ready pulse
-    ctx.strokeStyle= pulseK>0 ? "rgba("+Math.round(224-40*(1-pulseK))+",160,32,1)" : "#2c2733";
-    ctx.lineWidth=3.2+2*pulseK; ctx.beginPath();
+    // readiness portion, solid; gold flash on the ready pulse, gold-tinted at chain 2
+    var restCol = chainK>=2 ? "rgba(140,101,26,0.95)" : "#2c2733";   // faint gold tint at full chain
+    ctx.strokeStyle= pulseK>0 ? "rgba("+Math.round(224-40*(1-pulseK))+",160,32,1)" : restCol;
+    ctx.lineWidth=3.2+2*pulseK+chainK*0.35; ctx.beginPath();
     var amax=Math.PI*5*frac, st2=false;
     for(var a=0;a<=amax;a+=0.14){ var r=2.5+a*2.1, wx=Math.cos(a)*r, wy=Math.sin(a)*r;
       if(!st2){ ctx.moveTo(wx,wy); st2=true; } else ctx.lineTo(wx,wy); }
     ctx.stroke();
-    if(pulseK>0){ ctx.strokeStyle="rgba(255,209,92,"+(pulseK*0.6)+")"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,14,0,7); ctx.stroke(); }
+    // the ready-pulse gold grows stronger per chain level
+    if(pulseK>0){ ctx.strokeStyle="rgba(255,209,92,"+Math.min(0.95,pulseK*0.6*(1+chainK*0.45))+")";
+      ctx.lineWidth=3+chainK*0.6; ctx.beginPath(); ctx.arc(0,0,14,0,7); ctx.stroke(); }
     ctx.restore();
     if(S.cool<=0 && !S.busy){ ctx.fillStyle="#b9791a"; ctx.font="700 10px Nunito, sans-serif";
       ctx.fillText("cast ready", g.cx, g.cy+46); }
@@ -2822,7 +3018,12 @@ window.__wh = function(){
   return {
     realtime: CFG.realtime, actions: S.actions, maxActions: S.maxActions,
     cool: +S.cool.toFixed(3), coolMax: S.coolMax, castCd: CFG.castCd,
+    chain: S.chain, readyElapsed: +S.readyElapsed.toFixed(3),
     beatT: +S.beatT.toFixed(3), beatMax: S.beatMax,
+    stats: { waves:S.stats.waves, bestCast:S.stats.bestCast, doublecasts:S.stats.doublecasts, creations:S.stats.creations, motes:S.stats.motes, prisms:S.stats.prisms },
+    nextWaveSpec: S.nextWaveSpec ? { wave:S.nextWaveSpec.wave, elite:S.nextWaveSpec.elite,
+      enemies:S.nextWaveSpec.enemies.map(function(e){ return { lane:e.lane, rung:e.rung, ward:e.ward, brute:e.brute, elite:e.elite, armored:e.armored, healer:e.healer, leech:e.leech, hp:e.hp, dmg:e.dmg }; }) } : null,
+    foes: S.enemies.map(function(e){ return { lane:e.lane, rung:e.rung, ward:e.ward, brute:e.brute, elite:e.elite, armored:e.armored, healer:e.healer, leech:e.leech, hp:e.hp, dmg:e.dmg }; }),
     paused: S.paused, busy: S.busy, phase: S.phase, over: S.over, wave: S.wave, hp: S.hp,
     motes: S.motes, exotics: S.exotics.slice(), rituals: S.rituals.slice(), reagents: Object.keys(S.reagents),
     creations: S.creations.filter(function(c){ return !c.dead; }).map(function(c){ return { kind:c.kind, lane:c.lane, rung:c.rung, hp:c.hp, maxhp:c.maxhp, attack:c.attack, tl:c.tl }; }),
