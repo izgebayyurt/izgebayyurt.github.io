@@ -130,6 +130,10 @@ body{
 .bmeta span{ font-weight:700; font-size:11.5px; color:var(--ink-soft); }
 .bn{ flex:none; font-family:var(--font-d); font-weight:700; font-size:13px; color:var(--ink-soft); min-width:26px; text-align:right; }
 .bookrow.locked .bmeta b{ color:var(--ink-soft); font-style:italic; }
+.reactrow-head{ padding:12px 6px 2px; text-align:left; }
+.reactrow-head b{ font-family:var(--font-d); font-weight:700; font-size:13px; color:var(--ink-soft); letter-spacing:.06em; }
+.reactrow{ cursor:default; gap:11px; padding:8px 12px; }
+.reactrow:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
 
 /* ---------- motes: the coin chip + its collect pop ---------- */
 .chip.motes{ gap:5px; }
@@ -519,7 +523,25 @@ function freshBall(){
   var keys=["R","Y","B"];
   return { c:keys[(Math.random()*3)|0], lvl:1, born:now() };
 }
-function now(){ return performance.now(); }
+/* VIRTUAL CLOCK: now() is game time. A HITSTOP freezes it (freeze-frame) without touching
+   the rAF loop or input — every now()-driven animation & flow tick stalls uniformly, then resumes
+   continuously. setTimeout-scheduled cast phases run on wall-clock, so the brief stall never desyncs them. */
+var _timeFreeze=0, _freezeStart=0, _hitstopEnd=0;
+function now(){ if(_freezeStart) return _freezeStart - _timeFreeze; return performance.now() - _timeFreeze; }
+/* pump the freeze clock each frame; returns true while a hitstop is active (for the zoom pulse) */
+function pumpHitstop(){
+  if(!_freezeStart) return false;
+  var raw=performance.now();
+  if(raw>=_hitstopEnd){ _timeFreeze += (raw - _freezeStart); _freezeStart=0; return false; }
+  return true;
+}
+/* SPECTACLE hitstop: an ~80ms global freeze-frame. Stack-safe — repeats never push the total past 120ms. */
+function triggerHitstop(ms){
+  ms=ms||80; var raw=performance.now();
+  if(!_freezeStart){ _freezeStart=raw; _hitstopEnd=raw+ms; }
+  else { _hitstopEnd=Math.max(_hitstopEnd, raw+ms); }
+  _hitstopEnd=Math.min(_hitstopEnd, _freezeStart+120);
+}
 function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
 
 /* ---------- waves (human retune: count cap 8 = 2+ceil(0.6w), trash HP round(0.9·(4+3w)), wards O/G/P only) ----------
@@ -652,20 +674,28 @@ function sInscribe(){ [523,659,880].forEach(function(f,i){ setTimeout(function()
    the book PERSISTS across death / new game — it is the first thing that carries between runs. */
 var SPELL_ORDER = ["Blast","Lance","Venom","Ember","Frost","Sunburst","Pyre","Overgrowth","Eclipse","Void","Whorl","Prism","Fizzle"];
 var BOOK_INFO = {
-  Blast:     { recipe:["O","R","Y"],     desc:"splash · burns",          hint:"orange with red & yellow" },
+  Blast:     { recipe:["O","R","Y"],     desc:"splash · burns · fire reacts",          hint:"orange with red & yellow" },
   Lance:     { recipe:["P","R","B"],     desc:"pierces a lane",          hint:"purple with red & blue" },
-  Venom:     { recipe:["G","Y","B"],     desc:"hits a cluster · poisons", hint:"green with yellow & blue" },
-  Ember:     { recipe:["R","R","R"],     desc:"single hit · burns",       hint:"three reds, hot" },
-  Frost:     { recipe:["B","B","B"],     desc:"hits all · freezes",       hint:"three blues, cold" },
+  Venom:     { recipe:["G","Y","B"],     desc:"hits a cluster · poisons · blooms under fire", hint:"green with yellow & blue" },
+  Ember:     { recipe:["R","R","R"],     desc:"single hit · burns · fire reacts",       hint:"three reds, hot" },
+  Frost:     { recipe:["B","B","B"],     desc:"hits all · freezes · shatters under fire", hint:"three blues, cold" },
   Sunburst:  { recipe:["Y","Y","Y"],     desc:"hits all",                 hint:"three yellows, bright" },
-  Pyre:      { recipe:["O","O","O"],     desc:"wide splash · deep burn",  hint:"three of the warmest craft" },
-  Overgrowth:{ recipe:["G","G","G"],     desc:"hits all · heavy poison",  hint:"three of the living craft" },
+  Pyre:      { recipe:["O","O","O"],     desc:"wide splash · deep burn · fire reacts",  hint:"three of the warmest craft" },
+  Overgrowth:{ recipe:["G","G","G"],     desc:"hits all · heavy poison · blooms under fire",  hint:"three of the living craft" },
   Eclipse:   { recipe:["P","P","P"],     desc:"hits all · ignores wards", hint:"three of the royal craft" },
-  Void:      { recipe:["O","G","P"],     desc:"true strike · the strongest foe", hint:"the crafted colours, cancelled" },
-  Whorl:     { recipe:["W","W","W"],     desc:"true storm · hits all",    hint:"three lights, woven" },
+  Void:      { recipe:["O","G","P"],     desc:"true strike · consumes statuses", hint:"the crafted colours, cancelled" },
+  Whorl:     { recipe:["W","W","W"],     desc:"true storm · hits all · consumes statuses",    hint:"three lights, woven" },
   Prism:     { recipe:["R","Y","B"],     desc:"fuse one wildcard light",  hint:"one of each primary" },
   Fizzle:    { recipe:["any","any","any"],desc:"a cast that won't cohere",  hint:"a cast that won't cohere" }
 };
+/* the five elemental reactions, for the spellbook legend (icon colour + one-liner) */
+var REACT_LEGEND = [
+  { c:"#f2913d", n:"Shatter", d:"fire on a FROZEN foe → ×2.5, ice bursts" },
+  { c:"#57c268", n:"Bloom",   d:"fire on a POISONED foe → stacks detonate" },
+  { c:"#3d8bdf", n:"Brittle", d:"ice on a BURNING foe → next hit +50%" },
+  { c:"#6bbfa0", n:"Preserve",d:"freeze a POISONED foe → poison doubles on thaw" },
+  { c:"#2c2733", n:"Consume", d:"true damage → eats every status, +2 each" }
+];
 var BOOK = loadBook();
 function loadBook(){
   var b={};
@@ -717,6 +747,17 @@ function openBook(){
     row.innerHTML='<div class="recipe">'+chips+'</div>'+
       '<div class="bmeta"><b>'+nm+'</b><span>'+ds+'</span></div>'+
       '<div class="bn">'+cnt+'</div>';
+    box.appendChild(row);
+  });
+  // REACTIONS legend — a compact row of five, so combos are never a secret. Information is free.
+  var lgHead=document.createElement("div");
+  lgHead.className="reactrow-head";
+  lgHead.innerHTML='<b>REACTIONS — order is strategy</b>';
+  box.appendChild(lgHead);
+  REACT_LEGEND.forEach(function(rl){
+    var row=document.createElement("div"); row.className="rcard reactrow";
+    row.innerHTML='<div class="recipe"><i style="background:'+rl.c+';width:18px;height:18px;"></i></div>'+
+      '<div class="bmeta"><b style="font-size:14px;">'+rl.n+'</b><span>'+rl.d+'</span></div>';
     box.appendChild(row);
   });
   document.getElementById("bookSub").textContent = totalCasts>0
@@ -822,10 +863,15 @@ function applyDmg(e, amt, el, opts){
     }
   }
   if(e.freeze>0 && S.reagents && S.reagents.shatterfrost) amt = Math.round(amt*(isII("shatterfrost")?2:1.5));   // Shatterfrost: +50% frozen (II: +100%)
+  // ELEMENTAL REACTIONS — after damage math, before the hp subtract / death check (reactable hits only)
+  amt = applyReactions(e, amt, el, opts);
+  var reactGold=_reactGold, reactBanner_=_reactBanner;
   var crit = !trueDmg && !pierce && e.ward && el===e.ward;
   e.hp -= amt; e.hit = now();
   sHit(amt, crit);
-  spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit, false, false, opts.friend);
+  spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit, false, false, opts.friend, reactGold);
+  // HITSTOP: a reaction fired, or a single hit landed 25+
+  if(reactBanner_ || amt>=25) triggerHitstop(80);
   if(e.hp<=0 && !e.dead){
     e.dead=true; e.deadAt=now();
     boom(e.x,e.y, e.ward?HEX[e.ward]:"#c9c1b4", 1.4);
@@ -886,6 +932,65 @@ function applyBurn(e, val){ e.burn = Math.max(e.burn, val + (S.reagents && S.rea
 /* poison stacks are capped so doubling/jumps can't runaway */
 var POISON_CAP = 12;
 
+/* ===================== ELEMENTAL REACTIONS (Magicka/DOS2 style) =====================
+   Statuses stop being inert: a HIT of the right element on a foe carrying the right status
+   fires a named reaction. Element identities — fire = O/R (Blast/Pyre/Ember/Calcine + burn-carriers),
+   ice = B (Frost), true = Void/Whorl. Rules: at most ONE banner reaction per hit
+   (priority Shatter > Bloom > Brittle; Consume only on true dmg; Preserve is application-time).
+   Only reactable direct hits (spell / exotic-damage / creation) qualify — DoT ticks NEVER react.
+   BRITTLE the STATUS (a spent-once +50% flag) is a status payoff, applied independently of the
+   one-banner rule. applyReactions runs after ward/frost math, before hp is subtracted. */
+var _reactGold=false, _reactBanner=false, _reactBannerT=0;
+function reactBanner(txt, col){ toast(txt, 1150, col, "mid", true); _reactBannerT=now(); }
+function applyReactions(e, amt, el, opts){
+  _reactGold=false; _reactBanner=false;
+  if(!opts.reactable || e.dead) return amt;
+  // BRITTLE status payoff: the next hit after an ice-douse cracks for +50%, then the flag clears
+  if(e.brittle){ e.brittle=false; amt=Math.max(1,Math.round(amt*1.5)); _reactGold=true; boom(e.x,e.y,"#cfe3ff",1.0); }
+  var isTrue=!!opts.trueDamage, isFire=(el==="O"||el==="R"), isIce=(el==="B");
+  // CONSUME — true damage devours every status for +2 each
+  if(isTrue){
+    var tot=(e.burn||0)+(e.poison||0)+(e.freeze||0);
+    if(tot>0){ amt+=tot*2; e.burn=0; e.poison=0; e.freeze=0; e.psnPreserved=false;
+      reactBanner("CONSUME", "#2c2733"); consumeFx(e); vib([12,30,50]); _reactGold=true; _reactBanner=true; }
+    return amt;
+  }
+  if(isFire){
+    if(e.freeze>0){                                   // SHATTER — fire cracks the ice (no frImm: shattered, not thawed)
+      e.freeze=0; amt=Math.max(1,Math.round(amt*2.5));
+      reactBanner("SHATTER!", "#3d8bdf"); shatterFx(e); vib([18,40,80]); _reactGold=true; _reactBanner=true; return amt; }
+    if(e.poison>0){                                   // BLOOM — poison detonates for 2× its stacks
+      amt+=e.poison*2; e.poison=0; e.psnPreserved=false;
+      reactBanner("BLOOM!", "#57c268"); bloomFx(e); vib([14,30,60]); _reactGold=true; _reactBanner=true; return amt; }
+  }
+  if(isIce){
+    if(e.burn>0){                                     // BRITTLE — ice douses the burn, leaving hairline cracks
+      e.burn=0; e.brittle=true;
+      reactBanner("BRITTLE!", "#3d8bdf"); brittleFx(e); vib([10,26,40]); _reactBanner=true; return amt; }
+  }
+  return amt;
+}
+/* SHATTER: white ice shards + an ice-blue boom */
+function shatterFx(e){
+  boom(e.x,e.y,"#8fc7ff",1.9);
+  for(var i=0;i<10;i++){ var a=Math.random()*Math.PI*2, sp=2.0+Math.random()*2.6;
+    S.fx.push({ conf:true, x:e.x, y:e.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1.0,
+      col: i%3===0?"#3d8bdf":"#ffffff", s:2.5+Math.random()*3, rot:Math.random()*6, t:now() }); }
+  S.shake=Math.min(22,S.shake+6);
+}
+/* BLOOM: a green-to-orange burst */
+function bloomFx(e){
+  boom(e.x,e.y,"#57c268",1.6);
+  for(var i=0;i<8;i++){ var a=Math.random()*Math.PI*2, sp=1.6+Math.random()*2.2;
+    S.fx.push({ conf:true, x:e.x, y:e.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1.1,
+      col: i%2===0?"#f2913d":"#57c268", s:3+Math.random()*2.5, rot:Math.random()*6, t:now() }); }
+  S.shake=Math.min(22,S.shake+4);
+}
+/* BRITTLE (the douse): a puff of ice-blue */
+function brittleFx(e){ boom(e.x,e.y,"#cfe3ff",1.2); S.fx.push({ star:true, x:e.x, y:e.y, t:now(), tint:"#8fc7ff" }); }
+/* CONSUME: a void-dark implosion drawing inward */
+function consumeFx(e){ S.fx.push({ implode:true, x:e.x, y:e.y, t:now(), max:(geo.ballR||20)*2.2 }); boom(e.x,e.y,"#2c2733",1.3); S.shake=Math.min(22,S.shake+5); }
+
 /* ---------- pigment motes: the in-run currency the horde sheds ---------- */
 function moteValue(e){ return e.elite?9 : e.brute?3 : (e.armored||e.healer||e.leech)?2 : 1; }
 function moteHudSet(){ var n=document.getElementById("moteN"); if(n) n.textContent = S?S.motes:0; }
@@ -918,16 +1023,36 @@ function impactSpell(sp, hits, mul){
   mul = mul || 1;                                                                        // Mordant II passes 1.15 for its doubled casts
   var base = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
   var per = mul===1 ? base : Math.max(1, Math.round(base*mul));
-  var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW };
-  var dealt=0;
+  var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW, reactable:true };
+  var dealt=0, kills=0, preservedAny=false;
   hits.forEach(function(e){
+    var wasDead=e.dead;
     dealt += applyDmg(e, per, sp.el, opts) || 0;
-    if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
-    if(sp.poison) e.poison = Math.min(POISON_CAP, e.poison + sp.poison);   // poison stacks cap at 12
-    if(sp.burn) applyBurn(e, sp.burn);
+    if(!wasDead && e.dead) kills++;
+    // FREEZE application — the PRESERVE reaction: freezing a poisoned foe pauses its poison (doubles on thaw)
+    if(sp.freeze && !e.frImm && !e.dead){
+      e.freeze = Math.max(e.freeze, sp.freeze);
+      if(e.poison>0 && !e.psnPreserved){ e.psnPreserved=true; preservedAny=true; }
+    }
+    if(sp.poison && !e.dead) e.poison = Math.min(POISON_CAP, e.poison + sp.poison);   // poison stacks cap at 12
+    if(sp.burn && !e.dead) applyBurn(e, sp.burn);
   });
+  if(preservedAny){ toast("preserved…", 850, "#3fa07a", "low"); vib(6); }   // PRESERVE: subtle, no big banner
   recordCast(sp, dealt);   // best-cast tracking — each doublecast half lands here separately
+  killCallout(sp, kills);
   S.shake = Math.min(20, 4 + sp.tl*1.1 + (sp.tl>=6?4:0) + (sp.whorl?6:0));
+}
+/* SPECTACLE: a cast that reaps a crowd earns a big mid callout (after a beat so it lands post-damage),
+   a hitstop, and — for a Pyre/Ember reaping — an amber screen-mood. */
+function killCallout(sp, kills){
+  if(kills>=3){
+    triggerHitstop(80);
+    if((sp.name==="Pyre"||sp.name==="Ember")) setMood("amber");
+    vib([20,40,20,40,60]);
+    var word = kills>=5?"WIPE!" : (kills===4?"QUAD!":"TRIPLE!");
+    var st=S;
+    setTimeout(function(){ if(S!==st||st.over) return; toast(word, 1200, "#b9791a", "mid", true); S.shake=Math.min(24,S.shake+6); }, 350);
+  } else if(kills>=2 && (sp.name==="Pyre"||sp.name==="Ember")){ setMood("amber"); }
 }
 /* best-cast bookkeeping: the single hardest-hitting spell landing this run (by total damage dealt).
    doublecast halves and Mordant repeats each arrive as their own impactSpell, so each counts alone. */
@@ -961,8 +1086,10 @@ function cast(idxs){
   setTimeout(function(){ if(S!==st||st.over) return;
     impactSpell(sp, hits, dblMul);
     if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits, dblMul); S.shake=Math.min(24,S.shake+5); }
+    var reacted = (now()-_reactBannerT) < 80;   // a reaction banner just fired this cast — let it stand
     if(dbl){ toast("Mordant · "+sp.name+" ×2!", 1200, "#b9791a", "mid", true); }
     else if(sp.whorl){ toast("W H O R L !", 1400, "#b9791a", "mid", true); S.shake=Math.min(24,S.shake+8); vib([60,40,60,40,90]); }
+    else if(reacted){ /* keep the reaction banner — the combo is the headline */ }
     else if(sp.stale){ toast("Stale...", 1000, "#6b6472", "low"); }
     else {
       var label = sp.tl>=6 ? "L"+sp.tl+" "+sp.name.toUpperCase()+"!" : sp.name+(sp.tl>3?" · L"+sp.tl:"");
@@ -1117,7 +1244,7 @@ var EXOTIC = [
   { key:"quench", name:"Quench", recipe:["B","R","R","B"], price:22, bg:"#3d8bdf", dmg:true,
     desc:"Consume all burn on the field; each burned foe takes 3× its ticks as damage.",
     cast:function(st,TL,mul){ var any=false, qm=isII("Quench")?4:3;                       // II: consumed burn pays 4× (was 3×)
-      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*qm*mul)), "O"); any=true; } });
+      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*qm*mul)), "O", {reactable:true}); any=true; } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.5); if(any) sHit(9,true); } },
   { key:"mordant", name:"Mordant", recipe:["R","B","B","R"], price:24, bg:"#9b62d6",
     desc:"Your next TWO casts each fire twice — both hits at full power.",
@@ -1142,7 +1269,7 @@ var EXOTIC = [
     desc:"Scour the target lane: heavy fire damage plus a deep burn to everything in it.",
     cast:function(st,TL,mul){ var tgt=nearest(); if(!tgt) return;
       var dmg=Math.max(1,Math.round((isII("Calcine")?7:5)*TL*CFG.spellPow*mul));           // II: lane coeff 7 (was 5)
-      alive().slice().forEach(function(e){ if(e.lane===tgt.lane){ applyDmg(e,dmg,"O"); applyBurn(e,3); } });
+      alive().slice().forEach(function(e){ if(e.lane===tgt.lane){ applyDmg(e,dmg,"O",{reactable:true}); applyBurn(e,3); } });
       S.fx.push({ laneFlash:true, lane:tgt.lane, t:now(), tint:HEX.O }); } },
   { key:"distill", name:"Distill", recipe:["Y","B","B","Y"], price:20, bg:"#3d8bdf",
     desc:"Purge every husk on the dial — fresh primaries take their slots.",
@@ -1154,7 +1281,7 @@ var EXOTIC = [
   { key:"bellows", name:"Bellows", recipe:["R","Y","Y","R"], price:24, bg:"#f2913d", dmg:true,
     desc:"Every burn tick fires at once at 2×; the burn is then spent.",
     cast:function(st,TL,mul){ var bm=isII("Bellows")?6:4;                                  // II: detonate at 3× (was 2×)
-      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*bm*mul)), "O"); } });
+      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*bm*mul)), "O", {reactable:true}); } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.7); } },
   { key:"aurum", name:"Aurum", recipe:["Y","Y","R","Y","Y"], price:21, bg:"#f6c445",
     desc:"Once per wave: transmute the horde's light into coin — 2 motes per living foe.",
@@ -1472,14 +1599,14 @@ function frontEnemyInLane(lane, nearRung){
 }
 function creationStrike(c, e){
   if(!e || e.dead) return;
-  applyDmg(e, c.attack, null, { friend:true });
+  applyDmg(e, c.attack, null, { friend:true, reactable:true });
   S.fx.push({ arc:true, from:{x:c.x,y:c.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:creationTint(c.kind) });
   S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:creationTint(c.kind) });
   c.act=now(); sHit(c.attack,false); beep(300,.05,"triangle",.04);
 }
 function creationBolt(c, e){
   if(!e || e.dead) return;
-  applyDmg(e, c.attack, null, { friend:true });
+  applyDmg(e, c.attack, null, { friend:true, reactable:true });
   S.fx.push({ beam:true, tgt:{x:e.x,y:e.y}, t:now(), tint:creationTint(c.kind), from:{x:c.x,y:c.y-geo.ballR*0.5} });
   S.fx.push({ star:true, x:e.x, y:e.y, t:now()+50, tint:creationTint(c.kind) });
   c.act=now(); beep(520,.07,"sine",.04);
@@ -1665,7 +1792,8 @@ function leechDrain(L){
 function dotTick(e){
   if(e.dead) return;
   e.dotT = now();
-  if(e.poison>0){ applyDmg(e, Math.max(1,Math.round(e.poison)), "G"); e.poison--; }
+  // PRESERVE: a frozen foe's poison is held in stasis — it doesn't tick while iced
+  if(e.poison>0 && !(e.freeze>0)){ applyDmg(e, Math.max(1,Math.round(e.poison)), "G"); e.poison--; }
   if(e.burn>0){ applyDmg(e, (S.reagents && S.reagents.cinder) ? (isII("cinder")?4:3) : 2, "O"); e.burn--; }   // Cinder Wick: hotter ticks (3, II 4, vs 2)
 }
 function stepEnemy(e){
@@ -1673,7 +1801,11 @@ function stepEnemy(e){
   if(e.fled){ e.fled=false; return; }   // skittish healer just retreated — recover, don't also advance
   if(!e.arrived){ e.arrived=true; return; }   // ARRIVAL GRACE: freshly-spawned foe settles in — skip its first advance (DoT/heals already applied this phase)
   if(e.frImm>0) e.frImm--;
-  if(e.freeze>0){ e.freeze--; if(e.freeze<=0) e.frImm=1; return; }   // thaw grants 1-turn immunity
+  if(e.freeze>0){ e.freeze--;
+    if(e.freeze<=0){ e.frImm=1;
+      if(e.psnPreserved && e.poison>0){ e.poison=Math.min(POISON_CAP, e.poison*2); e.dotT=now(); }   // PRESERVE: poison doubles on thaw (cap 12)
+      e.psnPreserved=false;
+    } return; }   // thaw grants 1-turn immunity
   if(e.slow){ e.slowT=(e.slowT+1)%2; if(e.slowT===1) return; }
   if(e.rung<=0){
     // a ward-stone at the wall (rung 0) is a shield — foes strike it INSTEAD of the gate
@@ -2195,7 +2327,7 @@ function gameOver(){
 }
 
 /* ===================== effects ===================== */
-function spawnDmg(x,y,amt,crit,gate,heal,friend){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal, friend:friend }); }
+function spawnDmg(x,y,amt,crit,gate,heal,friend,react){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal, friend:friend, react:react }); }
 function boom(x,y,col,scale){ S.fx.push({ ring:true, x:x,y:y, col:col, t:now(), max:(geo.ballR||20)*(scale||1.6) }); }
 function confetti(x,y,col){
   for(var i=0;i<7;i++){
@@ -2204,8 +2336,18 @@ function confetti(x,y,col){
       col: i%3===0? "#2c2733" : col, s:3+Math.random()*2.5, rot:Math.random()*6, t:now() });
   }
 }
+/* SPELL SCREEN-MOODS: a cheap ~350ms canvas overlay per signature spell (no ctx.filter) */
+var screenMood=null;
+function setMood(type){ screenMood={ type:type, t:now() }; }
+function moodFor(sp){
+  if(!sp||sp.fizzle) return;
+  if(sp.name==="Frost") setMood("ice");
+  else if(sp.name==="Void") setMood("desat");
+  else if(sp.whorl) setMood("whorl");
+}
 function castFx(sp,tgt,hitPts){
   var t0=now();
+  moodFor(sp);
   if(sp.kind==="all"){ S.fx.push({ wave:true, t:t0, tint:sp.tint==="#fff"?"#ffd15c":sp.tint }); }
   else if(sp.kind==="lane" && tgt){ S.fx.push({ laneFlash:true, lane:tgt.lane, t:t0, tint:sp.tint }); }
   else if(tgt){
@@ -2326,6 +2468,7 @@ function updateFlow(dt){
   }
 }
 function draw(){
+  var hz=pumpHitstop();   // advance the freeze clock; true while a hitstop holds the world still
   var t=now();
   var dt=Math.min(0.1,(t-lastFrame)/1000); lastFrame=t;   // clamp: no giant jumps after a stall
   ctx.clearRect(0,0,W,H);
@@ -2333,6 +2476,7 @@ function draw(){
   var sx=0, sy=0;
   if(S && S.shake>0){ sx=(Math.random()*2-1)*S.shake; sy=(Math.random()*2-1)*S.shake; S.shake*=0.86; if(S.shake<0.4)S.shake=0; }
   ctx.save(); ctx.translate(sx,sy);
+  if(hz){ ctx.translate(W/2,H/2); ctx.scale(1.02,1.02); ctx.translate(-W/2,-H/2); }   // subtle zoom pulse on hitstop
 
   if(S){
     if(!S.over) maybeIdleWiggle(t);
@@ -2349,6 +2493,7 @@ function draw(){
     if(!S.over && S.hp/S.maxhp<0.4 && t-lastBeat>1900){ lastBeat=t; beep(70,.1,"sine",.045); }
   }
   ctx.restore();
+  if(S) drawMood(t);   // screen-space spell moods, over the shake but under system overlays
   if(S && CFG.realtime && S.paused && !S.over){
     ctx.fillStyle="rgba(240,230,207,.55)"; ctx.fillRect(0,0,W,H);
     ctx.fillStyle="#2c2733"; ctx.textAlign="center"; ctx.textBaseline="middle";
@@ -2711,12 +2856,24 @@ function drawEnemies(t){
         ctx.beginPath(); ctx.moveTo(s*pr*.22-3,pr*.12); ctx.lineTo(s*pr*.22+3,pr*.12); ctx.lineTo(s*pr*.22,pr*.36); ctx.closePath(); ctx.fill();
       });
     }
+    // BRITTLE status: hairline cracks etched across the body (next hit will shatter it for +50%)
+    if(e.brittle && !e.dead){
+      ctx.strokeStyle="rgba(44,39,51,.55)"; ctx.lineWidth=1.4; ctx.lineCap="round";
+      var seeds=[[-0.55,-0.4],[0.15,-0.55],[0.45,0.1]];
+      seeds.forEach(function(sd,si){
+        var bx0=sd[0]*pr, by0=sd[1]*pr, ang=si*1.9+e.seed, len=pr*0.7;
+        ctx.beginPath(); ctx.moveTo(bx0,by0);
+        var mx=bx0+Math.cos(ang)*len*0.5+ (si%2?4:-4), my=by0+Math.sin(ang)*len*0.5-3;
+        var ex2=bx0+Math.cos(ang)*len, ey2=by0+Math.sin(ang)*len;
+        ctx.lineTo(mx,my); ctx.lineTo(ex2,ey2); ctx.stroke();
+      });
+    }
     ctx.restore();
     if(e.dead) return;
     // status chips stacked to the right
     var chips=[];
     if(e.freeze>0) chips.push(["frz",HEX.B]);
-    if(e.poison>0) chips.push(["psn",HEX.G]);
+    if(e.poison>0) chips.push(["psn", e.psnPreserved&&e.freeze>0 ? "#6bbfa0" : HEX.G]);   // PRESERVE: frost-green tint while iced
     if(e.burn>0) chips.push(["brn",HEX.O]);
     var pulse=(t-e.dotT)<300;
     chips.forEach(function(c,k){ statusChip(e.x+pr+12, e.y+bob-8+k*19, c[1], c[0], pulse); });
@@ -2793,9 +2950,20 @@ function drawWindowArc(slots, tint, alpha){
   ctx.lineWidth=g.ballR*1.35; ctx.strokeStyle=tint; ctx.globalAlpha=alpha;
   ctx.lineCap="round"; ctx.stroke(); ctx.globalAlpha=1;
 }
+/* DOUBLECAST HOLD-GLOW: a valid held 6-ball weave (release would doublecast) — is it live right now? */
+function holdDblActive(){
+  if(!gesture || !gesture.visited || gesture.visited.length<6) return false;
+  var wb=gesture.visited.slice(0,6).map(function(i){ return S.dial[i]; });
+  if(!wb.every(Boolean)) return false;
+  var a=resolveSpell(wb.slice(0,3)), b=resolveSpell(wb.slice(3,6));
+  return !a.fizzle && !b.fizzle;                        // both triples cohere → a real weave awaits release
+}
 function drawDial(t){
   var g=geo;
   var dimmed = S.phase==="enemy" && !CFG.realtime;   // flow keeps the ring live during a beat
+  var holdGlow = holdDblActive();
+  // HOLD-GLOW: dim the whole field ~20% so only the six charged balls (drawn bright, burning gold) read
+  if(holdGlow){ ctx.fillStyle="rgba(20,18,26,0.20)"; ctx.fillRect(-40,-40,W+80,H+80); }
   // backboard + hub with sticker shadows
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR,0,7);
   ctx.lineWidth=g.ballR*1.7; ctx.strokeStyle="rgba(251,245,230,.9)"; ctx.stroke();
@@ -2879,6 +3047,14 @@ function drawDial(t){
     var pop=Math.max(0, 1-(t-b.born)/240);
     var breathe = vis? 0 : 0.02*Math.sin(t/650+i*1.7);
     var scale=1 + pop*0.25 + (isLast?0.18:(vis?0.08:0)) + breathe;
+    // HOLD-GLOW: the six charged balls burn gold — a coiled trigger waiting on release
+    if(holdGlow && vis){
+      var gp=0.6+0.4*Math.sin(t/110);
+      ctx.save(); ctx.shadowColor="#ffd15c"; ctx.shadowBlur=16;
+      ctx.beginPath(); ctx.arc(px,py, g.ballR*(0.9*scale)+4, 0,7);
+      ctx.lineWidth=4.5; ctx.strokeStyle="rgba(255,209,92,"+(0.55+0.4*gp)+")"; ctx.stroke();
+      ctx.restore();
+    }
     drawBall(b, px, py, i, t, scale, vis, false);
     // ONE-AWAY PULSE: a candidate that would complete a valid 3-recipe glows softly
     if(S.oneAway && S.oneAway.indexOf(i)>=0){
@@ -3233,16 +3409,29 @@ function drawFx(t){
       rr(-ss/2,-ss/2,ss,ss,2); ctx.fill(); ctx.stroke();
       ctx.rotate(Math.PI/4); rr(-ss/2,-ss/2,ss,ss,2); ctx.fill(); ctx.stroke();
       ctx.globalAlpha=1; ctx.restore();
+    } else if(f.implode){ var ik=age/300; if(ik>=1){ S.fx.splice(i,1); continue; }
+      // CONSUME: a void-dark ring drawing inward, collapsing to a point
+      ctx.beginPath(); ctx.arc(f.x,f.y, f.max*(1-ik), 0,7);
+      ctx.lineWidth=3+5*ik; ctx.strokeStyle="#2c2733"; ctx.globalAlpha=(1-ik)*0.9; ctx.stroke();
+      ctx.beginPath(); ctx.arc(f.x,f.y, f.max*(1-ik)*0.6, 0,7);
+      ctx.lineWidth=2; ctx.strokeStyle="#6b6472"; ctx.stroke(); ctx.globalAlpha=1;
     } else { S.fx.splice(i,1); }
   }
 }
 function drawDmgs(t){
   for(var i=S.dmgs.length-1;i>=0;i--){ var d=S.dmgs[i]; var age=t-d.t; var k=age/850;
     if(k>=1){ S.dmgs.splice(i,1); continue; }
+    // SPECTACLE: font size lerps with magnitude (~16px at 1-9 → ~34px at 40+)
+    var mag=Math.abs(d.amt)||0;
+    var fs=16 + Math.max(0,Math.min(1,(mag-9)/31))*18;
+    var big=d.react;                                         // reaction / boosted hit → gold + heavier + pop
+    if(d.crit && !big) fs=Math.max(fs,22);
+    var pop=1;                                               // small pop-overshoot on big numbers
+    if(big){ var pk=age/150; if(pk<1) pop=1+Math.sin(pk*Math.PI)*0.30; fs=Math.max(fs,22); }
     ctx.globalAlpha=1-k; ctx.textAlign="center";
-    ctx.font=(d.crit?"700 22px ":"700 16px ")+"Fredoka, sans-serif";
-    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.friend? "#8fd0ff" : (d.crit? "#ffd15c":"#fffdf6")));
-    ctx.strokeStyle="#2c2733"; ctx.lineWidth=3;
+    ctx.font="700 "+(fs*pop).toFixed(1)+"px Fredoka, sans-serif";
+    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.friend? "#8fd0ff" : ((big||d.crit)? "#ffd15c":"#fffdf6")));
+    ctx.strokeStyle="#2c2733"; ctx.lineWidth=big?5:3;
     var yy=Math.max(d.y-40*k, geo.fieldTop-24);
     var txt=(d.gate?"-":(d.heal?"+":""))+d.amt;
     ctx.strokeText(txt, d.x, yy); ctx.fillText(txt, d.x, yy);
@@ -3262,6 +3451,49 @@ function drawToast(t){
   ctx.strokeText(S.toast.txt, geo.cx, y);
   ctx.fillStyle=S.toast.col; ctx.fillText(S.toast.txt, geo.cx, y);
   ctx.globalAlpha=1;
+}
+/* SPELL SCREEN-MOODS — cheap screen-space overlays, ~350ms, no ctx.filter */
+function drawMood(t){
+  if(!screenMood) return;
+  var age=t-screenMood.t, D=350; if(age<0){ return; } if(age>D){ screenMood=null; return; }
+  var k=age/D, env=Math.sin(k*Math.PI);        // ramp up then down
+  var ty=screenMood.type;
+  ctx.save();
+  if(ty==="ice"){
+    // icy vignette creeping in from the four corners
+    var corners=[[0,0],[W,0],[0,H],[W,H]];
+    corners.forEach(function(c){
+      var rad=Math.max(W,H)*(0.35+0.35*k);
+      var g=ctx.createRadialGradient(c[0],c[1],0,c[0],c[1],rad);
+      g.addColorStop(0,"rgba(120,180,255,"+(0.34*env)+")");
+      g.addColorStop(1,"rgba(120,180,255,0)");
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    });
+  } else if(ty==="amber"){
+    // amber singe licking in from every edge
+    var inset=Math.max(W,H)*0.42;
+    [["top",ctx.createLinearGradient(0,0,0,inset)],["bot",ctx.createLinearGradient(0,H,0,H-inset)],
+     ["lft",ctx.createLinearGradient(0,0,inset,0)],["rgt",ctx.createLinearGradient(W,0,W-inset,0)]].forEach(function(p){
+      var g=p[1]; g.addColorStop(0,"rgba(242,145,61,"+(0.30*env)+")"); g.addColorStop(1,"rgba(242,145,61,0)");
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    });
+  } else if(ty==="desat"){
+    // Void desaturation snap — a translucent grey multiply (approximate, no filter)
+    ctx.globalCompositeOperation="saturation";
+    ctx.fillStyle="rgba(128,128,128,"+(0.85*env)+")"; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation="multiply";
+    ctx.fillStyle="rgba(150,146,154,"+(0.20*env)+")"; ctx.fillRect(0,0,W,H);
+  } else if(ty==="whorl"){
+    // a rainbow ripple ring sweeping across the field
+    var cx=geo.cx, cy=(geo.fieldTop+geo.gateY)/2, rr2=Math.hypot(W,H)*0.6*k;
+    var hues=["#ef4a5a","#f6c445","#57c268","#3d8bdf","#9b62d6"];
+    for(var h=0;h<hues.length;h++){
+      ctx.beginPath(); ctx.arc(cx,cy, Math.max(0,rr2-h*7), 0,7);
+      ctx.lineWidth=5; ctx.strokeStyle=hues[h]; ctx.globalAlpha=(1-k)*0.7; ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
 }
 
 /* hub preview for the live gesture */
@@ -3667,6 +3899,40 @@ window.__wh = function(){
     minRung: live.length? Math.min.apply(null, live.map(function(e){return e.rung;})) : -1,
     dial: S.dial.map(function(b){ return b? b.c+b.lvl : null; })
   };
+};
+/* ---- test hook: deterministic access to reactions / spectacle internals (harness only) ---- */
+window.__whx = {
+  now: now,
+  getS: function(){ return S; },
+  toastTxt: function(){ return S&&S.toast?S.toast.txt:null; },
+  POISON_CAP: POISON_CAP,
+  /* a synthetic foe with the fields combat touches; override any via `over` */
+  mkFoe: function(over){
+    var e={ x:geo.cx, y:geo.fieldTop+40, lane:1, rung:3, hp:9999, maxhp:9999,
+      burn:0, poison:0, freeze:0, frImm:0, brittle:false, psnPreserved:false,
+      dead:false, ward:null, armored:false, elite:false, brute:false,
+      healer:false, leech:false, seed:0, dotT:0 };
+    if(over) for(var k in over) e[k]=over[k];
+    return e;
+  },
+  applyDmg: function(e, amt, el, opts){ return applyDmg(e, amt, el, opts); },
+  impactSpell: function(sp, hits, mul){ return impactSpell(sp, hits, mul); },
+  dotTick: function(e){ return dotTick(e); },
+  stepEnemy: function(e){ return stepEnemy(e); },
+  applyReactions: function(e, amt, el, opts){ return applyReactions(e, amt, el, opts); },
+  reactState: function(){ return { gold:_reactGold, banner:_reactBanner }; },
+  triggerHitstop: function(ms){ triggerHitstop(ms); },
+  hitstop: function(){ var raw=performance.now();
+    return { active: !!_freezeStart, span: _freezeStart?(_hitstopEnd-_freezeStart):0, remain: _freezeStart?Math.max(0,_hitstopEnd-raw):0 }; },
+  clearHitstop: function(){ _freezeStart=0; _timeFreeze=0; _hitstopEnd=0; },
+  mood: function(){ return screenMood?screenMood.type:null; },
+  /* mirror of the drawDmgs magnitude→font lerp so the harness can assert the curve */
+  fontFor: function(amt, react, crit){
+    var mag=Math.abs(amt)||0, fs=16 + Math.max(0,Math.min(1,(mag-9)/31))*18;
+    if(crit && !react) fs=Math.max(fs,22);
+    if(react) fs=Math.max(fs,22);
+    return fs;
+  }
 };
 resize();
 requestAnimationFrame(draw);
