@@ -130,6 +130,20 @@ body{
 .bmeta span{ font-weight:700; font-size:11.5px; color:var(--ink-soft); }
 .bn{ flex:none; font-family:var(--font-d); font-weight:700; font-size:13px; color:var(--ink-soft); min-width:26px; text-align:right; }
 .bookrow.locked .bmeta b{ color:var(--ink-soft); font-style:italic; }
+.reactrow-head{ padding:12px 6px 2px; text-align:left; }
+.reactrow-head b{ font-family:var(--font-d); font-weight:700; font-size:13px; color:var(--ink-soft); letter-spacing:.06em; }
+.reactrow{ cursor:default; gap:11px; padding:8px 12px; }
+.reactrow:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.warrow{ cursor:default; gap:11px; padding:10px 12px; }
+.warrow:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.langwrap{ overflow-x:auto; padding:2px 2px 6px; }
+.langgrid table{ border-collapse:collapse; font-size:9.5px; margin:0 auto; }
+.langgrid th, .langgrid td{ border:1px solid var(--shadow); padding:2px 4px; text-align:center; white-space:nowrap; }
+.langgrid th{ color:var(--ink-soft); font-weight:800; }
+.langgrid th i{ display:inline-block; width:9px; height:9px; border-radius:50%; border:1.5px solid var(--ink); vertical-align:middle; margin-right:2px; }
+.langgrid th span{ font-size:8px; }
+.langgrid td{ color:var(--ink); font-weight:700; font-family:var(--font-u); }
+.langgrid small{ display:block; text-align:center; color:var(--ink-soft); font-weight:700; margin-top:4px; font-size:10px; }
 
 /* ---------- motes: the coin chip + its collect pop ---------- */
 .chip.motes{ gap:5px; }
@@ -291,7 +305,7 @@ body{
 <canvas id="c"></canvas>
 
 <div class="hud">
-  <div class="chip hearts">♥<b id="hpN">20</b></div>
+  <div class="chip hearts">♥<b id="hpN">30</b></div>
   <div class="chip wave"><small>Wave</small><b id="waveN">1</b></div>
   <div class="chip motes" id="chipMotes"><span class="coin"></span><b id="moteN">0</b></div>
   <div class="spacer"></div>
@@ -319,6 +333,8 @@ body{
       Merges and casts cost <b>1 action</b> each — but one <b>level-up merge per turn is free</b>.<br>
       Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.<br>
       A spell is its <b>exact recipe</b> — or a crafted pair. One of each primary weaves a <b>Prism</b>: it echoes the first colour you sweep.<br>
+      A <b>mirror</b> speaks a language: <span class="k">A·B·A</span> shapes a spell (wings shape, heart fills), <span class="k">A·B·B·A</span> forms a lane-holding <b>Warrior</b>.<br>
+      <b style="color:var(--ink)">Hold</b> a ball to lift and carry it — build the window you need.<br>
       <b style="color:var(--ink)">Turns</b> — actions &amp; End-turn. <b style="color:var(--ink)">Flow</b> — real-time: cast on a cooldown, the horde steps on a beat.
     </div>
     <div class="row">
@@ -385,7 +401,7 @@ body{
 var CFG = {
   slots: 12,
   actions: 3,          // base actions per turn (turn mode only)
-  hp: 24,
+  hp: 30,
   lanes: 4,
   rungs: 6,
   wardMult: 2,         // matching-colour hits multiply by this
@@ -398,11 +414,11 @@ var CFG = {
 
 /* ===================== DIFFICULTY (selector plumbing) =====================
    ONE multiplier table, applied in rollWave (enemy hp · wave count ceil · gate damage).
-   PLACEHOLDER values — the economist supplies finals; swapping the table is a one-line edit. */
+   FINAL values from the simulation-validated balance package. */
 var DIFF = {
-  gentle:   { hp:0.75, count:0.80, dmg:0.75 },
+  gentle:   { hp:0.70, count:0.75, dmg:0.70 },
   standard: { hp:1.00, count:1.00, dmg:1.00 },
-  fierce:   { hp:1.25, count:1.10, dmg:1.25 }
+  fierce:   { hp:1.20, count:1.15, dmg:1.20 }
 };
 var DIFF_LABEL = { gentle:"Gentle", standard:"Standard", fierce:"Fierce" };
 var difficulty = "standard";
@@ -486,6 +502,7 @@ function newGame(){
     exotics:[], reagents:{},                        // owned SIGIL names + reagent flags
     rituals:[],                                     // owned RITUAL names — share the 3-slot cap with exotics
     creations:[], pyre:null,                        // standing friendly entities (monuments) + the wave-scoped Pyre Ground zone
+    warriors:[],                                    // mirror-summoned WARRIORS — wave-scoped, cap 2, separate from creations
     pendingDouble:0, pendingDoubleT:0,              // Mordant: counter — next N casts fire twice (N=2)
     gildNext:false,                                 // Gilding: next merge free + +1 level
     aurumSpent:false, firstTransmuteUsed:false,     // Aurum: once/wave · Catalyst: only 1st transmute/turn is free
@@ -493,6 +510,10 @@ function newGame(){
     tier2:{}, catFree:0,                             // MERGE→II ownership set + Catalyst free-transmute counter/turn
     retireN:0, retireMode:false, retireSel:null,    // Retire slot: escalating fee count + UI mode/selection
     dialSig:"", exoticGlow:{}, masonFlash:0,        // strip-glow cache + Mason gate flourish
+    // ---- THE LIVING RING: arrange + legibility suite ----
+    lastInputT:now(), wiggle:null, wiggleFireT:0,   // idle-hint clock + the current wiggle burst
+    arrangeGlow:null, arrangeBest:null,             // live castable-window glow + best-spell readout while arranging
+    oneAway:null, castSig:"", castWindows:null,     // one-away pulse targets + cached castable-window scan (gentle arcs / wiggle)
     // ---- FLOW MODE clocks (delta-accumulated; only advance while unpaused) ----
     cool:0, coolMax:CFG.castCd, coolPulse:0,        // cast cooldown
     chain:0, readyElapsed:0,                        // FLOW CHAINING: consecutive prompt-cast count + idle-since-ready timer
@@ -514,23 +535,51 @@ function freshBall(){
   var keys=["R","Y","B"];
   return { c:keys[(Math.random()*3)|0], lvl:1, born:now() };
 }
-function now(){ return performance.now(); }
+/* VIRTUAL CLOCK: now() is game time. A HITSTOP freezes it (freeze-frame) without touching
+   the rAF loop or input — every now()-driven animation & flow tick stalls uniformly, then resumes
+   continuously. setTimeout-scheduled cast phases run on wall-clock, so the brief stall never desyncs them. */
+var _timeFreeze=0, _freezeStart=0, _hitstopEnd=0;
+function now(){ if(_freezeStart) return _freezeStart - _timeFreeze; return performance.now() - _timeFreeze; }
+/* pump the freeze clock each frame; returns true while a hitstop is active (for the zoom pulse) */
+function pumpHitstop(){
+  if(!_freezeStart) return false;
+  var raw=performance.now();
+  if(raw>=_hitstopEnd){ _timeFreeze += (raw - _freezeStart); _freezeStart=0; return false; }
+  return true;
+}
+/* SPECTACLE hitstop: an ~80ms global freeze-frame. Stack-safe — repeats never push the total past 120ms. */
+function triggerHitstop(ms){
+  ms=ms||80; var raw=performance.now();
+  if(!_freezeStart){ _freezeStart=raw; _hitstopEnd=raw+ms; }
+  else { _hitstopEnd=Math.max(_hitstopEnd, raw+ms); }
+  _hitstopEnd=Math.min(_hitstopEnd, _freezeStart+120);
+}
 function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
 
-/* ---------- waves (rebalanced: count cap 9, HP 4+4w, wards O/G/P only) ----------
+/* ---------- waves (human retune: count cap 8 = 2+ceil(0.6w), trash HP round(0.9·(4+3w)), wards O/G/P only) ----------
    type mix: brutes as before; of the rest ~20% armored (wave 3+), ~20% leech (wave 4+,
    max 2), one healer per wave at ~35% (wave 4+, mid-field rung 2-3 & SKITTISH). every 5th
    wave trades two normal spawns for one ELITE. */
 /* rollWave(w) — the PURE spec generator. Given only a wave number it rolls the full spawn list
    (types, lanes, rungs, wards, hp, dmg) as plain data. No side effects, no DOM, no now(): the SAME
    spec drives both the Bazaar's NEXT-WAVE preview and the actual spawn, so they can never diverge. */
+/* ELITE CADENCE (FINAL — economist-approved schedule). The skilled ceiling regressed when deep-spawn
+   / arrival-grace shipped, so elites ACCELERATE past the mid-game: through wave 16 every 4th, waves
+   17-24 every 3rd, past 24 every 2nd — first elite stays at wave 8. Elite waves: 8,12,16,18,21,24,26,
+   28,30… This is the one knob — swap the body freely and the rest of rollWave follows. */
+function eliteCadence(w){
+  if(w<8) return false;                     // first elite at wave 8
+  if(w<=16) return (w%4)===0;               // 8, 12, 16
+  if(w<=24) return (w%3)===0;               // 18, 21, 24
+  return (w%2)===0;                          // 26, 28, 30, ...
+}
 function rollWave(w){
   var D = diffMul();                       // difficulty multipliers (hp · count · dmg) — standard = identity
-  var elite = (w>=8 && (w-8)%4===0);      // elite cadence: 8, 12, 16, 20...
-  var count = Math.min(9, Math.ceil((2 + w) * D.count)) - (elite?2:0);
+  var elite = eliteCadence(w);            // accelerating elite schedule (see eliteCadence)
+  var count = Math.min(8, Math.ceil((2 + Math.ceil(0.6*w)) * D.count)) - (elite?2:0);
   var wardChance = Math.min(0.75, 0.05 + w*0.10);
   var baseDmg = Math.max(1, Math.round((2 + Math.ceil(w/4)) * D.dmg));
-  var spread = w>=5 ? 3 : 2;              // deeper spawn rungs from wave 5
+  var spread = 2;                        // spawns are ALWAYS the deepest two rungs (4-5) — one full field of runway every wave
   var used = {};
   var total = count + (elite?1:0);
   var wantHealer = w>=4 && Math.random()<0.35;   // at most 1 healer per wave
@@ -554,7 +603,7 @@ function rollWave(w){
     }
     var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
     var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
-    var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : (4+3*w);
+    var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : Math.round(0.90*(4+3*w));
     hp = Math.max(1, Math.round(hp * D.hp));      // difficulty: enemy HP scaling
     list.push({
       lane:lane, rung:rung, hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
@@ -581,8 +630,9 @@ function spawnWave(spec){
       lane:es.lane, rung:es.rung, x:laneX(es.lane), y:rungY(es.rung),
       hp:es.hp, maxhp:es.maxhp, ward:es.ward, brute:es.brute,
       elite:es.elite, armored:es.armored, healer:es.healer, leech:es.leech,
-      dmg:es.dmg, freeze:0, frImm:0, poison:0, burn:0,
+      dmg:es.dmg, freeze:0, frImm:0, poison:0, burn:0, chill:false,
       slow:es.slow, slowT:0, seed:es.seed, jit:es.jit,
+      arrived:false,                                                 // ARRIVAL GRACE: settle in — skip the first enemy-phase advance
       spawn: now()+k*80, hit:0, dotT:0, stepT:0, dead:false, deadAt:0
     });
     (function(e,delay){ setTimeout(function(){ if(S===st&&!st.over){
@@ -633,6 +683,7 @@ function sHorn(){ beep(220,.2,"triangle",.05); setTimeout(function(){beep(330,.2
 function sEliteHorn(){ beep(140,.3,"triangle",.06); setTimeout(function(){beep(105,.35,"triangle",.06);},180); setTimeout(function(){beep(210,.28,"triangle",.05);},340); }
 function sClank(){ beep(190,.05,"square",.05); setTimeout(function(){beep(120,.06,"square",.04);},45); }   // armored bounce
 function sChime(){ beep(660,.12,"sine",.035); setTimeout(function(){beep(880,.15,"sine",.03);},85); }      // healer pulse
+function sLift(){ beep(560,.06,"sine",.045); setTimeout(function(){ beep(860,.10,"sine",.04); },55); }     // ARRANGE: distinct "lift" chime
 function sChainChime(lvl){ beep(720+lvl*150,.06,"sine",.03); }                                             // flow chain: pitch rises with the chain
 function sDrain(){ beep(240,.14,"sawtooth",.035); setTimeout(function(){beep(170,.16,"sawtooth",.03);},90); }
 function sWin(){ [0,110,220,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,.16,"triangle",.05); },t); }); }
@@ -645,20 +696,44 @@ function sInscribe(){ [523,659,880].forEach(function(f,i){ setTimeout(function()
    the book PERSISTS across death / new game — it is the first thing that carries between runs. */
 var SPELL_ORDER = ["Blast","Lance","Venom","Ember","Frost","Sunburst","Pyre","Overgrowth","Eclipse","Void","Whorl","Prism","Fizzle"];
 var BOOK_INFO = {
-  Blast:     { recipe:["O","R","Y"],     desc:"splash · burns",          hint:"orange with red & yellow" },
+  Blast:     { recipe:["O","R","Y"],     desc:"splash · burns · fire reacts",          hint:"orange with red & yellow" },
   Lance:     { recipe:["P","R","B"],     desc:"pierces a lane",          hint:"purple with red & blue" },
-  Venom:     { recipe:["G","Y","B"],     desc:"hits a cluster · poisons", hint:"green with yellow & blue" },
-  Ember:     { recipe:["R","R","R"],     desc:"single hit · burns",       hint:"three reds, hot" },
-  Frost:     { recipe:["B","B","B"],     desc:"hits all · freezes",       hint:"three blues, cold" },
+  Venom:     { recipe:["G","Y","B"],     desc:"hits a cluster · poisons · blooms under fire", hint:"green with yellow & blue" },
+  Ember:     { recipe:["R","R","R"],     desc:"single hit · burns · fire reacts",       hint:"three reds, hot" },
+  Frost:     { recipe:["B","B","B"],     desc:"hits all · freezes · shatters under fire", hint:"three blues, cold" },
   Sunburst:  { recipe:["Y","Y","Y"],     desc:"hits all",                 hint:"three yellows, bright" },
-  Pyre:      { recipe:["O","O","O"],     desc:"wide splash · deep burn",  hint:"three of the warmest craft" },
-  Overgrowth:{ recipe:["G","G","G"],     desc:"hits all · heavy poison",  hint:"three of the living craft" },
+  Pyre:      { recipe:["O","O","O"],     desc:"wide splash · deep burn · fire reacts",  hint:"three of the warmest craft" },
+  Overgrowth:{ recipe:["G","G","G"],     desc:"hits all · heavy poison · blooms under fire",  hint:"three of the living craft" },
   Eclipse:   { recipe:["P","P","P"],     desc:"hits all · ignores wards", hint:"three of the royal craft" },
-  Void:      { recipe:["O","G","P"],     desc:"true strike · the strongest foe", hint:"the crafted colours, cancelled" },
-  Whorl:     { recipe:["W","W","W"],     desc:"true storm · hits all",    hint:"three lights, woven" },
+  Void:      { recipe:["O","G","P"],     desc:"true strike · consumes statuses", hint:"the crafted colours, cancelled" },
+  Whorl:     { recipe:["W","W","W"],     desc:"true storm · hits all · consumes statuses",    hint:"three lights, woven" },
   Prism:     { recipe:["R","Y","B"],     desc:"fuse one wildcard light",  hint:"one of each primary" },
   Fizzle:    { recipe:["any","any","any"],desc:"a cast that won't cohere",  hint:"a cast that won't cohere" }
 };
+/* THE MIRROR LANGUAGE — book data. SHAPE_ROWS (wings) × PAYLOAD_COLS (heart) build the 6×6 hint.
+   Only PRIMARY-wing shapes cast as language spells (a secondary wing is the canon pair rule). */
+var SHAPE_ROWS   = [ ["R","strike"], ["Y","radiance"], ["B","bolt"], ["O","burst"], ["G","spray"], ["P","lance"] ];
+var PAYLOAD_COLS = [ ["R","Fire"], ["O","Ember"], ["B","Frost"], ["G","Venom"], ["Y","Gleam"], ["P","Pierce"] ];
+var WARRIOR_BOOK = {
+  body:   [ ["R","thorns"], ["O","+atk"], ["Y","+mote/kill"], ["G","regrows"], ["B","+50% hp"], ["P","phasing"] ],
+  weapon: [ ["R","sword·burn"], ["O","bomb·splash"], ["B","mace·chill"], ["G","archer·ranged"], ["Y","sling·mote"], ["P","lancer·2 foes"] ]
+};
+var STRANGE_BOOK = [
+  { name:"Riptide",  recipe:["R","B","Y","B","R"], desc:"washes the whole horde back a rung" },
+  { name:"Backdraft",recipe:["Y","R","B","R","Y"], desc:"consumes all burn for 3× its ticks" },
+  { name:"Stoke",    recipe:["B","Y","R","Y","B"], desc:"detonates all burn at 4×" },
+  { name:"Echo",     recipe:["R","Y","R","Y","R"], desc:"your next two casts fire twice" },
+  { name:"Broil",    recipe:["B","G","B","G","B"], desc:"doubles every poison stack" },
+  { name:"Anneal",   recipe:["R","O","O","O","R"], desc:"your next merge is free & blessed" }
+];
+/* the five elemental reactions, for the spellbook legend (icon colour + one-liner) */
+var REACT_LEGEND = [
+  { c:"#f2913d", n:"Shatter", d:"fire on a CHILLED foe → ×1.75, a FROZEN foe → ×2.5, ice bursts" },
+  { c:"#57c268", n:"Bloom",   d:"fire on a POISONED foe → stacks detonate" },
+  { c:"#3d8bdf", n:"Brittle", d:"ice on a BURNING foe → next hit +50%" },
+  { c:"#6bbfa0", n:"Preserve",d:"freeze a POISONED foe → poison doubles on thaw" },
+  { c:"#2c2733", n:"Consume", d:"true damage → eats every status, +2 each" }
+];
 var BOOK = loadBook();
 function loadBook(){
   var b={};
@@ -669,7 +744,7 @@ function loadBook(){
 function saveBook(){ try{ localStorage.setItem("wh_book", JSON.stringify(BOOK)); }catch(e){} }
 /* the two LEGENDARIES stay hidden in the book until first cast — everything else is a
    known recipe from launch (the book is the player's cookbook). */
-var LEGEND = { Void:1, Whorl:1 };
+var LEGEND = { Void:1, Whorl:1, Riptide:1, Backdraft:1, Stoke:1, Echo:1, Broil:1, Anneal:1 };
 /* every cast passes through here: tally it, and fire the INSCRIBED moment only for a
    legendary's first casting. */
 function recordSpell(sp, isDouble){
@@ -706,10 +781,68 @@ function openBook(){
     }).join("");
     var nm = known? name : "???";
     var ds = known? info.desc : info.hint;
+    // PURE-RUN note on the single-colour triple rows — three-of-a-colour now SUMMONS (see Pure Runs below)
+    if(known && info.recipe.length===3 && info.recipe[0]!=="any" && info.recipe[0]===info.recipe[1] && info.recipe[1]===info.recipe[2] && info.recipe[0]!=="W")
+      ds += " · a lone 3-sweep now SUMMONS (Pure Runs below)";
     var cnt = rec? ("×"+rec.n) : "";
     row.innerHTML='<div class="recipe">'+chips+'</div>'+
       '<div class="bmeta"><b>'+nm+'</b><span>'+ds+'</span></div>'+
       '<div class="bn">'+cnt+'</div>';
+    box.appendChild(row);
+  });
+  // ===== PURE RUNS — a sweep of one colour SUMMONS. Length = tier, colour = soul. =====
+  var pH=document.createElement("div"); pH.className="reactrow-head";
+  pH.innerHTML='<b>PURE RUNS — one colour, swept long, SUMMONS a champion of that soul</b>';
+  box.appendChild(pH);
+  var tiers=[ ["warrior","Warrior","2×TL hp · blocks trash",3], ["knight","Knight","4×TL hp · stops brutes",4], ["champion","Champion","7×TL hp · stops everything",5] ];
+  tiers.forEach(function(tr){
+    var chips=''; for(var i=0;i<tr[3];i++) chips+='<i style="background:'+HEX.B+'"></i>';   // blue exemplar run
+    var row=document.createElement("div"); row.className="rcard warrow";
+    row.style.borderColor=SUMMON_TINT;
+    row.innerHTML='<div class="recipe">'+chips+'</div>'+
+      '<div class="bmeta"><b>'+tr[3]+'× same → '+tr[1]+'</b><span>'+tr[2]+' · colour = soul · secondary O/G/P: +50%</span></div>';
+    box.appendChild(row);
+  });
+  var soulNote=document.createElement("div"); soulNote.className="langwrap";
+  soulNote.innerHTML='<div class="langgrid"><small>SOUL (a summon\'s hits): '+
+    '<b style="color:'+HEX.R+'">R</b> burn · <b style="color:'+HEX.O+'">O</b> splash · <b style="color:'+HEX.G+'">G</b> poison · '+
+    '<b style="color:'+HEX.Y+'">Y</b> +mote/kill · <b style="color:'+HEX.B+'">B</b> chill (Champion: FREEZE) · <b style="color:'+HEX.P+'">P</b> pierces ward+armor · '+
+    'W·W·W stays WHORL</small></div>';
+  box.appendChild(soulNote);
+  // ===== MIXED MIRRORS — a palindrome of DIFFERENT colours CASTS. Longer = stronger. =====
+  var lgH=document.createElement("div"); lgH.className="reactrow-head";
+  lgH.innerHTML='<b>MIXED MIRRORS — wings shape it, the heart fills it · longer = stronger</b>';
+  box.appendChild(lgH);
+  // 6×6 hint grid: shape rows (wings) × payload cols (heart)
+  var grid='<div class="langgrid"><table><tr><th></th>';
+  PAYLOAD_COLS.forEach(function(p){ grid+='<th><i style="background:'+HEX[p[0]]+'"></i><span>'+p[1]+'</span></th>'; });
+  grid+='</tr>';
+  SHAPE_ROWS.forEach(function(sh){
+    grid+='<tr><th><i style="background:'+HEX[sh[0]]+'"></i><span>'+sh[1]+'</span></th>';
+    PAYLOAD_COLS.forEach(function(p){ grid+='<td>'+PAYLOAD[p[0]].prefix+sh[1]+'</td>'; });
+    grid+='</tr>';
+  });
+  grid+='</table><small>A·B·A weak · A·B·B·A good (heart doubled) · A·B·B·B·A strong (heart tripled) — a canon recipe still outranks a mirror</small></div>';
+  var gd=document.createElement("div"); gd.className="langwrap"; gd.innerHTML=grid; box.appendChild(gd);
+  // STRANGE MIRRORS — discovery rows (??? until first cast)
+  STRANGE_BOOK.forEach(function(sm){
+    var known=!!BOOK[sm.name];
+    var chips=sm.recipe.map(function(c){ return known?'<i style="background:'+HEX[c]+'"></i>':'<i class="sil"></i>'; }).join("");
+    var row=document.createElement("div"); row.className="rcard warrow"+(known?"":" locked");
+    row.innerHTML='<div class="recipe">'+chips+'</div>'+
+      '<div class="bmeta"><b>'+(known?sm.name:"???")+'</b><span>'+(known?sm.desc:"a strange mirror, undiscovered")+'</span></div>'+
+      '<div class="bn">'+(known&&BOOK[sm.name]?("×"+BOOK[sm.name].n):"")+'</div>';
+    box.appendChild(row);
+  });
+  // REACTIONS legend — a compact row of five, so combos are never a secret. Information is free.
+  var lgHead=document.createElement("div");
+  lgHead.className="reactrow-head";
+  lgHead.innerHTML='<b>REACTIONS — order is strategy</b>';
+  box.appendChild(lgHead);
+  REACT_LEGEND.forEach(function(rl){
+    var row=document.createElement("div"); row.className="rcard reactrow";
+    row.innerHTML='<div class="recipe"><i style="background:'+rl.c+';width:18px;height:18px;"></i></div>'+
+      '<div class="bmeta"><b style="font-size:14px;">'+rl.n+'</b><span>'+rl.d+'</span></div>';
     box.appendChild(row);
   });
   document.getElementById("bookSub").textContent = totalCasts>0
@@ -734,6 +867,75 @@ function mkSpell(sp, TL, usedW){
   sp.dmg = Math.max(1, Math.round(sp.coeff*TL*CFG.spellPow));
   return sp;
 }
+/* the single-colour TRIPLE templates — one source of truth, reused by canon triples AND the
+   greater/grand mirrors (4·A / 5·A) so they never drift. */
+function tripleSpell(colour){
+  switch(colour){
+    case "W": return { name:"Whorl", el:null, kind:"all", coeff:4, trueDamage:true, whorl:true, tint:"#ffd15c" };
+    case "R": return { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
+    case "Y": return { name:"Sunburst", el:"Y", kind:"all", coeff:4, tint:HEX.Y };
+    case "B": return { name:"Frost", el:"B", kind:"all", coeff:3, freeze:1, tint:HEX.B };
+    case "O": return { name:"Pyre", el:"O", kind:"splash", radius:2, coeff:5, burn:3, tint:HEX.O };
+    case "G": return { name:"Overgrowth", el:"G", kind:"all", coeff:2, poison:4, tint:HEX.G };
+    case "P": return { name:"Eclipse", el:"P", kind:"all", coeff:3, eclipsePierce:true, tint:HEX.P };
+  }
+  return null;
+}
+/* ===================== THE MIRROR LANGUAGE =====================
+   Post-echo, after every canon recipe, palindromic sweeps speak a language:
+     A·B·A       → a LANGUAGE SPELL: wings A shape it, heart B fills it.
+     A·B·B·A     → a WARRIOR: wings A = body, heart pair B = weapon (a summon).
+     4·A / 5·A   → GREATER / GRAND triples (the AAA spell, amplified).
+     curated 5s  → STRANGE MIRRORS (discovered content).
+   SHAPE (wings) sets kind (+ Strike's ×1.5). PAYLOAD (heart) sets element + a light rider. */
+var SHAPE = {
+  R:{ noun:"strike",   kind:"single",  mult:1.5 },
+  O:{ noun:"burst",    kind:"splash",  radius:1 },
+  B:{ noun:"bolt",     kind:"lane" },
+  G:{ noun:"spray",    kind:"cluster" },
+  Y:{ noun:"radiance", kind:"all" },
+  P:{ noun:"lance",    kind:"lane",    pierceWard:true }
+};
+var PAYLOAD = {
+  R:{ prefix:"Fire",   el:"R", burn:1 },
+  O:{ prefix:"Ember",  el:"O", burn:2 },
+  B:{ prefix:"Frost",  el:"B", chill:true },
+  G:{ prefix:"Venom",  el:"G", poison:1 },
+  Y:{ prefix:"Gleam",  el:"Y", moteKill:true },
+  P:{ prefix:"Pierce", el:"P", pierceArmored:true }
+};
+var LANG_COL = { R:1,O:1,B:1,G:1,Y:1,P:1 };   // the six castable colours (husk/prism excluded)
+function isLangCol(c){ return !!LANG_COL[c]; }
+/* LENGTH = INVESTMENT = POWER. A mixed mirror's coeff = MIR_BASE × SHAPE mult × LADDER[len]; the
+   number of HEART balls amplifies its payload stacks. FINAL (economist-approved) constants: MIR_BASE
+   0.8 puts a 3-ball mirror at ~1.0 effective coeff — below every canon spell, correctly outranked. */
+var MIR_BASE=0.8;
+function mirrorLenCoeff(mlen){ return mlen<=3 ? 1.0 : mlen===4 ? 1.8 : 3.0; }   // LADDER {3:1.0, 4:1.8, 5:3.0}
+/* build a MIXED-MIRROR language spell (wings A shape it, heart B fills it), length-scaled.
+   mlen 3 = A·B·A (1 heart, weak floor) · 4 = A·B·B·A (2 hearts, doubled) · 5 = A·B·B·B·A (3 hearts,
+   tripled). Real cast — flows through impactSpell. */
+function mixedMirrorSpell(wing, heart, mlen, TL, hasW){
+  var sh=SHAPE[wing], pl=PAYLOAD[heart];
+  if(!sh || !pl) return null;
+  var cm=mirrorLenCoeff(mlen), heartN=Math.max(1, mlen-2);   // heart balls = mlen-2: 3→1, 4→2, 5→3
+  var sp={ name: pl.prefix+sh.noun, language:true, mirror:true, wing:wing, heart:heart, mirrorLen:mlen,
+    el: pl.el, kind: sh.kind, coeff: MIR_BASE*(sh.mult||1)*cm, tint: HEX[heart] };
+  if(sh.radius) sp.radius=sh.radius;
+  if(sh.pierceWard) sp.eclipsePierce=true;          // Pierce shape ignores ward resistance
+  if(pl.burn) sp.burn=pl.burn*heartN;               // MORE heart balls = amplified payload
+  if(pl.poison) sp.poison=pl.poison*heartN;
+  if(pl.chill) sp.chill=true;
+  if(pl.moteKill) sp.moteKill=true;
+  if(pl.pierceArmored) sp.pierceArmored=true;
+  return mkSpell(sp, TL, hasW);
+}
+/* pure WHITE is the one pure run that's a SPELL — Whorl, the canon ultimate. Length still scales it. */
+function whorlSpell(mlen, TL, hasW){
+  var base=tripleSpell("W"); if(!base) return null;
+  var sp={}; for(var k in base) sp[k]=base[k];
+  sp.coeff = base.coeff*mirrorLenCoeff(mlen);
+  return mkSpell(sp, TL, hasW);
+}
 function resolveSpell(balls){
   var cols = balls.map(function(b){ return b.c; });
   var TL = tlOf(balls);
@@ -749,21 +951,37 @@ function resolveSpell(balls){
   /* the wildcard resolves first, then the recipe runs on the echoed colours */
   var echoed = echoColors(cols), set = countOf(echoed);
   var sp = null;
-  if(set.W===3)      sp = { name:"Whorl", el:null, kind:"all", coeff:4, trueDamage:true, whorl:true, tint:"#ffd15c" };
-  else if(set.R===3) sp = { name:"Ember", el:"R", kind:"single", coeff:4, burn:2, tint:HEX.R };
-  else if(set.Y===3) sp = { name:"Sunburst", el:"Y", kind:"all", coeff:4, tint:HEX.Y };
-  else if(set.B===3) sp = { name:"Frost", el:"B", kind:"all", coeff:3, freeze:1, tint:HEX.B };
-  else if(set.O===3) sp = { name:"Pyre", el:"O", kind:"splash", radius:2, coeff:5, burn:3, tint:HEX.O };
-  else if(set.G===3) sp = { name:"Overgrowth", el:"G", kind:"all", coeff:2, poison:4, tint:HEX.G };
-  else if(set.P===3) sp = { name:"Eclipse", el:"P", kind:"all", coeff:3, eclipsePierce:true, tint:HEX.P };
+  if(set.W===3||set.R===3||set.Y===3||set.B===3||set.O===3||set.G===3||set.P===3){
+    sp = tripleSpell(echoed[0]);   // any all-same triple → its canon spell
+  }
   else if(set.O===1&&set.R===1&&set.Y===1) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };
   else if(set.P===1&&set.R===1&&set.B===1) sp = { name:"Lance", el:"P", kind:"lane", coeff:4, tint:HEX.P };
   else if(set.G===1&&set.Y===1&&set.B===1) sp = { name:"Venom", el:"G", kind:"cluster", coeff:2, poison:3, tint:HEX.G };
   else if(set.O===2) sp = { name:"Blast", el:"O", kind:"splash", coeff:3, burn:2, tint:HEX.O };      // pair road
   else if(set.P===2) sp = { name:"Lance", el:"P", kind:"lane", coeff:4, tint:HEX.P };
   else if(set.G===2) sp = { name:"Venom", el:"G", kind:"cluster", coeff:2, poison:3, tint:HEX.G };
-  if(!sp) return fizzleOf(balls);
-  return mkSpell(sp, TL, hasW);
+  if(sp) return mkSpell(sp, TL, hasW);
+  /* THE MIRROR LANGUAGE — a palindromic A·B·A (post-echo, A≠B, both castable colours), checked
+     AFTER every canon recipe and BEFORE fizzle. Wings shape it, the heart fills it. Canon outranks:
+     e.g. G·R·G is the secondary-pair rule (Venom) above and never reaches here. */
+  if(echoed.length===3 && echoed[0]===echoed[2] && echoed[0]!==echoed[1] && isLangCol(echoed[0]) && isLangCol(echoed[1])){
+    var lsp=mixedMirrorSpell(echoed[0], echoed[1], 3, TL, hasW);
+    if(lsp) return lsp;
+  }
+  return fizzleOf(balls);
+}
+/* PURE RUN → SUMMON. A sweep of N identical CASTABLE colours (post-echo; N=3/4/5) is not a spell —
+   it raises a creature: 3 = Warrior, 4 = Knight, 5 = Champion. White is EXCLUDED (W·W·W is Whorl,
+   the one pure run that stays a spell — checked before this). Returns {tier,colour,tl} or null. */
+function resolveSummon(balls){
+  if(!balls) return null;
+  var L=balls.length; if(L<3||L>5) return null;
+  var ec=echoColors(balls.map(function(b){ return b.c; }));
+  var c0=ec[0];
+  if(c0==="W" || !isLangCol(c0)) return null;                 // W runs cast Whorl; husk/prism runs don't summon
+  for(var i=1;i<ec.length;i++){ if(ec[i]!==c0) return null; } // must be all one colour
+  var tier = L===3?"warrior" : L===4?"knight" : "champion";
+  return { tier:tier, colour:c0, tl:tlOf(balls) };
 }
 /* a one-line recipe nudge for a fizzle, read off the ECHOED colours (echo runs first) */
 function fizzleHint(echoed){
@@ -808,17 +1026,22 @@ function applyDmg(e, amt, el, opts){
       if(el===e.ward) amt = Math.round(amt*CFG.wardMult);
       else amt = Math.ceil(amt*0.5);
     }
-    if(e.armored && amt<5){
+    if(e.armored && amt<5 && !opts.pierceArmored){   // Pierce payload drives the plate regardless
       e.hit = now(); sClank();
       spawnDmg(e.x, e.y-geo.ballR*0.9, 0, false, false, false, opts.friend);
       return 0;                                    // plate bounced — no damage dealt
     }
   }
-  if(e.freeze>0 && S.reagents && S.reagents.shatterfrost) amt = Math.round(amt*(isII("shatterfrost")?2:1.5));   // Shatterfrost: +50% frozen (II: +100%)
+  if((e.freeze>0||e.chill) && S.reagents && S.reagents.shatterfrost) amt = Math.round(amt*(isII("shatterfrost")?2:1.5));   // Shatterfrost: +50% frozen/chilled (II: +100%)
+  // ELEMENTAL REACTIONS — after damage math, before the hp subtract / death check (reactable hits only)
+  amt = applyReactions(e, amt, el, opts);
+  var reactGold=_reactGold, reactBanner_=_reactBanner;
   var crit = !trueDmg && !pierce && e.ward && el===e.ward;
   e.hp -= amt; e.hit = now();
   sHit(amt, crit);
-  spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit, false, false, opts.friend);
+  spawnDmg(e.x, e.y-geo.ballR*0.9, amt, crit, false, false, opts.friend, reactGold);
+  // HITSTOP: a reaction fired, or a single hit landed 25+
+  if(reactBanner_ || amt>=25) triggerHitstop(80);
   if(e.hp<=0 && !e.dead){
     e.dead=true; e.deadAt=now();
     boom(e.x,e.y, e.ward?HEX[e.ward]:"#c9c1b4", 1.4);
@@ -879,8 +1102,68 @@ function applyBurn(e, val){ e.burn = Math.max(e.burn, val + (S.reagents && S.rea
 /* poison stacks are capped so doubling/jumps can't runaway */
 var POISON_CAP = 12;
 
+/* ===================== ELEMENTAL REACTIONS (Magicka/DOS2 style) =====================
+   Statuses stop being inert: a HIT of the right element on a foe carrying the right status
+   fires a named reaction. Element identities — fire = O/R (Blast/Pyre/Ember/Calcine + burn-carriers),
+   ice = B (Frost), true = Void/Whorl. Rules: at most ONE banner reaction per hit
+   (priority Shatter > Bloom > Brittle; Consume only on true dmg; Preserve is application-time).
+   Only reactable direct hits (spell / exotic-damage / creation) qualify — DoT ticks NEVER react.
+   BRITTLE the STATUS (a spent-once +50% flag) is a status payoff, applied independently of the
+   one-banner rule. applyReactions runs after ward/frost math, before hp is subtracted. */
+var _reactGold=false, _reactBanner=false, _reactBannerT=0;
+function reactBanner(txt, col){ toast(txt, 1150, col, "mid", true); _reactBannerT=now(); }
+function applyReactions(e, amt, el, opts){
+  _reactGold=false; _reactBanner=false;
+  if(!opts.reactable || e.dead) return amt;
+  // BRITTLE status payoff: the next hit after an ice-douse cracks for +50%, then the flag clears
+  if(e.brittle){ e.brittle=false; amt=Math.max(1,Math.round(amt*1.5)); _reactGold=true; boom(e.x,e.y,"#cfe3ff",1.0); }
+  var isTrue=!!opts.trueDamage, isFire=(el==="O"||el==="R"), isIce=(el==="B");
+  // CONSUME — true damage devours every status for +2 each (CHILL counts as one frozen unit)
+  if(isTrue){
+    var tot=(e.burn||0)+(e.poison||0)+(e.freeze||0)+(e.chill?1:0);
+    if(tot>0){ amt+=tot*2; e.burn=0; e.poison=0; e.freeze=0; e.chill=false; e.psnPreserved=false;
+      reactBanner("CONSUME", "#2c2733"); consumeFx(e); vib([12,30,50]); _reactGold=true; _reactBanner=true; }
+    return amt;
+  }
+  if(isFire){
+    if(e.freeze>0 || e.chill){                        // SHATTER — fire cracks the ice/chill (no frImm: shattered, not thawed)
+      var trulyFrozen=e.freeze>0;                     // Frost's real CC freeze shatters harder than a cheap chill
+      e.freeze=0; e.chill=false; amt=Math.max(1,Math.round(amt*(trulyFrozen?2.5:1.75)));
+      reactBanner("SHATTER!", "#3d8bdf"); shatterFx(e); vib([18,40,80]); _reactGold=true; _reactBanner=true; return amt; }
+    if(e.poison>0){                                   // BLOOM — poison detonates for 2× its stacks
+      amt+=e.poison*2; e.poison=0; e.psnPreserved=false;
+      reactBanner("BLOOM!", "#57c268"); bloomFx(e); vib([14,30,60]); _reactGold=true; _reactBanner=true; return amt; }
+  }
+  if(isIce){
+    if(e.burn>0){                                     // BRITTLE — ice douses the burn, leaving hairline cracks
+      e.burn=0; e.brittle=true;
+      reactBanner("BRITTLE!", "#3d8bdf"); brittleFx(e); vib([10,26,40]); _reactBanner=true; return amt; }
+  }
+  return amt;
+}
+/* SHATTER: white ice shards + an ice-blue boom */
+function shatterFx(e){
+  boom(e.x,e.y,"#8fc7ff",1.9);
+  for(var i=0;i<10;i++){ var a=Math.random()*Math.PI*2, sp=2.0+Math.random()*2.6;
+    S.fx.push({ conf:true, x:e.x, y:e.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1.0,
+      col: i%3===0?"#3d8bdf":"#ffffff", s:2.5+Math.random()*3, rot:Math.random()*6, t:now() }); }
+  S.shake=Math.min(22,S.shake+6);
+}
+/* BLOOM: a green-to-orange burst */
+function bloomFx(e){
+  boom(e.x,e.y,"#57c268",1.6);
+  for(var i=0;i<8;i++){ var a=Math.random()*Math.PI*2, sp=1.6+Math.random()*2.2;
+    S.fx.push({ conf:true, x:e.x, y:e.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1.1,
+      col: i%2===0?"#f2913d":"#57c268", s:3+Math.random()*2.5, rot:Math.random()*6, t:now() }); }
+  S.shake=Math.min(22,S.shake+4);
+}
+/* BRITTLE (the douse): a puff of ice-blue */
+function brittleFx(e){ boom(e.x,e.y,"#cfe3ff",1.2); S.fx.push({ star:true, x:e.x, y:e.y, t:now(), tint:"#8fc7ff" }); }
+/* CONSUME: a void-dark implosion drawing inward */
+function consumeFx(e){ S.fx.push({ implode:true, x:e.x, y:e.y, t:now(), max:(geo.ballR||20)*2.2 }); boom(e.x,e.y,"#2c2733",1.3); S.shake=Math.min(22,S.shake+5); }
+
 /* ---------- pigment motes: the in-run currency the horde sheds ---------- */
-function moteValue(e){ return e.elite?8 : e.brute?3 : (e.armored||e.healer||e.leech)?2 : 1; }
+function moteValue(e){ return e.elite?9 : e.brute?3 : (e.armored||e.healer||e.leech)?2 : 1; }
 function moteHudSet(){ var n=document.getElementById("moteN"); if(n) n.textContent = S?S.motes:0; }
 function moteChipXY(){
   var c=document.getElementById("chipMotes");
@@ -907,18 +1190,41 @@ function moteLand(){
 }
 
 /* one resolved spell landing: damage, payloads (always apply on a valid cast), shake */
-function impactSpell(sp, hits){
-  var per = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
-  var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW };
-  var dealt=0;
+function impactSpell(sp, hits, mul){
+  mul = mul || 1;                                                                        // Mordant II passes 1.15 for its doubled casts
+  var base = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
+  var per = mul===1 ? base : Math.max(1, Math.round(base*mul));
+  var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW, reactable:true, pierceArmored:sp.pierceArmored };
+  var dealt=0, kills=0, preservedAny=false;
   hits.forEach(function(e){
+    var wasDead=e.dead;
     dealt += applyDmg(e, per, sp.el, opts) || 0;
-    if(sp.freeze && !e.frImm) e.freeze = Math.max(e.freeze, sp.freeze);
-    if(sp.poison) e.poison = Math.min(POISON_CAP, e.poison + sp.poison);   // poison stacks cap at 12
-    if(sp.burn) applyBurn(e, sp.burn);
+    if(!wasDead && e.dead){ kills++; if(sp.moteKill) addMotes(1, e.x, e.y); }   // Gleam payload: +1 mote per kill this cast
+    // FREEZE application — the PRESERVE reaction: freezing a poisoned foe pauses its poison (doubles on thaw)
+    if(sp.freeze && !e.frImm && !e.dead){
+      e.freeze = Math.max(e.freeze, sp.freeze);
+      if(e.poison>0 && !e.psnPreserved){ e.psnPreserved=true; preservedAny=true; }
+    }
+    if(sp.poison && !e.dead) e.poison = Math.min(POISON_CAP, e.poison + sp.poison);   // poison stacks cap at 12
+    if(sp.burn && !e.dead) applyBurn(e, sp.burn);
+    if(sp.chill && !e.dead) e.chill=true;   // Frost payload: a light chill — shatterable, but no move-skip
   });
+  if(preservedAny){ toast("preserved…", 850, "#3fa07a", "low"); vib(6); }   // PRESERVE: subtle, no big banner
   recordCast(sp, dealt);   // best-cast tracking — each doublecast half lands here separately
+  killCallout(sp, kills);
   S.shake = Math.min(20, 4 + sp.tl*1.1 + (sp.tl>=6?4:0) + (sp.whorl?6:0));
+}
+/* SPECTACLE: a cast that reaps a crowd earns a big mid callout (after a beat so it lands post-damage),
+   a hitstop, and — for a Pyre/Ember reaping — an amber screen-mood. */
+function killCallout(sp, kills){
+  if(kills>=3){
+    triggerHitstop(80);
+    if((sp.name==="Pyre"||sp.name==="Ember")) setMood("amber");
+    vib([20,40,20,40,60]);
+    var word = kills>=5?"WIPE!" : (kills===4?"QUAD!":"TRIPLE!");
+    var st=S;
+    setTimeout(function(){ if(S!==st||st.over) return; toast(word, 1200, "#b9791a", "mid", true); S.shake=Math.min(24,S.shake+6); }, 350);
+  } else if(kills>=2 && (sp.name==="Pyre"||sp.name==="Ember")){ setMood("amber"); }
 }
 /* best-cast bookkeeping: the single hardest-hitting spell landing this run (by total damage dealt).
    doublecast halves and Mordant repeats each arrive as their own impactSpell, so each counts alone. */
@@ -933,6 +1239,8 @@ function cast(idxs){
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
+  var sum = resolveSummon(balls);                              // A·A·A pure run → SUMMON (W·W·W excluded → Whorl below)
+  if(sum){ summonWarrior(idxs, sum); return; }
   var sp = resolveSpell(balls);
   if(sp.transmute){ transmute(idxs); return; }                 // R+Y+B → craft a Prism, not a cast
   if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } }
@@ -940,6 +1248,7 @@ function cast(idxs){
   if(CFG.realtime) startCool();
   applyStale(st, sp);
   var dbl = (!sp.fizzle && doublePending()); if(dbl) S.pendingDouble--;   // Mordant: this cast fires twice (counter down)
+  var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;                       // Mordant II: each doubled cast also deals +15%
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib(sp.fizzle?[8,60,8]:(sp.whorl?[40,50,90]:(sp.tl>=6?[30,40,70]:25)));
@@ -949,10 +1258,12 @@ function cast(idxs){
     castFx(sp, tgt, hits.map(hitPt));
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    impactSpell(sp, hits);
-    if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits); S.shake=Math.min(24,S.shake+5); }
+    impactSpell(sp, hits, dblMul);
+    if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits, dblMul); S.shake=Math.min(24,S.shake+5); }
+    var reacted = (now()-_reactBannerT) < 80;   // a reaction banner just fired this cast — let it stand
     if(dbl){ toast("Mordant · "+sp.name+" ×2!", 1200, "#b9791a", "mid", true); }
     else if(sp.whorl){ toast("W H O R L !", 1400, "#b9791a", "mid", true); S.shake=Math.min(24,S.shake+8); vib([60,40,60,40,90]); }
+    else if(reacted){ /* keep the reaction banner — the combo is the headline */ }
     else if(sp.stale){ toast("Stale...", 1000, "#6b6472", "low"); }
     else {
       var label = sp.tl>=6 ? "L"+sp.tl+" "+sp.name.toUpperCase()+"!" : sp.name+(sp.tl>3?" · L"+sp.tl:"");
@@ -967,9 +1278,42 @@ function cast(idxs){
     st.phase=null; st.busy=false; postAction();
   },400);
 }
-/* TRANSMUTE: R+Y+B collapse into ONE Prism (W) in the MIDDLE swept slot; the other two
-   refill fresh. Costs an action in Turns; a free craft in Flow (no cast cooldown). It does
-   NOT touch lastSpell / stale, and records the Prism discovery. */
+/* a GREATER / GRAND mirror is a real 4-5 ball cast — same impact machinery as cast(), but the
+   spell is pre-resolved (resolveMirror built it). Stale/fresh apply by its own name; Mordant doubles. */
+function castMirrorSpell(idxs, sp){
+  if(S.busy) return;
+  var st=S;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
+  else if(st.actions<=0) return;
+  applyStale(st, sp);
+  var dbl = doublePending(); if(dbl) S.pendingDouble--;
+  var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });
+  vib(sp.whorl?[40,50,90]:[30,40,70]);
+  var aim=aimSpell(sp), tgt=aim.tgt, hits=aim.hits;
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(sp.tl, sp.whorl||true); castFx(sp, tgt, hits.map(hitPt));
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    impactSpell(sp, hits, dblMul);
+    if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits, dblMul); S.shake=Math.min(24,S.shake+5); }
+    var reacted=(now()-_reactBannerT)<80;
+    if(!reacted) toast(sp.name+"!", 1100, "#b9791a", "mid", true);
+    S.shake=Math.min(22, S.shake+4);
+    recordSpell(sp, false);
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; postAction();
+  },400);
+}
+/* TRANSMUTE: R+Y+B collapse into ONE Prism (W) at the LAST swept slot (where the sweep ends,
+   so the player can AIM where each Prism lands and cluster three adjacently for W·W·W); the
+   other two refill fresh. Costs an action in Turns; a free craft in Flow (no cast cooldown).
+   It does NOT touch lastSpell / stale, and records the Prism discovery. */
 function transmuteFx(slot){
   var gs=geo.slots[slot];
   boom(gs.x, gs.y, "#ffffff", 1.6);                       // white flash
@@ -987,7 +1331,7 @@ function transmute(idxs){
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // fuse: the three are drunk together
   vib([15,30,15,30,40]);
-  var mid = idxs[1];
+  var mid = idxs[idxs.length-1];                                          // mint at the LAST swept slot (aimable → clusterable)
   setTimeout(function(){ if(S!==st||st.over) return;
     transmuteFx(mid);
     toast("✨ TRANSMUTED", 1000, "#9b62d6", "low");
@@ -1018,11 +1362,18 @@ function castWeave(idxs){
   var st=S;
   var balls = idxs.map(function(i){ return st.dial[i]; });
   if(balls.some(function(b){return !b;})) return;
-  // a 4-5 sweep first offers itself to the owned SIGILS (exact ordered match), then to RITUALS (multiset)
+  // a 4-5 sweep first offers itself to the MIRROR LANGUAGE (greater/grand, warrior, strange),
+  // then to owned RITUALS (multiset). Mirrors take the priority slot the sigils used to hold.
   if(idxs.length>=4 && idxs.length<=5){
     var cols=balls.map(function(b){ return b.c; });
-    var ex=matchExotic(cols);
-    if(ex){ castExotic(idxs, ex); return; }                    // sigils win any tie with a ritual
+    var sum=resolveSummon(balls);                                 // pure 4·A/5·A run → KNIGHT / CHAMPION
+    if(sum){ summonWarrior(idxs, sum); return; }
+    var mir=resolveMirror(balls);
+    if(mir){
+      if(mir.type==="spell"){ castMirrorSpell(idxs, mir.sp); return; }
+      if(mir.type==="strange"){ castStrange(idxs, mir.def, mir.tl); return; }
+      if(mir.type==="stranger"){ strangerFizzle(idxs); return; }
+    }
     var ri=matchRitual(cols);
     if(ri){ castRitual(idxs, ri); return; }
   }
@@ -1107,17 +1458,19 @@ var EXOTIC = [
   { key:"quench", name:"Quench", recipe:["B","R","R","B"], price:22, bg:"#3d8bdf", dmg:true,
     desc:"Consume all burn on the field; each burned foe takes 3× its ticks as damage.",
     cast:function(st,TL,mul){ var any=false, qm=isII("Quench")?4:3;                       // II: consumed burn pays 4× (was 3×)
-      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*qm*mul)), "O"); any=true; } });
+      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*qm*mul)), "O", {reactable:true}); any=true; } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.5); if(any) sHit(9,true); } },
   { key:"mordant", name:"Mordant", recipe:["R","B","B","R"], price:24, bg:"#9b62d6",
     desc:"Your next TWO casts each fire twice — both hits at full power.",
     cast:function(st){ st.pendingDouble=(isII("Mordant")?3:2); st.pendingDoubleT=now(); sChime(); } },   // II: next THREE casts doubled
   { key:"undertow", name:"Undertow", recipe:["B","Y","Y","B"], price:25, bg:"#3d8bdf",
     desc:"Shove every foe back one rung; wall-huggers are washed off entirely.",
-    cast:function(st){ var push=isII("Undertow")?2:1;                                     // II: shove 2 rungs
+    cast:function(st){ var push=1, ii=isII("Undertow");                                    // II: still 1 rung, but pushed foes are DAZED
       alive().slice().forEach(function(e){
         if(e.rung < push){ e.dead=true; e.deadAt=now(); boom(e.x,e.y,HEX.B,1.1); }
-        else { e.rung=Math.min(CFG.rungs-1, e.rung+push); e.stepT=now(); } });
+        else { e.rung=Math.min(CFG.rungs-1, e.rung+push); e.stepT=now(); e.wallT=0;
+          if(ii) e.fled=true;                                                              // dazed — loses its next advance (reuse the fled/recover pattern)
+        } });
       S.fx.push({ wave:true, t:now(), tint:HEX.B }); } },
   { key:"ferment", name:"Ferment", recipe:["Y","B","Y","B","Y"], price:22, bg:"#57c268",
     desc:"Double every poison stack on every foe (capped at 12).",
@@ -1130,7 +1483,7 @@ var EXOTIC = [
     desc:"Scour the target lane: heavy fire damage plus a deep burn to everything in it.",
     cast:function(st,TL,mul){ var tgt=nearest(); if(!tgt) return;
       var dmg=Math.max(1,Math.round((isII("Calcine")?7:5)*TL*CFG.spellPow*mul));           // II: lane coeff 7 (was 5)
-      alive().slice().forEach(function(e){ if(e.lane===tgt.lane){ applyDmg(e,dmg,"O"); applyBurn(e,3); } });
+      alive().slice().forEach(function(e){ if(e.lane===tgt.lane){ applyDmg(e,dmg,"O",{reactable:true}); applyBurn(e,3); } });
       S.fx.push({ laneFlash:true, lane:tgt.lane, t:now(), tint:HEX.O }); } },
   { key:"distill", name:"Distill", recipe:["Y","B","B","Y"], price:20, bg:"#3d8bdf",
     desc:"Purge every husk on the dial — fresh primaries take their slots.",
@@ -1142,11 +1495,11 @@ var EXOTIC = [
   { key:"bellows", name:"Bellows", recipe:["R","Y","Y","R"], price:24, bg:"#f2913d", dmg:true,
     desc:"Every burn tick fires at once at 2×; the burn is then spent.",
     cast:function(st,TL,mul){ var bm=isII("Bellows")?6:4;                                  // II: detonate at 3× (was 2×)
-      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*bm*mul)), "O"); } });
+      alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*bm*mul)), "O", {reactable:true}); } });
       boom(geo.cx, geo.gateY-30, HEX.O, 1.7); } },
   { key:"aurum", name:"Aurum", recipe:["Y","Y","R","Y","Y"], price:21, bg:"#f6c445",
     desc:"Once per wave: transmute the horde's light into coin — 2 motes per living foe.",
-    cast:function(st){ var n=alive().length; if(n>0) addMotes((isII("Aurum")?3:2)*n, geo.cx, geo.cy-geo.dialR-geo.ballR); st.aurumSpent=true; sChime(); } }   // II: 3 motes/foe
+    cast:function(st){ var n=alive().length; if(n>0){ var gain=isII("Aurum")?Math.max(8,3*n):2*n; addMotes(gain, geo.cx, geo.cy-geo.dialR-geo.ballR); } st.aurumSpent=true; sChime(); } }   // II: 3 motes/foe, minimum 8/cast
 ];
 var EXOTIC_BY_NAME={}; EXOTIC.forEach(function(x){ EXOTIC_BY_NAME[x.name]=x; });
 /* the swept colours (in sweep order) vs owned recipes — exact, order-sensitive; any W = no match */
@@ -1224,6 +1577,69 @@ function ringHasMultiset(recipe){
   }
   return false;
 }
+/* ===================== LIVING RING: window scanning =====================
+   Scan every consecutive window on the ring for a valid RELEASE right now: 3 = a spell / Prism
+   transmute / pure-run SUMMON, 4-5 = a pure-run summon, a mixed mirror, or an owned ritual, 6 = a
+   doublecast. Returns plain window descriptors {slots, tint, gold, summon, mirror, len, name, score}.
+   PURE-RUN summon windows glow green-gold; MIXED-MIRROR windows glow grey-gold; rituals/doublecast
+   gold. Pure over the passed dial. Shared by the arrange live-glow, gentle arcs, and idle wiggle. */
+var SUMMON_TINT="#8fbf5c";   // distinct green-gold for pure-run SUMMON windows (mirror spells stay grey-gold)
+function scanWindows(dial){
+  var n=CFG.slots, out=[];
+  function ballsAt(s,L){ var a=[]; for(var k=0;k<L;k++){ var b=dial[(s+k)%n]; if(!b) return null; a.push(b); } return a; }
+  function slotsAt(s,L){ var a=[]; for(var k=0;k<L;k++) a.push((s+k)%n); return a; }
+  for(var s=0;s<n;s++){
+    var b3=ballsAt(s,3); if(!b3) continue;
+    var su3=resolveSummon(b3);   // A·A·A pure run → a SUMMON window (green-gold), checked before the spell
+    if(su3){ out.push({ slots:slotsAt(s,3), tint:SUMMON_TINT, gold:false, summon:true, len:3, name:summonName(su3.colour,su3.tier), score:120 }); continue; }
+    var sp=resolveSpell(b3);
+    if(sp.transmute) out.push({ slots:slotsAt(s,3), tint:"#9b62d6", gold:false, name:"Prism", score:40 });
+    else if(sp.language) out.push({ slots:slotsAt(s,3), tint:"#b9a76b", gold:false, mirror:true, len:3, name:sp.name, score:48+(sp.dmg||0) });   // soft grey-gold arc — a mirror window
+    else if(!sp.fizzle) out.push({ slots:slotsAt(s,3), tint:(sp.tint==="#ffd15c"?"#ffd15c":sp.tint), gold:false, name:sp.name, score:50+(sp.dmg||0) });
+  }
+  for(var L=4;L<=5;L++) for(var s2=0;s2<n;s2++){
+    var bl=ballsAt(s2,L); if(!bl) continue;
+    var cols=bl.map(function(b){ return b.c; });
+    var su=resolveSummon(bl);   // pure 4·A/5·A run → KNIGHT / CHAMPION summon window (green-gold), top priority
+    if(su){ out.push({ slots:slotsAt(s2,L), tint:SUMMON_TINT, gold:false, summon:true, len:L, name:summonName(su.colour,su.tier), score:200 }); continue; }
+    // MIXED-MIRROR & STRANGE windows — soft grey-gold
+    var mir=resolveMirror(bl);
+    if(mir && mir.type!=="stranger"){
+      var mn = mir.type==="strange" ? mir.def.name : (mir.sp&&mir.sp.name);
+      out.push({ slots:slotsAt(s2,L), tint:"#b9a76b", gold:false, mirror:true, len:L, name:mn, score:150 });
+      continue;
+    }
+    if(S.rituals.length){ var ri=matchRitual(cols); if(ri) out.push({ slots:slotsAt(s2,L), tint:"#ffd15c", gold:true, name:ri.name, score:190 }); }
+  }
+  for(var s3=0;s3<n;s3++){
+    var b6=ballsAt(s3,6); if(!b6) continue;
+    var A=resolveSpell(b6.slice(0,3)), B=resolveSpell(b6.slice(3,6));
+    if(!A.fizzle && !B.fizzle && !(A.transmute&&B.transmute)) out.push({ slots:slotsAt(s3,6), tint:"#ffd15c", gold:true, name:"Doublecast", score:150 });
+  }
+  return out;
+}
+function bestWindow(wins){ var b=null; wins.forEach(function(w){ if(!b||w.score>b.score) b=w; }); return b; }
+/* cached scan keyed by the dial signature — gentle arcs + idle wiggle recompute only on a ring change */
+function castWindowsCached(){
+  var sig=S.dial.map(function(b){ return b?(b.c+b.lvl):"-"; }).join("");
+  if(sig!==S.castSig){ S.castSig=sig; S.castWindows=scanWindows(S.dial); }
+  return S.castWindows;
+}
+/* ONE-AWAY: given a 2-ball sweep [a,b] (b last), the candidate continuation slots that would complete a
+   valid 3-recipe. Cheap — only the (at most two) neighbours of the last ball not already swept. */
+function oneAwayFor(v){
+  if(!v || v.length!==2) return [];
+  var a=v[0], b=v[1], n=CFG.slots, res=[];
+  [ (b+1)%n, (b+n-1)%n ].forEach(function(c){
+    if(v.indexOf(c)>=0) return;
+    var balls=[S.dial[a],S.dial[b],S.dial[c]];
+    if(balls.some(function(x){ return !x; })) return;
+    var sp=resolveSpell(balls);
+    if(sp.transmute || !sp.fizzle) res.push(c);
+  });
+  return res;
+}
+
 function exoticCastFx(ex){
   var ty=geo.cy-geo.dialR-geo.ballR;
   boom(geo.cx, ty, ex.bg, 1.6);
@@ -1242,6 +1658,7 @@ function castExotic(idxs, ex){
   if(st.lastSpell===ex.name){ st.repeatN++; if(ex.dmg) mul = st.repeatN>=2?0.3:0.5; }
   else { if(st.lastSpell && ex.dmg) mul=1.25; st.lastSpell=ex.name; st.repeatN=0; }
   var dbl = doublePending(); if(dbl) S.pendingDouble--;   // Mordant can double an exotic too (counter down)
+  var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;       // Mordant II: doubled casts (incl. damage exotics) deal +15%
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });
   vib([20,40,20,40,60]);
@@ -1249,8 +1666,8 @@ function castExotic(idxs, ex){
     sCast(TL,true); exoticCastFx(ex);
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    ex.cast(st, TL, mul);
-    if(dbl) ex.cast(st, TL, 1);
+    ex.cast(st, TL, mul*dblMul);
+    if(dbl) ex.cast(st, TL, dblMul);
     toast("✦ "+ex.name.toUpperCase()+(dbl?" ×2":""), 1150, "#b9791a", "mid", true);
     S.shake=Math.min(20, 6+TL*0.8);
   },230);
@@ -1313,7 +1730,7 @@ function creationStats(kind, TL){
   else if(kind==="sentry")   s={ hp:3*TL, attack:Math.ceil(TL*0.75) };
   else if(kind==="beacon")   s={ hp:4*TL, attack:Math.ceil(TL*0.6) };
   else s={ hp:4*TL, attack:Math.ceil(TL/2) };                 // golem
-  if(isII(KIND_RITUAL[kind])){ s.hp=Math.ceil(s.hp*1.5); s.attack=Math.ceil(s.attack*1.5); }   // Ritual II: creation +50%
+  if(isII(KIND_RITUAL[kind])){ var im=(kind==="beacon")?1.3:1.5; s.hp=Math.ceil(s.hp*im); s.attack=Math.ceil(s.attack*im); }   // Ritual II: creation +50% (Beacon nerfed to +30%)
   return s;
 }
 function liveCreations(){ return S.creations.filter(function(c){ return !c.dead; }); }
@@ -1405,14 +1822,14 @@ function frontEnemyInLane(lane, nearRung){
 }
 function creationStrike(c, e){
   if(!e || e.dead) return;
-  applyDmg(e, c.attack, null, { friend:true });
+  applyDmg(e, c.attack, null, { friend:true, reactable:true });
   S.fx.push({ arc:true, from:{x:c.x,y:c.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:creationTint(c.kind) });
   S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:creationTint(c.kind) });
   c.act=now(); sHit(c.attack,false); beep(300,.05,"triangle",.04);
 }
 function creationBolt(c, e){
   if(!e || e.dead) return;
-  applyDmg(e, c.attack, null, { friend:true });
+  applyDmg(e, c.attack, null, { friend:true, reactable:true });
   S.fx.push({ beam:true, tgt:{x:e.x,y:e.y}, t:now(), tint:creationTint(c.kind), from:{x:c.x,y:c.y-geo.ballR*0.5} });
   S.fx.push({ star:true, x:e.x, y:e.y, t:now()+50, tint:creationTint(c.kind) });
   c.act=now(); beep(520,.07,"sine",.04);
@@ -1432,6 +1849,243 @@ function creationAct(c){
     for(var l=0;l<CFG.lanes;l++) creationBolt(c, frontEnemyInLane(l, null));
   }
 }
+/* ===================== SUMMONS (PURE RUNS, wave-scoped) =====================
+   LENGTH = INVESTMENT = POWER. A pure run of N identical colours summons a creature that holds a
+   lane: 3 = WARRIOR, 4 = KNIGHT, 5 = CHAMPION. COLOUR is the soul (its hit behaviour). SECONDARY
+   colours (O/G/P) cost a merge, so they get +50% hp & atk. Reuses the wave-scoped warrior chassis
+   (S.warriors) — holds a lane, fights in the enemy phase, dissolves at wave clear. Cap 2, SEPARATE
+   from the 2-monument creation cap; one per lane. Its hits are DIRECT (reactable). TRAMPLE gate by
+   tier: a Warrior is trampled by brutes AND elites; a Knight only by elites; a Champion by nothing
+   (brutes/elites are stopped and must fight it). */
+var WARR_FILL2 = { R:"#c43a48", O:"#c46f26", Y:"#c99f2a", G:"#3f9b53", B:"#2f6ea8", P:"#7647b0" };
+var SOUL_NAME = { R:"Red", O:"Orange", Y:"Gold", G:"Green", B:"Blue", P:"Violet" };
+var TIER_NAME = { warrior:"Warrior", knight:"Knight", champion:"Champion" };
+function summonName(colour, tier){ return SOUL_NAME[colour]+" "+TIER_NAME[tier]; }
+function warriorName(colour, tier){ return summonName(colour, tier); }   // compat alias
+/* base hp/atk per tier, +50% for a SECONDARY soul (the merge tax, rewarded) */
+function summonStats(tier, colour, TL){
+  var hp, atk;
+  if(tier==="knight"){ hp=4*TL; atk=TL; }
+  else if(tier==="champion"){ hp=7*TL; atk=Math.ceil(1.5*TL); }
+  else { hp=2*TL; atk=Math.ceil(TL/2); }                          // warrior
+  if(colour==="O"||colour==="G"||colour==="P"){ hp=Math.ceil(hp*1.5); atk=Math.ceil(atk*1.5); }   // secondary +50%
+  return { hp:Math.max(1,hp), attack:Math.max(1,atk) };
+}
+/* the TRAMPLE gate: does this enemy crush a blocker of the given tier and roll on? (elites carry the
+   brute flag too, so a warrior's `e.brute` test covers both.) */
+function summonTramples(e, w){
+  if(w.tier==="champion") return false;        // Champion blocks everything
+  if(w.tier==="knight")   return !!e.elite;    // Knight: only elites trample
+  return !!e.brute;                            // Warrior: brutes AND elites (elite has brute=true)
+}
+function liveWarriors(){ return S.warriors.filter(function(w){ return !w.dead; }); }
+function warriorAt(lane, rung){
+  for(var i=0;i<S.warriors.length;i++){ var w=S.warriors[i]; if(!w.dead && w.lane===lane && w.rung===rung) return w; }
+  return null;
+}
+/* Rung 1 of the most-threatened FREE lane. */
+function spawnWarrior(st, tier, colour, TL){
+  if(liveWarriors().length>=2) dissolveOldestWarrior(st);        // cap 2 (shared) — the oldest fades first
+  var occ=[]; liveWarriors().forEach(function(w){ occ.push(w.lane); });   // one per lane — retarget like golems
+  var lane=pickThreatLane(occ);
+  var stt=summonStats(tier, colour, TL);
+  var w={ warrior:true, tier:tier, colour:colour, lane:lane, rung:1,
+    hp:stt.hp, maxhp:stt.hp, attack:stt.attack, tl:TL,
+    x:laneX(lane), y:rungY(1), born:now(), hit:0, sq:0, act:0, dead:false, deadAt:0, melt:0 };
+  st.warriors.push(w);
+  var tint=HEX[colour];
+  boom(w.x, w.y, tint, tier==="champion"?1.9:tier==="knight"?1.6:1.4); confetti(w.x, w.y, tint);
+  S.fx.push({ star:true, x:w.x, y:w.y, t:now(), tint:tint });
+  S.shake=Math.min(20, S.shake+(tier==="champion"?8:tier==="knight"?6:5));
+  sBoon(); beep(220,.14,"sine",.055); vib([18,28,38]);
+  return w;
+}
+function dissolveOldestWarrior(st){
+  var live=liveWarriors(); if(!live.length) return;
+  meltWarrior(live[0]);                                          // insertion order → [0] is the oldest still standing
+  toast("The old form fades...", 1000, "#8a7a5a", "mid");
+}
+/* the gentle wave-clear / cap melt — no confetti, just a soft sink-and-fade */
+function meltWarrior(w){
+  if(w.dead) return;
+  w.dead=true; w.deadAt=now(); w.melt=1;
+  boom(w.x, w.y, HEX[w.colour], 0.7);
+  beep(260,.18,"sine",.04);
+}
+/* a firmer combat death (struck down or stomped) — a pop, not a melt */
+function killWarrior(w){
+  if(w.dead) return;
+  w.dead=true; w.deadAt=now(); w.melt=0;
+  boom(w.x, w.y, HEX[w.colour], 1.3); confetti(w.x, w.y, HEX[w.colour]);
+  sDeath(); vib([20,30,40]);
+}
+function hitWarrior(w, amt){
+  if(w.dead) return;
+  w.hp-=amt; w.hit=now(); w.sq=now();
+  spawnDmg(w.x, w.y-geo.ballR*0.9, amt, false);
+  sHit(amt,false);
+  if(w.hp<=0) killWarrior(w);
+}
+function enemyStrikeWarrior(e, w){
+  hitWarrior(w, e.dmg);
+  e.stepT=now(); sThunk(); vib(10);
+}
+/* TRAMPLE: a brute/elite crushes a lower-tier blocker and rolls on (kill + advance). */
+function stompWarrior(e, w){
+  killWarrior(w);
+  boom(w.x, w.y, "#6b6472", 1.7);
+  S.fx.push({ conf:true, x:w.x, y:w.y, vx:0, vy:-1.4, col:"#6b6472", s:5, rot:0, t:now() });
+  S.shake=Math.min(20, S.shake+7);
+  sThunk(); vib([30,50,30]);
+}
+function warriorSummonFx(colour){
+  var ty=geo.cy-geo.dialR-geo.ballR;
+  boom(geo.cx, ty, HEX[colour], 1.5);
+  S.fx.push({ star:true, x:geo.cx, y:ty, t:now(), tint:HEX[colour] });
+}
+/* a single summon hit — carries its SOUL colour's behaviour (a direct, reactable friendly hit).
+   R burn 1 · O splash (targeting) · G poison 1 · Y +1 mote on kill · B chill (Champion B = true
+   FREEZE 1) · P ignores ward resist + armored threshold. */
+function warriorStrike(w, e){
+  if(!e || e.dead) return;
+  var col=w.colour, opts={ friend:true, reactable:true };
+  if(col==="P"){ opts.pierceArmored=true; opts.eclipsePierce=true; }    // Violet: pierce ward resist + armor plate
+  var wasDead=e.dead;
+  applyDmg(e, w.attack, col, opts);                                     // el = soul colour (R/O read as fire, B as ice)
+  if(!e.dead){
+    if(col==="R") applyBurn(e, 1);                                      // Red: burn 1
+    else if(col==="G") e.poison=Math.min(POISON_CAP, e.poison+1);       // Green: poison 1
+    else if(col==="B"){
+      if(w.tier==="champion" && !e.frImm){ e.freeze=Math.max(e.freeze,1); }   // Champion Blue: TRUE freeze 1
+      else e.chill=true;                                                       // else a light chill (shatterable)
+    }
+  }
+  if(!wasDead && e.dead && col==="Y") addMotes(1, e.x, e.y);            // Gold: +1 mote when it kills
+  S.fx.push({ arc:true, from:{x:w.x,y:w.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:HEX[w.colour] });
+  S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:HEX[w.colour] });
+}
+/* the summon's turn — it strikes the frontmost foe in its lane; an Orange soul splashes r1. */
+function warriorAct(w){
+  if(w.dead) return;
+  var front=frontEnemyInLane(w.lane, null);
+  if(!front) return;
+  var targets;
+  if(w.colour==="O"){                                                  // Orange: attack splashes r1 around the front foe
+    targets=alive().filter(function(en){ return Math.abs(en.lane-front.lane)<=1 && Math.abs(en.rung-front.rung)<=1; });
+  } else targets=[front];
+  targets.forEach(function(e){ warriorStrike(w, e); });
+  w.act=now(); sHit(w.attack,false); beep(320,.05,"triangle",.04);
+}
+/* summoning cadence mirrors a ritual: normal action/cooldown, and it NEVER touches lastSpell/stale. */
+function summonWarrior(idxs, sum){
+  if(S.busy) return;
+  var st=S;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
+  else if(S.actions<=0) return;
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // slurp the run into the hub (no stale)
+  vib([20,40,20,40,60]);
+  var nm=summonName(sum.colour, sum.tier);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(sum.tl,true); warriorSummonFx(sum.colour);
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    spawnWarrior(st, sum.tier, sum.colour, sum.tl);
+    S.shake=Math.min(20, 6+sum.tl*0.8);
+    toast(nm+"!", 1000, HEX[sum.colour], "mid", true);
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; postAction();
+  },400);
+}
+/* ===================== STRANGE MIRRORS =====================
+   Curated 5-ball palindromes (A·B·C·B·A) are STRANGE MIRRORS — the 6 discovery spells whose effects
+   recycle the retired sigils. (Pure 4·A/5·A runs are SUMMONS now; A·B·B·A / A·B·B·B·A are length-
+   scaled MIXED mirror spells.) resolveMirror answers a 4-5 sweep. */
+/* recycled sigil effects, plainly re-implemented for the strange mirrors (no tier-II) */
+function fxRiptide(st){ alive().slice().forEach(function(e){
+    if(e.rung<1){ e.dead=true; e.deadAt=now(); boom(e.x,e.y,HEX.B,1.1); }
+    else { e.rung=Math.min(CFG.rungs-1, e.rung+1); e.stepT=now(); e.wallT=0; } });
+  S.fx.push({ wave:true, t:now(), tint:HEX.B }); }
+function fxBackdraft(st){ var any=false; alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*3)), "O", {reactable:true}); any=true; } });
+  boom(geo.cx, geo.gateY-30, HEX.O, 1.5); if(any) sHit(9,true); }
+function fxStoke(st){ alive().slice().forEach(function(e){ if(e.burn>0){ var tk=e.burn; e.burn=0; applyDmg(e, Math.max(1,Math.round(tk*4)), "O", {reactable:true}); } });
+  boom(geo.cx, geo.gateY-30, HEX.O, 1.7); }
+function fxEcho(st){ st.pendingDouble=2; st.pendingDoubleT=now(); sChime(); }
+function fxBroil(st){ alive().forEach(function(e){ if(e.poison>0){ e.poison=Math.min(POISON_CAP, Math.round(e.poison*2)); e.dotT=now(); } }); sHit(6,false); }
+function fxAnneal(st){ st.gildNext=true; S.fx.push({ star:true, x:geo.cx, y:geo.cy, t:now(), tint:"#ffd15c" }); }
+/* the six STRANGE MIRRORS — keyed by echoed colour string. Discovery spells (??? until first cast). */
+var STRANGE = {
+  "RBYBR":{ name:"Riptide",  bg:"#3d8bdf", cast:fxRiptide  },   // Undertow — wash the horde back
+  "YRBRY":{ name:"Backdraft",bg:"#f2913d", cast:fxBackdraft, dmg:true },   // Quench — consume burn ×3
+  "BYRYB":{ name:"Stoke",    bg:"#f2913d", cast:fxStoke,     dmg:true },   // Bellows — detonate burn ×4
+  "RYRYR":{ name:"Echo",     bg:"#9b62d6", cast:fxEcho      },   // Mordant — next two casts double
+  "BGBGB":{ name:"Broil",    bg:"#57c268", cast:fxBroil     },   // Ferment — double all poison
+  "ROOOR":{ name:"Anneal",   bg:"#f6c445", cast:fxAnneal    }    // Gilding — bless the next merge
+};
+var STRANGE_NAMES = Object.keys(STRANGE).map(function(k){ return STRANGE[k].name; });
+/* a 4-5 ball sweep → a mirror descriptor (or null). Canon rituals/collapse handle the rest. */
+function resolveMirror(balls){
+  if(!balls || balls.length<4 || balls.length>5) return null;
+  var cols=balls.map(function(b){ return b.c; });
+  var ec=echoColors(cols), L=ec.length, hasW=cols.indexOf("W")>=0, TL=tlOf(balls);
+  var allSame = ec.every(function(c){ return c===ec[0]; });
+  // pure runs are SUMMONS (resolveSummon intercepts them first) — the only pure mirror that's a spell is WHITE
+  if(allSame && ec[0]==="W"){
+    var wsp=whorlSpell(L, TL, hasW);
+    if(wsp) return { type:"spell", sp:wsp };
+  }
+  if(allSame) return null;   // a non-white pure run is a summon, not a mirror (handled elsewhere)
+  // A·B·B·A → a MIXED mirror spell (2 hearts → payload doubled, length coeff 1.8)
+  if(L===4 && ec[0]===ec[3] && ec[1]===ec[2] && ec[0]!==ec[1] && isLangCol(ec[0]) && isLangCol(ec[1])){
+    var sp4=mixedMirrorSpell(ec[0], ec[1], 4, TL, hasW);
+    if(sp4) return { type:"spell", sp:sp4 };
+  }
+  if(L===5){
+    var key=ec.join("");
+    if(STRANGE[key]) return { type:"strange", def:STRANGE[key], tl:TL, hasW:hasW };   // curated first
+    // A·B·B·B·A → a MIXED mirror spell (3 hearts → payload tripled, length coeff 3.0)
+    if(ec[0]===ec[4] && ec[1]===ec[2] && ec[2]===ec[3] && ec[0]!==ec[1] && isLangCol(ec[0]) && isLangCol(ec[1])){
+      var sp5=mixedMirrorSpell(ec[0], ec[1], 5, TL, hasW);
+      if(sp5) return { type:"spell", sp:sp5 };
+    }
+    if(ec[0]===ec[4] && ec[1]===ec[3]) return { type:"stranger" };   // a non-curated A·B·C·B·A palindrome
+  }
+  return null;
+}
+/* cast a strange mirror — a discovered spell: records into the book (INSCRIBES on first cast) */
+function castStrange(idxs, def, TL){
+  if(S.busy) return;
+  var st=S;
+  if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
+  else if(st.actions<=0) return;
+  st.busy=true; st.phase="cast";
+  idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });
+  vib([20,40,20,40,70]);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    sCast(TL,true); var ty=geo.cy-geo.dialR-geo.ballR; boom(geo.cx,ty,def.bg,1.7); S.fx.push({ star:true, x:geo.cx, y:ty, t:now(), tint:def.bg });
+  },150);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    def.cast(st, TL);
+    recordSpell({ name:def.name, fizzle:false, tint:def.bg }, false);
+    if(!/INSCRIBED/.test((S.toast||{}).txt||"")) toast("✦ "+def.name.toUpperCase(), 1150, "#b9791a", "mid", true);
+    S.shake=Math.min(20, 6+TL*0.8);
+  },230);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
+  },300);
+  setTimeout(function(){ if(S!==st||st.over) return;
+    st.phase=null; st.busy=false; postAction();
+  },400);
+}
+function strangerFizzle(idxs){
+  sFizzle(); toast("a stranger mirror… its magic eludes you", 1100, "#b9b2a6", "mid");
+  vib([8,60,8]);
+}
+
 /* ---------- Pyre Ground: a wave-scoped burning zone on a lane's middle rung (rung 2) ---------- */
 function layPyre(st, TL){
   var lane=pickThreatLane(null);
@@ -1455,9 +2109,16 @@ function raiseBastion(st, TL){
   sWin(); vib([30,20,30,20,40]); syncHud();
 }
 
+/* MERGE RULE (build 13): the same-LEVEL constraint is gone. ANY two same-colour balls merge —
+   result level = max(a,b)+1, capped at MERGE_CAP (4); a merge whose higher ball is already at
+   the cap is rejected (this subsumes the old cap+cap rejection). Different primaries still mix
+   into a secondary at level = max(a,b) (equal levels behave exactly as before: max === that level).
+   Husks stay inert. W (Prism) obeys the same-colour rule. */
+var MERGE_CAP=4;
 function mergeLegal(A,B){
-  return !!(A&&B && A.c!=="H" && B.c!=="H" && A.lvl===B.lvl &&
-    (A.c===B.c || (isPrim(A.c)&&isPrim(B.c)&&mix(A.c,B.c))));
+  if(!(A&&B) || A.c==="H" || B.c==="H") return false;
+  if(A.c===B.c) return Math.max(A.lvl,B.lvl) < MERGE_CAP;                 // any same-colour pair below the cap
+  return !!(isPrim(A.c)&&isPrim(B.c)&&mix(A.c,B.c));                      // any two different primaries mix
 }
 function tryMerge(a,b){
   if(S.busy) return false;
@@ -1465,10 +2126,10 @@ function tryMerge(a,b){
   var A=S.dial[a], B=S.dial[b];
   if(!mergeLegal(A,B)) return false;   // husks are inert — cast them away
   var res=null, levelUp=false;
-  if(A.c===B.c){ res={ c:A.c, lvl:A.lvl+1 }; levelUp=true; }
-  else { res={ c:mix(A.c,B.c), lvl:A.lvl }; }
-  var gild = S.gildNext;               // Gilding: this merge is free and its result gains +1 level
-  if(gild){ res.lvl += 1; S.gildNext=false; }
+  if(A.c===B.c){ res={ c:A.c, lvl:Math.min(MERGE_CAP, Math.max(A.lvl,B.lvl)+1) }; levelUp=true; }
+  else { res={ c:mix(A.c,B.c), lvl:Math.max(A.lvl,B.lvl) }; }
+  var gild = S.gildNext;               // Gilding: this merge is free and its result gains +1 level (II: +2)
+  if(gild){ res.lvl += (isII("Gilding")?2:1); S.gildNext=false; }
   var free = (levelUp && S.freeMerge) || gild;
   /* goo join: A slides into B as one liquid blob (drawn in drawDial), then the
      union squashes and pops to the result at contact — born is set to contact time */
@@ -1481,6 +2142,7 @@ function tryMerge(a,b){
     sMerge(res.lvl);
     vib(levelUp?[10,30,25]:15);
     var gs=geo.slots[b]; boom(gs.x,gs.y, HEX[res.c], .6);
+    mergeShove(b, res.lvl);                                // MERGE-SHOVE: springy radial nudge to the neighbours
   }, GOO_TRAVEL);
   if(CFG.realtime){ /* every merge is free and instant in flow — the between-casts activity */ }
   else if(gild){ toast("Gilded merge!", 800, "#b9791a", "low"); syncHud(); }   // free, and freeMerge stays unspent
@@ -1564,6 +2226,11 @@ function enemyPhase(){
   liveCreations().forEach(function(c){
     later(t, function(){ creationAct(c); }); t+=110;
   });
+  // then the summons strike — direct hits, so they can trigger reactions too
+
+  liveWarriors().forEach(function(w){
+    later(t, function(){ warriorAct(w); }); t+=110;
+  });
   later(t+250, endEnemyPhase);
 }
 /* healer: tops up every OTHER living enemy; never itself */
@@ -1597,32 +2264,48 @@ function leechDrain(L){
 function dotTick(e){
   if(e.dead) return;
   e.dotT = now();
-  if(e.poison>0){ applyDmg(e, Math.max(1,Math.round(e.poison)), "G"); e.poison--; }
+  // PRESERVE: a frozen foe's poison is held in stasis — it doesn't tick while iced
+  if(e.poison>0 && !(e.freeze>0)){ applyDmg(e, Math.max(1,Math.round(e.poison)), "G"); e.poison--; }
   if(e.burn>0){ applyDmg(e, (S.reagents && S.reagents.cinder) ? (isII("cinder")?4:3) : 2, "O"); e.burn--; }   // Cinder Wick: hotter ticks (3, II 4, vs 2)
 }
 function stepEnemy(e){
   if(e.dead) return;
   if(e.fled){ e.fled=false; return; }   // skittish healer just retreated — recover, don't also advance
+  if(!e.arrived){ e.arrived=true; return; }   // ARRIVAL GRACE: freshly-spawned foe settles in — skip its first advance (DoT/heals already applied this phase)
   if(e.frImm>0) e.frImm--;
-  if(e.freeze>0){ e.freeze--; if(e.freeze<=0) e.frImm=1; return; }   // thaw grants 1-turn immunity
+  if(e.freeze>0){ e.freeze--;
+    if(e.freeze<=0){ e.frImm=1;
+      if(e.psnPreserved && e.poison>0){ e.poison=Math.min(POISON_CAP, e.poison*2); e.dotT=now(); }   // PRESERVE: poison doubles on thaw (cap 12)
+      e.psnPreserved=false;
+    } return; }   // thaw grants 1-turn immunity
   if(e.slow){ e.slowT=(e.slowT+1)%2; if(e.slowT===1) return; }
   if(e.rung<=0){
     // a ward-stone at the wall (rung 0) is a shield — foes strike it INSTEAD of the gate
     var guard = creationAt(e.lane, 0);
     if(guard && e.dmg>0){ enemyStrikeCreation(e, guard); return; }
     if(e.dmg<=0) return;                  // the healer just sits at the wall, mending
-    /* at the wall: attack every turn, PERSIST (no kamikaze farming) */
+    /* at the wall: strike on ARRIVAL, then only every OTHER phase — e.wallT toggles the beat.
+       falsy (fresh/just-wound-up) → strike this phase, then arm a windup; truthy → wind up (skip),
+       then re-arm the strike. The off-phase draws a coil cue in the advance-triangle spot. */
+    if(e.wallT){ e.wallT=0; return; }     // winding up this phase — recover, will strike next
     S.hp -= e.dmg; S.shake=Math.max(S.shake,10);
     sBreach(); vib([90,60,90]); flashGate();
     if(S.scorch.length<12) S.scorch.push({ x:e.x+((e.seed%9)-4) });
     spawnDmg(e.x, geo.gateY+16, e.dmg, false, true);
+    e.wallT=1;                            // next phase is a windup (no strike)
     syncHud();
     if(S.hp<=0) gameOver();
   } else {
     // BLOCKING: a creation in the destination cell is attacked instead of stepped past
     var dest = creationAt(e.lane, e.rung-1);
     if(dest){ enemyStrikeCreation(e, dest); return; }
-    e.rung--; e.stepT=now();
+    // a SUMMON in the destination cell blocks — trample gate depends on its tier (Warrior<Knight<Champion)
+    var wdest = warriorAt(e.lane, e.rung-1);
+    if(wdest){
+      if(summonTramples(e, wdest)){ stompWarrior(e, wdest); }   // TRAMPLE — crush and keep coming this same step
+      else { enemyStrikeWarrior(e, wdest); return; }            // blocked — fight the summon, don't advance
+    }
+    e.rung--; e.stepT=now(); e.wallT=0;   // stepping resets the wall cadence for a clean arrival strike
     sAdvance(); vib(8);
     applyPyre(e);                          // Pyre Ground bites a foe ENTERING its cell
   }
@@ -1637,6 +2320,7 @@ function endEnemyPhase(){
     st.freeMerge = true;
     st.firstTransmuteUsed = false; st.catFree = 0;   // Catalyst: a new turn re-arms the free transmute(s)
     st.busy=false;
+    st.lastInputT=now(); st.wiggle=null; st.wiggleFireT=0;   // fresh turn: restart the idle-hint clock
   }
   st.phase=null;
   syncHud(!CFG.realtime);
@@ -1648,7 +2332,9 @@ function waveClear(){
   S.busy=true; S.phase="clear";
   if(S.stats) S.stats.waves++;                 // held one more wave — death readout
 
-  if(S.reagents.mason){ S.hp=Math.min(S.maxhp, S.hp+(isII("mason")?2:1)); S.masonFlash=now(); syncHud(); }   // Mason re-lays a block (II: +2/wave)
+  if(S.reagents.mason){ S.hp=Math.min(S.maxhp, S.hp+(isII("mason")?3:1)); S.masonFlash=now(); syncHud(); }   // Mason re-lays a block (II: +3/wave)
+  // WARRIORS are wave-scoped — the reflection fades at wave clear (gentle melt, no confetti)
+  if(liveWarriors().length){ liveWarriors().forEach(meltWarrior); toast("The reflection fades…", 1000, "#8a7a5a", "low"); }
   sWin(); vib(20);
   toast("WAVE CLEAR!", 850, "#2c2733", "mid", true);
   boom(geo.cx, geo.cy-geo.dialR-geo.ballR, "#ffd15c", 2);
@@ -1721,7 +2407,7 @@ var RARITY = { common:{ word:"Common", border:"#2c2733" }, rare:{ word:"Rare", b
 var ITEM_META = {
   /* sigils (by name) */
   Gilding:{r:"common",t:["weave"]}, Distill:{r:"common",t:["weave"]}, Aurum:{r:"common",t:["economy"]}, Sublimate:{r:"common",t:["weave"]},
-  Quench:{r:"rare",t:["burn"]}, Bellows:{r:"rare",t:["burn"]}, Undertow:{r:"rare",t:["wall"]}, Ferment:{r:"rare",t:["poison"]},
+  Quench:{r:"rare",t:["burn"]}, Bellows:{r:"rare",t:["burn"]}, Undertow:{r:"rare",t:["wall"]}, Ferment:{r:"rare",t:[]},
   Mordant:{r:"epic",t:["weave"]}, Calcine:{r:"epic",t:["burn"]},
   /* rituals (by name) */
   Golem:{r:"rare",t:["summon"]}, Sentry:{r:"rare",t:["summon"]}, "Pyre Ground":{r:"rare",t:["burn"]},
@@ -1729,19 +2415,19 @@ var ITEM_META = {
   /* reagents (by key) */
   buttress:{r:"common",t:["wall"]}, catalyst:{r:"common",t:["economy"]}, mason:{r:"common",t:["wall"]},
   cinder:{r:"rare",t:["burn"]}, shatterfrost:{r:"rare",t:["freeze"]}, lens:{r:"rare",t:["economy"]},
-  quicksilver:{r:"epic",t:["weave"]}, mold:{r:"epic",t:["poison"]}
+  quicksilver:{r:"epic",t:["weave"]}, mold:{r:"epic",t:[]}   // Ferment/Mold carry no build tag (spec'd tag sets only)
 };
 /* concise tier-II upgrade blurbs — shown on a MERGE→II offer so the player knows what the merge buys */
 var II_DESC = {
-  Quench:"II: consumed burn pays 4× (was 3×)", Mordant:"II: your next THREE casts doubled", Undertow:"II: shove 2 rungs back",
+  Quench:"II: consumed burn pays 4× (was 3×)", Mordant:"II: your next THREE casts doubled, +15% each", Undertow:"II: pushed foes are dazed — lose their next advance",
   Ferment:"II: ×2 poison AND +2 flat to all", Gilding:"II: free merge grants +2 levels", Calcine:"II: lane coefficient 7",
   Distill:"II: purge husks + 2 motes per husk", Sublimate:"II: stripped foes take +2 from all sources",
-  Bellows:"II: detonate all burn at 3×", Aurum:"II: 3 motes per living foe",
+  Bellows:"II: detonate all burn at 3×", Aurum:"II: 3 motes per living foe (min 8)",
   Golem:"II: golem +50% HP & attack", Sentry:"II: sentry +50% HP & attack", "Pyre Ground":"II: damage 3 + burn 3",
-  Colossus:"II: colossus +50% HP & attack", Beacon:"II: beacon +50% HP & attack", Bastion:"II: +12 HP now / +6 max",
+  Colossus:"II: colossus +50% HP & attack", Beacon:"II: beacon +30% HP & attack", Bastion:"II: +12 HP now / +6 max",
   cinder:"II: burn ticks 4 dmg, +2 duration", shatterfrost:"II: frozen foes take +100%", lens:"II: minted Prisms at L3",
   quicksilver:"II: +2 actions / −24% cooldown", mold:"II: poison jumps to the TWO nearest",
-  buttress:"II: +8 more max HP (16 total)", mason:"II: +2 wall HP per wave clear", catalyst:"II: first TWO transmutes free"
+  buttress:"II: +8 more max HP (16 total)", mason:"II: +3 wall HP per wave clear", catalyst:"II: first TWO transmutes free"
 };
 function metaOf(id){ return ITEM_META[id] || { r:"common", t:[] }; }
 function rarityOf(id){ return metaOf(id).r; }
@@ -1792,13 +2478,19 @@ function makePackOffer(){ return { type:"pack", name:"Arcane Pack", price:28, ra
 /* per-class candidate pool: unowned rarity-legal items (NEW offers, cap-gated for arcane) + owned
    tier-I items (MERGE offers, cap-free). Tier-II items never appear. Each carries a roll weight. */
 function candsFor(cls, ownedTags){
-  var defs = cls==="sigil"?EXOTIC : cls==="ritual"?RITUAL : REAGENT;
+  if(cls==="sigil") return [];   // SIGILS RETIRED — the spell language replaced them; no sigil offers
+  var defs = cls==="ritual"?RITUAL : REAGENT;
   var capFull = arcaneOwned()>=3, out=[];
   defs.forEach(function(def){
     var id = cls==="reagent"?def.key:def.name;
     var owned = cls==="sigil" ? S.exotics.indexOf(id)>=0 : cls==="ritual" ? S.rituals.indexOf(id)>=0 : !!S.reagents[id];
     if(isII(id)) return;                                          // tier II drops out of the pool entirely
     if(owned){
+      // MERGE→II exclusions from the validation: Distill II is dead money (both modes); Quicksilver II
+      // is a trap in Turn mode (a II-merge there wastes an action slot), so it's Turn-only excluded —
+      // it CAN still II-merge in Flow, where II = −24% total cooldown. (mode-dependent by design.)
+      if(id==="Distill") return;
+      if(id==="quicksilver" && !CFG.realtime) return;
       out.push({ def:def, cls:cls, id:id, merge:true, w:Math.max(1, rarityWeight(rarityOf(id),S.wave))*tagMult(id,ownedTags) });
     } else {
       if(!itemLegal(rarityOf(id), S.wave)) return;               // rarity gate on NEW offers
@@ -1812,6 +2504,8 @@ function candsFor(cls, ownedTags){
    sigil/reagent before wave 4, when no ritual is legal) + REAGENT slot (Catalyst pity waves 1-6),
    backfilled to three. Rolls are rarity-gated + build-weighted (owning a tag → 2× same-tag). */
 function rollBazaar(){
+  // SIGILS RETIRED — the shelf is now 1 RITUAL + 1 REAGENT + 1 more (reagent-or-merge). An Arcane
+  // Pack (rituals/reagents only) takes a slot every 3rd Bazaar. Rarity-gated + build-weighted.
   var offers=[], used=[], ownedTags=ownedTagSet();
   var isPackWave = (S.wave%3===0);
   function pickFrom(cands){
@@ -1819,15 +2513,12 @@ function rollBazaar(){
     var pk=weightedPick(pool); if(!pk) return null;
     used.push(pk.id); return offerFor(pk.def, pk.cls, pk.merge);
   }
-  // SIGIL slot — replaced by the Arcane Pack every 3rd Bazaar
+  // PACK slot (pack waves) — else a RITUAL slot (falls back to a reagent when no ritual is legal yet)
   if(isPackWave){ offers.push(makePackOffer()); }
-  else { var so=pickFrom(candsFor("sigil",ownedTags)); if(so) offers.push(so); }
-  // RITUAL slot — pre-wave-4 no ritual is legal, so substitute a common sigil/reagent
-  var ro=pickFrom(candsFor("ritual",ownedTags));
-  if(ro){ offers.push(ro); }
   else {
-    var fb=candsFor("sigil",ownedTags).concat(candsFor("reagent",ownedTags)).filter(function(c){ return used.indexOf(c.id)<0 && c.w>0; });
-    var pk=weightedPick(fb); if(pk){ used.push(pk.id); offers.push(offerFor(pk.def,pk.cls,pk.merge)); }
+    var ro=pickFrom(candsFor("ritual",ownedTags));
+    if(ro) offers.push(ro);
+    else { var rgFb=pickFrom(candsFor("reagent",ownedTags)); if(rgFb) offers.push(rgFb); }
   }
   // REAGENT slot — THE CASUAL MERCY: pity-pin Catalyst on waves 1-6 until owned
   var rgCands=candsFor("reagent",ownedTags), pity=null;
@@ -1836,8 +2527,8 @@ function rollBazaar(){
   }
   if(pity){ used.push("catalyst"); offers.push(offerFor(pity.def,"reagent",false)); }
   else { var rgo=pickFrom(rgCands); if(rgo) offers.push(rgo); }
-  // backfill a thin shelf from anything still eligible
-  var all=candsFor("sigil",ownedTags).concat(candsFor("ritual",ownedTags)).concat(candsFor("reagent",ownedTags));
+  // third slot + backfill: any ritual/reagent (new or a MERGE→II of an owned item)
+  var all=candsFor("ritual",ownedTags).concat(candsFor("reagent",ownedTags));
   var guard=0;
   while(offers.length<3 && guard++<24){
     var pool=all.filter(function(c){ return used.indexOf(c.id)<0 && c.w>0; });
@@ -1883,7 +2574,7 @@ function rollPackChoices(){
       pool.push({def:def,cls:cls});
     });
   }
-  add(EXOTIC,"sigil"); add(RITUAL,"ritual"); add(REAGENT,"reagent");
+  add(RITUAL,"ritual"); add(REAGENT,"reagent");   // SIGILS RETIRED — the pack draws rituals/reagents only
   shuffle(pool);
   return pool.slice(0,3).map(function(c){ return offerFor(c.def,c.cls,false); });
 }
@@ -1964,7 +2655,7 @@ function renderShop(){
   renderRetire();
 }
 /* ---------- RETIRE SLOT (Peglin curation): remove an owned arcanum for an escalating fee ---------- */
-function retireFee(){ return 10*((S.retireN||0)+1); }                 // 10, 20, 30... per use this run
+function retireFee(){ return 6 + 10*(S.retireN||0); }                 // 6, 16, 26... per use this run (first use 6, +10 each)
 function ownedArcanaList(){
   var list=[];
   S.exotics.forEach(function(n){ list.push({ cls:"exotic", id:n, name:n, bg:(EXOTIC_BY_NAME[n]||{}).bg||"#8a8390", ic:"✦" }); });
@@ -2116,7 +2807,7 @@ function gameOver(){
 }
 
 /* ===================== effects ===================== */
-function spawnDmg(x,y,amt,crit,gate,heal,friend){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal, friend:friend }); }
+function spawnDmg(x,y,amt,crit,gate,heal,friend,react){ S.dmgs.push({ x:x,y:y, amt:amt, t:now(), crit:crit, gate:gate, heal:heal, friend:friend, react:react }); }
 function boom(x,y,col,scale){ S.fx.push({ ring:true, x:x,y:y, col:col, t:now(), max:(geo.ballR||20)*(scale||1.6) }); }
 function confetti(x,y,col){
   for(var i=0;i<7;i++){
@@ -2125,8 +2816,18 @@ function confetti(x,y,col){
       col: i%3===0? "#2c2733" : col, s:3+Math.random()*2.5, rot:Math.random()*6, t:now() });
   }
 }
+/* SPELL SCREEN-MOODS: a cheap ~350ms canvas overlay per signature spell (no ctx.filter) */
+var screenMood=null;
+function setMood(type){ screenMood={ type:type, t:now() }; }
+function moodFor(sp){
+  if(!sp||sp.fizzle) return;
+  if(sp.name==="Frost") setMood("ice");
+  else if(sp.name==="Void") setMood("desat");
+  else if(sp.whorl) setMood("whorl");
+}
 function castFx(sp,tgt,hitPts){
   var t0=now();
+  moodFor(sp);
   if(sp.kind==="all"){ S.fx.push({ wave:true, t:t0, tint:sp.tint==="#fff"?"#ffd15c":sp.tint }); }
   else if(sp.kind==="lane" && tgt){ S.fx.push({ laneFlash:true, lane:tgt.lane, t:t0, tint:sp.tint }); }
   else if(tgt){
@@ -2165,7 +2866,21 @@ function inkShadow(pathFn, dy){
    joined by two cubic beziers that bow toward the midpoint. neck + both
    circles filled together (nonzero winding) read as ONE liquid blob. */
 var GOO_TRAVEL=240, GOO_SQUASH=120, CAST_GOO=180;
+var ARR_SLIDE=190, SHOVE_DUR=270;                       // ARRANGE bead-slide + MERGE-SHOVE burst durations
 var PARENT={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a secondary remembers its primaries
+/* MERGE-SHOVE (Suika steal): the just-merged ball elbows its neighbours out along the ring, radially,
+   and they spring back over ~SHOVE_DUR. Visual only — no slot changes. The burst scales with the
+   resulting level so a big level-up feels like a heavier thump. */
+function mergeShove(slot, lvl){
+  var g=geo, n=CFG.slots, base=g.ballR*(0.18+0.055*Math.min(lvl,5));
+  [[ (slot+1)%n, 1 ],[ (slot+n-1)%n, 1 ],[ (slot+2)%n, 0.5 ],[ (slot+n-2)%n, 0.5 ]].forEach(function(pr){
+    var idx=pr[0], w=pr[1], nb=S.dial[idx]; if(!nb) return;
+    var ps=g.slots[slot], pn=g.slots[idx];
+    var vx=pn.x-ps.x, vy=pn.y-ps.y, d=Math.hypot(vx,vy)||1;
+    nb.shove={ t:now(), dx:vx/d*base*w, dy:vy/d*base*w };
+  });
+  S.shake=Math.min(20, S.shake + 1.5 + lvl*0.6);
+}
 function avgHex(a,b){
   var r=(parseInt(a.substr(1,2),16)+parseInt(b.substr(1,2),16))>>1,
       g=(parseInt(a.substr(3,2),16)+parseInt(b.substr(3,2),16))>>1,
@@ -2233,6 +2948,7 @@ function updateFlow(dt){
   }
 }
 function draw(){
+  var hz=pumpHitstop();   // advance the freeze clock; true while a hitstop holds the world still
   var t=now();
   var dt=Math.min(0.1,(t-lastFrame)/1000); lastFrame=t;   // clamp: no giant jumps after a stall
   ctx.clearRect(0,0,W,H);
@@ -2240,12 +2956,15 @@ function draw(){
   var sx=0, sy=0;
   if(S && S.shake>0){ sx=(Math.random()*2-1)*S.shake; sy=(Math.random()*2-1)*S.shake; S.shake*=0.86; if(S.shake<0.4)S.shake=0; }
   ctx.save(); ctx.translate(sx,sy);
+  if(hz){ ctx.translate(W/2,H/2); ctx.scale(1.02,1.02); ctx.translate(-W/2,-H/2); }   // subtle zoom pulse on hitstop
 
   if(S){
+    if(!S.over) maybeIdleWiggle(t);
     drawField(t);
     drawPyre(t);
     drawEnemies(t);
     drawCreations(t);
+    drawWarriors(t);
     drawGate(t);
     drawDial(t);
     drawExoticStrip(t);
@@ -2255,6 +2974,7 @@ function draw(){
     if(!S.over && S.hp/S.maxhp<0.4 && t-lastBeat>1900){ lastBeat=t; beep(70,.1,"sine",.045); }
   }
   ctx.restore();
+  if(S) drawMood(t);   // screen-space spell moods, over the shake but under system overlays
   if(S && CFG.realtime && S.paused && !S.over){
     ctx.fillStyle="rgba(240,230,207,.55)"; ctx.fillRect(0,0,W,H);
     ctx.fillStyle="#2c2733"; ctx.textAlign="center"; ctx.textBaseline="middle";
@@ -2401,6 +3121,67 @@ function drawCreations(t){
     }
   });
 }
+/* WARRIORS — smaller round friendly blobs in the mix colour, up-facing eyes. A wave-clear/cap
+   dissolve plays a gentle downward melt (sink + flatten + fade); a combat death deflates. */
+function drawWarriors(t){
+  var pitch=rungPitch();
+  var baseR=Math.min(geo.ballR*1.02, pitch*0.5);
+  for(var i=S.warriors.length-1;i>=0;i--){ var ww=S.warriors[i]; if(ww.dead && t-ww.deadAt>(ww.melt?600:460)) S.warriors.splice(i,1); }
+  S.warriors.forEach(function(w){
+    var tint=HEX[w.colour];
+    w.x += (laneX(w.lane)-w.x)*0.25; w.y += (rungY(w.rung)-w.y)*0.25;
+    var tierScale = w.tier==="champion"?1.08 : w.tier==="knight"?0.9 : 0.74;   // Champion largest, Warrior smallest
+    var r=baseR*tierScale;
+    var pop=Math.min(1,(t-w.born)/300); var pr=r*(0.4+0.6*(pop<1?(1.7*pop-0.7*pop*pop):1));
+    var meltK=0;
+    if(w.dead){
+      if(w.melt){ meltK=Math.min(1,(t-w.deadAt)/600); }         // gentle melt
+      else { var dk=(t-w.deadAt)/460; pr*=Math.max(0,1-dk); }   // combat deflate
+    }
+    if(pr<=0.4 && !w.melt) return;
+    var bob=1.2*Math.sin(t/560+w.lane*1.7);
+    var sqK=0; if(w.sq){ var sq=(t-w.sq)/220; if(sq>0&&sq<1) sqK=Math.sin(sq*Math.PI)*0.26; }
+    var actK=w.act? Math.max(0,1-(t-w.act)/200):0;
+    ctx.save();
+    ctx.globalAlpha = meltK ? Math.max(0,1-meltK) : 1;
+    ctx.translate(w.x, w.y+bob - actK*4 + meltK*pr*0.5);
+    ctx.scale((1+sqK)*(1+meltK*0.35), Math.max(0.02,(1-sqK*1.1)*(1-meltK*0.8)));
+    function bodyPath(){ ctx.beginPath(); ctx.arc(0,0,pr,0,7); }
+    inkShadow(bodyPath, 3);
+    bodyPath();
+    var grd=ctx.createLinearGradient(0,-pr,0,pr*1.2);
+    grd.addColorStop(0, tint); grd.addColorStop(1, WARR_FILL2[w.colour]||tint);
+    ctx.fillStyle=grd; ctx.fill();
+    var hitK=w.hit? Math.max(0,1-(t-w.hit)/220):0;
+    if(hitK>0){ ctx.fillStyle="rgba(255,255,255,"+(hitK*0.7)+")"; ctx.fill(); }
+    ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
+    // sticker streak highlight (shared material language with the dial balls)
+    ctx.beginPath(); ctx.ellipse(-pr*0.32,-pr*0.42, pr*0.32, pr*0.16, -0.4, 0, 7);
+    ctx.fillStyle="rgba(255,255,255,.4)"; ctx.fill();
+    // FRIENDLY FACE — up-facing eyes toward the horde
+    if(meltK<0.5){
+      var eyeY=-pr*0.06, eyeDX=pr*0.34, eyeR=pr*0.23;
+      [-1,1].forEach(function(s){
+        ctx.beginPath(); ctx.arc(s*eyeDX,eyeY,eyeR,0,7); ctx.fillStyle="#fffdf6"; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+        ctx.beginPath(); ctx.arc(s*eyeDX,eyeY-eyeR*0.42,eyeR*0.5,0,7); ctx.fillStyle="#2c2733"; ctx.fill();  // pupil up
+        ctx.beginPath(); ctx.arc(s*eyeDX-eyeR*0.16,eyeY-eyeR*0.62,eyeR*0.16,0,7); ctx.fillStyle="#fffdf6"; ctx.fill();
+      });
+      if(!w.dead){ ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; ctx.beginPath();
+        ctx.arc(0, eyeY+eyeR*1.1, pr*0.26, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke(); }
+    }
+    ctx.restore();
+    ctx.globalAlpha=1;
+    if(w.dead) return;
+    // slim hp bar once damaged
+    if(w.hp<w.maxhp){
+      var bw=r*1.9, bh=5, bx=w.x-bw/2, byy=w.y+bob-pr*1.3-10;
+      ctx.fillStyle="rgba(44,39,51,.9)"; rr(bx,byy+2,bw,bh,3); ctx.fill();
+      ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; rr(bx,byy,bw,bh,3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=tint; rr(bx+1.5,byy+1.5,(bw-3)*Math.max(0,w.hp/w.maxhp),bh-3,2); ctx.fill();
+    }
+  });
+}
 
 /* recipe dots packed into a tight two-row CLUSTER (a ritual reads "assemble, any order") */
 function drawClusterDots(cx, cy, cols, dotR){
@@ -2425,12 +3206,11 @@ function drawSwirlMark(cx, cy, r){
    when its multiset sits in any consecutive window (ringHasMultiset). */
 function drawExoticStrip(t){
   var items=[];
-  S.exotics.forEach(function(nm){ var ex=EXOTIC_BY_NAME[nm]; if(ex) items.push({ cls:"sigil", ex:ex, name:nm, recipe:ex.recipe, key:ex.key }); });
+  // SIGILS RETIRED — the strip shows owned RITUALS only
   S.rituals.forEach(function(nm){ var ri=RITUAL_BY_NAME[nm]; if(ri) items.push({ cls:"ritual", ri:ri, name:nm, recipe:ri.recipe, key:ri.key }); });
   if(!items.length) return;
   var sig=S.dial.map(function(b){ return b?b.c:"-"; }).join("");   // recompute glow only on a ring change
   if(sig!==S.dialSig){ S.dialSig=sig; S.exoticGlow={};
-    S.exotics.forEach(function(nm){ var ex=EXOTIC_BY_NAME[nm]; if(ex) S.exoticGlow[nm]=ringHasSeq(ex.recipe); });
     S.rituals.forEach(function(nm){ var ri=RITUAL_BY_NAME[nm]; if(ri) S.exoticGlow[nm]=ringHasMultiset(ri.recipe); }); }
   var g=geo;
   var blockBot=g.gateY+7, dialTop=g.cy-g.dialR-g.ballR*0.85;
@@ -2617,12 +3397,25 @@ function drawEnemies(t){
         ctx.beginPath(); ctx.moveTo(s*pr*.22-3,pr*.12); ctx.lineTo(s*pr*.22+3,pr*.12); ctx.lineTo(s*pr*.22,pr*.36); ctx.closePath(); ctx.fill();
       });
     }
+    // BRITTLE status: hairline cracks etched across the body (next hit will shatter it for +50%)
+    if(e.brittle && !e.dead){
+      ctx.strokeStyle="rgba(44,39,51,.55)"; ctx.lineWidth=1.4; ctx.lineCap="round";
+      var seeds=[[-0.55,-0.4],[0.15,-0.55],[0.45,0.1]];
+      seeds.forEach(function(sd,si){
+        var bx0=sd[0]*pr, by0=sd[1]*pr, ang=si*1.9+e.seed, len=pr*0.7;
+        ctx.beginPath(); ctx.moveTo(bx0,by0);
+        var mx=bx0+Math.cos(ang)*len*0.5+ (si%2?4:-4), my=by0+Math.sin(ang)*len*0.5-3;
+        var ex2=bx0+Math.cos(ang)*len, ey2=by0+Math.sin(ang)*len;
+        ctx.lineTo(mx,my); ctx.lineTo(ex2,ey2); ctx.stroke();
+      });
+    }
     ctx.restore();
     if(e.dead) return;
     // status chips stacked to the right
     var chips=[];
     if(e.freeze>0) chips.push(["frz",HEX.B]);
-    if(e.poison>0) chips.push(["psn",HEX.G]);
+    else if(e.chill) chips.push(["chl","#8fc7ff"]);   // CHILL: a light frost — shatterable, no move-skip
+    if(e.poison>0) chips.push(["psn", e.psnPreserved&&e.freeze>0 ? "#6bbfa0" : HEX.G]);   // PRESERVE: frost-green tint while iced
     if(e.burn>0) chips.push(["brn",HEX.O]);
     var pulse=(t-e.dotT)<300;
     chips.forEach(function(c,k){ statusChip(e.x+pr+12, e.y+bob-8+k*19, c[1], c[0], pulse); });
@@ -2658,8 +3451,21 @@ function drawEnemies(t){
       ctx.fillStyle="#2c2733"; [-4.5,0,4.5].forEach(function(jx){ ctx.beginPath(); ctx.arc(jx,1.5,1.1,0,7); ctx.fill(); });
       ctx.restore();
     }
-    // intent: drawn ink triangle (advance) or red damage badge (attacking the wall)
+    // intent: drawn ink triangle (advance) · red damage badge (will strike the wall) · coil (winding up)
     if(e.freeze>0){ /* frozen: chip says it */ }
+    else if(e.rung<=0 && e.dmg>0 && e.wallT){
+      // WINDUP cue — it just struck and won't hit next phase; a coiled/pause glyph in the badge spot
+      var byw=e.y+bob-pr-22;
+      ctx.fillStyle="rgba(44,39,51,.9)"; ctx.beginPath(); ctx.arc(e.x,byw+2,9.5,0,7); ctx.fill();
+      ctx.fillStyle="#f6c445"; ctx.beginPath(); ctx.arc(e.x,byw,9.5,0,7); ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+      // a small inward spiral/coil reading as "winding up"
+      ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; ctx.lineCap="round";
+      ctx.beginPath();
+      for(var wa=0; wa<=Math.PI*3; wa+=0.32){ var wr=1.2+wa*1.05, wx=e.x+Math.cos(wa-Math.PI/2)*wr, wy=byw+Math.sin(wa-Math.PI/2)*wr;
+        if(wa===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy); }
+      ctx.stroke();
+    }
     else if(e.rung<=0 && e.dmg>0){
       var byy=e.y+bob-pr-22;
       ctx.fillStyle="rgba(44,39,51,.9)"; ctx.beginPath(); ctx.arc(e.x,byy+2,9.5,0,7); ctx.fill();
@@ -2675,9 +3481,31 @@ function drawEnemies(t){
   });
 }
 
+/* a soft ink arc laid UNDER a consecutive window of balls, tinted by the spell's family colour
+   (gold for owned sigils/rituals) — the arrange live-glow and the gentle-mode always-on hints. */
+function drawWindowArc(slots, tint, alpha){
+  var g=geo, n=CFG.slots;
+  var a0=-Math.PI/2 + slots[0]*(Math.PI*2/n);
+  var a1=a0 + (slots.length-1)*(Math.PI*2/n);   // windows are consecutive & increasing (mod n) by construction
+  var pad=0.085;
+  ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR, a0-pad, a1+pad);
+  ctx.lineWidth=g.ballR*1.35; ctx.strokeStyle=tint; ctx.globalAlpha=alpha;
+  ctx.lineCap="round"; ctx.stroke(); ctx.globalAlpha=1;
+}
+/* DOUBLECAST HOLD-GLOW: a valid held 6-ball weave (release would doublecast) — is it live right now? */
+function holdDblActive(){
+  if(!gesture || !gesture.visited || gesture.visited.length<6) return false;
+  var wb=gesture.visited.slice(0,6).map(function(i){ return S.dial[i]; });
+  if(!wb.every(Boolean)) return false;
+  var a=resolveSpell(wb.slice(0,3)), b=resolveSpell(wb.slice(3,6));
+  return !a.fizzle && !b.fizzle;                        // both triples cohere → a real weave awaits release
+}
 function drawDial(t){
   var g=geo;
   var dimmed = S.phase==="enemy" && !CFG.realtime;   // flow keeps the ring live during a beat
+  var holdGlow = holdDblActive();
+  // HOLD-GLOW: dim the whole field ~20% so only the six charged balls (drawn bright, burning gold) read
+  if(holdGlow){ ctx.fillStyle="rgba(20,18,26,0.20)"; ctx.fillRect(-40,-40,W+80,H+80); }
   // backboard + hub with sticker shadows
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR,0,7);
   ctx.lineWidth=g.ballR*1.7; ctx.strokeStyle="rgba(251,245,230,.9)"; ctx.stroke();
@@ -2695,6 +3523,14 @@ function drawDial(t){
   ctx.fillStyle="#fffdf6"; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
 
   drawHub(t);
+
+  // LIVING RING: soft window arcs under the balls — live glow while arranging, faint always-on on Gentle
+  if(gesture && gesture.mode==="arrange" && S.arrangeGlow){
+    var pkA=0.5+0.5*Math.sin(t/280);
+    S.arrangeGlow.forEach(function(w){ drawWindowArc(w.slots, w.gold?"#ffd15c":w.tint, (w.gold?0.30:0.20)+0.13*pkA); });
+  } else if(difficulty==="gentle" && !S.busy && S.phase!=="enemy"){
+    castWindowsCached().forEach(function(w){ drawWindowArc(w.slots, w.gold?"#ffd15c":w.tint, w.gold?0.16:0.10); });
+  }
 
   if(dimmed) ctx.globalAlpha=0.65;
   // balls
@@ -2727,8 +3563,23 @@ function drawDial(t){
       }
       b.goo=null;
     }
-    var vis = gesture && gesture.visited.indexOf(i)>=0;
-    var isLast = gesture && gesture.visited[gesture.visited.length-1]===i;
+    var arranging = gesture && gesture.mode==="arrange";
+    var lifted = arranging && i===gesture.cur;
+    var vis = !arranging && gesture && gesture.visited.indexOf(i)>=0;
+    var isLast = !arranging && gesture && gesture.visited[gesture.visited.length-1]===i;
+    // ARRANGE bead-slide: a shoved neighbour flows in from its old slot
+    if(b.arrT){ var ak=(t-b.arrT)/ARR_SLIDE; if(ak<1 && b.arrFrom!=null){ var afp=g.slots[b.arrFrom]; var ae=1-Math.pow(1-ak,3); px=afp.x+(p.x-afp.x)*ae; py=afp.y+(p.y-afp.y)*ae; } else { b.arrT=0; b.arrFrom=null; } }
+    // MERGE-SHOVE: a springy radial nudge that settles back
+    if(b.shove){ var sk=(t-b.shove.t)/SHOVE_DUR; if(sk<1){ var env=Math.sin(sk*Math.PI); px+=b.shove.dx*env; py+=b.shove.dy*env; } else b.shove=null; }
+    // IDLE WIGGLE: a subtle Candy-Crush shimmy on a castable window
+    if(S.wiggle && S.wiggle.slots.indexOf(i)>=0){ var wk=(t-S.wiggle.t)/WIGGLE_DUR; if(wk<1){ px+=Math.sin(wk*Math.PI*6)*(1-wk)*3.2; py+=Math.cos(wk*Math.PI*5)*(1-wk)*2.0; } }
+    if(lifted){
+      // the carried bead: rides the finger, popped + a soft breathe, gold ring
+      var liftPop=b.liftT?Math.min(1,(t-b.liftT)/160):1;
+      var lscale=1.20+0.14*liftPop + 0.03*Math.sin(t/180);
+      drawBall(b, gesture.x, gesture.y, i, t, lscale, true, false);
+      continue;
+    }
     // drag response: last visited leans toward the finger
     if(isLast && gesture){
       var ddx=gesture.x-px, ddy=gesture.y-py, dd=Math.hypot(ddx,ddy)||1;
@@ -2738,7 +3589,21 @@ function drawDial(t){
     var pop=Math.max(0, 1-(t-b.born)/240);
     var breathe = vis? 0 : 0.02*Math.sin(t/650+i*1.7);
     var scale=1 + pop*0.25 + (isLast?0.18:(vis?0.08:0)) + breathe;
+    // HOLD-GLOW: the six charged balls burn gold — a coiled trigger waiting on release
+    if(holdGlow && vis){
+      var gp=0.6+0.4*Math.sin(t/110);
+      ctx.save(); ctx.shadowColor="#ffd15c"; ctx.shadowBlur=16;
+      ctx.beginPath(); ctx.arc(px,py, g.ballR*(0.9*scale)+4, 0,7);
+      ctx.lineWidth=4.5; ctx.strokeStyle="rgba(255,209,92,"+(0.55+0.4*gp)+")"; ctx.stroke();
+      ctx.restore();
+    }
     drawBall(b, px, py, i, t, scale, vis, false);
+    // ONE-AWAY PULSE: a candidate that would complete a valid 3-recipe glows softly
+    if(S.oneAway && S.oneAway.indexOf(i)>=0){
+      var op=0.5+0.5*Math.sin(t/160);
+      ctx.beginPath(); ctx.arc(p.x,p.y, g.ballR*0.95+4+op*2,0,7);
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(255,209,92,"+(0.32+0.42*op)+")"; ctx.stroke();
+    }
   }
   // anticipatory goo: two mergeable neighbours grow a liquid film that thickens
   // as the finger closes in — clipped to the waist gap so it bridges the rims
@@ -2774,8 +3639,8 @@ function drawDial(t){
   }
   if(dimmed) ctx.globalAlpha=1;
 
-  // gesture trail ON TOP of the balls + live tether to the finger
-  if(gesture && gesture.visited.length>=1){
+  // gesture trail ON TOP of the balls + live tether to the finger (not during an arrange walk)
+  if(gesture && gesture.mode!=="arrange" && gesture.visited.length>=1){
     var cooling = CFG.realtime && S.cool>0 && gesture.visited.length>=3;   // dim a cast-sweep that can't fire yet
     ctx.strokeStyle= cooling? "rgba(44,39,51,.20)" : "rgba(44,39,51,.55)"; ctx.lineWidth=4; ctx.setLineDash([1,8]);
     ctx.beginPath();
@@ -2934,6 +3799,28 @@ function drawHub(t){
   var g=geo;
   ctx.textAlign="center"; ctx.textBaseline="middle";
   var preview=gesturePreview();
+  if(gesture && gesture.mode==="arrange"){
+    if(gesture.tut){                                   // first-ever lift: the coach line, for the drag's duration
+      ctx.fillStyle="#2c2733"; ctx.font="700 15px Fredoka, sans-serif";
+      ctx.fillText("walk the ball", g.cx, g.cy-9);
+      ctx.fillText("around the ring", g.cx, g.cy+12);
+    } else if(S.arrangeBest){                           // live: the best available spell if released now
+      var bc = S.arrangeBest.gold ? "#b9791a" : (S.arrangeBest.tint==="#ffd15c" ? "#b9791a" : S.arrangeBest.tint);
+      ctx.fillStyle="#6b6472"; ctx.font="700 12px Nunito, sans-serif";
+      ctx.fillText("release:", g.cx, g.cy-16);
+      ctx.fillStyle=bc; ctx.font="700 "+(S.arrangeBest.name.length>9?17:21)+"px Fredoka, sans-serif";
+      ctx.fillText(S.arrangeBest.name, g.cx, g.cy+4);
+      ctx.fillStyle="#b9791a"; ctx.font="700 11px Nunito, sans-serif";
+      ctx.fillText("ready", g.cx, g.cy+22);
+    } else {
+      ctx.fillStyle="#8a8578"; ctx.font="700 14px Fredoka, sans-serif";
+      ctx.fillText("arranging…", g.cx, g.cy-2);
+      ctx.fillStyle="#a49e92"; ctx.font="700 11px Nunito, sans-serif";
+      ctx.fillText("shape a window", g.cx, g.cy+18);
+    }
+    ctx.textBaseline="alphabetic";
+    return;
+  }
   if(preview){
     ctx.fillStyle=preview.col; ctx.font="700 "+(preview.small?17:24)+"px Fredoka, sans-serif";
     ctx.fillText(preview.big, g.cx, g.cy-16);
@@ -3064,16 +3951,29 @@ function drawFx(t){
       rr(-ss/2,-ss/2,ss,ss,2); ctx.fill(); ctx.stroke();
       ctx.rotate(Math.PI/4); rr(-ss/2,-ss/2,ss,ss,2); ctx.fill(); ctx.stroke();
       ctx.globalAlpha=1; ctx.restore();
+    } else if(f.implode){ var ik=age/300; if(ik>=1){ S.fx.splice(i,1); continue; }
+      // CONSUME: a void-dark ring drawing inward, collapsing to a point
+      ctx.beginPath(); ctx.arc(f.x,f.y, f.max*(1-ik), 0,7);
+      ctx.lineWidth=3+5*ik; ctx.strokeStyle="#2c2733"; ctx.globalAlpha=(1-ik)*0.9; ctx.stroke();
+      ctx.beginPath(); ctx.arc(f.x,f.y, f.max*(1-ik)*0.6, 0,7);
+      ctx.lineWidth=2; ctx.strokeStyle="#6b6472"; ctx.stroke(); ctx.globalAlpha=1;
     } else { S.fx.splice(i,1); }
   }
 }
 function drawDmgs(t){
   for(var i=S.dmgs.length-1;i>=0;i--){ var d=S.dmgs[i]; var age=t-d.t; var k=age/850;
     if(k>=1){ S.dmgs.splice(i,1); continue; }
+    // SPECTACLE: font size lerps with magnitude (~16px at 1-9 → ~34px at 40+)
+    var mag=Math.abs(d.amt)||0;
+    var fs=16 + Math.max(0,Math.min(1,(mag-9)/31))*18;
+    var big=d.react;                                         // reaction / boosted hit → gold + heavier + pop
+    if(d.crit && !big) fs=Math.max(fs,22);
+    var pop=1;                                               // small pop-overshoot on big numbers
+    if(big){ var pk=age/150; if(pk<1) pop=1+Math.sin(pk*Math.PI)*0.30; fs=Math.max(fs,22); }
     ctx.globalAlpha=1-k; ctx.textAlign="center";
-    ctx.font=(d.crit?"700 22px ":"700 16px ")+"Fredoka, sans-serif";
-    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.friend? "#8fd0ff" : (d.crit? "#ffd15c":"#fffdf6")));
-    ctx.strokeStyle="#2c2733"; ctx.lineWidth=3;
+    ctx.font="700 "+(fs*pop).toFixed(1)+"px Fredoka, sans-serif";
+    ctx.fillStyle = d.gate? "#ef4a5a" : (d.heal? "#57c268" : (d.friend? "#8fd0ff" : ((big||d.crit)? "#ffd15c":"#fffdf6")));
+    ctx.strokeStyle="#2c2733"; ctx.lineWidth=big?5:3;
     var yy=Math.max(d.y-40*k, geo.fieldTop-24);
     var txt=(d.gate?"-":(d.heal?"+":""))+d.amt;
     ctx.strokeText(txt, d.x, yy); ctx.fillText(txt, d.x, yy);
@@ -3094,6 +3994,49 @@ function drawToast(t){
   ctx.fillStyle=S.toast.col; ctx.fillText(S.toast.txt, geo.cx, y);
   ctx.globalAlpha=1;
 }
+/* SPELL SCREEN-MOODS — cheap screen-space overlays, ~350ms, no ctx.filter */
+function drawMood(t){
+  if(!screenMood) return;
+  var age=t-screenMood.t, D=350; if(age<0){ return; } if(age>D){ screenMood=null; return; }
+  var k=age/D, env=Math.sin(k*Math.PI);        // ramp up then down
+  var ty=screenMood.type;
+  ctx.save();
+  if(ty==="ice"){
+    // icy vignette creeping in from the four corners
+    var corners=[[0,0],[W,0],[0,H],[W,H]];
+    corners.forEach(function(c){
+      var rad=Math.max(W,H)*(0.35+0.35*k);
+      var g=ctx.createRadialGradient(c[0],c[1],0,c[0],c[1],rad);
+      g.addColorStop(0,"rgba(120,180,255,"+(0.34*env)+")");
+      g.addColorStop(1,"rgba(120,180,255,0)");
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    });
+  } else if(ty==="amber"){
+    // amber singe licking in from every edge
+    var inset=Math.max(W,H)*0.42;
+    [["top",ctx.createLinearGradient(0,0,0,inset)],["bot",ctx.createLinearGradient(0,H,0,H-inset)],
+     ["lft",ctx.createLinearGradient(0,0,inset,0)],["rgt",ctx.createLinearGradient(W,0,W-inset,0)]].forEach(function(p){
+      var g=p[1]; g.addColorStop(0,"rgba(242,145,61,"+(0.30*env)+")"); g.addColorStop(1,"rgba(242,145,61,0)");
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    });
+  } else if(ty==="desat"){
+    // Void desaturation snap — a translucent grey multiply (approximate, no filter)
+    ctx.globalCompositeOperation="saturation";
+    ctx.fillStyle="rgba(128,128,128,"+(0.85*env)+")"; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation="multiply";
+    ctx.fillStyle="rgba(150,146,154,"+(0.20*env)+")"; ctx.fillRect(0,0,W,H);
+  } else if(ty==="whorl"){
+    // a rainbow ripple ring sweeping across the field
+    var cx=geo.cx, cy=(geo.fieldTop+geo.gateY)/2, rr2=Math.hypot(W,H)*0.6*k;
+    var hues=["#ef4a5a","#f6c445","#57c268","#3d8bdf","#9b62d6"];
+    for(var h=0;h<hues.length;h++){
+      ctx.beginPath(); ctx.arc(cx,cy, Math.max(0,rr2-h*7), 0,7);
+      ctx.lineWidth=5; ctx.strokeStyle=hues[h]; ctx.globalAlpha=(1-k)*0.7; ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
 
 /* hub preview for the live gesture */
 function greyTint(hex){
@@ -3108,23 +4051,30 @@ function gesturePreview(){
   if(v.length===2){
     var A=S.dial[v[0]], B=S.dial[v[1]];
     if(A&&B){
-      if(A.lvl===B.lvl && A.c!=="H" && B.c!=="H"){
-        if(A.c===B.c) return { big:NAME[A.c]+" L"+(A.lvl+1), sub:S.freeMerge?"level up · FREE":"level up", col:HEX[A.c], chips:[A.c,B.c] };
-        if(isPrim(A.c)&&isPrim(B.c)){ var m=mix(A.c,B.c); if(m) return { big:NAME[m], sub:"mix", col:HEX[m], chips:[A.c,B.c] }; }
+      if(A.c!=="H" && B.c!=="H"){
+        if(A.c===B.c){
+          if(Math.max(A.lvl,B.lvl)<MERGE_CAP)
+            return { big:NAME[A.c]+" L"+(Math.max(A.lvl,B.lvl)+1), sub:S.freeMerge?"level up · FREE":"level up", col:HEX[A.c], chips:[A.c,B.c] };
+          return { big:"✕", sub:"already at max level (L"+MERGE_CAP+")", col:"#b9b2a6", chips:[A.c,B.c] };
+        }
+        if(isPrim(A.c)&&isPrim(B.c)){ var m=mix(A.c,B.c); if(m) return { big:NAME[m]+" L"+Math.max(A.lvl,B.lvl), sub:"mix", col:HEX[m], chips:[A.c,B.c] }; }
       }
       return { big:"✕", sub:"won't merge — keep sweeping to cast", col:"#b9b2a6", chips:[A.c,B.c] };
     }
   } else if(v.length===3){
     var balls=v.slice(0,3).map(function(i){return S.dial[i];});
     if(balls.every(Boolean)){
-      var sp=resolveSpell(balls);
       var chips=balls.map(function(b){return b.c;});
+      var su3=resolveSummon(balls);   // A·A·A pure run → summon preview (green-gold)
+      if(su3){ var cl3=CFG.realtime&&S.cool>0; return { big:summonName(su3.colour,su3.tier), small:true, sub:cl3?"cooling...":"summon! — release", col:cl3?greyTint(SUMMON_TINT):SUMMON_TINT, chips:chips }; }
+      var sp=resolveSpell(balls);
       if(sp.transmute){   // flow: transmute is a craft — never "cooling"
         return { big:"✨ Prism", small:true, sub:"transmute · one of each primary — release!", col:"#9b62d6", chips:chips };
       }
-      var col = sp.fizzle ? "#b9b2a6" : (sp.tint==="#ffd15c" ? "#b9791a" : sp.tint);
+      var col = sp.fizzle ? "#b9b2a6" : (sp.language ? "#b9791a" : (sp.tint==="#ffd15c" ? "#b9791a" : sp.tint));
       var sub;
       if(sp.fizzle) sub = sp.hint || "won't cohere";
+      else if(sp.language) sub = "mirror ("+ (sp.mirrorLen||3) +") · "+NAME[sp.wing]+" shapes "+NAME[sp.heart];
       else if(sp.whorl) sub = "the ultimate";
       else if(sp.kind==="assassin") sub = "true strike";
       else if(sp.usedW){ var src=echoSrc(chips); sub = src ? "Prism echoes "+NAME[src] : "L"+sp.tl+" cast"; }
@@ -3145,15 +4095,21 @@ function gesturePreview(){
       var sA=resolveSpell(wb.slice(0,3));
       var nameA = sA.transmute?"Transmute":sA.name;
       if(v.length<6){
-        var exM=matchExotic(chips);                 // an owned SIGIL answers the 4-5 sweep (checked first)
-        if(exM) return { big:"✦ "+exM.name, small:true,
-          sub:(CFG.realtime&&S.cool>0)?"cooling...":"exotic · release!", col:"#b9791a", chips:chips };
-        var riM=matchRitual(chips);                  // then an owned RITUAL (order-agnostic)
+        var swb=v.map(function(i){ return S.dial[i]; });         // the actual 4-5 swept balls
+        var cooling = CFG.realtime && S.cool>0;
+        var suP=resolveSummon(swb);                              // pure 4·A/5·A run → KNIGHT / CHAMPION summon
+        if(suP) return { big:summonName(suP.colour,suP.tier), small:true, sub:cooling?"cooling...":"summon! — release", col:cooling?greyTint(SUMMON_TINT):SUMMON_TINT, chips:chips };
+        var mirP=resolveMirror(swb);                             // then the MIXED MIRROR / STRANGE answers a 4-5 sweep
+        if(mirP){
+          if(mirP.type==="spell"){ var mln=mirP.sp.mirrorLen||v.length, sw=mln>=5?"strong":"good"; return { big:mirP.sp.name+" ("+mln+")", small:true, sub:cooling?"cooling...":("longer = "+sw+" — release!"), col:"#b9791a", chips:chips }; }
+          if(mirP.type==="strange"){ var known=!!BOOK[mirP.def.name]; return { big:known?("✦ "+mirP.def.name):"✦ ? ? ?", small:true, sub:cooling?"cooling...":(known?"strange mirror — release!":"an unknown mirror — release to discover!"), col:"#b9791a", chips:chips }; }
+          if(mirP.type==="stranger") return { big:"a stranger mirror", small:true, sub:"its magic eludes you", col:"#b9b2a6", chips:chips };
+        }
+        var riM=matchRitual(chips);                              // then an owned RITUAL (order-agnostic)
         if(riM) return { big:"◈ "+riM.name, small:true,
-          sub:(CFG.realtime&&S.cool>0)?"cooling...":"assemble!", col:"#8a5a12", chips:chips };
+          sub:cooling?"cooling...":"assemble!", col:"#8a5a12", chips:chips };
         var cA = sA.fizzle?"#b9b2a6":(sA.transmute?"#9b62d6":(sA.tint==="#ffd15c"?"#b9791a":sA.tint));
-        var coolingD = CFG.realtime && S.cool>0;
-        return { big:nameA+" + ?", small:true, sub:coolingD?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
+        return { big:nameA+" + ?", small:true, sub:cooling?"cooling...":"release = fizzle — "+(6-v.length)+" more!", col:greyTint(cA), chips:chips };
       }
       var sB=resolveSpell(wb.slice(3,6));
       if(sA.fizzle||sB.fizzle) return { big:"✕ collapse", sub:"a weave must be two true spells", col:"#b9b2a6", chips:chips };
@@ -3170,6 +4126,11 @@ function gesturePreview(){
 
 /* ===================== input ===================== */
 var gesture=null;
+var armTimer=null, ARM_MS=250;                                      // ARRANGE long-press: 250ms stationary hold arms the lift
+var IDLE_MS=4000, WIGGLE_DUR=800, WIGGLE_GAP=6000;                  // idle-hint wiggle cadence
+function clearArm(){ if(armTimer){ clearTimeout(armTimer); armTimer=null; } }
+/* any pointer activity resets the idle-hint clock and dismisses a live wiggle */
+function markInput(){ if(S){ S.lastInputT=now(); S.wiggle=null; S.wiggleFireT=0; } }
 /* wedge hit-testing: the whole ring band belongs to the nearest slot */
 function slotAt(x,y,forDown){
   var dx=x-geo.cx, dy=y-geo.cy, r=Math.hypot(dx,dy);
@@ -3189,7 +4150,79 @@ function tryVisit(s){
 }
 function cancelGesture(){
   if(!gesture) return;
-  gesture=null; sCancel();
+  if(gesture.mode==="arrange" && gesture.origDial){        // abandon a live arrange: restore the ring, no cost
+    for(var i=0;i<CFG.slots;i++){ S.dial[i]=gesture.origDial[i]; if(S.dial[i]){ S.dial[i].arrFrom=null; S.dial[i].arrT=0; } }
+  }
+  clearArm(); gesture=null;
+  S.arrangeGlow=null; S.arrangeBest=null; S.oneAway=null;
+  sCancel();
+}
+/* ===================== THE ARRANGE ===================== */
+/* long-press armed: lift the ball under the finger and enter rotary-insert mode */
+function armArrange(){
+  var g=gesture; if(!g) return;
+  g.arming=false; g.mode="arrange";
+  g.origin=g.visited[0]; g.cur=g.origin;
+  g.origDial=S.dial.slice();                    // remembered so a hub-cancel can flow the beads back home
+  g.lifted=S.dial[g.origin];
+  var firstTut=false;
+  try{ if(!localStorage.getItem("wh_arrangetut")){ firstTut=true; localStorage.setItem("wh_arrangetut","1"); } }catch(e){}
+  g.tut=firstTut;                               // first-ever lift shows the "walk the ball around the ring" coach line
+  if(g.lifted){ g.lifted.liftT=now(); g.lifted.arrFrom=null; g.lifted.arrT=0; }
+  sLift(); vib([12]);
+  arrangeRecompute();
+}
+/* WALK the lifted bead to a target slot: each slot it passes, that neighbour shifts one toward the
+   origin (a chain of adjacent swaps along the shorter arc) — beads flowing round a string. */
+function arrangeStep(target){
+  var g=gesture, n=CFG.slots, cur=g.cur, guard=0;
+  while(cur!==target && guard++<n){
+    var d=((target-cur)%n+n)%n, dir=(d<=n/2)?1:-1;
+    var nx=((cur+dir)%n+n)%n;
+    var tmp=S.dial[cur]; S.dial[cur]=S.dial[nx]; S.dial[nx]=tmp;
+    var disp=S.dial[cur]; if(disp){ disp.arrFrom=nx; disp.arrT=now(); }   // the shoved neighbour slides in from nx
+    cur=nx;
+  }
+  g.cur=cur;
+  if(g.lifted){ g.lifted.arrFrom=null; g.lifted.arrT=0; }   // lifted bead tracks the finger, no slide
+  beep(430+((g.cur*37)%9)*22,.03,"sine",.028);
+  arrangeRecompute();
+}
+/* recompute the live window-glow + best-spell readout — on each SLOT change, not per frame */
+function arrangeRecompute(){
+  var wins=scanWindows(S.dial);
+  S.arrangeGlow=wins; S.arrangeBest=bestWindow(wins);
+}
+/* into the hub while arranging = cancel: the ring flows back to its original order, no cost */
+function arrangeCancel(){ cancelGesture(); }
+/* release: the lifted bead settles where it sits. Moved from origin → 1 action (Turns) / free (Flow);
+   released at origin → free cancel. Arranging NEVER auto-merges — it is its own verb. */
+function arrangeSettle(){
+  var g=gesture; gesture=null;
+  clearArm(); markInput();
+  S.arrangeGlow=null; S.arrangeBest=null;
+  if(g.lifted){ g.lifted.liftT=0; }
+  if(g.cur===g.origin){ sCancel(); return; }   // never left home — free cancel
+  sThunk(); vib(10);
+  if(!CFG.realtime) spend();                    // Turns: an arrange that lands elsewhere costs 1 action (Flow: free)
+}
+/* ===================== IDLE HINT WIGGLE ===================== */
+/* after ~4s idle on the player's turn (Turns) or ~4s idle unpaused (Flow), one currently-castable
+   window's balls wiggle for ~0.8s, then again every ~6s. Disabled entirely on FIERCE. */
+function maybeIdleWiggle(t){
+  if(!S || S.over || difficulty==="fierce") return;
+  if(gesture || S.busy) return;
+  if(CFG.realtime){ if(flowPaused()) return; }
+  else if(S.phase==="enemy" || S.phase==="clear") return;      // Turns: only while it's your move
+  var idle=t-(S.lastInputT||0);
+  if(idle<IDLE_MS) return;
+  if(S.wiggle && t-S.wiggle.t<WIGGLE_DUR) return;              // one already shimmying
+  if(S.wiggleFireT && t-S.wiggleFireT<WIGGLE_GAP) return;      // hold the ~6s cadence
+  var threes=castWindowsCached().filter(function(w){ return w.slots.length===3; });
+  if(!threes.length){ S.wiggleFireT=t; return; }              // nothing castable — try again next cadence
+  var w=threes[(Math.random()*threes.length)|0];
+  S.wiggle={ slots:w.slots.slice(), t:t };
+  S.wiggleFireT=t;
 }
 /* tap-target a standing creation on the field (outside the ring) */
 function creationAtPoint(x,y){
@@ -3218,29 +4251,54 @@ function down(x,y){
     return;
   }
   var si=slotAt(x,y,true); if(si<0) return;
-  gesture={ visited:[si], x:x, y:y };
+  markInput();
+  gesture={ visited:[si], x:x, y:y, downX:x, downY:y, mode:null, arming:true };
+  // arm the long-press: a stationary finger for ARM_MS lifts the ball. A moving finger disarms (see move).
+  clearArm();
+  var gref=gesture;
+  armTimer=setTimeout(function(){ armTimer=null;
+    if(gesture!==gref || !gesture.arming || gesture.mode) return;
+    if(!S || S.over) return;
+    if(CFG.realtime ? (S.paused||S.busy) : S.busy) return;
+    armArrange();
+  }, ARM_MS);
 }
 function move(x,y){
   if(!gesture) return;
-  gesture.x=x; gesture.y=y;
+  if(gesture.mode==="arrange"){                                  // WALK the lifted bead around the ring
+    gesture.x=x; gesture.y=y; markInput();
+    var ra=Math.hypot(x-geo.cx, y-geo.cy);
+    if(ra < geo.dialR-geo.ballR*1.6){ arrangeCancel(); return; }  // into the hub = cancel, beads flow home
+    var sa=slotAt(x,y,false); if(sa<0) return;
+    if(sa!==gesture.cur) arrangeStep(sa);
+    return;
+  }
+  gesture.x=x; gesture.y=y; markInput();
+  // a moving finger never arms the long-press: once it travels past the slot, disarm → this is a sweep/merge
+  if(gesture.arming){
+    if(Math.hypot(x-gesture.downX, y-gesture.downY) > geo.ballR*0.55){ gesture.arming=false; clearArm(); }
+  }
   var r=Math.hypot(x-geo.cx, y-geo.cy);
   if(r < geo.dialR-geo.ballR*1.6){ cancelGesture(); return; }   // drag into the hub = cancel
   var si=slotAt(x,y,false); if(si<0) return;
   var v=gesture.visited, last=v[v.length-1];
-  if(si===last) return;
-  if(v.length>=2 && si===v[v.length-2]){ v.pop(); return; }     // backtrack un-visits
-  if(adj(si,last)){ tryVisit(si); return; }
+  if(si===last){ S.oneAway=oneAwayFor(v); return; }
+  if(v.length>=2 && si===v[v.length-2]){ v.pop(); S.oneAway=oneAwayFor(v); return; }   // backtrack un-visits
+  if(adj(si,last)){ tryVisit(si); S.oneAway=oneAwayFor(v); return; }
   // fast flick: walk the ring along the shorter arc so no slot is skipped
   var d=((si-last)%12+12)%12, dir = d<=6? 1 : -1, cur=last;
   for(var guard=0; guard<6; guard++){
     cur=((cur+dir)%12+12)%12;
-    if(!tryVisit(cur)) return;
-    if(cur===si) return;
+    if(!tryVisit(cur)){ S.oneAway=oneAwayFor(v); return; }
+    if(cur===si){ S.oneAway=oneAwayFor(v); return; }
   }
 }
 function up(){
   if(!gesture) return;
+  clearArm();
+  if(gesture.mode==="arrange"){ arrangeSettle(); return; }      // arrange settles on its own — never merges
   var v=gesture.visited; gesture=null;
+  markInput(); S.oneAway=null;
   if(v.length===2){ if(!tryMerge(v[0],v[1])){ beep(180,.1,"sine",.04); } }
   else if(v.length===3){ cast(v); }
   else if(v.length>3){ castWeave(v); }                          // 4-6 = weave (or collapse)
@@ -3249,13 +4307,13 @@ function up(){
 function ballInfo(i){
   var b=S.dial[i]; if(!b) return;
   if(b.c==="H"){ S.hubInfo={ l1:"Husk · drained", l2:"won't merge — cast it away to refill", l3:null, col:HEX.H, until:now()+1400 }; return; }
-  if(b.c==="W"){ S.hubInfo={ l1:"Prism · L"+b.lvl, l2:"echoes the first colour you sweep", l3:"merge with another Prism to level up", col:"#9b62d6", until:now()+1400 }; return; }
-  var l2, l3=null;
+  if(b.c==="W"){ S.hubInfo={ l1:"Prism · L"+b.lvl, l2:"echoes the first colour you sweep", l3:b.lvl>=MERGE_CAP?"at max level (L"+MERGE_CAP+")":"merge with any Prism to level up", col:"#9b62d6", until:now()+1400 }; return; }
+  var atCap=b.lvl>=MERGE_CAP, l2, l3=null;
   if(isPrim(b.c)){
     var others={"R":["Y","B"],"Y":["R","B"],"B":["R","Y"]}[b.c];
-    l2="+"+NAME[b.c]+" = level up";
+    l2 = atCap ? "+"+NAME[b.c]+" = at max (L"+MERGE_CAP+")" : "+"+NAME[b.c]+" = level up";
     l3="+"+others[0]+" = "+NAME[mix(b.c,others[0])]+" · +"+others[1]+" = "+NAME[mix(b.c,others[1])];
-  } else l2="+"+NAME[b.c]+" = level up";
+  } else l2 = atCap ? "+"+NAME[b.c]+" = at max (L"+MERGE_CAP+")" : "+"+NAME[b.c]+" = level up";
   S.hubInfo={ l1:NAME[b.c]+" · L"+b.lvl, l2:l2, l3:l3, col:HEX[b.c], until:now()+1400 };
 }
 function joltPips(){
@@ -3386,11 +4444,81 @@ window.__wh = function(){
     creations: S.creations.filter(function(c){ return !c.dead; }).map(function(c){ return { kind:c.kind, lane:c.lane, rung:c.rung, hp:c.hp, maxhp:c.maxhp, attack:c.attack, tl:c.tl }; }),
     pyre: S.pyre ? { lane:S.pyre.lane, rung:S.pyre.rung } : null,
     pendingDouble: S.pendingDouble, gildNext: S.gildNext,
+    arrangeBest: S.arrangeBest ? { name:S.arrangeBest.name, gold:!!S.arrangeBest.gold } : null,
+    arrangeGlowN: S.arrangeGlow ? S.arrangeGlow.length : 0,
+    arranging: !!(gesture && gesture.mode==="arrange"),
+    oneAway: S.oneAway ? S.oneAway.slice() : [],
+    wiggle: S.wiggle ? { slots:S.wiggle.slots.slice() } : null,
     enemies: live.length,
     rungSum: live.reduce(function(s,e){ return s+e.rung; }, 0),
     minRung: live.length? Math.min.apply(null, live.map(function(e){return e.rung;})) : -1,
     dial: S.dial.map(function(b){ return b? b.c+b.lvl : null; })
   };
+};
+/* ---- test hook: deterministic access to reactions / spectacle internals (harness only) ---- */
+window.__whx = {
+  now: now,
+  getS: function(){ return S; },
+  toastTxt: function(){ return S&&S.toast?S.toast.txt:null; },
+  POISON_CAP: POISON_CAP,
+  /* a synthetic foe with the fields combat touches; override any via `over` */
+  mkFoe: function(over){
+    var e={ x:geo.cx, y:geo.fieldTop+40, lane:1, rung:3, hp:9999, maxhp:9999,
+      burn:0, poison:0, freeze:0, frImm:0, chill:false, brittle:false, psnPreserved:false,
+      dead:false, ward:null, armored:false, elite:false, brute:false,
+      healer:false, leech:false, seed:0, dotT:0 };
+    if(over) for(var k in over) e[k]=over[k];
+    return e;
+  },
+  applyDmg: function(e, amt, el, opts){ return applyDmg(e, amt, el, opts); },
+  impactSpell: function(sp, hits, mul){ return impactSpell(sp, hits, mul); },
+  dotTick: function(e){ return dotTick(e); },
+  stepEnemy: function(e){ return stepEnemy(e); },
+  /* ---- build-13 harness: resolve / warriors / merge / scanner ---- */
+  resolveCols: function(cols){ return resolveSpell(cols.map(function(c,i){ return { c:c, lvl:1 }; })); },
+  resolveBalls: function(balls){ return resolveSpell(balls.map(function(b){ return { c:b.c, lvl:b.lvl||1 }; })); },
+  MERGE_CAP: MERGE_CAP,
+  mergeLegal: function(A,B){ return mergeLegal(A,B); },
+  tryMerge: function(a,b){ return tryMerge(a,b); },
+  setBall: function(i,c,lvl){ S.dial[i]={ c:c, lvl:lvl||1, born:now() }; S.castSig=""; },
+  mergeResult: function(A,B){ if(!mergeLegal(A,B)) return null;
+    if(A.c===B.c) return { c:A.c, lvl:Math.min(MERGE_CAP, Math.max(A.lvl,B.lvl)+1) };
+    return { c:mix(A.c,B.c), lvl:Math.max(A.lvl,B.lvl) }; },
+  resolveMirror: function(cols){ return resolveMirror(cols.map(function(c){ return { c:c, lvl:1 }; })); },
+  resolveSummon: function(cols){ return resolveSummon(cols.map(function(c){ return { c:(typeof c==="string"?c:c.c), lvl:(c&&c.lvl)||1 }; })); },
+  cast: function(idxs){ return cast(idxs); },
+  castWeave: function(idxs){ return castWeave(idxs); },
+  geo: function(){ return geo; },
+  spawnWarrior: function(tier, colour, TL){ return spawnWarrior(S, tier, colour, TL); },
+  summonTramples: function(e,w){ return summonTramples(e,w); },
+  summonStats: function(tier,colour,TL){ return summonStats(tier,colour,TL); },
+  warriorStrike: function(w,e){ return warriorStrike(w,e); },
+  eliteCadence: function(w){ return eliteCadence(w); },
+  warriorAct: function(w){ return warriorAct(w); },
+  liveWarriors: function(){ return liveWarriors(); },
+  warriorAt: function(lane,rung){ return warriorAt(lane,rung); },
+  stompWarrior: function(e,w){ return stompWarrior(e,w); },
+  enemyStrikeWarrior: function(e,w){ return enemyStrikeWarrior(e,w); },
+  meltWarriorsForWaveClear: function(){ var live=liveWarriors(); live.forEach(meltWarrior); return live.length; },
+  clearWarriors: function(){ S.warriors=[]; },
+  STRANGE: STRANGE, STRANGE_NAMES: STRANGE_NAMES,
+  scanMirrorWindows: function(){ return scanWindows(S.dial).filter(function(w){ return w.mirror; }); },
+  scanWindows: function(){ return scanWindows(S.dial); },
+  setDial: function(cols){ for(var i=0;i<CFG.slots && i<cols.length;i++){ S.dial[i]={ c:cols[i], lvl:1, born:now() }; } S.castSig=""; },
+  applyReactions: function(e, amt, el, opts){ return applyReactions(e, amt, el, opts); },
+  reactState: function(){ return { gold:_reactGold, banner:_reactBanner }; },
+  triggerHitstop: function(ms){ triggerHitstop(ms); },
+  hitstop: function(){ var raw=performance.now();
+    return { active: !!_freezeStart, span: _freezeStart?(_hitstopEnd-_freezeStart):0, remain: _freezeStart?Math.max(0,_hitstopEnd-raw):0 }; },
+  clearHitstop: function(){ _freezeStart=0; _timeFreeze=0; _hitstopEnd=0; },
+  mood: function(){ return screenMood?screenMood.type:null; },
+  /* mirror of the drawDmgs magnitude→font lerp so the harness can assert the curve */
+  fontFor: function(amt, react, crit){
+    var mag=Math.abs(amt)||0, fs=16 + Math.max(0,Math.min(1,(mag-9)/31))*18;
+    if(crit && !react) fs=Math.max(fs,22);
+    if(react) fs=Math.max(fs,22);
+    return fs;
+  }
 };
 resize();
 requestAnimationFrame(draw);
