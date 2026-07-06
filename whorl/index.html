@@ -291,7 +291,7 @@ body{
 <canvas id="c"></canvas>
 
 <div class="hud">
-  <div class="chip hearts">♥<b id="hpN">20</b></div>
+  <div class="chip hearts">♥<b id="hpN">30</b></div>
   <div class="chip wave"><small>Wave</small><b id="waveN">1</b></div>
   <div class="chip motes" id="chipMotes"><span class="coin"></span><b id="moteN">0</b></div>
   <div class="spacer"></div>
@@ -385,7 +385,7 @@ body{
 var CFG = {
   slots: 12,
   actions: 3,          // base actions per turn (turn mode only)
-  hp: 24,
+  hp: 30,
   lanes: 4,
   rungs: 6,
   wardMult: 2,         // matching-colour hits multiply by this
@@ -398,11 +398,11 @@ var CFG = {
 
 /* ===================== DIFFICULTY (selector plumbing) =====================
    ONE multiplier table, applied in rollWave (enemy hp · wave count ceil · gate damage).
-   PLACEHOLDER values — the economist supplies finals; swapping the table is a one-line edit. */
+   FINAL values from the simulation-validated balance package. */
 var DIFF = {
-  gentle:   { hp:0.75, count:0.80, dmg:0.75 },
+  gentle:   { hp:0.70, count:0.75, dmg:0.70 },
   standard: { hp:1.00, count:1.00, dmg:1.00 },
-  fierce:   { hp:1.25, count:1.10, dmg:1.25 }
+  fierce:   { hp:1.20, count:1.15, dmg:1.20 }
 };
 var DIFF_LABEL = { gentle:"Gentle", standard:"Standard", fierce:"Fierce" };
 var difficulty = "standard";
@@ -517,7 +517,7 @@ function freshBall(){
 function now(){ return performance.now(); }
 function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
 
-/* ---------- waves (rebalanced: count cap 9, HP 4+4w, wards O/G/P only) ----------
+/* ---------- waves (human retune: count cap 8 = 2+ceil(0.6w), trash HP round(0.9·(4+3w)), wards O/G/P only) ----------
    type mix: brutes as before; of the rest ~20% armored (wave 3+), ~20% leech (wave 4+,
    max 2), one healer per wave at ~35% (wave 4+, mid-field rung 2-3 & SKITTISH). every 5th
    wave trades two normal spawns for one ELITE. */
@@ -527,7 +527,7 @@ function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
 function rollWave(w){
   var D = diffMul();                       // difficulty multipliers (hp · count · dmg) — standard = identity
   var elite = (w>=8 && (w-8)%4===0);      // elite cadence: 8, 12, 16, 20...
-  var count = Math.min(9, Math.ceil((2 + w) * D.count)) - (elite?2:0);
+  var count = Math.min(8, Math.ceil((2 + Math.ceil(0.6*w)) * D.count)) - (elite?2:0);
   var wardChance = Math.min(0.75, 0.05 + w*0.10);
   var baseDmg = Math.max(1, Math.round((2 + Math.ceil(w/4)) * D.dmg));
   var spread = w>=5 ? 3 : 2;              // deeper spawn rungs from wave 5
@@ -554,7 +554,7 @@ function rollWave(w){
     }
     var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
     var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
-    var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : (4+3*w);
+    var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : Math.round(0.90*(4+3*w));
     hp = Math.max(1, Math.round(hp * D.hp));      // difficulty: enemy HP scaling
     list.push({
       lane:lane, rung:rung, hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
@@ -880,7 +880,7 @@ function applyBurn(e, val){ e.burn = Math.max(e.burn, val + (S.reagents && S.rea
 var POISON_CAP = 12;
 
 /* ---------- pigment motes: the in-run currency the horde sheds ---------- */
-function moteValue(e){ return e.elite?8 : e.brute?3 : (e.armored||e.healer||e.leech)?2 : 1; }
+function moteValue(e){ return e.elite?9 : e.brute?3 : (e.armored||e.healer||e.leech)?2 : 1; }
 function moteHudSet(){ var n=document.getElementById("moteN"); if(n) n.textContent = S?S.motes:0; }
 function moteChipXY(){
   var c=document.getElementById("chipMotes");
@@ -907,8 +907,10 @@ function moteLand(){
 }
 
 /* one resolved spell landing: damage, payloads (always apply on a valid cast), shake */
-function impactSpell(sp, hits){
-  var per = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
+function impactSpell(sp, hits, mul){
+  mul = mul || 1;                                                                        // Mordant II passes 1.15 for its doubled casts
+  var base = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
+  var per = mul===1 ? base : Math.max(1, Math.round(base*mul));
   var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW };
   var dealt=0;
   hits.forEach(function(e){
@@ -940,6 +942,7 @@ function cast(idxs){
   if(CFG.realtime) startCool();
   applyStale(st, sp);
   var dbl = (!sp.fizzle && doublePending()); if(dbl) S.pendingDouble--;   // Mordant: this cast fires twice (counter down)
+  var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;                       // Mordant II: each doubled cast also deals +15%
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib(sp.fizzle?[8,60,8]:(sp.whorl?[40,50,90]:(sp.tl>=6?[30,40,70]:25)));
@@ -949,8 +952,8 @@ function cast(idxs){
     castFx(sp, tgt, hits.map(hitPt));
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    impactSpell(sp, hits);
-    if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits); S.shake=Math.min(24,S.shake+5); }
+    impactSpell(sp, hits, dblMul);
+    if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits, dblMul); S.shake=Math.min(24,S.shake+5); }
     if(dbl){ toast("Mordant · "+sp.name+" ×2!", 1200, "#b9791a", "mid", true); }
     else if(sp.whorl){ toast("W H O R L !", 1400, "#b9791a", "mid", true); S.shake=Math.min(24,S.shake+8); vib([60,40,60,40,90]); }
     else if(sp.stale){ toast("Stale...", 1000, "#6b6472", "low"); }
@@ -1114,10 +1117,12 @@ var EXOTIC = [
     cast:function(st){ st.pendingDouble=(isII("Mordant")?3:2); st.pendingDoubleT=now(); sChime(); } },   // II: next THREE casts doubled
   { key:"undertow", name:"Undertow", recipe:["B","Y","Y","B"], price:25, bg:"#3d8bdf",
     desc:"Shove every foe back one rung; wall-huggers are washed off entirely.",
-    cast:function(st){ var push=isII("Undertow")?2:1;                                     // II: shove 2 rungs
+    cast:function(st){ var push=1, ii=isII("Undertow");                                    // II: still 1 rung, but pushed foes are DAZED
       alive().slice().forEach(function(e){
         if(e.rung < push){ e.dead=true; e.deadAt=now(); boom(e.x,e.y,HEX.B,1.1); }
-        else { e.rung=Math.min(CFG.rungs-1, e.rung+push); e.stepT=now(); } });
+        else { e.rung=Math.min(CFG.rungs-1, e.rung+push); e.stepT=now(); e.wallT=0;
+          if(ii) e.fled=true;                                                              // dazed — loses its next advance (reuse the fled/recover pattern)
+        } });
       S.fx.push({ wave:true, t:now(), tint:HEX.B }); } },
   { key:"ferment", name:"Ferment", recipe:["Y","B","Y","B","Y"], price:22, bg:"#57c268",
     desc:"Double every poison stack on every foe (capped at 12).",
@@ -1146,7 +1151,7 @@ var EXOTIC = [
       boom(geo.cx, geo.gateY-30, HEX.O, 1.7); } },
   { key:"aurum", name:"Aurum", recipe:["Y","Y","R","Y","Y"], price:21, bg:"#f6c445",
     desc:"Once per wave: transmute the horde's light into coin — 2 motes per living foe.",
-    cast:function(st){ var n=alive().length; if(n>0) addMotes((isII("Aurum")?3:2)*n, geo.cx, geo.cy-geo.dialR-geo.ballR); st.aurumSpent=true; sChime(); } }   // II: 3 motes/foe
+    cast:function(st){ var n=alive().length; if(n>0){ var gain=isII("Aurum")?Math.max(8,3*n):2*n; addMotes(gain, geo.cx, geo.cy-geo.dialR-geo.ballR); } st.aurumSpent=true; sChime(); } }   // II: 3 motes/foe, minimum 8/cast
 ];
 var EXOTIC_BY_NAME={}; EXOTIC.forEach(function(x){ EXOTIC_BY_NAME[x.name]=x; });
 /* the swept colours (in sweep order) vs owned recipes — exact, order-sensitive; any W = no match */
@@ -1242,6 +1247,7 @@ function castExotic(idxs, ex){
   if(st.lastSpell===ex.name){ st.repeatN++; if(ex.dmg) mul = st.repeatN>=2?0.3:0.5; }
   else { if(st.lastSpell && ex.dmg) mul=1.25; st.lastSpell=ex.name; st.repeatN=0; }
   var dbl = doublePending(); if(dbl) S.pendingDouble--;   // Mordant can double an exotic too (counter down)
+  var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;       // Mordant II: doubled casts (incl. damage exotics) deal +15%
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });
   vib([20,40,20,40,60]);
@@ -1249,8 +1255,8 @@ function castExotic(idxs, ex){
     sCast(TL,true); exoticCastFx(ex);
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    ex.cast(st, TL, mul);
-    if(dbl) ex.cast(st, TL, 1);
+    ex.cast(st, TL, mul*dblMul);
+    if(dbl) ex.cast(st, TL, dblMul);
     toast("✦ "+ex.name.toUpperCase()+(dbl?" ×2":""), 1150, "#b9791a", "mid", true);
     S.shake=Math.min(20, 6+TL*0.8);
   },230);
@@ -1313,7 +1319,7 @@ function creationStats(kind, TL){
   else if(kind==="sentry")   s={ hp:3*TL, attack:Math.ceil(TL*0.75) };
   else if(kind==="beacon")   s={ hp:4*TL, attack:Math.ceil(TL*0.6) };
   else s={ hp:4*TL, attack:Math.ceil(TL/2) };                 // golem
-  if(isII(KIND_RITUAL[kind])){ s.hp=Math.ceil(s.hp*1.5); s.attack=Math.ceil(s.attack*1.5); }   // Ritual II: creation +50%
+  if(isII(KIND_RITUAL[kind])){ var im=(kind==="beacon")?1.3:1.5; s.hp=Math.ceil(s.hp*im); s.attack=Math.ceil(s.attack*im); }   // Ritual II: creation +50% (Beacon nerfed to +30%)
   return s;
 }
 function liveCreations(){ return S.creations.filter(function(c){ return !c.dead; }); }
@@ -1611,18 +1617,22 @@ function stepEnemy(e){
     var guard = creationAt(e.lane, 0);
     if(guard && e.dmg>0){ enemyStrikeCreation(e, guard); return; }
     if(e.dmg<=0) return;                  // the healer just sits at the wall, mending
-    /* at the wall: attack every turn, PERSIST (no kamikaze farming) */
+    /* at the wall: strike on ARRIVAL, then only every OTHER phase — e.wallT toggles the beat.
+       falsy (fresh/just-wound-up) → strike this phase, then arm a windup; truthy → wind up (skip),
+       then re-arm the strike. The off-phase draws a coil cue in the advance-triangle spot. */
+    if(e.wallT){ e.wallT=0; return; }     // winding up this phase — recover, will strike next
     S.hp -= e.dmg; S.shake=Math.max(S.shake,10);
     sBreach(); vib([90,60,90]); flashGate();
     if(S.scorch.length<12) S.scorch.push({ x:e.x+((e.seed%9)-4) });
     spawnDmg(e.x, geo.gateY+16, e.dmg, false, true);
+    e.wallT=1;                            // next phase is a windup (no strike)
     syncHud();
     if(S.hp<=0) gameOver();
   } else {
     // BLOCKING: a creation in the destination cell is attacked instead of stepped past
     var dest = creationAt(e.lane, e.rung-1);
     if(dest){ enemyStrikeCreation(e, dest); return; }
-    e.rung--; e.stepT=now();
+    e.rung--; e.stepT=now(); e.wallT=0;   // stepping resets the wall cadence for a clean arrival strike
     sAdvance(); vib(8);
     applyPyre(e);                          // Pyre Ground bites a foe ENTERING its cell
   }
@@ -1648,7 +1658,7 @@ function waveClear(){
   S.busy=true; S.phase="clear";
   if(S.stats) S.stats.waves++;                 // held one more wave — death readout
 
-  if(S.reagents.mason){ S.hp=Math.min(S.maxhp, S.hp+(isII("mason")?2:1)); S.masonFlash=now(); syncHud(); }   // Mason re-lays a block (II: +2/wave)
+  if(S.reagents.mason){ S.hp=Math.min(S.maxhp, S.hp+(isII("mason")?3:1)); S.masonFlash=now(); syncHud(); }   // Mason re-lays a block (II: +3/wave)
   sWin(); vib(20);
   toast("WAVE CLEAR!", 850, "#2c2733", "mid", true);
   boom(geo.cx, geo.cy-geo.dialR-geo.ballR, "#ffd15c", 2);
@@ -1733,15 +1743,15 @@ var ITEM_META = {
 };
 /* concise tier-II upgrade blurbs — shown on a MERGE→II offer so the player knows what the merge buys */
 var II_DESC = {
-  Quench:"II: consumed burn pays 4× (was 3×)", Mordant:"II: your next THREE casts doubled", Undertow:"II: shove 2 rungs back",
+  Quench:"II: consumed burn pays 4× (was 3×)", Mordant:"II: your next THREE casts doubled, +15% each", Undertow:"II: pushed foes are dazed — lose their next advance",
   Ferment:"II: ×2 poison AND +2 flat to all", Gilding:"II: free merge grants +2 levels", Calcine:"II: lane coefficient 7",
   Distill:"II: purge husks + 2 motes per husk", Sublimate:"II: stripped foes take +2 from all sources",
-  Bellows:"II: detonate all burn at 3×", Aurum:"II: 3 motes per living foe",
+  Bellows:"II: detonate all burn at 3×", Aurum:"II: 3 motes per living foe (min 8)",
   Golem:"II: golem +50% HP & attack", Sentry:"II: sentry +50% HP & attack", "Pyre Ground":"II: damage 3 + burn 3",
-  Colossus:"II: colossus +50% HP & attack", Beacon:"II: beacon +50% HP & attack", Bastion:"II: +12 HP now / +6 max",
+  Colossus:"II: colossus +50% HP & attack", Beacon:"II: beacon +30% HP & attack", Bastion:"II: +12 HP now / +6 max",
   cinder:"II: burn ticks 4 dmg, +2 duration", shatterfrost:"II: frozen foes take +100%", lens:"II: minted Prisms at L3",
   quicksilver:"II: +2 actions / −24% cooldown", mold:"II: poison jumps to the TWO nearest",
-  buttress:"II: +8 more max HP (16 total)", mason:"II: +2 wall HP per wave clear", catalyst:"II: first TWO transmutes free"
+  buttress:"II: +8 more max HP (16 total)", mason:"II: +3 wall HP per wave clear", catalyst:"II: first TWO transmutes free"
 };
 function metaOf(id){ return ITEM_META[id] || { r:"common", t:[] }; }
 function rarityOf(id){ return metaOf(id).r; }
@@ -1799,6 +1809,11 @@ function candsFor(cls, ownedTags){
     var owned = cls==="sigil" ? S.exotics.indexOf(id)>=0 : cls==="ritual" ? S.rituals.indexOf(id)>=0 : !!S.reagents[id];
     if(isII(id)) return;                                          // tier II drops out of the pool entirely
     if(owned){
+      // MERGE→II exclusions from the validation: Distill II is dead money (both modes); Quicksilver II
+      // is a trap in Turn mode (a II-merge there wastes an action slot), so it's Turn-only excluded —
+      // it CAN still II-merge in Flow, where II = −24% total cooldown. (mode-dependent by design.)
+      if(id==="Distill") return;
+      if(id==="quicksilver" && !CFG.realtime) return;
       out.push({ def:def, cls:cls, id:id, merge:true, w:Math.max(1, rarityWeight(rarityOf(id),S.wave))*tagMult(id,ownedTags) });
     } else {
       if(!itemLegal(rarityOf(id), S.wave)) return;               // rarity gate on NEW offers
@@ -1964,7 +1979,7 @@ function renderShop(){
   renderRetire();
 }
 /* ---------- RETIRE SLOT (Peglin curation): remove an owned arcanum for an escalating fee ---------- */
-function retireFee(){ return 10*((S.retireN||0)+1); }                 // 10, 20, 30... per use this run
+function retireFee(){ return 6 + 10*(S.retireN||0); }                 // 6, 16, 26... per use this run (first use 6, +10 each)
 function ownedArcanaList(){
   var list=[];
   S.exotics.forEach(function(n){ list.push({ cls:"exotic", id:n, name:n, bg:(EXOTIC_BY_NAME[n]||{}).bg||"#8a8390", ic:"✦" }); });
@@ -2658,8 +2673,21 @@ function drawEnemies(t){
       ctx.fillStyle="#2c2733"; [-4.5,0,4.5].forEach(function(jx){ ctx.beginPath(); ctx.arc(jx,1.5,1.1,0,7); ctx.fill(); });
       ctx.restore();
     }
-    // intent: drawn ink triangle (advance) or red damage badge (attacking the wall)
+    // intent: drawn ink triangle (advance) · red damage badge (will strike the wall) · coil (winding up)
     if(e.freeze>0){ /* frozen: chip says it */ }
+    else if(e.rung<=0 && e.dmg>0 && e.wallT){
+      // WINDUP cue — it just struck and won't hit next phase; a coiled/pause glyph in the badge spot
+      var byw=e.y+bob-pr-22;
+      ctx.fillStyle="rgba(44,39,51,.9)"; ctx.beginPath(); ctx.arc(e.x,byw+2,9.5,0,7); ctx.fill();
+      ctx.fillStyle="#f6c445"; ctx.beginPath(); ctx.arc(e.x,byw,9.5,0,7); ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle="#2c2733"; ctx.stroke();
+      // a small inward spiral/coil reading as "winding up"
+      ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; ctx.lineCap="round";
+      ctx.beginPath();
+      for(var wa=0; wa<=Math.PI*3; wa+=0.32){ var wr=1.2+wa*1.05, wx=e.x+Math.cos(wa-Math.PI/2)*wr, wy=byw+Math.sin(wa-Math.PI/2)*wr;
+        if(wa===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy); }
+      ctx.stroke();
+    }
     else if(e.rung<=0 && e.dmg>0){
       var byy=e.y+bob-pr-22;
       ctx.fillStyle="rgba(44,39,51,.9)"; ctx.beginPath(); ctx.arc(e.x,byy+2,9.5,0,7); ctx.fill();
