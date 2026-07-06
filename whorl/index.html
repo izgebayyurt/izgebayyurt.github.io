@@ -134,6 +134,8 @@ body{
 .reactrow-head b{ font-family:var(--font-d); font-weight:700; font-size:13px; color:var(--ink-soft); letter-spacing:.06em; }
 .reactrow{ cursor:default; gap:11px; padding:8px 12px; }
 .reactrow:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.warrow{ cursor:default; gap:11px; padding:10px 12px; }
+.warrow:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
 
 /* ---------- motes: the coin chip + its collect pop ---------- */
 .chip.motes{ gap:5px; }
@@ -751,13 +753,20 @@ function openBook(){
       '<div class="bn">'+cnt+'</div>';
     box.appendChild(row);
   });
-  // WARRIORS — one visible row: a mirror of primaries gives form. "a mirror gives form".
-  var wrow=document.createElement("div"); wrow.className="rcard bookrow";
+  // SUMMONS — mirrors give form. Distinct class (not .bookrow) so the recipe count stays clean.
+  var smHead=document.createElement("div"); smHead.className="reactrow-head";
+  smHead.innerHTML='<b>SUMMONS — a mirror gives form</b>';
+  box.appendChild(smHead);
+  var wrow=document.createElement("div"); wrow.className="rcard warrow";
   wrow.innerHTML='<div class="recipe">'+
       '<i style="background:'+HEX.R+'"></i><i style="background:'+HEX.Y+'"></i><i style="background:'+HEX.R+'"></i></div>'+
-    '<div class="bmeta"><b>Warriors</b><span>a mirror of primaries summons a warrior of their mix — it fades with the wave</span></div>'+
-    '<div class="bn"></div>';
+    '<div class="bmeta"><b>Warriors</b><span>a mirror of primaries summons a warrior of their mix — it fades with the wave</span></div>';
   box.appendChild(wrow);
+  var srow=document.createElement("div"); srow.className="rcard warrow";
+  srow.innerHTML='<div class="recipe">'+
+      '<i style="background:'+HEX.R+'"></i><i style="background:'+HEX.G+'"></i><i style="background:'+HEX.R+'"></i></div>'+
+    '<div class="bmeta"><b>Specialists</b><span>a crafted heart makes a specialist — its wings arm it (R burns · Y motes · B armors)</span></div>';
+  box.appendChild(srow);
   // REACTIONS legend — a compact row of five, so combos are never a secret. Information is free.
   var lgHead=document.createElement("div");
   lgHead.className="reactrow-head";
@@ -1735,10 +1744,15 @@ function warriorAct(w){
   var e=frontEnemyInLane(w.lane, w.rung);
   if(!e || e.dead) return;
   var col=w.colour, opts={ friend:true, reactable:true };
-  if(col==="P") opts.eclipsePierce=true;                         // purple ignores ward resistance
-  applyDmg(e, w.attack, col, opts);                              // el = the warrior's colour (O/G/P)
-  if(col==="O" && !e.dead) applyBurn(e, 1);                       // orange warrior hits apply burn 1
-  if(col==="G" && !e.dead) e.poison=Math.min(POISON_CAP, e.poison+1);   // green warrior hits apply poison 1
+  if(col==="P") opts.eclipsePierce=true;                         // purple heart ignores ward resistance
+  var wasDead=e.dead;
+  applyDmg(e, w.attack, col, opts);                              // el = the heart colour (O/G/P) — feeds reactions
+  if(!e.dead){
+    if(col==="O") applyBurn(e, 1);                               // orange heart: burn 1
+    if(col==="G") e.poison=Math.min(POISON_CAP, e.poison+1);     // green heart: poison 1
+    if(w.wing==="R") applyBurn(e, 1);                            // R-wing rider: hits also burn 1
+  }
+  if(w.wing==="Y" && !wasDead && e.dead) addMotes(1, e.x, e.y);  // Y-wing rider: +1 mote on a kill
   S.fx.push({ arc:true, from:{x:w.x,y:w.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:HEX[col] });
   S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:HEX[col] });
   w.act=now(); sHit(w.attack,false); beep(320,.05,"triangle",.04);
@@ -1756,7 +1770,7 @@ function summonWarrior(idxs, sp){
     sCast(sp.tl,true); warriorSummonFx(sp.colour);
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    spawnWarrior(st, sp.colour, sp.tl);
+    spawnWarrior(st, sp.colour, sp.tl, { specialist:sp.specialist, wing:sp.wing });
     S.shake=Math.min(20, 6+sp.tl*0.8);
     toast(sp.name+"!", 1000, HEX[sp.colour], "mid", true);
   },230);
@@ -4154,10 +4168,12 @@ window.__whx = {
   resolveBalls: function(balls){ return resolveSpell(balls.map(function(b){ return { c:b.c, lvl:b.lvl||1 }; })); },
   MERGE_CAP: MERGE_CAP,
   mergeLegal: function(A,B){ return mergeLegal(A,B); },
+  tryMerge: function(a,b){ return tryMerge(a,b); },
+  setBall: function(i,c,lvl){ S.dial[i]={ c:c, lvl:lvl||1, born:now() }; S.castSig=""; },
   mergeResult: function(A,B){ if(!mergeLegal(A,B)) return null;
     if(A.c===B.c) return { c:A.c, lvl:Math.min(MERGE_CAP, Math.max(A.lvl,B.lvl)+1) };
     return { c:mix(A.c,B.c), lvl:Math.max(A.lvl,B.lvl) }; },
-  spawnWarrior: function(colour, TL){ return spawnWarrior(S, colour, TL); },
+  spawnWarrior: function(colour, TL, opts){ return spawnWarrior(S, colour, TL, opts); },
   warriorAct: function(w){ return warriorAct(w); },
   liveWarriors: function(){ return liveWarriors(); },
   warriorAt: function(lane,rung){ return warriorAt(lane,rung); },
