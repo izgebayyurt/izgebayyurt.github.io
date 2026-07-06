@@ -535,7 +535,7 @@ function rollWave(w){
   var count = Math.min(8, Math.ceil((2 + Math.ceil(0.6*w)) * D.count)) - (elite?2:0);
   var wardChance = Math.min(0.75, 0.05 + w*0.10);
   var baseDmg = Math.max(1, Math.round((2 + Math.ceil(w/4)) * D.dmg));
-  var spread = w>=5 ? 3 : 2;              // deeper spawn rungs from wave 5
+  var spread = 2;                        // spawns are ALWAYS the deepest two rungs (4-5) — one full field of runway every wave
   var used = {};
   var total = count + (elite?1:0);
   var wantHealer = w>=4 && Math.random()<0.35;   // at most 1 healer per wave
@@ -588,6 +588,7 @@ function spawnWave(spec){
       elite:es.elite, armored:es.armored, healer:es.healer, leech:es.leech,
       dmg:es.dmg, freeze:0, frImm:0, poison:0, burn:0,
       slow:es.slow, slowT:0, seed:es.seed, jit:es.jit,
+      arrived:false,                                                 // ARRIVAL GRACE: settle in — skip the first enemy-phase advance
       spawn: now()+k*80, hit:0, dotT:0, stepT:0, dead:false, deadAt:0
     });
     (function(e,delay){ setTimeout(function(){ if(S===st&&!st.over){
@@ -1670,6 +1671,7 @@ function dotTick(e){
 function stepEnemy(e){
   if(e.dead) return;
   if(e.fled){ e.fled=false; return; }   // skittish healer just retreated — recover, don't also advance
+  if(!e.arrived){ e.arrived=true; return; }   // ARRIVAL GRACE: freshly-spawned foe settles in — skip its first advance (DoT/heals already applied this phase)
   if(e.frImm>0) e.frImm--;
   if(e.freeze>0){ e.freeze--; if(e.freeze<=0) e.frImm=1; return; }   // thaw grants 1-turn immunity
   if(e.slow){ e.slowT=(e.slowT+1)%2; if(e.slowT===1) return; }
