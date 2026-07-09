@@ -230,7 +230,11 @@ export function buildJunctionLevel(n, rng, spec = {}) {
   const o = shuffle([0, 1, 2], rng);
   const sq = [[p1, ...armEnd(arms[o[0]])], [p2, ...armEnd(arms[o[1]])]];
   const ci = [[sec, ...armEnd(arms[o[2]])]];
-  return { n, sq, ci, walls: levelWalls(n, visited) };
+  const paint = new Map([[J[0] + "," + J[1], sec]]);
+  arms[o[0]].forEach((c) => paint.set(c[0] + "," + c[1], p1));
+  arms[o[1]].forEach((c) => paint.set(c[0] + "," + c[1], p2));
+  arms[o[2]].forEach((c) => paint.set(c[0] + "," + c[1], sec));
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J] };
 }
 
 /* Build a fork level: one emitter (p) forks into two junctions, each mixing with
@@ -258,7 +262,59 @@ export function buildForkLevel(n, rng, spec = {}) {
   const [f2, b2] = shuffle(a2.slice(), rng);
   const sq = [[p, E[0], E[1]], [q1, ...armEnd(f1)], [q2, ...armEnd(f2)]];
   const ci = [[sec1, ...armEnd(b1)], [sec2, ...armEnd(b2)]];
-  return { n, sq, ci, walls: levelWalls(n, visited) };
+  const paint = new Map([[E[0] + "," + E[1], p], [J1[0] + "," + J1[1], sec1], [J2[0] + "," + J2[1], sec2]]);
+  legs[0].forEach((c) => paint.set(c[0] + "," + c[1], p));
+  legs[1].forEach((c) => paint.set(c[0] + "," + c[1], p));
+  f1.forEach((c) => paint.set(c[0] + "," + c[1], q1));
+  b1.forEach((c) => paint.set(c[0] + "," + c[1], sec1));
+  f2.forEach((c) => paint.set(c[0] + "," + c[1], q2));
+  b2.forEach((c) => paint.set(c[0] + "," + c[1], sec2));
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2] };
+}
+
+/* Generate a clean single-emitter level with COLOUR GATES for challenge.
+   The board is (near-)full — no maze of walls. Gates pin a colour onto some
+   pipe cells, which the player must satisfy while filling the board. Uniqueness
+   is not required; we report the solution count so difficulty can be tuned.
+   spec: {n, type:"junction"|"fork", looseness, minOpen, gates|gateFrac, gateBudget} */
+export function genGate(spec, rng) {
+  const build = spec.type === "fork" ? buildForkLevel : buildJunctionLevel;
+  const lo = spec.looseness == null ? 0.85 : spec.looseness;
+  for (let attempt = 0; attempt < (spec.tries || 800); attempt++) {
+    const L = build(spec.n, rng, { ...spec, looseness: lo });
+    if (!L) continue;
+    const open = spec.n * spec.n - L.walls.length;
+    if (spec.minOpen && open < spec.minOpen) continue;    // prefer near-full boards
+    // gate candidates: painted FIELD cells (not emitter / circle / junction)
+    const skip = new Set();
+    L.sq.forEach(([, r, c]) => skip.add(r + "," + c));
+    L.ci.forEach(([, r, c]) => skip.add(r + "," + c));
+    (L.junctions || []).forEach(([r, c]) => skip.add(r + "," + c));
+    const prim = [], sec = [];
+    for (const [k, col] of L.paint) { if (skip.has(k)) continue; const [r, c] = k.split(",").map(Number);
+      (SECS.includes(col) ? sec : prim).push([col, r, c]); }
+    if (!sec.length && !prim.length) continue;
+    // FEW gates, SPREAD OUT (no two adjacent), secondary-first so mixing is the puzzle.
+    const want = spec.gates != null ? spec.gates : 3;
+    const cand = [...shuffle(sec, rng), ...shuffle(prim, rng)];
+    const gates = [], gkey = new Set();
+    for (const g of cand) {
+      if (gates.length >= want) break;
+      let adj = false; for (const h of gates) if (Math.abs(h[1] - g[1]) + Math.abs(h[2] - g[2]) === 1) { adj = true; break; }
+      if (adj) continue;
+      gates.push(g); gkey.add(g[1] + "," + g[2]);
+    }
+    if (gates.length < want) continue;                  // couldn't place enough spread-out gates
+    const out = { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates };
+    // uniqueness isn't required, so counting is OFF by default (it's the slow part on
+    // open boards). Only measure when asked, and only reject if a cap is set.
+    let solutions = null, capped = false;
+    if (spec.measure) { const res = countSolutions(out, spec.solCap || 4, spec.gateBudget || 200000);
+      solutions = res.aborted ? null : res.count; capped = res.capped;
+      if (spec.maxSolutions && (res.aborted || res.count > spec.maxSolutions)) continue; }
+    return { L: out, open, solutions, capped };
+  }
+  return null;
 }
 
 /* Generate ONE unique single-emitter level for a spec.

@@ -48,6 +48,10 @@ function buildModel(L) {
     return new Set(ALL);                               // field: any colour
   }
   const allow = Array.from({ length: n }, (_, r) => new Array(n).fill(null).map((_, c) => allowed(r, c)));
+  // GATES: a gate cell is a field pipe forced to carry one colour (it can't be an
+  // emitter/circle). Restricting its allowed edge-colours makes it a degree-2 pipe
+  // of that colour — the junction pattern (3 different colours) can't apply.
+  (L.gates || []).forEach(([col, r, c]) => { if (type[r][c] && type[r][c].kind === "F") allow[r][c] = new Set([col]); });
   return { n, wall, type, allow };
 }
 
@@ -201,6 +205,25 @@ export function countSolutions(L, cap = 2, budget = 4_000_000) {
   }
   function rollback(mark) { while (ufLog.length > mark) { const x = ufLog.pop(); parent[x] = x; } }
 
+  // forward feasibility prune: each non-wall cell has a fixed number of possible
+  // edges (maxDeg). Track how many are committed ON/OFF; if a cell can no longer
+  // reach its minimum degree (2 for a field cell, 1 for a circle) or already has
+  // too many ON, this whole branch is dead. This is what makes open (wall-free)
+  // boards tractable to verify.
+  const maxDeg = new Int8Array(NN), minReach = new Int8Array(NN), maxOn = new Int8Array(NN);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (wall[r][c]) continue; const id = r * n + c, t = type[r][c];
+    let d = 0; if (passable(r - 1, c)) d++; if (passable(r + 1, c)) d++; if (passable(r, c - 1)) d++; if (passable(r, c + 1)) d++;
+    maxDeg[id] = d;
+    if (t.kind === "S") { minReach[id] = 0; maxOn[id] = 4; }
+    else if (t.kind === "C") { minReach[id] = 1; maxOn[id] = 1; }
+    else { minReach[id] = 2; maxOn[id] = 3; }
+  }
+  const onCnt = new Int8Array(NN), offCnt = new Int8Array(NN), cntLog = [];
+  function edgeCount(a, b, on) { if (on) { onCnt[a]++; onCnt[b]++; } else { offCnt[a]++; offCnt[b]++; } cntLog.push(a, b, on ? 1 : 0); }
+  function cntRollback(mark) { while (cntLog.length > mark) { const on = cntLog.pop(), b = cntLog.pop(), a = cntLog.pop(); if (on) { onCnt[a]--; onCnt[b]--; } else { offCnt[a]--; offCnt[b]--; } } }
+  function feasible(id) { return (maxDeg[id] - offCnt[id]) >= minReach[id] && onCnt[id] <= maxOn[id]; }
+
   function recurse(ci) {
     if (aborted) return;
     if (count >= cap) return;
@@ -211,22 +234,27 @@ export function countSolutions(L, cap = 2, budget = 4_000_000) {
     }
     const [r, c] = cells[ci];
     const rid = r * n + c;
-    const rightOpts = (c < n - 1 && passable(r, c + 1)) ? [null, ...edgeColours(r, c, r, c + 1)] : [null];
+    const hasRight = c < n - 1 && passable(r, c + 1);
+    const hasDown = r < n - 1 && passable(r + 1, c);
+    const rightOpts = hasRight ? [null, ...edgeColours(r, c, r, c + 1)] : [null];
     for (const rc of rightOpts) {
       H[r][c] = rc;
-      const markR = ufLog.length;
-      // union the right edge; a cycle here means this whole branch is dead
-      if (rc && !join(rc, rid, r * n + c + 1)) { rollback(markR); H[r][c] = null; continue; }
-      const downOpts = (r < n - 1 && passable(r + 1, c)) ? [null, ...edgeColours(r, c, r + 1, c)] : [null];
+      const ufR = ufLog.length, cntR = cntLog.length;
+      if (hasRight) edgeCount(rid, rid + 1, !!rc);
+      if (rc && !join(rc, rid, rid + 1)) { rollback(ufR); cntRollback(cntR); H[r][c] = null; continue; }
+      if (hasRight && !feasible(rid + 1)) { rollback(ufR); cntRollback(cntR); H[r][c] = null; continue; }
+      const downOpts = hasDown ? [null, ...edgeColours(r, c, r + 1, c)] : [null];
       for (const dc of downOpts) {
         V[r][c] = dc;
-        const markD = ufLog.length;
-        if (dc && !join(dc, rid, (r + 1) * n + c)) { rollback(markD); V[r][c] = null; continue; }
-        if (cellOK(r, c)) recurse(ci + 1);
-        rollback(markD); V[r][c] = null;
-        if (count >= cap || aborted) { rollback(markR); H[r][c] = null; return; }
+        const ufD = ufLog.length, cntD = cntLog.length;
+        if (hasDown) edgeCount(rid, rid + n, !!dc);
+        if (dc && !join(dc, rid, rid + n)) { rollback(ufD); cntRollback(cntD); V[r][c] = null; continue; }
+        // rid is now fully decided; check its rule + feasibility, and the down neighbour's feasibility
+        if (feasible(rid) && (!hasDown || feasible(rid + n)) && cellOK(r, c)) recurse(ci + 1);
+        rollback(ufD); cntRollback(cntD); V[r][c] = null;
+        if (count >= cap || aborted) { rollback(ufR); cntRollback(cntR); H[r][c] = null; return; }
       }
-      rollback(markR);
+      rollback(ufR); cntRollback(cntR);
       H[r][c] = null;
     }
   }
