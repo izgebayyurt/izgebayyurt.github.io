@@ -134,7 +134,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .tgl[aria-pressed="true"] i{ left:23px; }
 /* colour-blind glyph on dots */
 .dot .cb{ position:absolute; z-index:3; font-family:var(--font-d); font-weight:700; font-size:12px; color:#fff; -webkit-text-stroke:.8px var(--line); left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
-.dot.ci .cb{ top:31%; }
+.dot.sq .cb{ top:31%; }   /* the ✦ objectives are squares — lift the colour-blind glyph clear of the star */
 </style>
 </head>
 <body>
@@ -191,7 +191,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>How to play</h2>
         <div class="coachmix" id="helpMix"></div>
-        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b>. Where two different colours <b>meet at a junction they mix</b> into a blend, which carries on to its matching <b>✦</b> circle. Feed <b>every circle</b>, <b>fill every square</b>, and run each <b>gate</b> tile's colour through it (an orange gate needs orange to pass). Leave no loose ends.</p>
+        <p style="margin-top:2px">Drag a line out of each coloured <b>circle</b>. Where two different colours <b>meet at a junction they mix</b> into a blend, which carries on to its matching <b>✦</b> square. Feed <b>every ✦ square</b>, <b>cover the whole board</b>, and run each <b>gate</b> tile's colour through it (an orange gate needs orange to pass). Leave no loose ends.</p>
         <button class="mk" id="btnHelpClose">Got it</button>
       </div>
     </div>
@@ -550,6 +550,7 @@ function step(cell){
   if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return; }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
+  if(tgtAt(head[0],head[1])) return;    // a terminal is an endpoint — you can't drag a pipe THROUGH it
   var o=occAt(cell[0],cell[1]);
   if(!o){ leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true); renderPaths(); return; }   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
 
@@ -634,7 +635,7 @@ function noDangling(){
 }
 function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
-  if(coverage()<paintTarget()){ toast("Fill every square to finish!"); return; }
+  if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
   if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
   solved=true; hintCells=null; preGesture=null; sfxWin(); playWinCascade();
@@ -649,7 +650,7 @@ function checkWin(){
     wn.style.display=""; wn.textContent="Back to levels";
   } else {
     var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
-    document.getElementById("winMsg").textContent = "Every square filled."+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
+    document.getElementById("winMsg").textContent = "Whole board covered."+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
     wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
   }
   setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
@@ -663,8 +664,8 @@ function renderDots(){
     var cb = cbOn ? '<span class="cb">'+col+'</span>' : '';
     return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
-  ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"sq",false); });
-  tgts.forEach(function(T){ h+=dot(T.col,T.r,T.c,"ci",true); });
+  ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round…
+  tgts.forEach(function(T){ h+=dot(T.col,T.r,T.c,"sq",true); });   // …objectives are square (gates are square too, so squares read as "goals")
   dotL.innerHTML=h;
 }
 /* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
@@ -697,7 +698,7 @@ function spawnConfetti(){ var W=board.clientWidth,H=board.clientHeight,cols=[HEX
 function playWinCascade(){
   var legList=[]; ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.cells.length>1) legList.push(Lg.cells); }); }); junctions.forEach(function(J){ if(J.leg.length>1) legList.push(J.leg); });
   legList.forEach(function(cells,i){ addSweep(cells,"#fff", i*100, 560); });
-  dotL.querySelectorAll(".dot.ci").forEach(function(d){ d.classList.add("winspin"); });
+  dotL.querySelectorAll(".dot.sq").forEach(function(d){ d.classList.add("winspin"); });   // the ✦ objectives (now squares) do the victory spin
   spawnConfetti();
 }
 
@@ -940,9 +941,9 @@ document.getElementById("btnHow").addEventListener("click", function(){ ensureAu
 var ovHelp=document.getElementById("ovHelp");
 (function(){ function sw(col,sh){ return '<span class="sw '+sh+'" style="background:'+HEX[col]+'"></span>'; }
   document.getElementById("helpMix").innerHTML =
-    '<div class="mx">'+sw("R","sq")+"+"+sw("Y","sq")+"="+sw("O","ci")+'</div>'
-   +'<div class="mx">'+sw("Y","sq")+"+"+sw("B","sq")+"="+sw("G","ci")+'</div>'
-   +'<div class="mx">'+sw("B","sq")+"+"+sw("R","sq")+"="+sw("P","ci")+'</div>'; })();
+    '<div class="mx">'+sw("R","ci")+"+"+sw("Y","ci")+"="+sw("O","sq")+'</div>'
+   +'<div class="mx">'+sw("Y","ci")+"+"+sw("B","ci")+"="+sw("G","sq")+'</div>'
+   +'<div class="mx">'+sw("B","ci")+"+"+sw("R","ci")+"="+sw("P","sq")+'</div>'; })();
 document.getElementById("btnHelp").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.add("show"); });
 document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
 
