@@ -29,11 +29,15 @@ node huemeld/tools/flow-app.mjs --seed 20260709   # writes flow-data.js (campaig
 ```
 
 - `tools/flow-solve.mjs` — exact solution counter + one-solution extractor.
-- `tools/flow-gen.mjs` — builds proven-unique boards (Hamiltonian snake → coloured
-  segments + welded mixing junctions), rejecting anything not uniquely solvable or
-  with a dead/forked square.
-- `tools/flow-app.mjs` — the campaign ramp + daily pool, with baked hint paths.
-- `tools/flow-build.mjs` — the shorter fallback campaign embedded in `flow2.html`.
+- `tools/flow-gen2.mjs` — the single-emitter generator: grows the solution's paths
+  first (three arms from a junction, or one square forking to two junctions) so the
+  board is a full-coverage single-emitter solution by construction, then the counter
+  confirms exactly one solution. One R/Y/B square each; secondary circles (O/G/P) as
+  objectives.
+- `tools/flow-hints.mjs` — derives the per-circle delivery paths baked in as hints.
+- `tools/flow-app.mjs` — the campaign ramp + daily pool, with baked hints.
+- `tools/flow-gen.mjs` / `flow-build.mjs` — the earlier multi-emitter snake generator
+  (kept for reference).
 
 To add difficulty or more levels, edit the `CAMPAIGN` / `DAILY` ramps in
 `flow-app.mjs` and rerun. The **Daily Puzzle** is deterministic by UTC date and
