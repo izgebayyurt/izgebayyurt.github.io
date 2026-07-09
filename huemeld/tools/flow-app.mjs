@@ -6,28 +6,21 @@
 import { writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { genUnique, mulberry32 } from "./flow-gen.mjs";
+import { genSpider, mulberry32 } from "./flow-gen2.mjs";
 import { countSolutions, findOneSolution } from "./flow-solve.mjs";
 import { deliveriesByTarget } from "./flow-hints.mjs";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const seed = +(args.indexOf("--seed") >= 0 ? args[args.indexOf("--seed") + 1] : 20260709) || 20260709;
+const seed = +(args.indexOf("--seed") >= 0 ? args[args.indexOf("--seed") + 1] : 20260710) || 20260710;
 const rng = mulberry32(seed);
-const BUDGET = 130_000;
+const BUDGET = 150_000;
 
-const interiorWalls = (n, count) => (r) => {
-  const s = new Set(); let g = 0;
-  while (s.size < count && g++ < 80) { const rr = 1 + ((r() * (n - 2)) | 0), cc = 1 + ((r() * (n - 2)) | 0); s.add(rr + "," + cc); }
-  return s;
-};
-
+/* Levels are single-emitter (one R/Y/B square each, free to fork), with secondary
+   circles as objectives. "junction" = 2 emitters + 1 mix; "fork" = 3 emitters +
+   2 mixes (one square forks). */
 function makeLevel(base) {
-  const spec = {
-    n: base.n, junctions: base.junctions, minSeg: base.minSeg, maxSeg: base.maxSeg, tries: 60,
-    makeWalls: base.walls ? interiorWalls(base.n, base.walls) : null,
-  };
-  const g = genUnique(spec, rng, BUDGET);
+  const g = genSpider({ ...base, tries: base.tries || 600 }, rng, BUDGET);
   if (!g) return null;
   const sol = findOneSolution(g.L, 2_000_000);
   if (!sol) return null;
@@ -54,28 +47,28 @@ function buildSet(ramp, label) {
   return set;
 }
 
-// campaign — a longer version of the shipped ramp
+// campaign — learn the single mix, then forks, on bigger boards
 const CAMPAIGN = [
-  [3, { n: 5, junctions: 0, minSeg: 5, maxSeg: 8, walls: 1 }],
-  [3, { n: 5, junctions: 0, minSeg: 4, maxSeg: 7, walls: 2 }],
-  [3, { n: 6, junctions: 0, minSeg: 5, maxSeg: 9, walls: 2 }],
-  [4, { n: 5, junctions: 1, minSeg: 2, maxSeg: 4, walls: 2 }],
-  [4, { n: 6, junctions: 1, minSeg: 2, maxSeg: 4, walls: 3 }],
-  [5, { n: 6, junctions: 2, minSeg: 2, maxSeg: 4, walls: 4 }],
-  [5, { n: 6, junctions: 2, minSeg: 2, maxSeg: 3, walls: 5 }],
-  [6, { n: 7, junctions: 2, minSeg: 2, maxSeg: 4, walls: 6 }],
-  [6, { n: 7, junctions: 3, minSeg: 2, maxSeg: 4, walls: 7 }],
-  [5, { n: 7, junctions: 3, minSeg: 2, maxSeg: 3, walls: 8 }],
-  // hard tier — dense mixing, tight boards (make you think)
-  [5, { n: 7, junctions: 3, minSeg: 2, maxSeg: 3, walls: 9 }],
-  [4, { n: 7, junctions: 4, minSeg: 2, maxSeg: 3, walls: 9 }],
+  // Tier 1 — one mix: two squares meet, blend to their ✦
+  [4, { n: 5, type: "junction", minOpen: 12 }],
+  [4, { n: 6, type: "junction", minOpen: 16 }],
+  [4, { n: 6, type: "junction", minOpen: 20, looseness: 0.2 }],
+  // Tier 2 — bigger single-mix boards
+  [4, { n: 7, type: "junction", minOpen: 24, looseness: 0.2 }],
+  // Tier 3 — the fork: one square feeds two mixes
+  [5, { n: 6, type: "fork", minOpen: 18 }],
+  [5, { n: 7, type: "fork", minOpen: 24, looseness: 0.2 }],
+  // Tier 4 — hard forks, big boards (make you think)
+  [5, { n: 8, type: "fork", minOpen: 30, looseness: 0.2 }],
+  [4, { n: 8, type: "fork", minOpen: 36, looseness: 0.3 }],
 ];
 
-// daily pool — a spread of self-contained "one satisfying puzzle" boards (medium)
+// daily pool — a spread of self-contained medium puzzles
 const DAILY = [
-  [30, { n: 6, junctions: 1, minSeg: 2, maxSeg: 4, walls: 3 }],
-  [30, { n: 6, junctions: 2, minSeg: 2, maxSeg: 4, walls: 4 }],
-  [30, { n: 7, junctions: 2, minSeg: 2, maxSeg: 4, walls: 6 }],
+  [25, { n: 6, type: "junction", minOpen: 18, looseness: 0.2 }],
+  [25, { n: 7, type: "fork", minOpen: 24, looseness: 0.2 }],
+  [25, { n: 7, type: "junction", minOpen: 26, looseness: 0.25 }],
+  [15, { n: 8, type: "fork", minOpen: 32, looseness: 0.2 }],
 ];
 
 const campaign = buildSet(CAMPAIGN, "campaign");
