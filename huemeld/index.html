@@ -74,6 +74,10 @@ h1{ font-size:30px; line-height:1; }
 .lvl-card.lock{ background:#e9e0cb; opacity:.7; cursor:default; }
 .lvl-card.lock .lnum{ color:var(--ink-soft); }
 .lvl-card.lock:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.modes{ text-align:center; margin-top:18px; }
+.modelinks{ margin-top:9px; font-family:var(--font-d); font-weight:600; font-size:13px; color:var(--ink-soft); }
+.modelinks a{ color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
+.modelinks span{ margin:0 8px; opacity:.55; }
 .credit{ text-align:center; margin-top:16px; font-size:12px; }
 .credit a{ color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
 
@@ -274,6 +278,14 @@ h1{ font-size:30px; line-height:1; }
       <div class="progress" id="progress">0 / 0</div>
     </div>
     <div class="grid" id="levelGrid"></div>
+    <div class="modes">
+      <a class="mk" href="flow2.html" style="display:inline-flex; align-items:center; gap:8px; height:50px; padding:0 22px; font-size:16px; background:#ffd15c; text-decoration:none;">
+        <span aria-hidden="true">✦</span> Play Huemeld <b style="font-weight:700">Flow</b> <span style="font-weight:600; color:var(--ink-soft); font-size:12.5px;">· one-solution puzzles</span>
+      </a>
+      <div class="modelinks">
+        <a href="blitz.html">Blitz</a><span>·</span><a href="arcade.html">Arcade</a>
+      </div>
+    </div>
     <div class="credit"><a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a></div>
   </section>
 
