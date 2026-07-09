@@ -217,6 +217,12 @@ function adjToForbidCenter(n, r, c, center, forbid) {
 }
 const cellsOfArms = (arms) => arms.flat();
 const armEnd = (arm) => arm[arm.length - 1];
+/* the coloured edges of one arm, connecting `center` -> arm[0] -> arm[1] ... */
+function armEdges(center, arm, col) {
+  const e = []; let p = center;
+  for (const cell of arm) { e.push({ r1: p[0], c1: p[1], r2: cell[0], c2: cell[1], col }); p = cell; }
+  return e;
+}
 function levelWalls(n, visited) { const w = []; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (!visited.has(r + "," + c)) w.push([r, c]); return w; }
 
 /* Build a single-junction level (2 emitters + 1 secondary circle). */
@@ -234,7 +240,8 @@ export function buildJunctionLevel(n, rng, spec = {}) {
   arms[o[0]].forEach((c) => paint.set(c[0] + "," + c[1], p1));
   arms[o[1]].forEach((c) => paint.set(c[0] + "," + c[1], p2));
   arms[o[2]].forEach((c) => paint.set(c[0] + "," + c[1], sec));
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J] };
+  const edges = [...armEdges(J, arms[o[0]], p1), ...armEdges(J, arms[o[1]], p2), ...armEdges(J, arms[o[2]], sec)];
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J], edges };
 }
 
 /* Build a fork level: one emitter (p) forks into two junctions, each mixing with
@@ -269,7 +276,12 @@ export function buildForkLevel(n, rng, spec = {}) {
   b1.forEach((c) => paint.set(c[0] + "," + c[1], sec1));
   f2.forEach((c) => paint.set(c[0] + "," + c[1], q2));
   b2.forEach((c) => paint.set(c[0] + "," + c[1], sec2));
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2] };
+  const edges = [
+    ...armEdges(E, legs[0], p), ...armEdges(E, legs[1], p),
+    ...armEdges(J1, f1, q1), ...armEdges(J1, b1, sec1),
+    ...armEdges(J2, f2, q2), ...armEdges(J2, b2, sec2),
+  ];
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges };
 }
 
 /* Generate a clean single-emitter level with COLOUR GATES for challenge.
@@ -312,7 +324,7 @@ export function genGate(spec, rng) {
     if (spec.measure) { const res = countSolutions(out, spec.solCap || 4, spec.gateBudget || 200000);
       solutions = res.aborted ? null : res.count; capped = res.capped;
       if (spec.maxSolutions && (res.aborted || res.count > spec.maxSolutions)) continue; }
-    return { L: out, open, solutions, capped };
+    return { L: out, open, solutions, capped, edges: L.edges };   // edges = the constructed solution
   }
   return null;
 }

@@ -6,26 +6,26 @@
 import { writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { genSpider, mulberry32 } from "./flow-gen2.mjs";
+import { genGate, mulberry32 } from "./flow-gen2.mjs";
 import { countSolutions, findOneSolution } from "./flow-solve.mjs";
 import { deliveriesByTarget } from "./flow-hints.mjs";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const seed = +(args.indexOf("--seed") >= 0 ? args[args.indexOf("--seed") + 1] : 20260710) || 20260710;
+const seed = +(args.indexOf("--seed") >= 0 ? args[args.indexOf("--seed") + 1] : 20260712) || 20260712;
 const rng = mulberry32(seed);
-const BUDGET = 150_000;
 
-/* Levels are single-emitter (one R/Y/B square each, free to fork), with secondary
-   circles as objectives. "junction" = 2 emitters + 1 mix; "fork" = 3 emitters +
-   2 mixes (one square forks). */
+/* Clean single-emitter boards (one R/Y/B square each, free to fork) with secondary
+   circles as objectives and COLOUR GATES for challenge. "junction" = 2 emitters +
+   1 mix; "fork" = 3 emitters + 2 mixes. Boards are (near-)full — walls stay sparse. */
+const SOL = { campaign: [], daily: [] };   // constructed solution edges, per level (for the verifier)
 function makeLevel(base) {
-  const g = genSpider({ ...base, tries: base.tries || 600 }, rng, BUDGET);
+  const g = genGate({ tries: 6000, ...base }, rng);
   if (!g) return null;
-  const sol = findOneSolution(g.L, 2_000_000);
-  if (!sol) return null;
-  const hints = deliveriesByTarget(g.L, sol).map((d) => d.cells);
-  return { n: g.L.n, sq: g.L.sq, ci: g.L.ci, walls: g.L.walls || [], hints };
+  const L = g.L;
+  // hints come straight from the CONSTRUCTED solution (g.edges) — no need to solve.
+  const hints = deliveriesByTarget(L, g.edges).map((d) => d.cells);
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls || [], gates: L.gates, hints }, edges: g.edges };
 }
 
 function buildSet(ramp, label) {
@@ -33,54 +33,55 @@ function buildSet(ramp, label) {
   const t0 = Date.now();
   for (const [count, base] of ramp) {
     let made = 0, attempts = 0;
-    while (made < count && attempts < count * 80) {
+    while (made < count && attempts < count * 120) {
       attempts++;
-      const lv = makeLevel(base);
-      if (!lv) continue;
-      const sig = JSON.stringify([lv.n, lv.sq, lv.ci, lv.walls]);
+      const r = makeLevel(base);
+      if (!r) continue;
+      const lv = r.lv;
+      const sig = JSON.stringify([lv.n, lv.sq, lv.ci, lv.walls, lv.gates]);
       if (sigs.has(sig)) continue;
-      sigs.add(sig); set.push(lv); made++;
+      sigs.add(sig); set.push(lv); SOL[label].push({ lv, edges: r.edges }); made++;
     }
-    if (made < count) process.stderr.write(`  (${label} tier short ${made}/${count} n${base.n} j${base.junctions})\n`);
+    if (made < count) process.stderr.write(`  (${label} tier short ${made}/${count} n${base.n} ${base.type})\n`);
   }
-  process.stderr.write(`${label}: ${set.length} levels in ${Math.round((Date.now() - t0) / 1000)}s\n`);
+  const walls = set.reduce((a, l) => a + l.walls.length, 0) / (set.length || 1);
+  process.stderr.write(`${label}: ${set.length} levels, avg walls ${walls.toFixed(1)}, ${Math.round((Date.now() - t0) / 1000)}s\n`);
   return set;
 }
 
-// campaign — learn the single mix, then forks, on bigger boards
+// campaign — learn one mix, then the fork; gates scale up; walls stay sparse
 const CAMPAIGN = [
-  // Tier 1 — one mix: two squares meet, blend to their ✦
-  [4, { n: 5, type: "junction", minOpen: 12 }],
-  [4, { n: 6, type: "junction", minOpen: 16 }],
-  [4, { n: 6, type: "junction", minOpen: 20, looseness: 0.2 }],
+  // Tier 1 — one mix on a full 5×5, a single gate to start
+  [3, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
+  [3, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
   // Tier 2 — bigger single-mix boards
-  [4, { n: 7, type: "junction", minOpen: 24, looseness: 0.2 }],
-  // Tier 3 — the fork: one square feeds two mixes
-  [5, { n: 6, type: "fork", minOpen: 18 }],
-  [5, { n: 7, type: "fork", minOpen: 24, looseness: 0.2 }],
-  // Tier 4 — hard forks, big boards (make you think)
-  [5, { n: 8, type: "fork", minOpen: 30, looseness: 0.2 }],
-  [4, { n: 8, type: "fork", minOpen: 36, looseness: 0.3 }],
+  [4, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
+  // Tier 3 — the fork: one square feeds two mixes (2 secondaries)
+  [4, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
+  [4, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
+  // Tier 4 — bigger forks, more gates (make you think)
+  [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 4 }],
+  [4, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 5 }],
 ];
 
 // daily pool — a spread of self-contained medium puzzles
 const DAILY = [
-  [25, { n: 6, type: "junction", minOpen: 18, looseness: 0.2 }],
-  [25, { n: 7, type: "fork", minOpen: 24, looseness: 0.2 }],
-  [25, { n: 7, type: "junction", minOpen: 26, looseness: 0.25 }],
-  [15, { n: 8, type: "fork", minOpen: 32, looseness: 0.2 }],
+  [30, { n: 6, type: "junction", minOpen: 35, looseness: 0.9, gates: 2 }],
+  [30, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 3 }],
+  [30, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
 ];
 
 const campaign = buildSet(CAMPAIGN, "campaign");
 const daily = buildSet(DAILY, "daily");
 
-// final re-verification
-let bad = 0;
-for (const s of [campaign, daily]) for (const lv of s) { const r = countSolutions(lv, 2, 2_000_000); if (r.aborted || r.count !== 1) bad++; }
-process.stderr.write(`re-verify: ${bad} non-unique (want 0)\n`);
+// levels are solvable by construction; end-to-end winnability is verified
+// separately by replaying each through the real engine.
+void countSolutions; void findOneSolution;
 
-const payload = { version: 2, campaign, daily };
-const js = "/* GENERATED by tools/flow-app.mjs — proven-unique levels with baked hints. */\n" +
+const payload = { version: 3, campaign, daily };
+const js = "/* GENERATED by tools/flow-app.mjs — single-emitter gate puzzles with baked hints. */\n" +
   "window.HUEMELD_FLOW=" + JSON.stringify(payload) + ";\n";
 writeFileSync(join(__dir, "..", "flow-data.js"), js);
+// sidecar for the engine-replay verifier (NOT shipped): levels + their solution edges
+if (args.indexOf("--solfile") >= 0) writeFileSync(args[args.indexOf("--solfile") + 1], JSON.stringify(SOL));
 process.stderr.write(`wrote ../flow-data.js  campaign=${campaign.length} daily=${daily.length}  ${(js.length / 1024 | 0)}KB\n`);
