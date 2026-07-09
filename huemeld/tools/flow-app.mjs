@@ -51,17 +51,21 @@ function buildSet(ramp, label) {
 
 // campaign — learn one mix, then the fork; gates scale up; walls stay sparse
 const CAMPAIGN = [
-  // Tier 1 — one mix on a full 5×5, a single gate to start
-  [3, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
-  [3, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
-  // Tier 2 — bigger single-mix boards
-  [4, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
+  // Tier 1 — one mix on a full 5×5, ease in with a gate or two
+  [5, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
+  [5, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
+  // Tier 2 — bigger single-mix boards, gates start to bite
+  [5, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
+  [5, { n: 6, type: "junction", minOpen: 33, looseness: 0.9, gates: 3 }],
   // Tier 3 — the fork: one square feeds two mixes (2 secondaries)
-  [4, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
-  [4, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
-  // Tier 4 — bigger forks, more gates (make you think)
+  [5, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
+  [5, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 3 }],
+  // Tier 4 — bigger forks, gates ramp toward "make you think"
+  [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
   [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 4 }],
-  [4, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 5 }],
+  [5, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 5 }],
+  // Tier 5 — the wall: dense gates on the largest clean boards
+  [5, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
 ];
 
 // daily pool — a spread of self-contained medium puzzles
