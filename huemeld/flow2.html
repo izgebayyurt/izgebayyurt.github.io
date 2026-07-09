@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
-<meta name="theme-color" content="#f3ead6" />
+<meta name="theme-color" content="#17131f" />
 <title>Huemeld Flow</title>
 <meta name="description" content="Huemeld Flow — a colour-mixing pipe puzzle. Every level has exactly one solution." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -17,14 +17,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  /* dark is the default */
+  --paper:#17131f; --card:#2a2438; --ink:#efe7d6; --ink-soft:#9a92a6; --line:#141019; --shadow:rgba(0,0,0,.45);
+  --grid:rgba(255,255,255,.07); --bgdot:rgba(255,255,255,.03); --veil:rgba(23,19,31,.92);
   --font-d:'Fredoka',sans-serif; --font-u:'Nunito',sans-serif;
+}
+:root[data-theme="light"]{
+  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  --grid:rgba(44,39,51,.12); --bgdot:rgba(44,39,51,.055); --veil:rgba(243,234,214,.9);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{
   background:var(--paper);
-  background-image:radial-gradient(rgba(44,39,51,.055) 1.2px, transparent 1.3px);
+  background-image:radial-gradient(var(--bgdot) 1.2px, transparent 1.3px);
   background-size:22px 22px;
   font-family:var(--font-u); color:var(--ink);
   display:flex; flex-direction:column; align-items:center;
@@ -34,7 +40,7 @@ body{
 .brand{ display:flex; align-items:baseline; gap:8px; }
 .brand a{ text-decoration:none; color:var(--ink); }
 h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
-.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--ink); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
+.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--line); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
 .topbtns{ display:flex; gap:7px; }
 .mkk{ height:38px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; font-family:var(--font-d); font-weight:600; padding:0 13px; color:var(--ink); }
 .mkk:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
@@ -50,7 +56,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .gridlayer,.dotlayer{ position:absolute; inset:0; pointer-events:none; }
 .pathlayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .gcell{ position:absolute; }
-.gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.12; }
+.gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--grid); }
 .gcell.wall::before{ display:none; }
 .gcell.wall::after{ content:""; position:absolute; left:9%; top:9%; width:82%; height:82%; border-radius:22% 26% 24% 28% / 26% 22% 28% 24%; background:#4a4353; border:2.5px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 5px, rgba(0,0,0,.06) 5px 10px); }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
@@ -66,20 +72,20 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
 .toast{
   position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
-  background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
+  background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
   padding:7px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s; white-space:nowrap;
 }
 .toast.show{ opacity:1; }
 .ov{
   position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
-  background:rgba(243,234,214,.9); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
+  background:var(--veil); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
 }
 .ov.show{ opacity:1; pointer-events:auto; }
 .panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 26px; text-align:center; max-width:88%; }
 .panel h2{ font-family:var(--font-d); font-weight:700; font-size:24px; margin-bottom:8px; }
 .panel p{ font-size:13px; font-weight:700; color:var(--ink-soft); line-height:1.5; }
 .mk{
-  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:#2c2733;
   background:#ffd15c; border:2.5px solid var(--line); border-radius:14px;
   box-shadow:0 3px 0 var(--shadow); height:46px; padding:0 28px; font-size:16px; margin-top:13px;
   transition:transform .08s, box-shadow .08s; touch-action:manipulation;
@@ -96,7 +102,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 }
 .pkbtn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
 .pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
-.pkbtn.cur{ background:#ffd15c; }
+.pkbtn.cur{ background:#ffd15c; color:#2c2733; }
 .tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
@@ -108,7 +114,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
 /* demo "ghost hand" + caption banner + skip */
 .ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1); }
-.demoban{ width:min(94vw,420px); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
+.demoban{ width:min(94vw,420px); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
 .demoban.show{ display:flex; }
 .demoskip{ display:none; margin:10px auto 0; }
 .demoskip.show{ display:block; }
@@ -117,12 +123,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .actionbar .mkk{ height:44px; }
 #btnUndo{ padding:0 18px; font-size:15px; }
 #btnUndo[disabled]{ opacity:.45; }
-.hintbtn{ height:44px; padding:0 22px; font-size:16px; background:#ffd15c; }
+.hintbtn{ height:44px; padding:0 22px; font-size:16px; background:#ffd15c; color:#2c2733; }
 .hintbtn[disabled]{ opacity:.45; }
-#hintN{ font-size:12px; font-weight:800; color:var(--ink-soft); }
+#hintN{ font-size:12px; font-weight:800; color:#6b6472; }
 /* settings toggles */
 .setrow{ display:flex; align-items:center; justify-content:space-between; gap:20px; margin:12px 2px 0; font-family:var(--font-d); font-weight:600; font-size:15px; }
-.tgl{ width:52px; height:30px; border:2.5px solid var(--line); border-radius:999px; background:#e7ddc6; box-shadow:inset 0 1px 2px rgba(44,39,51,.15); cursor:pointer; padding:0; position:relative; flex:0 0 auto; }
+.tgl{ width:52px; height:30px; border:2.5px solid var(--line); border-radius:999px; background:var(--paper); box-shadow:inset 0 1px 2px rgba(0,0,0,.25); cursor:pointer; padding:0; position:relative; flex:0 0 auto; }
 .tgl i{ position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--line); transition:left .16s; }
 .tgl[aria-pressed="true"]{ background:#8fd39b; }
 .tgl[aria-pressed="true"] i{ left:23px; }
@@ -173,10 +179,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div class="ov" id="ovSet">
       <div class="panel">
         <h2>Settings</h2>
+        <div class="setrow"><span>Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads</button>
-        <p style="margin-top:10px">Every level is machine-checked to have <b>exactly one</b> solution.</p>
+        <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
         <button class="mk" id="btnSetClose">Done</button>
       </div>
     </div>
@@ -271,6 +278,15 @@ var curHints=null;             // baked hint paths for the active level
 var hintCells=null, hintT0=0, HINT_MS=2600;
 var soundOn = localStorage.getItem("hm_flow2_sound")!=="0";
 var cbOn = localStorage.getItem("hm_flow2_cb")==="1";
+/* theme — dark by default. INK is the canvas outline colour, kept in sync. */
+var theme = localStorage.getItem("hm_flow2_theme")==="light" ? "light" : "dark";
+var INK = theme==="light" ? "#2c2733" : "#141019";
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", theme);
+  INK = theme==="light" ? "#2c2733" : "#141019";
+  var mc=document.querySelector('meta[name=theme-color]'); if(mc) mc.setAttribute("content", theme==="light" ? "#f3ead6" : "#17131f");
+  try{ renderPaths(); }catch(_e){}
+}
 function hintBank(){ var v=localStorage.getItem("hm_flow2_hints"); return v===null?3:(+v||0); }
 function setHintBank(n){ n=Math.max(0,Math.min(9,n)); localStorage.setItem("hm_flow2_hints",""+n); updateHintUI(); }
 function todayKey(){ var d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
@@ -717,11 +733,11 @@ function renderPaths(){
   //     so overlapping strokes/dabs never stack into dark circles at cell centres
   if(shadowCanvas.width!==canvas.width){ shadowCanvas.width=canvas.width; shadowCanvas.height=canvas.height; }
   sctx.setTransform(dpr,0,0,dpr,0,0); sctx.clearRect(0,0,W,H);
-  sctx.strokeStyle=sctx.fillStyle="#2c2733"; silhouette(sctx, pipeInk);
+  sctx.strokeStyle=sctx.fillStyle=INK; silhouette(sctx, pipeInk);
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=0.24;
   ctx.drawImage(shadowCanvas, Math.round(s*0.03*dpr), Math.round(s*0.05*dpr)); ctx.restore();
   // 2 — ink silhouette (opaque: overlaps are fine)
-  ctx.strokeStyle="#2c2733"; ctx.fillStyle="#2c2733"; silhouette(ctx, pipeInk);
+  ctx.strokeStyle=INK; ctx.fillStyle=INK; silhouette(ctx, pipeInk);
   // 3 — colour (gradient into the blend on a feeder's final segment)
   ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
   legs.forEach(function(L){
@@ -766,10 +782,10 @@ function renderPaths(){
   rejects.forEach(function(x){ var age=(nowMs()-x.t0)/REJ_MS, pt=P([x.r,x.c]);
     var pop=age<0.22? age/0.22 : 1-Math.max(0,(age-0.75)/0.25)*0.12, arm=s*0.17*(0.5+0.5*pop), a=age<0.7?1:(1-(age-0.7)/0.3);
     ctx.save(); ctx.globalAlpha=Math.max(0,a);
-    ctx.fillStyle="rgba(253,248,236,0.92)"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.028;
+    ctx.fillStyle="rgba(253,248,236,0.92)"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.028;
     ctx.beginPath(); ctx.arc(pt[0],pt[1],s*0.27,0,6.2832); ctx.fill(); ctx.stroke();
     ctx.lineCap="round"; ctx.lineJoin="round";
-    ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.14;   // dark halo behind the cross
+    ctx.strokeStyle=INK; ctx.lineWidth=s*0.14;   // dark halo behind the cross
     ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
     ctx.strokeStyle="#e23b45"; ctx.lineWidth=s*0.085;
     ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
@@ -785,7 +801,7 @@ function renderPaths(){
   if(hintCells && nowMs()-hintT0<HINT_MS){
     var hage=(nowMs()-hintT0)/HINT_MS, hp=0.5+0.5*Math.sin(animT/160);
     ctx.save(); ctx.globalAlpha=(1-hage*0.4)*(0.55+0.35*hp);
-    ctx.fillStyle="#fff"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.03;
+    ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.03;
     hintCells.forEach(function(hc){ var x=hc[1]*s+s/2, y=hc[0]*s+s/2, rad=s*0.16*(0.85+0.4*hp);
       ctx.beginPath(); ctx.arc(x,y,rad,0,6.2832); ctx.fill(); ctx.stroke(); });
     ctx.restore();
@@ -799,17 +815,17 @@ function renderPaths(){
       var cx=G.c*s+s/2, cy=G.r*s+s/2, col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
       var x=cx-gs/2, y=cy-gs/2;
       ctx.save(); ctx.lineJoin="round";
-      ctx.lineWidth=s*0.105; ctx.strokeStyle="#2c2733"; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
+      ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
       ctx.lineWidth=s*0.055; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
       if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.055; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
-      if(cbOn){ ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(G.col,cx,cy); ctx.fillText(G.col,cx,cy); }
+      if(cbOn){ ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(G.col,cx,cy); ctx.fillText(G.col,cx,cy); }
       ctx.restore();
     });
   }
   // 7 — win confetti (marker chips, on top of everything)
   confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
   if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
-    ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle="#2c2733"; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle=INK; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
   covEl.textContent=coverage()+"/"+paintTarget()+" painted";
   var dots=dotL.querySelectorAll(".dot");
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
@@ -890,9 +906,11 @@ var ovSet=document.getElementById("ovSet");
     nb.buyRemoveAds(function(ok){ if(ok){ localStorage.setItem("hm_flow2_noads","1"); rm.style.display="none"; toast("Ads removed — thank you!"); } }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
-  document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false"); }
+  document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
+  document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false"); }
 document.getElementById("btnSet").addEventListener("click", function(){ syncToggles(); ovSet.classList.add("show"); });
 document.getElementById("btnSetClose").addEventListener("click", function(){ ovSet.classList.remove("show"); });
+document.getElementById("tglTheme").addEventListener("click", function(){ theme = theme==="dark"?"light":"dark"; localStorage.setItem("hm_flow2_theme",theme); applyTheme(); renderDots(); syncToggles(); });
 document.getElementById("tglSound").addEventListener("click", function(){ soundOn=!soundOn; localStorage.setItem("hm_flow2_sound",soundOn?"1":"0"); if(soundOn)ensureAudio(); syncToggles(); });
 document.getElementById("tglCB").addEventListener("click", function(){ cbOn=!cbOn; localStorage.setItem("hm_flow2_cb",cbOn?"1":"0"); syncToggles(); renderDots(); });
 /* "How to play" in the picker opens the same ? legend */
@@ -907,6 +925,7 @@ var ovHelp=document.getElementById("ovHelp");
 document.getElementById("btnHelp").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.add("show"); });
 document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
 
+applyTheme();
 loadLevel(li);
 updateHintUI();
 if(!localStorage.getItem("hm_flow2_seen")){ localStorage.setItem("hm_flow2_seen","1"); document.getElementById("ovHelp").classList.add("show"); }
