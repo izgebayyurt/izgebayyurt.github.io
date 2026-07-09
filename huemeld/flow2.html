@@ -245,7 +245,7 @@ var board=document.getElementById("board"), canvas=document.getElementById("path
 
 var li=Math.min(+(localStorage.getItem("hm_flow2_i")||0), LEVELS.length-1);
 var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
-var walls=[], wallSet={};
+var walls=[], wallSet={}, gates=[];
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
@@ -337,6 +337,7 @@ function applyLevel(L){
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
   walls=(L.walls||[]).map(function(w){ return [w[0],w[1]]; });
   wallSet={}; walls.forEach(function(w){ wallSet[w[0]+","+w[1]]=1; });
+  gates=(L.gates||[]).map(function(g){ return {col:g[0], r:g[1], c:g[2]}; });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
   buildGrid(); renderDots(); renderPaths(); updateHintUI(); updateUndoUI();
 }
@@ -371,6 +372,14 @@ function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&li
 /* a circle of this colour that still needs feeding (prefer an undone one; else any) */
 function tgtFor(col){ var any=null; for(var i=0;i<tgts.length;i++) if(tgts[i].col===col){ if(!tgts[i].done) return tgts[i]; any=any||tgts[i]; } return any; }
 function tgtAt(r,c){ for(var i=0;i<tgts.length;i++) if(tgts[i].r===r && tgts[i].c===c) return tgts[i]; return null; }
+/* the colour of the pipe passing through a cell (feeder = its emitter's primary;
+   blend leg = the junction's secondary), or null if unpainted. Used by colour gates. */
+function colorAt(r,c){
+  for(var j=0;j<junctions.length;j++){ if(indexIn(junctions[j].leg,r,c)>=0) return junctions[j].sec; }
+  for(var e=0;e<ems.length;e++){ for(var l=0;l<ems[e].legs.length;l++){ if(indexIn(ems[e].legs[l].cells,r,c)>=0) return ems[e].col; } }
+  return null;
+}
+function gatesSatisfied(){ for(var i=0;i<gates.length;i++){ if(colorAt(gates[i].r,gates[i].c)!==gates[i].col) return false; } return true; }
 function bounceDot(r,c){ var rd=[].slice.call(dotL.querySelectorAll(".dot")).filter(function(d){ return +d.dataset.dr===r && +d.dataset.dc===c; })[0]; if(rd){ rd.classList.remove("bounce"); void rd.offsetWidth; rd.classList.add("bounce"); } }
 
 function buildGrid(){
@@ -611,6 +620,7 @@ function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
   if(coverage()<paintTarget()){ toast("Fill every square to finish!"); return; }
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
+  if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
   solved=true; hintCells=null; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI();
   setHintBank(hintBank()+1);                 // reward: +1 hint per solve (economy seam for ads/IAP later)
@@ -780,6 +790,29 @@ function renderPaths(){
       ctx.beginPath(); ctx.arc(x,y,rad,0,6.2832); ctx.fill(); ctx.stroke(); });
     ctx.restore();
   } else if(hintCells){ hintCells=null; }
+  // 6c — colour gates: a ringed tile that the pipe passing through must match.
+  //      drawn on top of the pipe (inset frame) so both read; glows when satisfied.
+  if(gates.length){
+    var gp=0.5+0.5*Math.sin(animT/300);
+    gates.forEach(function(G){
+      var x=G.c*s, y=G.r*s, col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
+      var m=s*0.14, rr=s*0.22;                         // inset + corner radius
+      ctx.save();
+      // dark backing frame so the colour reads on any pipe
+      ctx.lineWidth=s*0.13; ctx.strokeStyle="#2c2733"; ctx.lineJoin="round";
+      roundRect(ctx, x+m, y+m, s-2*m, s-2*m, rr); ctx.stroke();
+      ctx.lineWidth=s*0.075; ctx.strokeStyle=col;
+      ctx.globalAlpha = ok ? 1 : 0.9;
+      roundRect(ctx, x+m, y+m, s-2*m, s-2*m, rr); ctx.stroke();
+      if(ok){ ctx.globalAlpha=0.35+0.35*gp; ctx.lineWidth=s*0.075; ctx.strokeStyle=col; roundRect(ctx, x+m, y+m, s-2*m, s-2*m, rr); ctx.stroke(); }
+      // corner nibs so it reads as a "gate", plus the colour letter when colour-blind aid is on
+      ctx.globalAlpha=1; ctx.fillStyle=col;
+      [[x+m,y+m],[x+s-m,y+m],[x+m,y+s-m],[x+s-m,y+s-m]].forEach(function(p){ ctx.beginPath(); ctx.arc(p[0],p[1],s*0.05,0,6.2832); ctx.fill(); ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.02; ctx.stroke(); });
+      if(cbOn){ ctx.fillStyle="#fff"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.03; ctx.font="700 "+(s*0.3)+"px "+"'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.strokeText(G.col, x+s/2, y+s/2); ctx.fillText(G.col, x+s/2, y+s/2); }
+      ctx.restore();
+    });
+  }
   // 7 — win confetti (marker chips, on top of everything)
   confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
   if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;

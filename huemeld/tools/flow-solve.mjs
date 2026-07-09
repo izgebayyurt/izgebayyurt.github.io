@@ -48,6 +48,10 @@ function buildModel(L) {
     return new Set(ALL);                               // field: any colour
   }
   const allow = Array.from({ length: n }, (_, r) => new Array(n).fill(null).map((_, c) => allowed(r, c)));
+  // GATES: a gate cell is a field pipe forced to carry one colour (it can't be an
+  // emitter/circle). Restricting its allowed edge-colours makes it a degree-2 pipe
+  // of that colour — the junction pattern (3 different colours) can't apply.
+  (L.gates || []).forEach(([col, r, c]) => { if (type[r][c] && type[r][c].kind === "F") allow[r][c] = new Set([col]); });
   return { n, wall, type, allow };
 }
 
