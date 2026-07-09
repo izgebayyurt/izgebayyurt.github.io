@@ -294,18 +294,25 @@ export function genGate(spec, rng) {
     for (const [k, col] of L.paint) { if (skip.has(k)) continue; const [r, c] = k.split(",").map(Number);
       (SECS.includes(col) ? sec : prim).push([col, r, c]); }
     if (!sec.length && !prim.length) continue;
-    // how many gates: a fraction of available cells, weighted toward secondary
-    const want = spec.gates != null ? spec.gates : Math.max(1, Math.round((sec.length + prim.length) * (spec.gateFrac || 0.4)));
-    const pool = shuffle([...shuffle(sec, rng), ...shuffle(prim, rng)], rng);
-    // keep secondary gates a bit more likely by front-loading them
-    const gates = [...shuffle(sec, rng), ...shuffle(prim, rng)].slice(0, want);
+    // FEW gates, SPREAD OUT (no two adjacent), secondary-first so mixing is the puzzle.
+    const want = spec.gates != null ? spec.gates : 3;
+    const cand = [...shuffle(sec, rng), ...shuffle(prim, rng)];
+    const gates = [], gkey = new Set();
+    for (const g of cand) {
+      if (gates.length >= want) break;
+      let adj = false; for (const h of gates) if (Math.abs(h[1] - g[1]) + Math.abs(h[2] - g[2]) === 1) { adj = true; break; }
+      if (adj) continue;
+      gates.push(g); gkey.add(g[1] + "," + g[2]);
+    }
+    if (gates.length < want) continue;                  // couldn't place enough spread-out gates
     const out = { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates };
-    void pool;
-    const res = countSolutions(out, spec.solCap || 3, spec.gateBudget || 300000);
-    // accept boards that aren't wildly ambiguous; prefer few solutions
-    if (res.aborted) continue;
-    if (spec.maxSolutions && res.count > spec.maxSolutions) continue;
-    return { L: out, open, solutions: res.count, capped: res.capped };
+    // uniqueness isn't required, so counting is OFF by default (it's the slow part on
+    // open boards). Only measure when asked, and only reject if a cap is set.
+    let solutions = null, capped = false;
+    if (spec.measure) { const res = countSolutions(out, spec.solCap || 4, spec.gateBudget || 200000);
+      solutions = res.aborted ? null : res.count; capped = res.capped;
+      if (spec.maxSolutions && (res.aborted || res.count > spec.maxSolutions)) continue; }
+    return { L: out, open, solutions, capped };
   }
   return null;
 }

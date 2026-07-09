@@ -790,26 +790,19 @@ function renderPaths(){
       ctx.beginPath(); ctx.arc(x,y,rad,0,6.2832); ctx.fill(); ctx.stroke(); });
     ctx.restore();
   } else if(hintCells){ hintCells=null; }
-  // 6c — colour gates: a ringed tile that the pipe passing through must match.
-  //      drawn on top of the pipe (inset frame) so both read; glows when satisfied.
+  // 6c — colour gates: a small ring (about pipe width) the pipe through it must
+  //      match. Sits over the pipe; glows when satisfied.
   if(gates.length){
     var gp=0.5+0.5*Math.sin(animT/300);
+    var gs=s*0.5, rr=s*0.13;                           // small square, ~pipe width, centred
     gates.forEach(function(G){
-      var x=G.c*s, y=G.r*s, col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
-      var m=s*0.14, rr=s*0.22;                         // inset + corner radius
-      ctx.save();
-      // dark backing frame so the colour reads on any pipe
-      ctx.lineWidth=s*0.13; ctx.strokeStyle="#2c2733"; ctx.lineJoin="round";
-      roundRect(ctx, x+m, y+m, s-2*m, s-2*m, rr); ctx.stroke();
-      ctx.lineWidth=s*0.075; ctx.strokeStyle=col;
-      ctx.globalAlpha = ok ? 1 : 0.9;
-      roundRect(ctx, x+m, y+m, s-2*m, s-2*m, rr); ctx.stroke();
-      if(ok){ ctx.globalAlpha=0.35+0.35*gp; ctx.lineWidth=s*0.075; ctx.strokeStyle=col; roundRect(ctx, x+m, y+m, s-2*m, s-2*m, rr); ctx.stroke(); }
-      // corner nibs so it reads as a "gate", plus the colour letter when colour-blind aid is on
-      ctx.globalAlpha=1; ctx.fillStyle=col;
-      [[x+m,y+m],[x+s-m,y+m],[x+m,y+s-m],[x+s-m,y+s-m]].forEach(function(p){ ctx.beginPath(); ctx.arc(p[0],p[1],s*0.05,0,6.2832); ctx.fill(); ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.02; ctx.stroke(); });
-      if(cbOn){ ctx.fillStyle="#fff"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.03; ctx.font="700 "+(s*0.3)+"px "+"'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-        ctx.strokeText(G.col, x+s/2, y+s/2); ctx.fillText(G.col, x+s/2, y+s/2); }
+      var cx=G.c*s+s/2, cy=G.r*s+s/2, col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
+      var x=cx-gs/2, y=cy-gs/2;
+      ctx.save(); ctx.lineJoin="round";
+      ctx.lineWidth=s*0.105; ctx.strokeStyle="#2c2733"; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
+      ctx.lineWidth=s*0.055; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
+      if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.055; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
+      if(cbOn){ ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(G.col,cx,cy); ctx.fillText(G.col,cx,cy); }
       ctx.restore();
     });
   }
