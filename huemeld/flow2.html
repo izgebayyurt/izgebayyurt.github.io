@@ -118,14 +118,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .demoban.show{ display:flex; }
 .demoskip{ display:none; margin:10px auto 0; }
 .demoskip.show{ display:block; }
-/* action bar (hint) */
+/* action bar */
 .actionbar{ width:min(94vw,420px); display:flex; gap:10px; justify-content:center; margin-top:12px; }
 .actionbar .mkk{ height:44px; }
 #btnUndo{ padding:0 18px; font-size:15px; }
 #btnUndo[disabled]{ opacity:.45; }
-.hintbtn{ height:44px; padding:0 22px; font-size:16px; background:#ffd15c; color:#2c2733; }
-.hintbtn[disabled]{ opacity:.45; }
-#hintN{ font-size:12px; font-weight:800; color:#6b6472; }
 /* settings toggles */
 .setrow{ display:flex; align-items:center; justify-content:space-between; gap:20px; margin:12px 2px 0; font-family:var(--font-d); font-weight:600; font-size:15px; }
 .tgl{ width:52px; height:30px; border:2.5px solid var(--line); border-radius:999px; background:var(--paper); box-shadow:inset 0 1px 2px rgba(0,0,0,.25); cursor:pointer; padding:0; position:relative; flex:0 0 auto; }
@@ -199,7 +196,6 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   </div>
   <div class="actionbar">
     <button class="mkk" id="btnUndo" title="Undo last move">↶ Undo</button>
-    <button class="mkk hintbtn" id="btnHint" title="Reveal one delivery">💡 Hint <span id="hintN"></span></button>
   </div>
   <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
 
@@ -221,23 +217,22 @@ document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-la
 /* ---------- levels — OFFLINE FALLBACK ONLY. The live campaign + daily pool load
    from flow-data.js (window.HUEMELD_FLOW); this inline set is used only if that
    file is missing. Single-emitter style: one R/Y/B square each (free to fork),
-   secondary circles (O/G/P) as the objective, every level proven to have EXACTLY
-   ONE full-coverage solution. Rebuild all with:
-   node tools/flow-app.mjs --seed 20260710 */
+   secondary circles (O/G/P) as the objective, plus COLOUR GATES for challenge.
+   Rebuild the full dataset with: node tools/flow-app.mjs */
 var LEVELS=[
-  { n:5, sq:[["B",1,4],["R",2,0]], ci:[["P",3,4]], walls:[[0,0],[0,1],[1,0],[1,3],[2,2],[2,3],[2,4],[3,0],[3,2],[3,3],[4,0]], hints:[[[3,4],[4,4],[4,3],[4,2],[4,1],[3,1],[2,1],[1,1],[1,2],[0,2],[0,3],[0,4],[1,4],[2,0]]] },
-  { n:5, sq:[["B",0,4],["R",4,2]], ci:[["P",4,0]], walls:[[0,0],[0,1],[0,2],[1,0],[1,4],[2,0],[2,2],[3,2],[3,3],[4,1]], hints:[[[4,0],[3,0],[3,1],[2,1],[1,1],[1,2],[1,3],[0,3],[0,4],[2,3],[2,4],[3,4],[4,4],[4,3],[4,2]]] },
-  { n:6, sq:[["R",2,3],["Y",5,1]], ci:[["O",5,3]], walls:[[0,5],[1,1],[1,2],[1,3],[2,1],[2,2],[2,4],[3,1],[3,4],[4,3],[5,0],[5,2],[5,5]], hints:[[[5,3],[5,4],[4,4],[4,5],[3,5],[2,5],[1,5],[1,4],[0,4],[0,3],[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[3,2],[3,3],[2,3],[5,1]]] },
-  { n:6, sq:[["R",3,5],["Y",5,0]], ci:[["O",1,1]], walls:[[0,3],[0,4],[0,5],[1,5],[2,0],[2,1],[2,2],[2,3],[2,5],[3,2],[3,3],[4,2],[4,5],[5,4],[5,5]], hints:[[[1,1],[1,0],[0,0],[0,1],[0,2],[1,2],[1,3],[1,4],[2,4],[3,4],[3,5],[4,4],[4,3],[5,3],[5,2],[5,1],[4,1],[3,1],[3,0],[4,0],[5,0]]] },
-  { n:6, sq:[["Y",4,2],["R",5,5],["B",5,1]], ci:[["O",0,5],["G",0,0]], walls:[[0,3],[0,4],[1,0],[1,1],[1,3],[2,3],[2,5],[3,1],[3,3],[3,5],[4,1],[5,2],[5,3],[5,4]], hints:[[[0,5],[1,5],[1,4],[2,4],[3,4],[4,4],[4,3],[4,2],[3,2],[2,2],[4,5],[5,5]],[[0,0],[0,1],[0,2],[1,2],[2,2],[2,1],[2,0],[3,0],[4,0],[5,0],[5,1],[3,2],[4,2],[4,3],[4,4]]] },
-  { n:7, sq:[["B",4,4],["R",3,5],["Y",6,6]], ci:[["P",0,3],["G",5,0]], walls:[[0,0],[1,2],[2,1],[2,4],[3,3],[3,4],[4,0],[4,1],[4,6],[5,2],[5,3],[5,4],[6,0]], hints:[[[0,3],[0,2],[0,1],[1,1],[1,0],[2,0],[3,0],[3,1],[3,2],[2,2],[2,3],[1,3],[1,4],[0,4],[0,5],[0,6],[1,6],[1,5],[2,5],[2,6],[3,6],[3,5],[4,2],[4,3],[4,4],[4,5],[5,5]],[[5,0],[5,1],[6,1],[6,2],[6,3],[6,4],[6,5],[5,5],[4,5],[4,4],[4,3],[4,2],[3,2],[5,6],[6,6]]] },
-  { n:7, sq:[["R",2,3],["B",5,6],["Y",4,2]], ci:[["P",0,4],["O",0,2]], walls:[[0,3],[0,5],[0,6],[1,1],[1,2],[2,1],[2,4],[2,5],[3,3],[4,0],[4,3],[4,5],[4,6],[5,3],[5,5],[6,3]], hints:[[[0,4],[1,4],[1,3],[2,3],[2,2],[3,2],[3,1],[1,5],[1,6],[2,6],[3,6],[3,5],[3,4],[4,4],[5,4],[6,4],[6,5],[6,6],[5,6]],[[0,2],[0,1],[0,0],[1,0],[2,0],[3,0],[3,1],[3,2],[2,2],[2,3],[1,3],[1,4],[4,1],[5,1],[5,0],[6,0],[6,1],[6,2],[5,2],[4,2]]] },
-  { n:8, sq:[["R",4,1],["B",0,7],["Y",7,6]], ci:[["P",1,3],["O",6,0]], walls:[[0,0],[0,1],[0,4],[0,5],[1,0],[1,1],[1,4],[1,5],[2,0],[2,1],[3,0],[3,3],[3,4],[3,5],[3,6],[3,7],[4,0],[4,2],[4,3],[4,4],[4,5],[4,6],[4,7],[5,0],[5,2],[5,3],[5,4],[6,2],[6,3],[6,4],[6,6]], hints:[[[1,3],[0,3],[0,2],[1,2],[2,2],[2,3],[2,4],[2,5],[2,6],[2,7],[1,7],[1,6],[0,6],[0,7],[3,2],[3,1],[4,1],[5,1],[6,1],[7,1]],[[6,0],[7,0],[7,1],[6,1],[5,1],[4,1],[3,1],[3,2],[2,2],[7,2],[7,3],[7,4],[7,5],[6,5],[5,5],[5,6],[5,7],[6,7],[7,7],[7,6]]] },
+  { n:5, sq:[["B",0,0],["R",2,4]], ci:[["P",4,1]], walls:[], gates:[["P",2,3]] },
+  { n:5, sq:[["B",0,0],["R",4,0]], ci:[["P",0,4]], walls:[], gates:[["P",3,4]] },
+  { n:6, sq:[["R",0,5],["Y",1,1]], ci:[["O",5,2]], walls:[[5,5]], gates:[["O",4,0],["O",5,1]] },
+  { n:6, sq:[["B",4,3],["Y",1,4]], ci:[["G",0,0]], walls:[], gates:[["G",0,2],["G",2,0],["G",1,1]] },
+  { n:6, sq:[["R",2,2],["Y",4,4],["B",2,4]], ci:[["O",3,1],["P",1,1]], walls:[[0,4],[0,5],[2,0],[2,1],[3,2]], gates:[["O",4,0],["O",4,3],["O",5,2]] },
+  { n:7, sq:[["Y",2,4],["B",5,1],["R",2,6]], ci:[["G",1,5],["O",6,4]], walls:[[0,2],[2,3],[2,5],[3,3]], gates:[["O",4,6],["O",5,4],["G",0,5]] },
+  { n:7, sq:[["B",2,3],["R",1,0],["Y",2,5]], ci:[["P",5,1],["G",1,2]], walls:[[2,4],[3,3],[3,4]], gates:[["P",3,0],["P",5,2],["P",6,1],["P",5,4],["G",0,2]] },
+  { n:7, sq:[["R",3,2],["B",1,4],["Y",6,6]], ci:[["P",0,6],["O",0,0]], walls:[[2,2],[4,5]], gates:[["P",3,4],["P",1,3],["O",2,0],["P",0,4],["O",0,1],["Y",6,2]] },
 ];
 
 /* the inline array above is a baked-in FALLBACK (works with no network / before the
    service worker caches). When flow-data.js loads it supplies the fuller campaign +
-   the daily-puzzle pool, each level carrying baked hint paths. */
+   the daily-puzzle pool. */
 var FALLBACK_LEVELS=LEVELS;
 var FLOWDATA=(typeof window!=="undefined" && window.HUEMELD_FLOW) ? window.HUEMELD_FLOW : null;
 LEVELS = (FLOWDATA && FLOWDATA.campaign && FLOWDATA.campaign.length) ? FLOWDATA.campaign : FALLBACK_LEVELS;
@@ -267,15 +262,13 @@ function restoreState(str){ var s=JSON.parse(str);
   s.ems.forEach(function(legs,i){ if(ems[i]) ems[i].legs=legs.map(function(l){ return {cells:l.c.map(function(x){return [x[0],x[1]];}), jun:l.j}; }); });
   s.tg.forEach(function(d,i){ if(tgts[i]) tgts[i].done=d; });
   junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];})}; });
-  drag=null; hintCells=null; renderPaths(); updateUndoUI();
+  drag=null; renderPaths(); updateUndoUI();
 }
 function pushUndo(){ if(preGesture!=null && preGesture!==snapState()){ undoStack.push(preGesture); if(undoStack.length>UNDO_CAP) undoStack.shift(); } preGesture=null; updateUndoUI(); }
 function updateUndoUI(){ var b=document.getElementById("btnUndo"); if(b) b.disabled = solved || !undoStack.length; }
 
-/* mode + progression + hints + settings */
+/* mode + progression + settings */
 var mode="campaign";           // "campaign" | "daily"
-var curHints=null;             // baked hint paths for the active level
-var hintCells=null, hintT0=0, HINT_MS=2600;
 var soundOn = localStorage.getItem("hm_flow2_sound")!=="0";
 var cbOn = localStorage.getItem("hm_flow2_cb")==="1";
 /* theme — dark by default. INK is the canvas outline colour, kept in sync. */
@@ -287,8 +280,6 @@ function applyTheme(){
   var mc=document.querySelector('meta[name=theme-color]'); if(mc) mc.setAttribute("content", theme==="light" ? "#f3ead6" : "#17131f");
   try{ renderPaths(); }catch(_e){}
 }
-function hintBank(){ var v=localStorage.getItem("hm_flow2_hints"); return v===null?3:(+v||0); }
-function setHintBank(n){ n=Math.max(0,Math.min(9,n)); localStorage.setItem("hm_flow2_hints",""+n); updateHintUI(); }
 function todayKey(){ var d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
 function dailyIndex(){ if(!DAILY.length) return 0; var d=new Date(); var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return ((n%DAILY.length)+DAILY.length)%DAILY.length; }
 
@@ -348,14 +339,14 @@ function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ s
 function applyLevel(L){
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
-  hintCells=null; curHints=L.hints||null; undoStack=[]; preGesture=null;
+  undoStack=[]; preGesture=null;
   ems=L.sq.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
   walls=(L.walls||[]).map(function(w){ return [w[0],w[1]]; });
   wallSet={}; walls.forEach(function(w){ wallSet[w[0]+","+w[1]]=1; });
   gates=(L.gates||[]).map(function(g){ return {col:g[0], r:g[1], c:g[2]}; });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
-  buildGrid(); renderDots(); renderPaths(); updateHintUI(); updateUndoUI();
+  buildGrid(); renderDots(); renderPaths(); updateUndoUI();
 }
 function loadLevel(i){
   isTut=false; mode="campaign";
@@ -638,9 +629,8 @@ function checkWin(){
   if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
   if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
-  solved=true; hintCells=null; preGesture=null; sfxWin(); playWinCascade();
+  solved=true; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI();
-  setHintBank(hintBank()+1);                 // reward: +1 hint per solve (economy seam for ads/IAP later)
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
   var wn=document.getElementById("btnWinNext");
   document.querySelector("#ovWin h2").textContent="Solved! ✦";
@@ -815,15 +805,6 @@ function renderPaths(){
     for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]||wallSet[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
     ctx.restore();
   }
-  // 6b — hint ghost: pulse the cells of one correct delivery for a few seconds
-  if(hintCells && nowMs()-hintT0<HINT_MS){
-    var hage=(nowMs()-hintT0)/HINT_MS, hp=0.5+0.5*Math.sin(animT/160);
-    ctx.save(); ctx.globalAlpha=(1-hage*0.4)*(0.55+0.35*hp);
-    ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.03;
-    hintCells.forEach(function(hc){ var x=hc[1]*s+s/2, y=hc[0]*s+s/2, rad=s*0.16*(0.85+0.4*hp);
-      ctx.beginPath(); ctx.arc(x,y,rad,0,6.2832); ctx.fill(); ctx.stroke(); });
-    ctx.restore();
-  } else if(hintCells){ hintCells=null; }
   // 6c — colour gates: a small ring the pipe through it must match. Pops (grows
   //      then settles) the moment the right colour first runs through it.
   if(gates.length){
@@ -880,41 +861,16 @@ document.getElementById("btnNext").addEventListener("click", function(){ if(mode
 document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); mode==="daily"?loadDaily():loadLevel(li); });
 document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadLevel(li); else loadLevel(li+1); });
 
-/* ---------- hints (powered by each level's baked unique solution) ---------- */
-function updateHintUI(){
-  var b=document.getElementById("btnHint"), n=hintBank();
-  document.getElementById("hintN").textContent="("+n+")";
-  b.disabled = solved || !curHints || n<=0;
-}
-function showHint(){
-  if(solved || !curHints || !curHints.length) return;
-  if(hintBank()<=0){ if(!rewardedForHints()) toast("Out of hints — solve a level to earn more"); return; }
-  // choose an undelivered target, prefer one the player hasn't started correctly
-  var order=[]; for(var i=0;i<tgts.length;i++) if(!tgts[i].done && curHints[i]) order.push(i);
-  if(!order.length){ toast("Every colour already delivered!"); return; }
-  var pick=order[0];
-  hintCells=curHints[pick].map(function(c){ return [c[0],c[1]]; });
-  hintT0=nowMs();
-  setHintBank(hintBank()-1);
-  try{ if(navigator.vibrate) navigator.vibrate(15); }catch(_e){}
-  voice(880,0.14,{type:"sine",g:0.03,lp:3000,atk:0.003});
-}
-document.getElementById("btnHint").addEventListener("click", function(){ ensureAudio(); showHint(); });
 document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(undoStack.length) restoreState(undoStack.pop()); });
 
 /* ---------- monetization seams ----------
    Real ads/IAP live in the native (Capacitor) wrapper, which injects
-   window.HuemeldNative = { rewarded(cb), interstitial(), buyRemoveAds(cb) }.
+   window.HuemeldNative = { interstitial(), buyRemoveAds(cb) }.
    On the plain web build there is no bridge, so everything degrades gracefully
-   (no ads shown; hints are earned by solving). See PUBLISHING.md. */
+   (no ads shown). See PUBLISHING.md. */
 function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNative) ? window.HuemeldNative : null; }
 function adsRemoved(){ return localStorage.getItem("hm_flow2_noads")==="1"; }
 var solveCount=+(localStorage.getItem("hm_flow2_solves")||0);
-function rewardedForHints(){
-  var n=nativeBridge();
-  if(n && n.rewarded){ n.rewarded(function(ok){ if(ok){ setHintBank(hintBank()+2); toast("+2 hints"); } }); return true; }
-  return false;   // no ad network on the web build
-}
 function maybeInterstitial(){
   var n=nativeBridge();
   if(n && n.interstitial && !adsRemoved() && solveCount%4===0){ try{ n.interstitial(); }catch(_e){} }
@@ -949,7 +905,6 @@ document.getElementById("btnHelpClose").addEventListener("click", function(){ ov
 
 applyTheme();
 loadLevel(li);
-updateHintUI();
 if(!localStorage.getItem("hm_flow2_seen")){ localStorage.setItem("hm_flow2_seen","1"); document.getElementById("ovHelp").classList.add("show"); }
 
 /* PWA: installable + offline. Registered from a subpath so scope stays under /huemeld/. */
@@ -970,10 +925,6 @@ window.__flow={
   render:function(){ renderPaths(); },
   mode:function(){ return mode; },
   daily:loadDaily,
-  hints:function(){ return curHints; },
-  hintBank:hintBank,
-  hint:showHint,
-  hintCells:function(){ return hintCells; },
   undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
   undoDepth:function(){ return undoStack.length; },
   data:function(){ return { campaign:LEVELS, daily:DAILY }; },
