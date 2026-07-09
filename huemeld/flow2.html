@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#17131f" />
 <title>Huemeld Flow</title>
-<meta name="description" content="Huemeld Flow — a colour-mixing pipe puzzle. Every level has exactly one solution." />
+<meta name="description" content="Huemeld Flow — a colour-mixing pipe puzzle: mix the primaries, fill the board, run each gate's colour through it." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Huemeld Flow" />
@@ -191,7 +191,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>How to play</h2>
         <div class="coachmix" id="helpMix"></div>
-        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b> (a source). A square can send out up to <b>4 lines</b>. A line reaches a same colour <b>✦</b> directly, or <b>meets a different colour</b> at a junction to mix and carry that blend to its <b>✦</b>. Feed <b>every circle</b>, leave <b>no loose ends</b>, and <b>fill every open square</b> to win. Dark <b>blocked</b> tiles can't be crossed or filled. Every level has <b>exactly one</b> solution.</p>
+        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b>. Where two different colours <b>meet at a junction they mix</b> into a blend, which carries on to its matching <b>✦</b> circle. Feed <b>every circle</b>, <b>fill every square</b>, and run each <b>gate</b> tile's colour through it (an orange gate needs orange to pass). Leave no loose ends.</p>
         <button class="mk" id="btnHelpClose">Got it</button>
       </div>
     </div>
@@ -823,19 +823,23 @@ function renderPaths(){
       ctx.beginPath(); ctx.arc(x,y,rad,0,6.2832); ctx.fill(); ctx.stroke(); });
     ctx.restore();
   } else if(hintCells){ hintCells=null; }
-  // 6c — colour gates: a small ring (about pipe width) the pipe through it must
-  //      match. Sits over the pipe; glows when satisfied.
+  // 6c — colour gates: a small ring the pipe through it must match. Pops (grows
+  //      then settles) the moment the right colour first runs through it.
   if(gates.length){
-    var gp=0.5+0.5*Math.sin(animT/300);
-    var gs=s*0.5, rr=s*0.13;                           // small square, ~pipe width, centred
+    var gp=0.5+0.5*Math.sin(animT/300), GPOP=380;
+    var gs0=s*0.56, rr0=s*0.14;                        // a touch bigger than before
     gates.forEach(function(G){
-      var cx=G.c*s+s/2, cy=G.r*s+s/2, col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
-      var x=cx-gs/2, y=cy-gs/2;
+      var col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
+      if(ok && !G.sat){ G.sat=true; G.satAt=nowMs(); if(soundOn) voice(880,0.13,{type:"sine",g:0.03,lp:3200,atk:0.003}); }
+      else if(!ok) G.sat=false;
+      var pop=1, age=(nowMs()-(G.satAt||-9999))/GPOP;
+      if(G.sat && age<1) pop = 1 + Math.sin(age*Math.PI)*0.55;   // 1 -> ~1.55 -> 1
+      var gs=gs0*pop, rr=rr0*pop, cx=G.c*s+s/2, cy=G.r*s+s/2, x=cx-gs/2, y=cy-gs/2;
       ctx.save(); ctx.lineJoin="round";
       ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
-      ctx.lineWidth=s*0.055; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
-      if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.055; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
-      if(cbOn){ ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(G.col,cx,cy); ctx.fillText(G.col,cx,cy); }
+      ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
+      if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.06; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
+      if(cbOn){ ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(G.col,cx,cy); ctx.fillText(G.col,cx,cy); }
       ctx.restore();
     });
   }
