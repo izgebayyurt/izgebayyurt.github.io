@@ -685,6 +685,10 @@ function rejectMix(cell){
 }
 function addBloom(r,c,color,dur){ blooms.push({r:r,c:c,color:color,t0:nowMs(),dur:dur||600}); }
 function polyCum(pts){ var cum=[0],tot=0; for(var i=1;i<pts.length;i++){ tot+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); cum.push(tot); } return {cum:cum,total:tot}; }
+function frac(x){ return x-Math.floor(x); }
+/* a lighter tint of a #rrggbb colour (mix toward white by amt 0..1) */
+function lighten(hex,amt){ var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  r=Math.round(r+(255-r)*amt); g=Math.round(g+(255-g)*amt); b=Math.round(b+(255-b)*amt); return "rgb("+r+","+g+","+b+")"; }
 function ptAtLen(pts,cum,len){ if(pts.length===1) return pts[0]; if(len<=0) return pts[0]; for(var i=1;i<pts.length;i++){ if(cum[i]>=len){ var seg=(cum[i]-cum[i-1])||1,t=(len-cum[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; }
 function addSweep(cells,color,delay,dur){ var s=cs(); var pts=cells.map(function(c){ return [c[1]*s+s/2, c[0]*s+s/2]; }); var m=polyCum(pts); sweeps.push({pts:pts,cum:m.cum,total:m.total,t0:nowMs()+(delay||0),dur:dur||520,color:color}); }
 function paintedSet(){ var set={}; ems.forEach(function(E){ set[E.r+","+E.c]=1; E.legs.forEach(function(Lg){ Lg.cells.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); }); junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); tgts.forEach(function(T){ set[T.r+","+T.c]=1; }); return set; }
@@ -758,15 +762,28 @@ function renderPaths(){
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
   });
-  // 4 — living paint + delivery/win sweeps, CLIPPED to the pipes via source-atop so light flows INSIDE them
+  // 4 — living paint: tiny bubbles drifting inside each pipe, tinted a LIGHTER
+  //     shade of that pipe's colour. Clipped to the pipes (source-atop) so they
+  //     only show inside the band.
   ctx.save(); ctx.globalCompositeOperation="source-atop";
   legs.forEach(function(L,idx){
-    var pts=L.cells.map(P); if(!pts.length) return; var m=polyCum(pts); if(m.total<=0) return;
-    var travel=m.total+s*1.5, speed=s*2.5, off=((idx*0.41)%1)*travel;
-    var pos=(((animT/1000)*speed+off)%travel);
-    if(pos<=m.total){ var pt=ptAtLen(pts,m.cum,pos); var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.6);
-      rg.addColorStop(0,"rgba(255,255,255,0.28)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.6,0,6.2832); ctx.fill(); }
+    var pts=L.cells.map(P); if(pts.length<1) return; var m=polyCum(pts); if(m.total<=0) return;
+    var lite=lighten(L.color,0.5), t=animT/1000;
+    var count=Math.max(2, Math.round(m.total/(s*1.0)));     // ~1 bubble per cell
+    for(var k=0;k<count;k++){
+      var ph=frac(idx*0.3197+k*0.61803);                    // stable per-bubble phase
+      var sp=s*(0.85+0.5*frac(ph*7.13));                    // speed varies a little
+      var rad=pipeW*(0.13+0.11*frac(ph*3.71));              // size varies a little
+      var pos=frac((t*sp)/m.total + ph)*m.total;
+      var pt=ptAtLen(pts,m.cum,pos);
+      var a=0.30+0.30*(0.5+0.5*Math.sin(t*3.1+ph*6.283));   // gentle twinkle
+      ctx.globalAlpha=a; ctx.fillStyle=lite;
+      ctx.beginPath(); ctx.arc(pt[0],pt[1],rad,0,6.2832); ctx.fill();
+      ctx.globalAlpha=a*0.6; ctx.fillStyle="rgba(255,255,255,0.75)";
+      ctx.beginPath(); ctx.arc(pt[0]-rad*0.28,pt[1]-rad*0.28,rad*0.42,0,6.2832); ctx.fill();  // tiny gloss highlight
+    }
   });
+  ctx.globalAlpha=1;
   sweeps=sweeps.filter(function(sw){ return nowMs()-sw.t0<sw.dur; });
   sweeps.forEach(function(sw){ var age=(nowMs()-sw.t0)/sw.dur; if(age<0||age>1) return; var pt=ptAtLen(sw.pts,sw.cum,age*sw.total);
     var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.95); rg.addColorStop(0,"rgba(255,255,255,0.9)"); rg.addColorStop(0.55,"rgba(255,255,255,0.45)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.95,0,6.2832); ctx.fill(); });
