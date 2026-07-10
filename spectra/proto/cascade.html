@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Prism Drop (prototype)</title>
+<style>
+  :root { --bg:#0c0e1a; --panel:#161a2e; --ink:#eef1ff; --dim:#8b91b8; --line:#272c47; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; overflow:hidden;
+    touch-action:none; user-select:none; -webkit-user-select:none; }
+  #wrap { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:10px; }
+  #hud { width:100%; max-width:460px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .stat { display:flex; flex-direction:column; line-height:1.05; }
+  .stat .k { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+  .stat .v { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  #next { display:flex; align-items:center; gap:8px; }
+  #nextCv { width:46px; height:46px; background:var(--panel); border-radius:10px; border:1px solid var(--line); }
+  #stage { position:relative; }
+  canvas#game { background:linear-gradient(180deg,#11142400,#0a0c16); border-radius:14px;
+    border:1px solid var(--line); box-shadow:0 14px 40px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.02); display:block; }
+  #pad { width:100%; max-width:460px; display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; }
+  .btn { background:var(--panel); border:1px solid var(--line); color:var(--ink); font-size:22px;
+    padding:14px 0; border-radius:12px; font-weight:600; cursor:pointer; transition:transform .05s, background .1s; }
+  .btn:active { transform:translateY(2px) scale(.97); background:#1d2340; }
+  .overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; text-align:center; background:rgba(8,10,20,.86); border-radius:14px; backdrop-filter:blur(3px); padding:22px; }
+  .overlay h1 { margin:0; font-size:30px; letter-spacing:.01em; }
+  .overlay p { margin:0; color:var(--dim); font-size:14px; max-width:300px; line-height:1.5; }
+  .overlay .play { font-size:18px; padding:13px 30px; background:linear-gradient(180deg,#8b6bff,#6a45f0); border:none; border-radius:999px; color:#fff; font-weight:700; cursor:pointer; }
+  .swatch { display:inline-block; width:13px; height:13px; border-radius:4px; vertical-align:-2px; margin:0 1px; }
+  .hidden { display:none !important; }
+  #tip { color:var(--dim); font-size:12px; max-width:460px; text-align:center; min-height:16px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div class="stat"><span class="k">Score</span><span class="v" id="score">0</span></div>
+    <div class="stat" style="text-align:center"><span class="k">Best</span><span class="v" id="best">0</span></div>
+    <div id="next"><div class="stat" style="text-align:right"><span class="k">Next</span></div><canvas id="nextCv" width="92" height="92"></canvas></div>
+  </div>
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div class="overlay" id="startOv">
+      <h1>Prism Drop</h1>
+      <p>Drop colors. When different colors touch they <b>mix</b>:
+        <span class="swatch" style="background:#e23b3b"></span>+<span class="swatch" style="background:#f4c63a"></span>=<span class="swatch" style="background:#ef8a2b"></span>.
+        Line up <b>3 of a mixed color</b> to pop them. Pops cause chains. Don't let it reach the top.</p>
+      <button class="play" id="startBtn">Play</button>
+      <p style="font-size:12px">Desktop: arrows move, up rotates, space hard-drops.</p>
+    </div>
+    <div class="overlay hidden" id="overOv">
+      <h1>Stacked out</h1>
+      <p>Score <b id="finalScore">0</b> &nbsp;|&nbsp; Best chain x<b id="bestChain">0</b></p>
+      <button class="play" id="retryBtn">Again</button>
+    </div>
+  </div>
+  <div id="pad">
+    <button class="btn" id="bL">&#9664;</button>
+    <button class="btn" id="bRot">&#10227;</button>
+    <button class="btn" id="bR">&#9654;</button>
+    <button class="btn" id="bDrop">&#10515;</button>
+  </div>
+  <div id="tip"></div>
+</div>
+<script>
+(() => {
+  // ---- config ----
+  const COLS = 7, ROWS = 13;
+  const COL = { R:'#e23b3b', Y:'#f4c63a', B:'#2f6fd0', O:'#ef8a2b', G:'#3fae6b', P:'#8a5cd0', W:'#f3f0e8' };
+  const PRIM = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'], W:['R','Y','B'] };
+  const MIX = { R:'R', Y:'Y', B:'B', RY:'O', BY:'G', BR:'P', BRY:'W' }; // key = sorted prim letters
+  const isPrim = c => c==='R'||c==='Y'||c==='B';
+  const isRipe = c => c==='O'||c==='G'||c==='P'||c==='W'; // mixed colors are poppable
+  const mixOf = set => MIX[[...set].sort().join('')] || 'W';
+  const CLEAR_MIN = 3;
+
+  // ---- state ----
+  let grid, active, nextPiece, score, best, bestChain, state, dropEvery, dropAcc, last, danger;
+  best = +(localStorage.getItem('prismdrop_best')||0);
+  const effects = []; // {type, r,c,color,t0,dur}
+  let shake = 0, floaters = [];
+
+  // ---- canvas sizing ----
+  const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+  const nx = document.getElementById('nextCv'), nctx = nx.getContext('2d');
+  let CELL = 34;
+  function sizeBoard(){
+    const maxH = Math.min(window.innerHeight - 220, 560);
+    const maxW = Math.min(window.innerWidth - 24, 460);
+    CELL = Math.floor(Math.min(maxW / COLS, maxH / ROWS));
+    cv.width = COLS*CELL; cv.height = ROWS*CELL;
+  }
+  window.addEventListener('resize', () => { sizeBoard(); draw(); });
+
+  // ---- piece ----
+  function randPrim(){ return ['R','Y','B'][Math.floor(rng()*3)]; }
+  let seed = (Date.now()>>>0) || 12345;
+  function rng(){ seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; }
+  function newPiece(){ return { pr:0, pc:3, rot:2, a:randPrim(), b:randPrim() }; }
+  // a = pivot at (pr,pc); b offset by rot: 0 up,1 right,2 down,3 left
+  function cellsOf(p){
+    const off = [[-1,0],[0,1],[1,0],[0,-1]][p.rot];
+    return [ {r:p.pr, c:p.pc, color:p.a}, {r:p.pr+off[0], c:p.pc+off[1], color:p.b} ];
+  }
+  function fits(p){
+    return cellsOf(p).every(({r,c}) => c>=0 && c<COLS && r<ROWS && (r<0 || grid[r][c]===null));
+  }
+
+  // ---- core ops ----
+  function gravity(){
+    let moved = false;
+    for (let c=0;c<COLS;c++){
+      let write = ROWS-1;
+      for (let r=ROWS-1;r>=0;r--){
+        if (grid[r][c]!==null){
+          if (r!==write){ grid[write][c]=grid[r][c]; grid[r][c]=null; moved=true; }
+          write--;
+        }
+      }
+    }
+    return moved;
+  }
+  function blendPass(){
+    const marks = [];
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++){
+      const cell = grid[r][c];
+      if (!cell || !isPrim(cell)) continue;
+      const set = new Set(PRIM[cell]);
+      for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+        const nr=r+dr, nc=c+dc;
+        if (nr<0||nr>=ROWS||nc<0||nc>=COLS) continue;
+        const n = grid[nr][nc];
+        if (n && isPrim(n)) set.add(n);
+      }
+      if (set.size>1) marks.push({r,c,color:mixOf(set)});
+    }
+    for (const m of marks){ grid[m.r][m.c]=m.color; effects.push({type:'blend',r:m.r,c:m.c,color:m.color,t0:now(),dur:200}); }
+    return marks.length>0;
+  }
+  function clearPass(){
+    const seen = Array.from({length:ROWS},()=>new Array(COLS).fill(false));
+    let cleared = 0, groups = 0;
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++){
+      const col = grid[r][c];
+      if (!col || seen[r][c] || !isRipe(col)) continue;
+      // flood same-color
+      const stack=[[r,c]], group=[]; seen[r][c]=true;
+      while (stack.length){
+        const [cr,cc]=stack.pop(); group.push([cr,cc]);
+        for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+          const nr=cr+dr,nc=cc+dc;
+          if (nr<0||nr>=ROWS||nc<0||nc>=COLS||seen[nr][nc]) continue;
+          if (grid[nr][nc]===col){ seen[nr][nc]=true; stack.push([nr,nc]); }
+        }
+      }
+      if (group.length>=CLEAR_MIN){
+        groups++;
+        for (const [gr,gc] of group){
+          effects.push({type:'pop',r:gr,c:gc,color:grid[gr][gc],t0:now(),dur:280});
+          grid[gr][gc]=null; cleared++;
+        }
+      }
+    }
+    return {cleared, groups};
+  }
+
+  // ---- resolve loop (the chain engine), stepped for juice ----
+  let chain = 0;
+  function lockPiece(){
+    for (const {r,c,color} of cellsOf(active)){ if (r>=0) grid[r][c]=color; }
+    sfx('lock');
+    active = null; chain = 0;
+    state = 'resolving';
+    step();
+  }
+  function step(){
+    gravity();
+    const blended = blendPass();
+    draw();
+    setTimeout(() => {
+      const { cleared, groups } = clearPass();
+      draw();
+      if (cleared>0){
+        chain++;
+        bestChain = Math.max(bestChain, chain);
+        const gain = cleared * 10 * chain + (groups>1?groups*20:0);
+        score += gain;
+        if (chain>=2){ addFloater('CHAIN x'+chain, gain); shake = Math.min(16, 4+chain*2); }
+        sfx('pop', chain);
+        setTimeout(step, 300);
+      } else if (blended){
+        sfx('blend');
+        setTimeout(step, 150);
+      } else {
+        endResolve();
+      }
+    }, blended?170:30);
+  }
+  function endResolve(){
+    updateHud();
+    spawn();
+  }
+  function spawn(){
+    active = nextPiece || newPiece();
+    nextPiece = newPiece();
+    drawNext();
+    if (!fits(active)){ gameOver(); return; }
+    state = 'play';
+    dropAcc = 0;
+    danger = false;
+  }
+
+  // ---- controls ----
+  function tryMove(dc){ if (state!=='play'||!active) return; const p={...active,pc:active.pc+dc}; if (fits(p)){ active=p; sfx('move'); draw(); } }
+  function tryRotate(){
+    if (state!=='play'||!active) return;
+    for (const k of [0,-1,1,-2,2]){ const p={...active,rot:(active.rot+1)%4,pc:active.pc+k}; if (fits(p)){ active=p; sfx('rot'); draw(); return; } }
+  }
+  function softDrop(){ if (state!=='play'||!active) return; const p={...active,pr:active.pr+1}; if (fits(p)){ active=p; dropAcc=0; draw(); } else lockPiece(); }
+  function hardDrop(){ if (state!=='play'||!active) return; while (true){ const p={...active,pr:active.pr+1}; if (fits(p)) active=p; else break; } sfx('drop'); lockPiece(); }
+
+  document.addEventListener('keydown', e => {
+    if (state==='play'){
+      if (e.key==='ArrowLeft'){ tryMove(-1); e.preventDefault(); }
+      else if (e.key==='ArrowRight'){ tryMove(1); e.preventDefault(); }
+      else if (e.key==='ArrowUp'||e.key==='x'||e.key==='X'){ tryRotate(); e.preventDefault(); }
+      else if (e.key==='ArrowDown'){ softDrop(); e.preventDefault(); }
+      else if (e.key===' '){ hardDrop(); e.preventDefault(); }
+    }
+  });
+  const hold = (el, fn, repeat) => {
+    let iv=null, to=null;
+    const start = e => { e.preventDefault(); fn(); if (repeat){ to=setTimeout(()=>{ iv=setInterval(fn,70); },220); } };
+    const stop = () => { clearTimeout(to); clearInterval(iv); };
+    el.addEventListener('pointerdown', start); el.addEventListener('pointerup', stop);
+    el.addEventListener('pointerleave', stop); el.addEventListener('pointercancel', stop);
+  };
+  hold(document.getElementById('bL'), ()=>tryMove(-1), true);
+  hold(document.getElementById('bR'), ()=>tryMove(1), true);
+  document.getElementById('bRot').addEventListener('pointerdown', e=>{e.preventDefault();tryRotate();});
+  document.getElementById('bDrop').addEventListener('pointerdown', e=>{e.preventDefault();hardDrop();});
+
+  // swipe on the board
+  let sw=null;
+  cv.addEventListener('pointerdown', e => { sw={x:e.clientX,y:e.clientY,t:now(),moved:0}; });
+  cv.addEventListener('pointermove', e => {
+    if (!sw) return;
+    const dx=e.clientX-sw.x, dy=e.clientY-sw.y;
+    if (Math.abs(dx)>CELL*0.8 && Math.abs(dx)>Math.abs(dy)){ tryMove(dx>0?1:-1); sw.x=e.clientX; sw.moved+=Math.abs(dx); }
+    else if (dy>CELL*1.1){ softDrop(); sw.y=e.clientY; sw.moved+=dy; }
+  });
+  cv.addEventListener('pointerup', e => {
+    if (sw){ const dy=e.clientY-sw.y, dt=now()-sw.t; if (sw.moved<8 && dt<240) tryRotate(); else if (dy>CELL*2.5) hardDrop(); }
+    sw=null;
+  });
+
+  // ---- audio ----
+  let AC=null;
+  function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function tone(f,d,type='sine',g=0.05,slide=0){
+    const a=ac(); if(!a) return; const o=a.createOscillator(), v=a.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,f*slide), a.currentTime+d);
+    v.gain.setValueAtTime(g,a.currentTime); v.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+d);
+    o.connect(v); v.connect(a.destination); o.start(); o.stop(a.currentTime+d+0.02);
+  }
+  function sfx(name, n=1){
+    switch(name){
+      case 'move': tone(320,0.04,'square',0.025); break;
+      case 'rot': tone(520,0.05,'square',0.03); break;
+      case 'lock': tone(150,0.09,'triangle',0.05,0.6); break;
+      case 'drop': tone(110,0.12,'sawtooth',0.05,0.5); break;
+      case 'blend': tone(440,0.08,'sine',0.04); break;
+      case 'pop': tone(420+Math.min(n,8)*90,0.10,'triangle',0.06); if(n>=3) tone(660+n*70,0.12,'sine',0.04); break;
+      case 'over': tone(300,0.5,'sawtooth',0.06,0.25); break;
+    }
+  }
+
+  // ---- floaters / hud ----
+  function addFloater(text, sub){ floaters.push({text, sub, t0:now(), dur:900}); }
+  function updateHud(){
+    document.getElementById('score').textContent = score;
+    document.getElementById('best').textContent = best;
+  }
+
+  // ---- rendering ----
+  function now(){ return performance.now(); }
+  function roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+  function drawCell(g, c, x, y, s, scale=1, alpha=1){
+    const pad = s*0.06; const sz = (s-pad*2)*scale; const ox=x+pad+((s-pad*2)-sz)/2, oy=y+pad+((s-pad*2)-sz)/2;
+    g.globalAlpha = alpha;
+    g.fillStyle = COL[c]||'#888'; roundRect(g,ox,oy,sz,sz,sz*0.26); g.fill();
+    // gloss
+    g.fillStyle='rgba(255,255,255,.22)'; roundRect(g,ox,oy,sz,sz*0.42,sz*0.26); g.fill();
+    g.fillStyle='rgba(0,0,0,.14)'; roundRect(g,ox,oy+sz*0.62,sz,sz*0.38,sz*0.26); g.fill();
+    g.globalAlpha=1;
+  }
+  function ghostY(){ if(!active) return null; let p={...active}; while(true){ const q={...p,pr:p.pr+1}; if(fits(q)) p=q; else break; } return p; }
+
+  function draw(){
+    const sx = shake>0 ? (Math.random()*2-1)*shake : 0, sy = shake>0 ? (Math.random()*2-1)*shake : 0;
+    ctx.setTransform(1,0,0,1,sx,sy);
+    ctx.clearRect(-20,-20,cv.width+40,cv.height+40);
+    // grid lines / wells
+    ctx.strokeStyle='rgba(255,255,255,.035)';
+    for(let c=0;c<=COLS;c++){ ctx.beginPath(); ctx.moveTo(c*CELL,0); ctx.lineTo(c*CELL,cv.height); ctx.stroke(); }
+    // danger line
+    ctx.strokeStyle='rgba(226,59,59,.25)'; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(0,2*CELL); ctx.lineTo(cv.width,2*CELL); ctx.stroke(); ctx.setLineDash([]);
+    // settled cells
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ if(grid[r][c]) drawCell(ctx,grid[r][c],c*CELL,r*CELL,CELL); }
+    // ghost + active
+    if(active){
+      const g=ghostY();
+      if(g) for(const {r,c,color} of cellsOf(g)){ if(r>=0){ ctx.globalAlpha=.22; drawCell(ctx,color,c*CELL,r*CELL,CELL); ctx.globalAlpha=1; } }
+      for(const {r,c,color} of cellsOf(active)){ if(r>=0) drawCell(ctx,color,c*CELL,r*CELL,CELL); }
+    }
+    // effects
+    const t=now();
+    for(let i=effects.length-1;i>=0;i--){
+      const e=effects[i]; const k=(t-e.t0)/e.dur;
+      if(k>=1){ effects.splice(i,1); continue; }
+      if(e.type==='pop'){ const sc=1+k*0.6; drawCell(ctx,e.color,e.c*CELL,e.r*CELL,CELL,sc,1-k);
+        ctx.globalAlpha=(1-k)*0.7; ctx.fillStyle='#fff'; roundRect(ctx,e.c*CELL+CELL*0.2,e.r*CELL+CELL*0.2,CELL*0.6,CELL*0.6,CELL*0.2); ctx.fill(); ctx.globalAlpha=1; }
+      else if(e.type==='blend'){ const sc=1+Math.sin(k*Math.PI)*0.18; drawCell(ctx,e.color,e.c*CELL,e.r*CELL,CELL,sc,1);
+        ctx.globalAlpha=(1-k)*0.5; ctx.fillStyle='#fff'; roundRect(ctx,e.c*CELL+CELL*0.1,e.r*CELL+CELL*0.1,CELL*0.8,CELL*0.8,CELL*0.24); ctx.fill(); ctx.globalAlpha=1; }
+    }
+    // floaters
+    ctx.setTransform(1,0,0,1,0,0);
+    for(let i=floaters.length-1;i>=0;i--){
+      const f=floaters[i]; const k=(t-f.t0)/f.dur; if(k>=1){ floaters.splice(i,1); continue; }
+      const y=cv.height*0.42 - k*40;
+      ctx.globalAlpha=Math.min(1,(1-k)*1.6); ctx.textAlign='center';
+      ctx.fillStyle='#fff'; ctx.font='800 '+Math.round(CELL*0.9)+'px sans-serif'; ctx.fillText(f.text,cv.width/2,y);
+      ctx.fillStyle='#ffd76b'; ctx.font='700 '+Math.round(CELL*0.5)+'px sans-serif'; ctx.fillText('+'+f.sub,cv.width/2,y+CELL*0.6);
+      ctx.globalAlpha=1;
+    }
+  }
+  function drawNext(){
+    nctx.clearRect(0,0,nx.width,nx.height);
+    if(!nextPiece) return; const s=nx.width/2;
+    drawCell(nctx,nextPiece.a,s*0.5,s*0.15,s*0.9);
+    drawCell(nctx,nextPiece.b,s*0.5,s*1.05,s*0.9);
+  }
+
+  // ---- main loop ----
+  function frame(t){
+    const dt = t-(last||t); last=t;
+    if(state==='play' && active){
+      dropAcc += dt;
+      if(dropAcc>=dropEvery){ dropAcc=0; const p={...active,pr:active.pr+1}; if(fits(p)) active=p; else lockPiece(); }
+      // difficulty: speed scales with score
+      dropEvery = Math.max(140, 820 - Math.floor(score/350)*55);
+      // danger tint
+      let top=ROWS; for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++){ if(grid[r][c]){ top=Math.min(top,r); break; } }
+      danger = top<=2;
+    }
+    if(shake>0) shake=Math.max(0,shake-dt*0.06);
+    draw();
+    document.getElementById('tip').textContent = danger ? 'Careful -- the stack is high!' : '';
+    requestAnimationFrame(frame);
+  }
+
+  // ---- game lifecycle ----
+  function reset(){
+    grid = Array.from({length:ROWS},()=>new Array(COLS).fill(null));
+    score=0; bestChain=0; chain=0; dropEvery=820; dropAcc=0; effects.length=0; floaters.length=0; shake=0;
+    nextPiece=newPiece(); updateHud(); spawn();
+  }
+  function gameOver(){
+    state='over'; sfx('over');
+    best=Math.max(best,score); localStorage.setItem('prismdrop_best',best);
+    document.getElementById('finalScore').textContent=score;
+    document.getElementById('bestChain').textContent=bestChain;
+    document.getElementById('best').textContent=best;
+    document.getElementById('overOv').classList.remove('hidden');
+  }
+  function startGame(){
+    ac(); document.getElementById('startOv').classList.add('hidden');
+    document.getElementById('overOv').classList.add('hidden');
+    sizeBoard(); reset();
+  }
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+
+  sizeBoard();
+  state='start';
+  grid = Array.from({length:ROWS},()=>new Array(COLS).fill(null));
+  document.getElementById('best').textContent=best;
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

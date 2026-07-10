@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Conflux</title>
+<style>
+  html,body{margin:0;height:100%;background:#06070c;overflow:hidden;color:#eaf0ff;
+    font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;cursor:crosshair;}
+  #top{position:fixed;top:10px;left:0;right:0;z-index:5;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;}
+  #wave{font-weight:800;letter-spacing:.06em;text-shadow:0 0 8px #000;}
+  .bar{width:260px;height:11px;border-radius:7px;overflow:hidden;border:1px solid #2a3350;background:#121a2c;}
+  #thp{height:100%;width:100%;background:linear-gradient(90deg,#46e0ff,#7affd0);transition:width .12s;}
+  #manawrap{display:flex;align-items:center;gap:7px;}
+  #mana{width:200px;height:9px;border-radius:6px;overflow:hidden;border:1px solid #34306a;background:#16142c;}
+  #manaf{height:100%;width:0;background:linear-gradient(90deg,#7a5cff,#b388ff);}
+  #manan{font-weight:800;color:#c0a8ff;font-size:13px;}
+  #hand{position:fixed;bottom:14px;left:0;right:0;z-index:6;display:flex;gap:9px;justify-content:center;}
+  .card{position:relative;width:74px;height:92px;border-radius:13px;border:2px solid #2a3354;background:#101727;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;
+    box-shadow:0 6px 14px rgba(0,0,0,.4);transition:transform .07s;}
+  .card:active{transform:translateY(1px);}
+  .card.sel{border-color:#fff;box-shadow:0 0 0 2px #fff,0 0 18px rgba(255,255,255,.3);transform:translateY(-6px);}
+  .card.no{opacity:.4;filter:grayscale(.5);}
+  .card .ic{font-size:26px;filter:drop-shadow(0 0 6px currentColor);}
+  .card .nm{font-size:11px;font-weight:700;}
+  .card .co{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#7a5cff;
+    color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #06070c;}
+  .overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;background:rgba(6,7,12,.72);backdrop-filter:blur(3px);text-align:center;padding:24px;}
+  .overlay h1{margin:0;font-size:40px;letter-spacing:.12em;background:linear-gradient(90deg,#ff8a3b,#46e0ff,#b388ff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .overlay h2{margin:0;font-size:22px;}
+  .overlay p{margin:0;color:#9fb0d0;font-size:13px;max-width:36ch;line-height:1.6;}
+  .btn{background:linear-gradient(90deg,#7a5cff,#46a0ff);border:none;color:#fff;font:800 16px ui-rounded,system-ui;
+    padding:13px 26px;border-radius:13px;cursor:pointer;box-shadow:0 0 22px rgba(122,92,255,.5);}
+  .btn:active{transform:translateY(1px);}
+  .hidden{display:none!important;}
+  #cards{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+  .dcard{width:150px;background:#121828;border:2px solid #283454;border-radius:14px;padding:16px 12px;cursor:pointer;transition:.1s;}
+  .dcard:hover{transform:translateY(-4px);border-color:#b388ff;box-shadow:0 0 22px rgba(179,136,255,.35);}
+  .dcard .ic{font-size:30px;filter:drop-shadow(0 0 8px currentColor);}
+  .dcard .t{font-weight:800;margin:8px 0 5px;font-size:15px;}
+  .dcard .d{font-size:11.5px;color:#9fb0d0;line-height:1.45;}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="top">
+    <div id="wave">Wave <span id="wnum">1</span></div>
+    <div class="bar"><div id="thp"></div></div>
+    <div id="manawrap"><div id="mana"><div id="manaf"></div></div><span id="manan">5</span></div>
+  </div>
+  <div id="hand"></div>
+
+  <div id="ovStart" class="overlay">
+    <h1>CONFLUX</h1>
+    <p>Defend the core. Cast <b style="color:#ff8a3b">elements</b> from your hand -- they react where they meet.
+    Lay <b style="color:#b388ff">oil</b> then <b style="color:#ff8a3b">fire</b> for a wall of flame. Flood with
+    <b style="color:#46a0ff">water</b> then <b style="color:#a0e0ff">spark</b> to chain-shock the wet. Mana refills over time.</p>
+    <button class="btn" id="bStart">Begin</button>
+  </div>
+  <div id="ovDraft" class="overlay hidden"><h2>Wave cleared</h2><p>Add one to your deck.</p><div id="cards"></div></div>
+  <div id="ovOver" class="overlay hidden">
+    <h1 style="background:linear-gradient(90deg,#ff4d6d,#ff9a6c);-webkit-background-clip:text;background-clip:text;color:transparent;">CORE LOST</h1>
+    <h2 id="overStat"></h2><button class="btn" id="bRetry">Again</button>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, CELL = 46, gw = 0, gh = 0, TX = 0, TY = 0;
+  function fit() { W = cv.width = innerWidth; H = cv.height = innerHeight; gw = Math.ceil(W / CELL); gh = Math.ceil(H / CELL); TX = W / 2; TY = H / 2; }
+  fit(); addEventListener('resize', fit);
+
+  // ---------- surfaces (DOS2 chemistry) ----------
+  const ELC = { fire: [255, 120, 40], oil: [150, 90, 200], water: [60, 150, 255], steam: [200, 210, 230], poison: [120, 220, 90] };
+  let surf = []; const idx = (gx, gy) => gy * gw + gx;
+  const sAt = (gx, gy) => (gx >= 0 && gy >= 0 && gx < gw && gy < gh) ? surf[idx(gx, gy)] : null;
+  const cellOf = (x, y) => [Math.floor(x / CELL), Math.floor(y / CELL)];
+  const clearSurf = () => surf = new Array(gw * gh).fill(null);
+  const MAXA = 8;
+  function applyEl(gx, gy, el, amt) {
+    if (gx < 0 || gy < 0 || gx >= gw || gy >= gh) return; amt = Math.min(MAXA, amt);
+    const i = idx(gx, gy), cur = surf[i];
+    if (!cur) { surf[i] = { el, amt }; return; }
+    if (cur.el === el) { cur.amt = Math.min(MAXA, Math.max(cur.amt, amt)); return; }
+    const has = (a, b) => (cur.el === a && el === b) || (cur.el === b && el === a);
+    if (has('oil', 'fire')) { surf[i] = { el: 'fire', amt: Math.min(MAXA, (cur.el === 'oil' ? cur.amt : amt) + 2) }; pop(gx, gy, 'fire'); }
+    else if (has('water', 'fire')) { surf[i] = { el: 'steam', amt: Math.min(cur.amt, amt) }; pop(gx, gy, 'steam'); }
+    else if (has('poison', 'fire')) { surf[i] = { el: 'fire', amt: MAXA }; explode((gx + .5) * CELL, (gy + .5) * CELL, 95, 30); }
+    else surf[i] = { el, amt };
+  }
+  const nb = (gx, gy) => { const o = []; if (gx > 0) o.push([gx - 1, gy]); if (gx < gw - 1) o.push([gx + 1, gy]); if (gy > 0) o.push([gx, gy - 1]); if (gy < gh - 1) o.push([gx, gy + 1]); return o; };
+  function tickSurf() {
+    const sp = [];
+    for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) { const s = surf[idx(gx, gy)]; if (!s) continue;
+      if (s.el === 'fire') { s.amt -= 1.0; for (const [nx, ny] of nb(gx, gy)) { const n = sAt(nx, ny); if (n && n.el === 'oil') sp.push([nx, ny, 'fire', n.amt + 2]); else if (n && n.el === 'poison') sp.push([nx, ny, 'fire', 8]); else if (P.wildfire && !n && s.amt > 3) sp.push([nx, ny, 'fire', s.amt - 3]); } }
+      else if (s.el === 'water') { s.amt -= 0.22; if (s.amt > 3) for (const [nx, ny] of nb(gx, gy)) if (!sAt(nx, ny)) { sp.push([nx, ny, 'water', s.amt - 2]); s.amt -= 1; break; } }
+      else if (s.el === 'oil') s.amt -= 0.05;
+      else if (s.el === 'poison') { s.amt -= 0.4; if (s.amt > 2) for (const [nx, ny] of nb(gx, gy)) if (!sAt(nx, ny)) { sp.push([nx, ny, 'poison', s.amt - 2]); break; } }
+      else if (s.el === 'steam') { s.amt -= 0.7; if (s.amt > 2) for (const [nx, ny] of nb(gx, gy)) if (!sAt(nx, ny)) { sp.push([nx, ny, 'steam', s.amt - 2]); break; } }
+      if (s.amt <= 0) surf[idx(gx, gy)] = null;
+    }
+    for (const [x, y, e, a] of sp) applyEl(x, y, e, a);
+  }
+  function paint(x, y, el, amt, r) { const [cx, cy] = cellOf(x, y); for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r + 1) applyEl(cx + dx, cy + dy, el, amt); }
+  function strike(x, y) {
+    const [cx, cy] = cellOf(x, y), seen = {}, q = [], region = [];
+    for (const [sx, sy] of [[cx, cy], ...nb(cx, cy)]) { const s = sAt(sx, sy); if (s && (s.el === 'water' || s.el === 'steam') && !seen[sx + ',' + sy]) { seen[sx + ',' + sy] = 1; q.push([sx, sy]); } }
+    while (q.length) { const [gx, gy] = q.pop(); region.push([gx, gy]); for (const [nx, ny] of nb(gx, gy)) { const n = sAt(nx, ny); if (n && (n.el === 'water' || n.el === 'steam') && !seen[nx + ',' + ny]) { seen[nx + ',' + ny] = 1; q.push([nx, ny]); } } }
+    let hit = 0;
+    for (const e of enemies) { const [ex, ey] = cellOf(e.x, e.y); if (seen[ex + ',' + ey] || (Math.hypot(e.x - x, e.y - y) < CELL)) { shock(e); hit++; } }
+    if (region.length) for (const [gx, gy] of region) arc(x, y, (gx + .5) * CELL, (gy + .5) * CELL);
+    else arc(x, y, x, y);
+    if (hit >= 2) { label(x, y - 24, 'CHAIN x' + hit, '#bff0ff'); shakeAdd(Math.min(8, hit)); }
+    sfx(region.length ? 'shockBig' : 'shock');
+  }
+  function shock(e) { hurt(e, P.boltDmg * (e.wet > 0 ? 2.2 : 1), 'shock', '#bff0ff'); e.stun = 0.8; for (let i = 0; i < 4; i++) part(e.x, e.y, '#bff0ff', 130); }
+  function explode(x, y, rad, d) { shakeAdd(6); sfx('ignite'); for (let i = 0; i < 18; i++) part(x, y, '#ff9040', 220); for (const e of enemies) if (Math.hypot(e.x - x, e.y - y) < rad) hurt(e, d, 'fire', '#ff9040'); label(x, y - 20, 'BOOM', '#ff9040'); }
+
+  // ---------- state ----------
+  let enemies, bullets, parts, arcs, dmgs, labels;
+  let tower, mana, manaMax, deck, sel, aim, wave, toSpawn, spawned, spawnT, state, shake, surfAcc, kills;
+  const P = {};
+  function reset() {
+    clearSurf(); enemies = []; bullets = []; parts = []; arcs = []; dmgs = []; labels = [];
+    tower = { hp: 130, max: 130, r: 26, range: 230, cd: 0, rate: 0.65, dmg: 13 };
+    mana = 5; manaMax = 10; sel = null; aim = null; shake = 0; surfAcc = 0; kills = 0;
+    Object.assign(P, { manaRegen: 1.3, fireR: 2, oilR: 2, waterR: 2, boltDmg: 24, wildfire: 0, fbDmg: 16 });
+    deck = ['fire', 'oil', 'water', 'bolt', 'fire', 'water']; // starting deck
+    wave = 0; startWave(1);
+  }
+
+  // ---------- cards ----------
+  const CARDS = {
+    fire:  { name: 'Fireball', ic: '🔥', col: '#ff8a3b', cost: 4, cast(x, y) { const had = underHasOil(x, y); paint(x, y, 'fire', 6, P.fireR); for (const e of enemies) if (Math.hypot(e.x - x, e.y - y) < P.fireR * CELL + 10) hurt(e, P.fbDmg, 'fire', '#ffb060'); for (let i = 0; i < 10; i++) part(x, y, '#ffb060', 160); if (had) label(x, y - 22, 'IGNITE', '#ff8a3b'); sfx('ignite'); } },
+    oil:   { name: 'Oil', ic: '🛢️', col: '#b388ff', cost: 2, cast(x, y) { paint(x, y, 'oil', 6, P.oilR); for (const e of enemies) if (Math.hypot(e.x - x, e.y - y) < P.oilR * CELL) e.oil = 3; sfx('steam'); } },
+    water: { name: 'Water', ic: '💧', col: '#46a0ff', cost: 2, cast(x, y) { paint(x, y, 'water', 6, P.waterR); for (const e of enemies) if (Math.hypot(e.x - x, e.y - y) < P.waterR * CELL) e.wet = 3.5; for (let i = 0; i < 8; i++) part(x, y, '#46a0ff', 120); sfx('steam'); } },
+    bolt:  { name: 'Spark', ic: '⚡', col: '#a0e0ff', cost: 4, cast(x, y) { strike(x, y); } },
+    frost: { name: 'Frost', ic: '❄️', col: '#9fe6ff', cost: 3, cast(x, y) { for (const e of enemies) if (Math.hypot(e.x - x, e.y - y) < 2.2 * CELL) { e.chill = 3; if (e.wet > 0) { e.stun = 2; hurt(e, 14, 'cold', '#cfeaff'); } } for (let i = 0; i < 10; i++) part(x, y, '#cfeaff', 130); sfx('shock'); } },
+    poison:{ name: 'Poison', ic: '☠️', col: '#7fe070', cost: 3, cast(x, y) { paint(x, y, 'poison', 6, 2); for (let i = 0; i < 8; i++) part(x, y, '#7fe070', 120); sfx('steam'); } },
+  };
+  function underHasOil(x, y) { const [cx, cy] = cellOf(x, y); for (let dy = -P.fireR; dy <= P.fireR; dy++) for (let dx = -P.fireR; dx <= P.fireR; dx++) { const s = sAt(cx + dx, cy + dy); if (s && s.el === 'oil') return true; } return false; }
+
+  // ---------- enemies ----------
+  const ETYPE = {
+    grunt: { hue: 350, hp: 14, spd: 26, dmg: 6, r: 11 },
+    runner:{ hue: 50, hp: 9, spd: 46, dmg: 5, r: 9 },
+    imp:   { hue: 22, hp: 16, spd: 30, dmg: 7, r: 11, resist: 'fire' },   // shrug off flame -> wet & shock it
+    brute: { hue: 285, hp: 46, spd: 17, dmg: 14, r: 17 },
+  };
+  function spawn(type, w) {
+    const d = ETYPE[type], edge = Math.floor(Math.random() * 4); let x, y;
+    if (edge === 0) { x = -20; y = Math.random() * H; } else if (edge === 1) { x = W + 20; y = Math.random() * H; }
+    else if (edge === 2) { x = Math.random() * W; y = -20; } else { x = Math.random() * W; y = H + 20; }
+    const hp = d.hp + w * 5;
+    enemies.push({ x, y, type, r: d.r, hp, max: hp, spd: d.spd, dmg: d.dmg, hue: d.hue, resist: d.resist, burn: 0, wet: 0, oil: 0, stun: 0, chill: 0, atk: 0 });
+  }
+  function startWave(w) { wave = w; document.getElementById('wnum').textContent = w; toSpawn = 5 + w * 2; spawned = 0; spawnT = 0.4; }
+  function hurt(e, d, type, col) { if (type === 'fire' && e.resist === 'fire') d *= 0.12; e.hp -= d; dmgs.push({ x: e.x, y: e.y - e.r, t: Math.round(d), c: col || '#fff', life: .7, v: -34 }); }
+
+  // ---------- input ----------
+  cv.addEventListener('pointermove', e => { aim = [e.clientX, e.clientY]; });
+  cv.addEventListener('pointerdown', e => { aim = [e.clientX, e.clientY]; if (state !== 'play' || sel == null) return; const c = CARDS[deck[sel]]; if (mana < c.cost) { sfx('no'); return; } aOn(); mana -= c.cost; c.cast(e.clientX, e.clientY); const id = deck.splice(sel, 1)[0]; deck.push(id); sel = null; renderHand(); });
+
+  // ---------- hand UI ----------
+  const handEl = document.getElementById('hand');
+  function renderHand() {
+    handEl.innerHTML = '';
+    for (let i = 0; i < 4; i++) { const id = deck[i]; const c = CARDS[id]; const el = document.createElement('div');
+      el.className = 'card' + (sel === i ? ' sel' : '') + (mana < c.cost ? ' no' : '');
+      el.innerHTML = `<div class="co">${c.cost}</div><div class="ic" style="color:${c.col}">${c.ic}</div><div class="nm">${c.name}</div>`;
+      el.onclick = () => { if (state !== 'play') return; aOn(); sel = (sel === i) ? null : i; renderHand(); };
+      handEl.appendChild(el);
+    }
+  }
+
+  // ---------- draft ----------
+  const POOL = [
+    { ic: '⚡', c: '#a0e0ff', t: 'Spark', d: 'Add a Spark to your deck.', ap: () => deck.push('bolt') },
+    { ic: '🔥', c: '#ff8a3b', t: 'Fireball', d: 'Add a Fireball to your deck.', ap: () => deck.push('fire') },
+    { ic: '🛢️', c: '#b388ff', t: 'Oil', d: 'Add an Oil to your deck.', ap: () => deck.push('oil') },
+    { ic: '💧', c: '#46a0ff', t: 'Water', d: 'Add a Water to your deck.', ap: () => deck.push('water') },
+    { ic: '❄️', c: '#9fe6ff', t: 'Frost', d: 'New skill: chill foes, freeze the wet.', ap: () => deck.push('frost'), once: 'frost' },
+    { ic: '☠️', c: '#7fe070', t: 'Poison', d: 'New skill: poison cloud, blows up with fire.', ap: () => deck.push('poison'), once: 'poison' },
+    { ic: '🌋', c: '#ff6a2b', t: 'Wildfire', d: 'Fire spreads across bare ground.', ap: () => P.wildfire = 1, once: 'wild' },
+    { ic: '🔮', c: '#b388ff', t: 'Deep Well', d: '+3 max mana, +25% regen.', ap: () => { manaMax += 3; P.manaRegen *= 1.25; } },
+    { ic: '🏯', c: '#7affd0', t: 'Bulwark', d: 'Core: +40 max HP (healed), +25% damage.', ap: () => { tower.max += 40; tower.hp += 40; tower.dmg *= 1.25; } },
+    { ic: '💥', c: '#ffae66', t: 'Bigger Bombs', d: 'Fireballs cover +1 tile and hit harder.', ap: () => { P.fireR++; P.fbDmg *= 1.3; } },
+  ];
+  const taken = {};
+  function openDraft() { state = 'draft'; const av = POOL.filter(u => !u.once || !taken[u.once]); const pick = [];
+    while (pick.length < 3 && av.length) pick.push(av.splice(Math.floor(Math.random() * av.length), 1)[0]);
+    const wrap = document.getElementById('cards'); wrap.innerHTML = '';
+    for (const u of pick) { const el = document.createElement('div'); el.className = 'dcard';
+      el.innerHTML = `<div class="ic" style="color:${u.c}">${u.ic}</div><div class="t">${u.t}</div><div class="d">${u.d}</div>`;
+      el.onclick = () => { u.ap(); if (u.once) taken[u.once] = 1; document.getElementById('ovDraft').classList.add('hidden'); startWave(wave + 1); state = 'play'; renderHand(); };
+      wrap.appendChild(el);
+    }
+    document.getElementById('ovDraft').classList.remove('hidden');
+  }
+
+  // ---------- update ----------
+  function update(dt) {
+    mana = Math.min(manaMax, mana + P.manaRegen * dt);
+    // spawn
+    if (spawned < toSpawn) { spawnT -= dt; if (spawnT <= 0) { let t = 'grunt'; const r = Math.random(); if (wave >= 2 && r < .18) t = 'runner'; else if (wave >= 3 && r < .32) t = 'imp'; else if (wave >= 4 && r < .42) t = 'brute'; spawn(t, wave); spawned++; spawnT = Math.max(.35, 1.0 - wave * .04); } }
+    else if (enemies.length === 0) { openDraft(); return; }
+    // tower auto-attack
+    tower.cd -= dt; if (tower.cd <= 0) { let b = null, bd = tower.range ** 2; for (const e of enemies) { const d = (e.x - TX) ** 2 + (e.y - TY) ** 2; if (d < bd) { bd = d; b = e; } } if (b) { const a = Math.atan2(b.y - TY, b.x - TX); bullets.push({ x: TX, y: TY, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, r: 4, dmg: tower.dmg, life: 1 }); tower.cd = tower.rate; sfx('shoot'); } }
+    // bullets
+    for (let i = bullets.length - 1; i >= 0; i--) { const b = bullets[i]; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (b.life <= 0) { bullets.splice(i, 1); continue; } for (const e of enemies) if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < (e.r + b.r) ** 2) { hurt(e, b.dmg, 'phys', '#9fe8ff'); bullets.splice(i, 1); break; } }
+    // enemies
+    for (let i = enemies.length - 1; i >= 0; i--) { const e = enemies[i];
+      const [cx, cy] = cellOf(e.x, e.y), s = sAt(cx, cy);
+      if (s) { if (s.el === 'fire' && e.wet <= 0 && e.resist !== 'fire') e.burn = 1.5; if (s.el === 'water' || s.el === 'steam') { e.wet = 3; e.burn = 0; } if (s.el === 'oil') e.oil = 2.5; if (s.el === 'poison') hurt(e, 9 * dt, 'pois', '#7fe070'); }
+      let mul = 1; if (e.oil > 0) { mul *= .5; e.oil -= dt; } if (e.chill > 0) { mul *= .5; e.chill -= dt; } if (e.stun > 0) { mul = 0; e.stun -= dt; }
+      if (e.burn > 0) { e.hp -= (7 + wave * .1) * (e.oil > 0 ? 2 : 1) * dt; e.burn -= dt; if (Math.random() < dt * 6) part(e.x, e.y, '#ff9040', 70); }
+      if (e.wet > 0) e.wet -= dt;
+      const dx = TX - e.x, dy = TY - e.y, l = Math.hypot(dx, dy) || 1;
+      if (l > tower.r + e.r) { e.x += (dx / l) * e.spd * mul * dt; e.y += (dy / l) * e.spd * mul * dt; e.atk = 0; }
+      else { e.atk += dt; if (mul > 0) { tower.hp -= e.dmg * dt; if (Math.random() < dt * 4) part(TX + (Math.random() - .5) * 40, TY + (Math.random() - .5) * 40, '#ff5070', 80); } }
+      if (e.hp <= 0) { for (let k = 0; k < 7; k++) part(e.x, e.y, `hsl(${e.hue},85%,65%)`, 150); enemies.splice(i, 1); kills++; sfx('die'); }
+    }
+    if (tower.hp <= 0) return gameOver();
+    surfAcc += dt; while (surfAcc >= 0.12) { tickSurf(); surfAcc -= 0.12; }
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .93; p.vy *= .93; }
+    for (let i = arcs.length - 1; i >= 0; i--) { arcs[i].life -= dt; if (arcs[i].life <= 0) arcs.splice(i, 1); }
+    for (let i = dmgs.length - 1; i >= 0; i--) { const d = dmgs[i]; d.life -= dt; d.y += d.v * dt; if (d.life <= 0) dmgs.splice(i, 1); }
+    for (let i = labels.length - 1; i >= 0; i--) { const m = labels[i]; m.life -= dt; m.y -= 18 * dt; if (m.life <= 0) labels.splice(i, 1); }
+    if (shake > 0) shake = Math.max(0, shake - dt * 26);
+  }
+
+  // ---------- fx ----------
+  function part(x, y, c, sp) { const a = Math.random() * 7, s = sp * (.3 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .4 + Math.random() * .4, max: .8, c, r: 1.5 + Math.random() * 2 }); }
+  function pop(gx, gy, kind) { const x = (gx + .5) * CELL, y = (gy + .5) * CELL; for (let i = 0; i < 6; i++) part(x, y, kind === 'fire' ? '#ff9040' : '#cfe0ff', 110); }
+  function arc(x1, y1, x2, y2) { arcs.push({ x1, y1, x2, y2, life: .12 }); }
+  function label(x, y, t, c) { labels.push({ x, y, t, c, life: 1 }); }
+  function shakeAdd(v) { shake = Math.min(13, shake + v); }
+
+  // ---------- render ----------
+  function render() {
+    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(6,7,12,0.4)'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); if (shake > 0) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) { const s = surf[idx(gx, gy)]; if (!s) continue; const c = ELC[s.el]; const a = Math.min(.6, .12 + s.amt / MAXA * .5) * (s.el === 'fire' ? .8 + Math.random() * .2 : 1); ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`; ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL); }
+    for (const b of bullets) glow(b.x, b.y, b.r, '#9fe8ff');
+    ctx.strokeStyle = '#cdf0ff'; ctx.lineWidth = 2; for (const a of arcs) { ctx.globalAlpha = a.life / .12; jag(a.x1, a.y1, a.x2, a.y2); } ctx.globalAlpha = 1;
+    for (const e of enemies) { glow(e.x, e.y, e.r, `hsl(${e.hue},85%,62%)`); if (e.burn > 0) ringS(e.x, e.y, e.r + 3, '#ff8030'); if (e.wet > 0) ringS(e.x, e.y, e.r + 3, '#46a0ff'); if (e.stun > 0) ringS(e.x, e.y, e.r + 5, '#cfeaff');
+      if (e.hp < e.max) { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(e.x - e.r, e.y - e.r - 6, e.r * 2, 2.5); ctx.fillStyle = '#7affd0'; ctx.fillRect(e.x - e.r, e.y - e.r - 6, e.r * 2 * Math.max(0, e.hp / e.max), 2.5); ctx.globalCompositeOperation = 'lighter'; } }
+    for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+    // tower (core)
+    const pulse = 1 + Math.sin(Date.now() / 250) * .07; glow(TX, TY, tower.r * pulse, '#7affd0'); glow(TX, TY, tower.r * .55, '#ffffff');
+    ctx.strokeStyle = 'rgba(122,255,208,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(TX, TY, tower.range, 0, 7); ctx.stroke();
+    // aim preview
+    if (state === 'play' && sel != null && aim) { const c = CARDS[deck[sel]], rad = (c.cost && (deck[sel] === 'fire' ? P.fireR : deck[sel] === 'oil' ? P.oilR : deck[sel] === 'water' ? P.waterR : 2)) * CELL; ctx.strokeStyle = mana >= c.cost ? c.col : '#ff5a5a'; ctx.lineWidth = 2; ctx.globalAlpha = .8; ctx.beginPath(); ctx.arc(aim[0], aim[1], rad, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+    // text fx
+    ctx.globalCompositeOperation = 'source-over'; ctx.textAlign = 'center';
+    ctx.font = '700 13px ui-rounded,system-ui'; for (const d of dmgs) { ctx.globalAlpha = Math.max(0, d.life / .7); ctx.fillStyle = d.c; ctx.fillText(d.t, d.x, d.y); }
+    ctx.font = '800 20px ui-rounded,system-ui'; for (const m of labels) { ctx.globalAlpha = Math.max(0, m.life); ctx.fillStyle = m.c; ctx.shadowColor = m.c; ctx.shadowBlur = 10; ctx.fillText(m.t, m.x, m.y); ctx.shadowBlur = 0; }
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+  function glow(x, y, r, c) { ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = r * 1.7; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.shadowBlur = 0; }
+  function ringS(x, y, r, c) { ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); }
+  function jag(x1, y1, x2, y2) { ctx.beginPath(); ctx.moveTo(x1, y1); for (let i = 1; i < 4; i++) { const t = i / 4; ctx.lineTo(x1 + (x2 - x1) * t + (Math.random() - .5) * 16, y1 + (y2 - y1) * t + (Math.random() - .5) * 16); } ctx.lineTo(x2, y2); ctx.stroke(); }
+
+  // ---------- audio ----------
+  let ac = null; function aOn() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
+  function tone(f, d, t, g, gl) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = t || 'sine'; o.frequency.setValueAtTime(f, s); if (gl) o.frequency.exponentialRampToValueAtTime(Math.max(1, gl), s + d); n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .04, s + .008); n.gain.exponentialRampToValueAtTime(.0001, s + d); o.connect(n); n.connect(ac.destination); o.start(s); o.stop(s + d + .02); }
+  function noise(d, g, f) { if (!ac) return; const n = Math.floor(ac.sampleRate * d), b = ac.createBuffer(1, n, ac.sampleRate), dd = b.getChannelData(0); for (let i = 0; i < n; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / n); const s = ac.createBufferSource(); s.buffer = b; const fl = ac.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = f || 800; const gg = ac.createGain(); gg.gain.value = g || .04; s.connect(fl); fl.connect(gg); gg.connect(ac.destination); s.start(); s.stop(ac.currentTime + d); }
+  function sfx(n) { if (!ac) return; switch (n) { case 'shoot': tone(620, .05, 'triangle', .02, 380); break; case 'die': tone(200, .12, 'triangle', .03, 80); break; case 'hurt': tone(150, .2, 'sawtooth', .05, 60); break; case 'ignite': noise(.18, .05, 500); tone(120, .22, 'sine', .05, 70); break; case 'steam': noise(.22, .025, 2400); break; case 'shock': tone(1100, .07, 'square', .03, 300); break; case 'shockBig': tone(1500, .12, 'sawtooth', .05, 200); noise(.12, .035, 2200); break; case 'no': tone(180, .08, 'square', .02, 150); break; } }
+
+  // ---------- loop ----------
+  let last = 0;
+  function frame(ts) { const dt = Math.min(.05, (ts - last) / 1000 || 0); last = ts; if (state === 'play') { update(dt); hud(); } render(); requestAnimationFrame(frame); }
+  function hud() { document.getElementById('thp').style.width = (100 * Math.max(0, tower.hp) / tower.max) + '%'; document.getElementById('manaf').style.width = (100 * mana / manaMax) + '%'; document.getElementById('manan').textContent = Math.floor(mana); }
+
+  function start() { fit(); reset(); state = 'play'; renderHand(); document.getElementById('ovStart').classList.add('hidden'); document.getElementById('ovOver').classList.add('hidden'); aOn(); }
+  function gameOver() { state = 'over'; document.getElementById('overStat').textContent = `Reached wave ${wave} · ${kills} slain`; document.getElementById('ovOver').classList.remove('hidden'); }
+  document.getElementById('bStart').onclick = () => { aOn(); start(); };
+  document.getElementById('bRetry').onclick = () => { aOn(); start(); };
+  state = 'start'; reset(); renderHand();
+  requestAnimationFrame(frame);
+  window.__cf = { get state() { return state; }, get wave() { return wave; }, get kills() { return kills; }, get hp() { return tower ? Math.round(tower.hp) : 0; } };
+})();
+</script>
+</body>
+</html>

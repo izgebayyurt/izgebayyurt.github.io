@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Merge War</title>
+<style>
+  :root{color-scheme:light;}
+  html,body{margin:0;height:100%;background:#efe7d6;overflow:hidden;color:#2a2622;
+    font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;cursor:grab;}
+  #top{position:fixed;top:10px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:18px;pointer-events:none;}
+  .chip{background:#fbf6ea;border:2.5px solid #2a2622;border-radius:11px;box-shadow:2px 2px 0 #2a2622;padding:5px 12px;font-weight:800;font-size:14px;}
+  .chip small{color:#8a8170;font-weight:700;font-size:10px;letter-spacing:.06em;}
+  #bot{position:fixed;bottom:12px;left:0;right:0;z-index:6;display:flex;justify-content:center;gap:10px;}
+  .btn{background:#fbf6ea;border:2.5px solid #2a2622;border-radius:13px;box-shadow:2px 3px 0 #2a2622;
+    font:800 14px ui-rounded,system-ui;color:#2a2622;cursor:pointer;padding:11px 16px;text-align:center;}
+  .btn:active{transform:translate(1px,2px);box-shadow:1px 1px 0 #2a2622;}
+  .btn.recruit{background:#bfe0a8;}.btn.reinf{background:#f3c98a;}
+  .btn small{display:block;color:#6b6357;font-weight:700;font-size:10px;}
+  #hint{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:5;font-size:12px;color:#8a8170;text-align:center;max-width:90%;}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="top">
+    <div class="chip"><small>GOLD</small> <span id="gold">0</span></div>
+    <div class="chip"><small>BASE</small> #<span id="base">1</span></div>
+  </div>
+  <div id="hint">Drag soldiers together to merge. Drag one up into the battlefield to send it.</div>
+  <div id="bot">
+    <div class="btn recruit" id="bRecruit">Recruit<small id="recCost">10g</small></div>
+    <div class="btn reinf" id="bReinf">Reinforce<small id="reinCost">50g</small></div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const INK = '#2a2622', PAPER = '#efe7d6';
+  const TCOL = ['#9ccb7a', '#7cc1e8', '#b294e0', '#f2a65a', '#e8746b', '#5fd0c0', '#f2c94c', '#c77dff', '#6fae5e', '#5a9bd4'];
+  const tcol = (t) => TCOL[(t - 1) % TCOL.length];
+
+  let W, H, lane, board, cell, cols = 6, rows = 4, bx, by;
+  function layout() {
+    W = cv.width = innerWidth; H = cv.height = innerHeight;
+    const top = 56, gap = 8, botH = 64;
+    const availH = H - top - botH - gap * 2;
+    const laneH = Math.max(150, Math.min(availH * 0.46, 260));
+    lane = { x: 0, y: top, w: W, h: laneH, gy: top + laneH * 0.62 };
+    cell = Math.min(72, Math.floor((W - 24) / cols), Math.floor((availH - laneH - gap) / rows));
+    const bw = cell * cols, bh = cell * rows;
+    bx = (W - bw) / 2; by = lane.y + lane.h + gap + Math.max(0, (availH - laneH - gap - bh) / 2);
+  }
+  layout();
+
+  // ---------- state ----------
+  let gold, baseNum, baseHP, baseMax, slots, units, defs, turrets, projs, parts, reinf, recCost, autoT, defT, dragging;
+  const sHP = (t) => Math.round(10 * Math.pow(1.85, t - 1) * (1 + .25 * reinf));
+  const sDMG = (t) => Math.max(1, Math.round(3 * Math.pow(1.85, t - 1) * (1 + .25 * reinf)));
+  const baseMaxOf = (n) => Math.round(90 * Math.pow(1.5, n - 1));
+  const rewardOf = (n) => Math.round(25 * Math.pow(1.42, n - 1));
+  const turDmgOf = (n) => 4 * Math.pow(1.26, n - 1);
+  const defTierOf = (n) => 1 + Math.floor((n - 1) / 2);
+  const baseX = () => W - 64;
+
+  function reset() {
+    gold = 30; baseNum = 1; baseMax = baseHP = baseMaxOf(1); reinf = 0; recCost = 10; autoT = 0; defT = 2.5;
+    slots = new Array(cols * rows).fill(0); units = []; defs = []; projs = []; parts = []; dragging = null;
+    makeTurrets();
+    for (let i = 0; i < 4; i++) spawnSoldier();
+    hud();
+  }
+  function makeTurrets() { turrets = [{ x: baseX() + 8, y: lane.gy - 34, cd: 0 }, { x: baseX() + 8, y: lane.gy + 8, cd: 0 }]; }
+  function emptyCell() { const e = []; for (let i = 0; i < slots.length; i++) if (!slots[i]) e.push(i); return e.length ? e[Math.floor(Math.random() * e.length)] : -1; }
+  function spawnSoldier(t) { const c = emptyCell(); if (c < 0) return false; slots[c] = t || 1; return true; }
+
+  // ---------- merge board geometry ----------
+  const cellXY = (i) => ({ x: bx + (i % cols) * cell, y: by + Math.floor(i / cols) * cell });
+  function cellAt(px, py) { if (px < bx || py < by || px >= bx + cols * cell || py >= by + rows * cell) return -1; const cx = Math.floor((px - bx) / cell), cy = Math.floor((py - by) / cell); return cy * cols + cx; }
+
+  // ---------- input: drag to merge / deploy ----------
+  cv.addEventListener('pointerdown', e => { const i = cellAt(e.clientX, e.clientY); if (i >= 0 && slots[i]) { dragging = { from: i, tier: slots[i], x: e.clientX, y: e.clientY }; slots[i] = 0; } });
+  cv.addEventListener('pointermove', e => { if (dragging) { dragging.x = e.clientX; dragging.y = e.clientY; } });
+  cv.addEventListener('pointerup', e => {
+    if (!dragging) return; const d = dragging; dragging = null;
+    if (e.clientY < by - 4) { deploy(d.tier); aOn(); sfx('send'); return; }          // dropped in lane -> send
+    const i = cellAt(e.clientX, e.clientY);
+    if (i < 0) { slots[d.from] = d.tier; return; }                                    // off-board -> return
+    if (!slots[i]) { slots[i] = d.tier; }                                             // empty -> move
+    else if (slots[i] === d.tier) { slots[i] = d.tier + 1; mergePop(i); aOn(); sfx('merge'); } // same -> merge
+    else { slots[d.from] = d.tier; }                                                  // mismatch -> return
+  });
+  function deploy(t) { units.push({ x: 24, y: lane.gy + (Math.random() - .5) * lane.h * 0.5, tier: t, hp: sHP(t), max: sHP(t), dmg: sDMG(t), r: 9 + t }); }
+  function mergePop(i) { const p = cellXY(i); for (let k = 0; k < 10; k++) part(p.x + cell / 2, p.y + cell / 2, tcol(slots[i]), 120); }
+
+  // ---------- buttons ----------
+  document.getElementById('bRecruit').onclick = () => { if (gold < recCost) return; if (spawnSoldier(1)) { gold -= recCost; recCost = Math.round(recCost * 1.12); hud(); aOn(); sfx('merge'); } };
+  document.getElementById('bReinf').onclick = () => { const c = reinfCost(); if (gold < c) return; gold -= c; reinf++; hud(); aOn(); sfx('up'); };
+  const reinfCost = () => Math.round(50 * Math.pow(1.6, reinf));
+  function hud() { document.getElementById('gold').textContent = Math.floor(gold); document.getElementById('base').textContent = baseNum; document.getElementById('recCost').textContent = recCost + 'g'; document.getElementById('reinCost').textContent = reinfCost() + 'g'; }
+
+  // ---------- update ----------
+  function update(dt) {
+    gold += 2 * dt;
+    autoT -= dt; if (autoT <= 0) { spawnSoldier(1); autoT = 3.4; }
+    // enemy spawns defenders
+    defT -= dt; if (defT <= 0 && defs.length < 4 + baseNum) { const t = defTierOf(baseNum); defs.push({ x: baseX() - 20, y: lane.gy + (Math.random() - .5) * lane.h * 0.5, tier: t, hp: sHP(t) * 1.1, max: sHP(t) * 1.1, dmg: sDMG(t), r: 9 + t }); defT = Math.max(1.3, 3.2 - baseNum * .08); }
+    // turrets
+    for (const tu of turrets) { tu.cd -= dt; if (tu.cd <= 0) { let b = null, bd = 200 * 200; for (const u of units) { const dd = (u.x - tu.x) ** 2 + (u.y - tu.y) ** 2; if (dd < bd) { bd = dd; b = u; } } if (b) { projs.push({ x: tu.x, y: tu.y, tx: b.x, ty: b.y, t: b, dmg: turDmgOf(baseNum) }); tu.cd = 1.2; } } }
+    for (let i = projs.length - 1; i >= 0; i--) { const p = projs[i]; const dx = p.tx - p.x, dy = p.ty - p.y, l = Math.hypot(dx, dy); if (l < 12) { if (p.t && p.t.hp > 0) { p.t.hp -= p.dmg; for (let k = 0; k < 4; k++) part(p.x, p.y, '#e8746b', 90); } projs.splice(i, 1); continue; } p.x += dx / l * 520 * dt; p.y += dy / l * 520 * dt; }
+    // your units: fight nearest defender, else hit base, else march
+    for (let i = units.length - 1; i >= 0; i--) { const u = units[i]; let foe = null, fd = 28 * 28; for (const d of defs) { const dd = (u.x - d.x) ** 2 + (u.y - d.y) ** 2; if (dd < fd) { fd = dd; foe = d; } }
+      if (foe) { foe.hp -= u.dmg * dt; }
+      else if (u.x >= baseX() - 26) { baseHP -= u.dmg * dt; u.x = baseX() - 26; if (Math.random() < dt * 4) part(baseX() - 20, u.y, '#b06a4a', 90); }
+      else u.x += (78 + u.tier * 3) * dt;
+      if (u.hp <= 0) { for (let k = 0; k < 7; k++) part(u.x, u.y, tcol(u.tier), 130); units.splice(i, 1); }
+    }
+    // defenders: fight nearest your-unit, else march left
+    for (let i = defs.length - 1; i >= 0; i--) { const d = defs[i]; let foe = null, fd = 28 * 28; for (const u of units) { const dd = (u.x - d.x) ** 2 + (u.y - d.y) ** 2; if (dd < fd) { fd = dd; foe = u; } }
+      if (foe) { foe.hp -= d.dmg * dt; } else d.x -= 54 * dt;
+      if (d.x < -20) defs.splice(i, 1);
+      else if (d.hp <= 0) { for (let k = 0; k < 7; k++) part(d.x, d.y, '#cc6666', 130); defs.splice(i, 1); gold += 3; }
+    }
+    // base defeated -> advance
+    if (baseHP <= 0) { baseNum++; gold += rewardOf(baseNum - 1); baseMax = baseHP = baseMaxOf(baseNum); defs = []; projs = []; makeTurrets(); for (let k = 0; k < 26; k++) part(baseX(), lane.gy, '#e8a23b', 240); sfx('boom'); hud(); }
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .95; p.vy *= .95; }
+    hud();
+  }
+  function part(x, y, c, sp) { const a = Math.random() * 7, s = sp * (.3 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .4 + Math.random() * .4, max: .8, c, r: 1.5 + Math.random() * 2 }); }
+
+  // ---------- render (marker) ----------
+  function token(x, y, s, tier, label) { ctx.fillStyle = tcol(tier); ctx.strokeStyle = INK; ctx.lineWidth = 2.5; rr(x - s / 2, y - s / 2, s, s, s * .26); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `800 ${Math.round(s * .42)}px ui-rounded,system-ui`; ctx.fillText(label != null ? label : tier, x, y + 1); }
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function hpbar(x, y, w, f, col) { ctx.fillStyle = '#2a2622'; ctx.fillRect(x, y, w, 3); ctx.fillStyle = col; ctx.fillRect(x, y, w * Math.max(0, f), 3); }
+  function render() {
+    ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
+    // battlefield band
+    ctx.fillStyle = '#e7ddc9'; ctx.fillRect(lane.x, lane.y, lane.w, lane.h); ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeRect(lane.x + 1, lane.y + 1, lane.w - 2, lane.h - 2);
+    ctx.strokeStyle = 'rgba(42,38,34,.25)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, lane.gy + 22); ctx.lineTo(W, lane.gy + 22); ctx.stroke();
+    // your spawn flag
+    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(20, lane.y + lane.h - 8); ctx.lineTo(20, lane.y + 14); ctx.stroke(); ctx.fillStyle = '#7cc1e8'; rr(20, lane.y + 14, 16, 11, 2); ctx.fill(); ctx.stroke();
+    // enemy base (fort)
+    const bX = baseX(); ctx.fillStyle = '#b9876a'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; rr(bX, lane.y + 16, 52, lane.h - 28, 5); ctx.fill(); ctx.stroke();
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = '#b9876a'; rr(bX + i * 13, lane.y + 8, 9, 12, 2); ctx.fill(); ctx.stroke(); }
+    hpbar(bX - 2, lane.y + 2, 56, baseHP / baseMax, '#e8746b');
+    for (const tu of turrets) { ctx.fillStyle = '#8a8170'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(tu.x, tu.y, 8, 0, 7); ctx.fill(); ctx.stroke(); }
+    // projectiles
+    for (const p of projs) { ctx.fillStyle = '#5a534a'; ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, 7); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.stroke(); }
+    // units + defenders
+    for (const u of units) { token(u.x, u.y, u.r * 1.7, u.tier); hpbar(u.x - u.r, u.y - u.r * 1.1 - 6, u.r * 2, u.hp / u.max, '#7a9e5e'); }
+    for (const d of defs) { ctx.fillStyle = '#d98b8b'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = INK; ctx.font = `800 ${Math.round(d.r)}px ui-rounded,system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.tier, d.x, d.y + 1); hpbar(d.x - d.r, d.y - d.r - 6, d.r * 2, d.hp / d.max, '#cc6666'); }
+    // merge board
+    for (let i = 0; i < slots.length; i++) { const p = cellXY(i); ctx.fillStyle = '#f3eee0'; ctx.strokeStyle = 'rgba(42,38,34,.5)'; ctx.lineWidth = 2; rr(p.x + 2, p.y + 2, cell - 4, cell - 4, 8); ctx.fill(); ctx.stroke();
+      if (slots[i]) token(p.x + cell / 2, p.y + cell / 2, cell - 14, slots[i]); }
+    // particles
+    for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+    // dragged token
+    if (dragging) token(dragging.x, dragging.y, cell - 10, dragging.tier);
+  }
+
+  // ---------- audio ----------
+  let ac = null; function aOn() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} }
+  function tn(f, d, t, g, gl) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = t || 'sine'; o.frequency.setValueAtTime(f, s); if (gl) o.frequency.exponentialRampToValueAtTime(Math.max(1, gl), s + d); n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .04, s + .008); n.gain.exponentialRampToValueAtTime(.0001, s + d); o.connect(n); n.connect(ac.destination); o.start(s); o.stop(s + d + .02); }
+  function nz(d, g, f) { if (!ac) return; const n = Math.floor(ac.sampleRate * d), b = ac.createBuffer(1, n, ac.sampleRate), dd = b.getChannelData(0); for (let i = 0; i < n; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / n); const s = ac.createBufferSource(); s.buffer = b; const g2 = ac.createGain(); g2.gain.value = g || .05; s.connect(g2); g2.connect(ac.destination); s.start(); s.stop(ac.currentTime + d); }
+  function sfx(n) { if (!ac) return; switch (n) { case 'merge': tn(560, .07, 'triangle', .03, 760); break; case 'send': tn(380, .08, 'triangle', .03, 520); break; case 'up': tn(523, .1, 'triangle', .04); tn(784, .14, 'triangle', .03); break; case 'boom': nz(.3, .1, 600); tn(90, .3, 'sine', .07, 50); break; } }
+
+  // ---------- loop ----------
+  let last = 0;
+  function loop(ts) { const dt = Math.min(.04, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); }
+  addEventListener('resize', () => { const sl = slots, g = gold, bn = baseNum, bh = baseHP, bm = baseMax, rf = reinf, rc = recCost; layout(); /* keep state */ slots = sl; gold = g; baseNum = bn; baseHP = bh; baseMax = bm; reinf = rf; recCost = rc; makeTurrets(); });
+  reset();
+  requestAnimationFrame(loop);
+  window.__mw = { get gold() { return Math.floor(gold); }, get base() { return baseNum; }, get baseHP() { return Math.round(baseHP); }, get units() { return units.length; }, board() { return slots.filter(Boolean).length; }, deployAll() { for (let i = 0; i < slots.length; i++) if (slots[i]) { deploy(slots[i]); slots[i] = 0; } }, mergeAllPairs() { for (let t = 1; t < 8; t++) { let idxs = []; for (let i = 0; i < slots.length; i++) if (slots[i] === t) idxs.push(i); for (let k = 0; k + 1 < idxs.length; k += 2) { slots[idxs[k]] = t + 1; slots[idxs[k + 1]] = 0; } } }, addSoldiers(t, n) { for (let i = 0; i < n; i++) spawnSoldier(t); } };
+})();
+</script>
+</body>
+</html>

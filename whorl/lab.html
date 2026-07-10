@@ -1,0 +1,808 @@
+<!doctype html>
+<!-- whorl · BOARD LAB — a/b/c board-shape experiment (ring vs rack vs grid).
+     one-file prototype: sandbox (juicy dummy targets) + spot-test (time-to-find, 5-find averages).
+     NOT a product. does not touch the game. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f0e6cf" />
+<title>Whorl · Board Lab</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f0e6cf'/%3E%3Ccircle cx='9' cy='9' r='4' fill='%23ef4a5a' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='23' cy='9' r='4' fill='%23f6c445' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='9' cy='23' r='4' fill='%233d8bdf' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='23' cy='23' r='4' fill='%23f2913d' stroke='%232c2733' stroke-width='2'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --paper:#f0e6cf; --paper2:#fbf5e6; --card:#fffdf6;
+  --ink:#2c2733; --ink-soft:#6b6472;
+  --shadow:rgba(44,39,51,.9);
+  --accent:#ffd15c;
+  --font-d:"Fredoka", system-ui, sans-serif;
+  --font-u:"Nunito", system-ui, sans-serif;
+  --calm:cubic-bezier(.4,0,.2,1); --pop:cubic-bezier(.34,1.7,.6,1);
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; height:100%; overflow:hidden; }
+body{
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.05) 1px, transparent 1.4px);
+  background-size:7px 7px;
+  color:var(--ink); font-family:var(--font-u);
+  -webkit-font-smoothing:antialiased; -webkit-user-select:none; user-select:none;
+  touch-action:none;
+}
+#c{ position:fixed; inset:0; display:block; }
+
+.hud{ position:fixed; top:calc(env(safe-area-inset-top) + 8px); left:0; right:0; z-index:4;
+  display:flex; flex-direction:column; align-items:center; gap:7px; padding:0 10px; pointer-events:none; }
+.hud > *{ pointer-events:auto; }
+.seg{ display:flex; background:var(--paper2); border:2.5px solid var(--ink); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); overflow:hidden; }
+.seg button{ font-family:var(--font-d); font-weight:600; font-size:15px; color:var(--ink);
+  background:transparent; border:0; padding:8px 18px; cursor:pointer; touch-action:manipulation;
+  border-right:2.5px solid var(--ink); transition:background .12s var(--calm); }
+.seg button:last-child{ border-right:0; }
+.seg button.on{ background:var(--accent); }
+.row2{ display:flex; gap:8px; align-items:center; }
+.mk{ font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:var(--card); border:2.5px solid var(--ink); border-radius:12px;
+  box-shadow:0 3px 0 var(--shadow); transition:transform .08s var(--calm), box-shadow .08s var(--calm);
+  touch-action:manipulation; padding:6px 13px; font-size:13px; }
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.mk.on{ background:var(--accent); }
+.mk.tiny{ padding:4px 9px; font-size:11px; border-width:2px; border-radius:9px; box-shadow:0 2px 0 var(--shadow); }
+
+.banner{ position:fixed; left:0; right:0; top:calc(env(safe-area-inset-top) + 96px); z-index:4;
+  display:none; justify-content:center; gap:8px; align-items:center; pointer-events:none; }
+.banner.show{ display:flex; }
+.banner .bn{ font-family:var(--font-d); font-weight:700; font-size:15px; color:var(--ink);
+  background:var(--accent); border:2.5px solid var(--ink); border-radius:12px 12px 12px 3px;
+  box-shadow:0 3px 0 var(--shadow); padding:6px 14px; transform:rotate(-1.2deg); }
+.banner .mk{ pointer-events:auto; }
+
+.strip{ position:fixed; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 8px); z-index:4;
+  display:flex; flex-direction:column; align-items:center; gap:6px; padding:0 10px; pointer-events:none; }
+.strip > *{ pointer-events:auto; }
+.chip{ display:flex; align-items:center; gap:7px; background:var(--paper2); border:2.5px solid var(--ink);
+  border-radius:12px; box-shadow:0 3px 0 var(--shadow); padding:5px 12px;
+  font-family:var(--font-d); font-weight:600; font-size:12.5px; white-space:nowrap; }
+.chip small{ font-family:var(--font-u); font-weight:800; font-size:8.5px; letter-spacing:.12em;
+  color:var(--ink-soft); text-transform:uppercase; }
+.chip b{ font-weight:700; }
+.chip .sep{ color:rgba(44,39,51,.3); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="seg" id="seg">
+    <button data-b="ring" class="on">Ring</button>
+    <button data-b="rack">Rack</button>
+    <button data-b="grid">Grid</button>
+  </div>
+  <div class="row2">
+    <button class="mk" id="btnMode">Spot-test: off</button>
+    <button class="mk" id="btnHint">Hint wiggle: off</button>
+  </div>
+</div>
+
+<div class="banner" id="banner">
+  <span class="bn" id="bnTxt">Find the cast!</span>
+  <button class="mk tiny" id="btnSkip">re-deal</button>
+</div>
+
+<div class="strip">
+  <div class="chip" id="sandChip"><small>Sandbox</small><span id="sandTxt">—</span></div>
+  <div class="chip"><small>Find avg</small><span id="avgTxt">Ring — · Rack — · Grid —</span>
+    <button class="mk tiny" id="btnReset">reset</button></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ===================== shared vocabulary (mirrors the game) ===================== */
+var HEX = { R:"#ef4a5a", Y:"#f6c445", B:"#3d8bdf", O:"#f2913d", G:"#57c268", P:"#9b62d6" };
+var NAME = { R:"Red", Y:"Yellow", B:"Blue", O:"Orange", G:"Green", P:"Purple" };
+var PRIM = { R:1, Y:1, B:1 };
+var PARENT = { O:["R","Y"], G:["Y","B"], P:["R","B"] };
+function isPrim(c){ return !!PRIM[c]; }
+function mix(a,b){ var s=[a,b].sort().join("");
+  if(s==="RY") return "O"; if(s==="BY") return "G"; if(s==="BR") return "P"; return null; }
+function pick(a){ return a[(Math.random()*a.length)|0]; }
+function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0, t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function now(){ return performance.now(); }
+function freshBall(){ return { c:pick(["R","Y","B"]), lvl:1, born:now() }; }
+
+/* the recipe grammar, in miniature — a 3-ball sweep resolves to a spell or a fizzle.
+   RRR/YYY/BBB · OOO/GGG/PPP · secondary+both parents · secondary PAIR+any · R+Y+B=Transmute. */
+function resolveCast(cols){
+  var s={}; cols.forEach(function(c){ s[c]=(s[c]||0)+1; });
+  if(s.R===3) return { name:"Ember",      valid:true, tint:HEX.R };
+  if(s.Y===3) return { name:"Sunburst",   valid:true, tint:HEX.Y };
+  if(s.B===3) return { name:"Frost",      valid:true, tint:HEX.B };
+  if(s.O===3) return { name:"Pyre",       valid:true, tint:HEX.O };
+  if(s.G===3) return { name:"Overgrowth", valid:true, tint:HEX.G };
+  if(s.P===3) return { name:"Eclipse",    valid:true, tint:HEX.P };
+  if(s.R===1 && s.Y===1 && s.B===1) return { name:"Transmute", valid:true, tint:"#9b62d6" };
+  if(s.O===1 && s.R===1 && s.Y===1) return { name:"Blast", valid:true, tint:HEX.O };
+  if(s.P===1 && s.R===1 && s.B===1) return { name:"Lance", valid:true, tint:HEX.P };
+  if(s.G===1 && s.Y===1 && s.B===1) return { name:"Venom", valid:true, tint:HEX.G };
+  if(s.O===2) return { name:"Blast", valid:true, tint:HEX.O };
+  if(s.P===2) return { name:"Lance", valid:true, tint:HEX.P };
+  if(s.G===2) return { name:"Venom", valid:true, tint:HEX.G };
+  return { name:"Fizzle", valid:false, tint:"#b9b2a6" };
+}
+
+/* ===================== canvas ===================== */
+var cv=document.getElementById("c"), ctx=cv.getContext("2d");
+var W,H,DPR;
+function resize(){
+  DPR=Math.min(2, window.devicePixelRatio||1);
+  W=window.innerWidth; H=window.innerHeight;
+  cv.width=W*DPR; cv.height=H*DPR;
+  cv.style.width=W+"px"; cv.style.height=H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.lineJoin="round"; ctx.lineCap="round";
+  layoutAll();
+}
+window.addEventListener("resize", resize);
+
+/* ===================== the three boards =====================
+   a board = slots (positions) + adj (who counts as "next to"). the SAME sweep
+   and merge code runs on all three; only the adjacency differs:
+     RING — 12 in a circle, adj = i±1 with wrap. a sweep is an arc window.
+     RACK — 12 on a gentle card-fan arc, adj = i±1, NO wrap. windows are left-right runs.
+     GRID — 4x4, adj = 4-way orthogonal. a sweep is any 3-cell orthogonal path. */
+function ringBoard(){
+  var b={ name:"ring", n:12, adj:[], balls:[] };
+  for(var i=0;i<12;i++) b.adj.push([ (i+11)%12, (i+1)%12 ]);
+  b.layout=function(){
+    var dialR=Math.min(W*0.375, 150);
+    var cy=Math.min(H-dialR-70, H*0.60+40);
+    b.ballR=dialR*0.215+8; b.slots=[]; b.cx=W/2; b.cy=cy; b.dialR=dialR;
+    for(var i=0;i<12;i++){
+      var a=-Math.PI/2+i*(Math.PI*2/12);
+      b.slots.push({ x:W/2+Math.cos(a)*dialR, y:cy+Math.sin(a)*dialR });
+    }
+  };
+  return b;
+}
+function rackBoard(){
+  var b={ name:"rack", n:12, adj:[], balls:[] };
+  for(var i=0;i<12;i++){
+    var a=[]; if(i>0)a.push(i-1); if(i<11)a.push(i+1); b.adj.push(a);
+  }
+  b.layout=function(){
+    var m=Math.min(W-36, 372), x0=(W-m)/2, cy=H*0.60+40;
+    b.ballR=Math.min(19, m/12/2+3.5); b.slots=[];
+    for(var i=0;i<12;i++){
+      var u=(i-5.5)/5.5;                      // -1..1 across the hand
+      b.slots.push({ x:x0+(i+0.5)*(m/12), y:cy-26+30*u*u });   // middle sits proud, ends droop — a fanned hand
+    }
+  };
+  return b;
+}
+function gridBoard(){
+  /* 5x5 with FOUR HOLES at (1,1) (1,3) (3,1) (3,3) — 21 playable cells in a pinwheel.
+     holes are not traversable: adjacency simply skips them, so sweeps and merges
+     must ROUTE around them. that bending read is the whole experiment. */
+  var b={ name:"grid", n:25, adj:[], balls:[], hole:{} };
+  [6,8,16,18].forEach(function(i){ b.hole[i]=1; });
+  for(var i=0;i<25;i++){
+    var r=(i/5)|0, c=i%5, a=[];
+    if(!b.hole[i]){
+      if(c>0 && !b.hole[i-1]) a.push(i-1);
+      if(c<4 && !b.hole[i+1]) a.push(i+1);
+      if(r>0 && !b.hole[i-5]) a.push(i-5);
+      if(r<4 && !b.hole[i+5]) a.push(i+5);
+    }
+    b.adj.push(a);
+  }
+  b.layout=function(){
+    var cell=Math.min((W-50)/5, 66), cy=H*0.60+40;
+    b.ballR=cell*0.36; b.slots=[]; b.cell=cell;
+    for(var i=0;i<25;i++){
+      var r=(i/5)|0, c=i%5;
+      b.slots.push({ x:W/2+(c-2)*cell, y:cy+(r-2)*cell });
+    }
+  };
+  return b;
+}
+var BOARDS={ ring:ringBoard(), rack:rackBoard(), grid:gridBoard() };
+var cur=BOARDS.ring;
+function layoutAll(){ Object.keys(BOARDS).forEach(function(k){ BOARDS[k].layout(); }); }
+
+/* every possible 3-slot window a sweep could trace, enumerated once per board.
+   a window is a path a—m—b (a,b distinct neighbours of the middle m); each unique
+   cell-set appears exactly once. ring: 12 · rack: 10 · grid: 52. */
+function windowsOf(b){
+  if(b.wins) return b.wins;
+  var out=[], seen={};
+  for(var m=0;m<b.n;m++){
+    var nb=b.adj[m];
+    for(var x=0;x<nb.length;x++) for(var y=x+1;y<nb.length;y++){
+      var key=[nb[x],m,nb[y]].slice().sort(function(p,q){return p-q;}).join("_");
+      if(!seen[key]){ seen[key]=1; out.push([nb[x],m,nb[y]]); }
+    }
+  }
+  b.wins=out; return out;
+}
+function countValidWindows(b){
+  var n=0;
+  windowsOf(b).forEach(function(w){
+    var cols=w.map(function(i){ return b.balls[i].c; });
+    if(resolveCast(cols).valid) n++;
+  });
+  return n;
+}
+
+/* ===================== state ===================== */
+var mode="sandbox";                 // "sandbox" | "spot"
+var hintOn=false;
+var fx=[], dmgs=[], toastO=null, shake=0;
+var lastInput=now();
+var stats={ ring:{casts:0,fizz:0,ms:0}, rack:{casts:0,fizz:0,ms:0}, grid:{casts:0,fizz:0,ms:0} };
+var avgs={ ring:null, rack:null, grid:null };
+try{ var raw=localStorage.getItem("whlab_avgs"); if(raw){ var p=JSON.parse(raw);
+  ["ring","rack","grid"].forEach(function(k){ if(typeof p[k]==="number") avgs[k]=p[k]; }); } }catch(e){}
+function saveAvgs(){ try{ localStorage.setItem("whlab_avgs", JSON.stringify(avgs)); }catch(e){} }
+var spot={ win:null, t0:0, finds:[], waiting:false };
+var castLog=[];
+
+/* dummy targets — three grey blobs holding still at the top, purely to be hit */
+var enemies=[];
+function makeEnemies(){
+  enemies=[];
+  for(var i=0;i<3;i++) enemies.push({ x:W*(0.25+0.25*i), y:118+ (window.innerHeight>700?58:34),
+    hp:60, max:60, seed:i*2.3+1, hit:0, dead:false, deadAt:0 });
+}
+function aliveEnemies(){ return enemies.filter(function(e){ return !e.dead; }); }
+
+/* ===================== tiny audio ===================== */
+var actx=null;
+function ac(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(actx&&actx.state==="suspended") actx.resume(); return actx; }
+function beep(f,d,type,g){ var a=ac(); if(!a) return; try{
+  var o=a.createOscillator(),v=a.createGain(),t=a.currentTime;
+  o.type=type||"sine"; o.frequency.value=f; o.connect(v); v.connect(a.destination);
+  v.gain.setValueAtTime(.0001,t); v.gain.linearRampToValueAtTime(g||.05,t+.01);
+  v.gain.exponentialRampToValueAtTime(.0001,t+d); o.start(t); o.stop(t+d+.02); }catch(e){} }
+function sCast(tl){ var st=Math.min(7,2+Math.round(tl/2));
+  for(var i=0;i<st;i++)(function(i){ setTimeout(function(){ beep(300*Math.pow(2,i*3/12),.1,"triangle",.05); }, i*45); })(i); }
+function sFizzle(){ beep(200,.16,"sawtooth",.04); setTimeout(function(){ beep(150,.13,"sawtooth",.03); },100); }
+function sMerge(l){ beep(360+l*70,.08,"triangle",.05); setTimeout(function(){ beep(520+l*80,.08,"triangle",.04); },50); }
+function sFind(){ [523,659,880].forEach(function(f,i){ setTimeout(function(){ beep(f,.14,"triangle",.05); }, i*80); }); }
+function vib(p){ if(navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
+
+/* ===================== fx ===================== */
+function boom(x,y,col,scale){ fx.push({ ring:true, x:x,y:y, col:col, t:now(), max:(cur.ballR||24)*(scale||1.8) }); }
+function confetti(x,y,col,n){
+  for(var i=0;i<(n||8);i++){
+    var a=Math.random()*Math.PI*2, sp=1.6+Math.random()*2.6;
+    fx.push({ conf:true, x:x,y:y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1.6,
+      col:i%3===0?"#2c2733":col, s:3+Math.random()*2.5, rot:Math.random()*6, t:now() });
+  }
+}
+function puff(x,y){ for(var i=0;i<5;i++) fx.push({ puff:true, x:x+(Math.random()*2-1)*10,
+  y:y+(Math.random()*2-1)*8, vy:-0.35-Math.random()*0.4, s:5+Math.random()*5, t:now()+i*30 }); }
+function spawnDmg(x,y,amt,big){ dmgs.push({ x:x,y:y, amt:amt, t:now(), big:!!big }); }
+function toast(txt,ms,col,big){ toastO={ txt:txt, t:now(), ms:ms||900, col:col||"#2c2733", big:!!big }; }
+
+/* ===================== casting & merging (board-agnostic) ===================== */
+function tlOf(balls){ return balls.reduce(function(s,b){ return s+b.lvl; },0); }
+function refillSlot(b,i,delay){ b.balls[i]=freshBall(); b.balls[i].born=now()+(delay||0); }
+
+function doCast(idxs){
+  var b=cur, balls=idxs.map(function(i){ return b.balls[i]; });
+  var sp=resolveCast(balls.map(function(x){ return x.c; }));
+  var TL=tlOf(balls);
+  var st=stats[b.name];
+  lastInput=now();
+  if(!sp.valid){
+    // the sad puff — a sweep that won't cohere
+    var mx=0,my=0; idxs.forEach(function(i){ mx+=b.slots[i].x/3; my+=b.slots[i].y/3; });
+    puff(mx,my-8); sFizzle(); vib(12); shake=Math.max(shake,2);
+    toast("fizzle…", 650, "#8a8390");
+    if(mode==="sandbox"){ st.fizz++; idxs.forEach(function(i,k){ boom(b.slots[i].x,b.slots[i].y,"#b9b2a6",0.7); refillSlot(b,i,k*50); }); }
+    return sp;                                   // spot-test: board stays intact, keep hunting
+  }
+  // ---- valid cast: this is the moment that has to feel GREAT ----
+  var dmg=3*TL;
+  idxs.forEach(function(i,k){ boom(b.slots[i].x,b.slots[i].y,sp.tint,1.2); });
+  sCast(TL); vib([15,30,25]);
+  shake=Math.min(18, 6+TL*1.2);
+  castLog.push({ name:sp.name, dmg:dmg, board:b.name, mode:mode });
+  if(mode==="sandbox"){
+    st.casts++;
+    var tgt=pick(aliveEnemies().length?aliveEnemies():[null]);
+    if(tgt){
+      fx.push({ beam:true, from:{x:b.slots[idxs[1]].x,y:b.slots[idxs[1]].y}, tgt:{x:tgt.x,y:tgt.y}, t:now(), tint:sp.tint });
+      setTimeout(function(){ hitEnemy(tgt, dmg, sp.tint, TL); }, 110);
+    }
+    toast(sp.name+"  ·  L"+TL, 950, sp.tint==="#f6c445"?"#b9791a":sp.tint, TL>=6);
+    idxs.forEach(function(i,k){ refillSlot(b,i,120+k*60); });
+  } else {
+    spotFound(sp, TL, idxs);
+  }
+  return sp;
+}
+function hitEnemy(e,dmg,tint,TL){
+  if(e.dead) return;
+  e.hp-=dmg; e.hit=now();
+  spawnDmg(e.x, e.y-38, dmg, true);
+  boom(e.x,e.y,tint,2.2); boom(e.x,e.y,"#2c2733",1.3);
+  shake=Math.min(22, shake+4+TL*0.6);
+  beep(160+Math.min(dmg,30)*5,.09,"square",.05);
+  if(e.hp<=0){
+    e.dead=true; e.deadAt=now();
+    confetti(e.x,e.y,"#cfc5b2",10);
+    beep(620,.06,"triangle",.05); setTimeout(function(){ beep(340,.09,"triangle",.04); },60);
+    setTimeout(function(){ e.hp=e.max; e.dead=false; e.deadAt=0; e.born=now();
+      boom(e.x,e.y,"#c9c1b4",1.5); }, 1100);
+  }
+}
+function doMerge(a,bI){
+  var b=cur, A=b.balls[a], B=b.balls[bI];
+  lastInput=now();
+  if(mode==="spot"){ toast("merges are off in spot-test", 900, "#8a8390"); return false; }
+  if(!A||!B) return false;
+  if(A.c===B.c && A.lvl===B.lvl && A.lvl<4){
+    B.lvl++; B.born=now();
+    boom(b.slots[bI].x,b.slots[bI].y,HEX[B.c],1.4); sMerge(B.lvl); vib(14);
+    toast(NAME[B.c]+" L"+B.lvl, 750, HEX[B.c]==="#f6c445"?"#b9791a":HEX[B.c]);
+    refillSlot(b,a,90);
+    return true;
+  }
+  if(isPrim(A.c)&&isPrim(B.c)&&A.c!==B.c&&A.lvl===B.lvl){
+    var m=mix(A.c,B.c);
+    b.balls[bI]={ c:m, lvl:A.lvl, born:now() };
+    boom(b.slots[bI].x,b.slots[bI].y,HEX[m],1.4); sMerge(A.lvl); vib(14);
+    toast(NAME[m]+"!", 750, HEX[m]);
+    refillSlot(b,a,90);
+    return true;
+  }
+  puff(b.slots[bI].x, b.slots[bI].y-6);
+  toast("won't merge", 600, "#8a8390"); beep(220,.08,"sine",.035);
+  return false;
+}
+
+/* ===================== spot-test =====================
+   the deal PLANTS exactly one valid window, then fills everything else so no other
+   window coheres: greedy fill (mostly primaries, ~25% decoy secondaries so secondaries
+   aren't a tell), rejecting any colour that completes a second valid window; verified
+   with a full window count at the end. */
+function plantedRecipe(){
+  var r=Math.random(), secs=["O","G","P"], prims=["R","Y","B"];
+  if(r<0.20){ var c=pick(prims); return [c,c,c]; }
+  if(r<0.38){ var s=pick(secs); return [s,s,s]; }
+  if(r<0.68){ var s2=pick(secs); return shuffle([s2].concat(PARENT[s2])); }
+  if(r<0.90){ var s3=pick(secs); return shuffle([s3,s3,pick(["R","Y","B","O","G","P"].filter(function(c){ return c!==s3; }))]); }
+  return shuffle(["R","Y","B"]);              // Transmute window
+}
+function dealSpot(b){
+  var wins=windowsOf(b);
+  for(var attempt=0; attempt<400; attempt++){
+    var win=pick(wins), rec=plantedRecipe();
+    var balls=new Array(b.n).fill(null);
+    win.forEach(function(i,k){ balls[i]={ c:rec[k], lvl:1, born:now()+k*40 }; });
+    var winKey={}; win.forEach(function(i){ winKey[i]=1; });
+    var rest=shuffle(Object.keys(balls).map(Number).filter(function(i){ return !winKey[i] && !(b.hole&&b.hole[i]); }));
+    var ok=true;
+    for(var ri=0; ri<rest.length && ok; ri++){
+      var idx=rest[ri];
+      var palette=shuffle(["R","Y","B"]);
+      if(Math.random()<0.25) palette.unshift(pick(["O","G","P"]));   // decoy secondary, if it fits safely
+      var placed=false;
+      for(var pi=0; pi<palette.length && !placed; pi++){
+        balls[idx]={ c:palette[pi], lvl:1, born:now()+200+ri*22 };
+        var bad=false;
+        for(var wi=0; wi<wins.length && !bad; wi++){
+          var w=wins[wi];
+          if(w.indexOf(idx)<0) continue;
+          if(w[0]===win[0]&&w[1]===win[1]&&w[2]===win[2]) continue;
+          var cols=[], full=true;
+          for(var ci=0; ci<3; ci++){ if(!balls[w[ci]]){ full=false; break; } cols.push(balls[w[ci]].c); }
+          if(full && resolveCast(cols).valid) bad=true;
+        }
+        if(!bad) placed=true; else balls[idx]=null;
+      }
+      if(!placed) ok=false;
+    }
+    if(!ok) continue;
+    b.balls=balls;
+    if(countValidWindows(b)===1){ spot.win=win.slice(); spot.t0=now(); spot.waiting=false; return; }
+  }
+  // pathological fallback (should never happen): all-primaries + a planted RYB re-attempt
+  dealSpot(b);
+}
+function spotFound(sp, TL, idxs){
+  var b=cur, secs=(now()-spot.t0)/1000;
+  spot.finds.push(secs);
+  spot.waiting=true;
+  idxs.forEach(function(i){ confetti(b.slots[i].x,b.slots[i].y,sp.tint,6); });
+  sFind(); vib([20,40,20]);
+  toast(secs.toFixed(1)+"s !", 1100, "#b9791a", true);
+  if(spot.finds.length>=5){
+    var avg=spot.finds.reduce(function(a,x){ return a+x; },0)/spot.finds.length;
+    avgs[b.name]=Math.round(avg*10)/10;
+    saveAvgs(); renderAvgs();
+    setTimeout(function(){ toast(cap(b.name)+" avg "+avgs[b.name].toFixed(1)+"s", 1600, "#2c2733", true); }, 900);
+    spot.finds=[];
+  }
+  setTimeout(function(){ if(mode==="spot") dealSpot(cur); }, 850);
+}
+function hintActive(t){
+  return mode==="spot" && hintOn && !spot.waiting && spot.win && (t-lastInput>4000) && (t-spot.t0>4000);
+}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* ===================== dealing / mode & board switching ===================== */
+function dealSandbox(b){ b.balls=[]; for(var i=0;i<b.n;i++) b.balls.push(b.hole&&b.hole[i]? null : freshBall()); }
+Object.keys(BOARDS).forEach(function(k){ dealSandbox(BOARDS[k]); });
+
+function setBoard(name){
+  if(!BOARDS[name] || cur===BOARDS[name]) return;
+  cancelGesture();
+  cur=BOARDS[name];
+  document.querySelectorAll("#seg button").forEach(function(btn){
+    btn.classList.toggle("on", btn.dataset.b===name);
+  });
+  if(mode==="spot"){ spot.finds=[]; dealSpot(cur); }
+  renderSand();
+}
+function setMode(m){
+  if(m===mode) return;
+  cancelGesture();
+  mode=m;
+  document.getElementById("btnMode").textContent="Spot-test: "+(m==="spot"?"on":"off");
+  document.getElementById("btnMode").classList.toggle("on", m==="spot");
+  document.getElementById("banner").classList.toggle("show", m==="spot");
+  if(m==="spot"){ spot.finds=[]; dealSpot(cur); }
+  else { Object.keys(BOARDS).forEach(function(k){ dealSandbox(BOARDS[k]); }); spot.win=null; }
+}
+
+/* ===================== input (touch + mouse share one path) ===================== */
+var gesture=null;
+function slotAt(x,y){
+  var best=-1, bd=1e9, hitR=cur.ballR*1.4;
+  for(var i=0;i<cur.n;i++){
+    var d=Math.hypot(cur.slots[i].x-x, cur.slots[i].y-y);
+    if(d<hitR && d<bd){ bd=d; best=i; }
+  }
+  return best;
+}
+function down(x,y){
+  lastInput=now(); ac();
+  if(mode==="spot"&&spot.waiting) return;
+  var i=slotAt(x,y);
+  if(i<0 || !cur.balls[i]) return;
+  gesture={ visited:[i], x:x, y:y };
+}
+function move(x,y){
+  if(!gesture) return;
+  lastInput=now();
+  gesture.x=x; gesture.y=y;
+  var i=slotAt(x,y);
+  if(i<0 || !cur.balls[i]) return;
+  var v=gesture.visited, last=v[v.length-1];
+  if(i===last || v.indexOf(i)>=0) return;
+  if(cur.adj[last].indexOf(i)<0) return;      // only a step onto a NEIGHBOUR extends the sweep
+  v.push(i);
+  beep(420+v.length*90,.05,"sine",.03);
+  if(v.length===3){ var idxs=v.slice(); gesture=null; doCast(idxs); }
+}
+function up(){
+  if(!gesture) return;
+  var v=gesture.visited; gesture=null;
+  if(v.length===2) doMerge(v[0], v[1]);       // released on a neighbour = a merge attempt
+}
+function cancelGesture(){ gesture=null; }
+
+function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:(e.changedTouches?e.changedTouches[0]:e);
+  return { x:t.clientX, y:t.clientY }; }
+cv.addEventListener("mousedown", function(e){ var p=pt(e); down(p.x,p.y); });
+window.addEventListener("mousemove", function(e){ if(gesture){ var p=pt(e); move(p.x,p.y); } });
+window.addEventListener("mouseup", function(){ up(); });
+cv.addEventListener("touchstart", function(e){ e.preventDefault(); var p=pt(e); down(p.x,p.y); }, {passive:false});
+cv.addEventListener("touchmove", function(e){ e.preventDefault(); if(e.touches.length>1)return; var p=pt(e); move(p.x,p.y); }, {passive:false});
+cv.addEventListener("touchend", function(e){ e.preventDefault(); up(); }, {passive:false});
+/* iOS zoom guards, same as the game */
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+var lastTap=0;
+document.addEventListener("touchend", function(e){ var n=Date.now();
+  if(n-lastTap<300 && !e.target.closest("button")) e.preventDefault(); lastTap=n; }, {passive:false});
+
+/* ===================== DOM controls ===================== */
+document.getElementById("seg").addEventListener("click", function(e){
+  var b=e.target.closest("button"); if(b) setBoard(b.dataset.b);
+});
+document.getElementById("btnMode").addEventListener("click", function(){
+  setMode(mode==="spot"?"sandbox":"spot");
+});
+document.getElementById("btnHint").addEventListener("click", function(){
+  hintOn=!hintOn;
+  this.textContent="Hint wiggle: "+(hintOn?"on":"off");
+  this.classList.toggle("on", hintOn);
+});
+document.getElementById("btnSkip").addEventListener("click", function(){
+  if(mode==="spot"&&!spot.waiting){ dealSpot(cur); toast("re-dealt", 600, "#8a8390"); }
+});
+document.getElementById("btnReset").addEventListener("click", function(){
+  avgs={ ring:null, rack:null, grid:null }; saveAvgs(); renderAvgs(); toast("averages cleared", 800, "#8a8390");
+});
+function renderAvgs(){
+  document.getElementById("avgTxt").textContent =
+    ["ring","rack","grid"].map(function(k){
+      return cap(k)+" "+(avgs[k]==null?"—":avgs[k].toFixed(1)+"s");
+    }).join(" · ");
+}
+function renderSand(){
+  var st=stats[cur.name], min=st.ms/60000;
+  var cpm = (st.casts>0 && min>0.05) ? (st.casts/min).toFixed(1) : "—";
+  var fz = (st.casts+st.fizz>0) ? Math.round(100*st.fizz/(st.casts+st.fizz))+"%" : "—";
+  document.getElementById("sandTxt").textContent =
+    cap(cur.name)+" · "+st.casts+" casts · "+cpm+"/min · fizzle "+fz;
+}
+renderAvgs(); renderSand();
+
+/* ===================== drawing ===================== */
+function inkShadow(pathFn, dy){
+  ctx.save(); ctx.translate(0, dy||3);
+  pathFn(); ctx.fillStyle="rgba(44,39,51,.9)"; ctx.fill();
+  ctx.restore();
+}
+function drawBall(b, px, py, i, t, wig){
+  var r0=cur.ballR*(0.86 + Math.min(b.lvl-1,3)*0.07);
+  var k=Math.min(1, Math.max(0,(t-b.born)/240));
+  var scale=k<1 ? (0.2+0.8*k)*(1+0.25*Math.sin(k*Math.PI)) : 1;   // pop-in overshoot
+  r0*=scale;
+  if(r0<1) return;
+  // hint wiggle: wig is the ball's position ALONG the planted path (-1 = not hinted).
+  // amplitude pulses down the path in order, so on the grid the hint TEACHES the route.
+  var amp=0;
+  if(wig>=0) amp=Math.max(0, Math.sin(t/260 - wig*1.15));
+  var wob=(((i*7)%5)-2)*Math.PI/180 + amp*Math.sin(t/85+i*1.7)*0.10;
+  var dx=amp*Math.sin(t/70+i)*1.8;
+  ctx.save(); ctx.translate(px+dx,py); ctx.rotate(wob);
+  if(b.lvl>=2){ ctx.beginPath(); ctx.arc(0,0,r0+5,0,7); ctx.fillStyle="rgba(255,209,92,"+(0.1*Math.min(b.lvl,4))+")"; ctx.fill(); }
+  function shape(){ ctx.beginPath(); ctx.arc(0,0,r0,0,7); }
+  inkShadow(shape, 3);
+  shape(); ctx.fillStyle=HEX[b.c]; ctx.fill();
+  if(!isPrim(b.c) && PARENT[b.c]){       // a secondary wears its recipe: two parent-tinted crescents
+    var par=PARENT[b.c], j=((i*13)%5)*0.09;
+    ctx.save(); ctx.beginPath(); ctx.arc(0,0,r0-1.2,0,7); ctx.clip();
+    ctx.globalAlpha=0.35; ctx.lineWidth=r0*0.44;
+    ctx.strokeStyle=HEX[par[0]];
+    ctx.beginPath(); ctx.arc(r0*0.30,r0*0.26,r0*0.62, Math.PI*0.72+j, Math.PI*1.42+j); ctx.stroke();
+    ctx.strokeStyle=HEX[par[1]];
+    ctx.beginPath(); ctx.arc(-r0*0.26,-r0*0.22,r0*0.58, -Math.PI*0.28+j, Math.PI*0.46+j); ctx.stroke();
+    ctx.globalAlpha=1; ctx.restore();
+  }
+  shape(); ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(-r0*0.3,-r0*0.38, r0*0.3, r0*0.17, -0.4, 0, 7);
+  ctx.fillStyle="rgba(255,255,255,.4)"; ctx.fill();
+  if(b.lvl>=2){
+    ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2;
+    var n=Math.min(b.lvl,4), pw=Math.max(5,r0*0.2), gap=3, tot=n*pw+(n-1)*gap, sx=-tot/2;
+    for(var q=0;q<n;q++){ ctx.beginPath(); ctx.arc(sx+pw/2+q*(pw+gap), r0*0.52, pw/2,0,7); ctx.fill(); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawBoardChrome(t){
+  ctx.strokeStyle="rgba(44,39,51,.14)"; ctx.lineWidth=2.5; ctx.setLineDash([2,7]);
+  if(cur.name==="ring"){
+    ctx.beginPath(); ctx.arc(cur.cx,cur.cy,cur.dialR,0,7); ctx.stroke();
+  } else if(cur.name==="rack"){
+    ctx.beginPath();
+    cur.slots.forEach(function(p,i){ if(i===0)ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.stroke();
+  } else {
+    // connectors only between traversable neighbours — the lanes visibly bend around the holes
+    for(var i=0;i<cur.n;i++){
+      cur.adj[i].forEach(function(j){
+        if(j<i) return;
+        ctx.beginPath(); ctx.moveTo(cur.slots[i].x,cur.slots[i].y); ctx.lineTo(cur.slots[j].x,cur.slots[j].y); ctx.stroke();
+      });
+    }
+    // holes: a quiet ink cross so the gap reads as "no ball ever lives here"
+    ctx.setLineDash([]);
+    ctx.strokeStyle="rgba(44,39,51,.18)"; ctx.lineWidth=2.5;
+    Object.keys(cur.hole).forEach(function(hi){
+      var p=cur.slots[+hi], s=cur.ballR*0.3;
+      ctx.beginPath(); ctx.moveTo(p.x-s,p.y-s); ctx.lineTo(p.x+s,p.y+s);
+      ctx.moveTo(p.x+s,p.y-s); ctx.lineTo(p.x-s,p.y+s); ctx.stroke();
+    });
+  }
+  ctx.setLineDash([]);
+}
+function drawEnemies(t){
+  enemies.forEach(function(e){
+    var deadK=e.dead? Math.min(1,(t-e.deadAt)/240) : 0;
+    var popK=e.born? Math.min(1,(t-e.born)/240) : 1;
+    var sc=(1-deadK)*(0.3+0.7*popK);
+    if(sc<=0.02) return;
+    var hitK=e.hit? Math.max(0,1-(t-e.hit)/180) : 0;
+    var r=30*sc*(1+hitK*0.12);
+    ctx.save(); ctx.translate(e.x, e.y+Math.sin(t/800+e.seed)*2);
+    function blob(){
+      ctx.beginPath();
+      for(var k=0;k<=24;k++){
+        var a=k/24*Math.PI*2, rr=r*(1+0.07*Math.sin(a*3+e.seed+t/600));
+        var px=Math.cos(a)*rr, py=Math.sin(a)*rr*0.92;
+        if(k===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+    }
+    inkShadow(blob, 3);
+    blob(); ctx.fillStyle=hitK>0.4? "#fffdf6" : "#b9b2a6"; ctx.fill();
+    blob(); ctx.lineWidth=3; ctx.strokeStyle="#2c2733"; ctx.stroke();
+    ctx.fillStyle="#2c2733";
+    ctx.beginPath(); ctx.arc(-9,-4,3.2,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(9,-4,3.2,0,7); ctx.fill();
+    ctx.strokeStyle="#2c2733"; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(0,9,5,Math.PI*0.15,Math.PI*0.85, hitK>0? false : true);
+    if(hitK>0){ ctx.beginPath(); ctx.arc(0,13,5,Math.PI*1.15,Math.PI*1.85); }   // hit = sad mouth
+    else { ctx.beginPath(); ctx.moveTo(-4,8); ctx.lineTo(4,8); }
+    ctx.stroke();
+    ctx.restore();
+    // HP bar
+    if(!e.dead){
+      var bw=64,bh=11,bx=e.x-bw/2,by=e.y+40;
+      ctx.fillStyle="rgba(44,39,51,.9)"; roundRect(bx,by+2.5,bw,bh,5); ctx.fill();
+      ctx.fillStyle="#fffdf6"; roundRect(bx,by,bw,bh,5); ctx.fill();
+      var pct=Math.max(0,e.hp/e.max);
+      ctx.fillStyle= pct>0.55?"#57c268":pct>0.25?"#f6c445":"#ef4a5a";
+      if(pct>0){ roundRect(bx+2,by+2,(bw-4)*pct,bh-4,3); ctx.fill(); }
+      ctx.lineWidth=2.5; ctx.strokeStyle="#2c2733"; roundRect(bx,by,bw,bh,5); ctx.stroke();
+    }
+  });
+}
+function roundRect(x,y,w,h,r){ r=Math.min(r,h/2,w/2); ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawFx(t){
+  for(var i=fx.length-1;i>=0;i--){
+    var f=fx[i], age=t-f.t;
+    if(age<0) continue;
+    if(f.ring){
+      var k=age/380; if(k>=1){ fx.splice(i,1); continue; }
+      ctx.globalAlpha=1-k;
+      ctx.beginPath(); ctx.arc(f.x,f.y,4+f.max*2.4*k,0,7);
+      ctx.lineWidth=5*(1-k)+1.5; ctx.strokeStyle=f.col; ctx.stroke();
+      ctx.beginPath(); ctx.arc(f.x,f.y,2+f.max*1.7*k,0,7);
+      ctx.lineWidth=2.5; ctx.strokeStyle="rgba(44,39,51,.55)"; ctx.stroke();
+      ctx.globalAlpha=1;
+    } else if(f.conf){
+      var k2=age/750; if(k2>=1){ fx.splice(i,1); continue; }
+      f.x+=f.vx; f.y+=f.vy; f.vy+=0.09;
+      ctx.save(); ctx.translate(f.x,f.y); ctx.rotate(f.rot+age/120);
+      ctx.globalAlpha=1-k2; ctx.fillStyle=f.col;
+      ctx.fillRect(-f.s/2,-f.s/2,f.s,f.s*0.7);
+      ctx.restore(); ctx.globalAlpha=1;
+    } else if(f.puff){
+      var k3=age/600; if(k3>=1){ fx.splice(i,1); continue; }
+      f.y+=f.vy;
+      ctx.globalAlpha=(1-k3)*0.5;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.s*(0.6+k3),0,7);
+      ctx.fillStyle="#8a8390"; ctx.fill();
+      ctx.globalAlpha=1;
+    } else if(f.beam){
+      var k4=age/260; if(k4>=1){ fx.splice(i,1); continue; }
+      ctx.globalAlpha=(1-k4)*0.9;
+      ctx.lineWidth=6*(1-k4)+2; ctx.strokeStyle=f.tint;
+      ctx.beginPath(); ctx.moveTo(f.from.x,f.from.y);
+      var mx=(f.from.x+f.tgt.x)/2+18, my=(f.from.y+f.tgt.y)/2;
+      ctx.quadraticCurveTo(mx,my,f.tgt.x,f.tgt.y); ctx.stroke();
+      ctx.globalAlpha=1;
+    } else fx.splice(i,1);
+  }
+}
+function drawDmgs(t){
+  for(var i=dmgs.length-1;i>=0;i--){
+    var d=dmgs[i], age=t-d.t, k=age/950;
+    if(k>=1){ dmgs.splice(i,1); continue; }
+    var popK=k<0.16? 1+(1-k/0.16)*0.9 : 1;                 // slams in oversized, settles, floats away
+    var fs=(d.big? 44:18)*popK;
+    ctx.globalAlpha=k>0.7? (1-k)/0.3 : 1;
+    ctx.textAlign="center";
+    ctx.font="700 "+fs.toFixed(1)+"px Fredoka, sans-serif";
+    ctx.strokeStyle="#2c2733"; ctx.lineWidth=d.big?7:3;
+    ctx.fillStyle=d.big? (d.amt>=24? "#ffd15c" : "#fffdf6") : "#fffdf6";
+    var yy=Math.max(d.y-46*k, 106);   // never floats up into the HUD buttons
+    ctx.strokeText(""+d.amt, d.x, yy); ctx.fillText(""+d.amt, d.x, yy);
+    ctx.globalAlpha=1;
+  }
+}
+function drawToast(t){
+  if(!toastO) return;
+  var age=t-toastO.t; if(age>toastO.ms){ toastO=null; return; }
+  var k=age/toastO.ms, a=k<0.15? k/0.15 : (k>0.8? (1-k)/0.2 : 1);
+  ctx.globalAlpha=a; ctx.textAlign="center";
+  ctx.font="700 "+(toastO.big?30:20)+"px Fredoka, sans-serif";
+  var y=cur.name==="grid"? cur.slots[0].y-cur.ballR-34 : (cur.name==="ring"? cur.cy-cur.dialR-cur.ballR-26 : cur.slots[0].y-70);
+  ctx.strokeStyle="#2c2733"; ctx.lineWidth=5; ctx.fillStyle="#fffdf6";
+  ctx.strokeText(toastO.txt, W/2, y);
+  ctx.fillStyle=toastO.col; ctx.fillText(toastO.txt, W/2, y);
+  ctx.globalAlpha=1;
+}
+
+var lastT=now(), sandTick=0;
+function frame(){
+  var t=now(), dt=Math.min(80, t-lastT); lastT=t;
+  if(mode==="sandbox") stats[cur.name].ms+=dt;
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  if(shake>0){ ctx.translate((Math.random()*2-1)*shake,(Math.random()*2-1)*shake); shake*=0.86; if(shake<0.4)shake=0; }
+  drawBoardChrome(t);
+  // empty sockets under missing balls
+  ctx.strokeStyle="rgba(44,39,51,.2)"; ctx.lineWidth=2; ctx.setLineDash([2,6]);
+  for(var i=0;i<cur.n;i++){ if(!cur.balls[i] && !(cur.hole&&cur.hole[i])){ ctx.beginPath(); ctx.arc(cur.slots[i].x,cur.slots[i].y,cur.ballR*0.8,0,7); ctx.stroke(); } }
+  ctx.setLineDash([]);
+  if(mode==="sandbox") drawEnemies(t);
+  var hint=hintActive(t);
+  for(var i2=0;i2<cur.n;i2++){
+    var b=cur.balls[i2]; if(!b) continue;
+    var wig=hint? spot.win.indexOf(i2) : -1;
+    drawBall(b, cur.slots[i2].x, cur.slots[i2].y, i2, t, wig);
+  }
+  // gesture trail: visited slots + live tether to the finger
+  if(gesture&&gesture.visited.length>=1){
+    ctx.strokeStyle="rgba(44,39,51,.55)"; ctx.lineWidth=4; ctx.setLineDash([1,8]);
+    ctx.beginPath();
+    gesture.visited.forEach(function(si,k){ var p=cur.slots[si]; if(k===0)ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.lineTo(gesture.x,gesture.y); ctx.stroke(); ctx.setLineDash([]);
+    gesture.visited.forEach(function(si){
+      ctx.beginPath(); ctx.arc(cur.slots[si].x,cur.slots[si].y,cur.ballR+6,0,7);
+      ctx.lineWidth=3.5; ctx.strokeStyle="#ffd15c"; ctx.stroke();
+    });
+  }
+  drawFx(t); drawDmgs(t); drawToast(t);
+  ctx.restore();
+  // banner + strip text (cheap; every ~150ms)
+  if(t-sandTick>150){
+    sandTick=t;
+    renderSand();
+    if(mode==="spot"){
+      var el=spot.waiting? "✓" : ((t-spot.t0)/1000).toFixed(1)+"s";
+      document.getElementById("bnTxt").textContent="Find the cast! · "+(spot.finds.length+1)+"/5 · "+el;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ===================== boot ===================== */
+resize();
+makeEnemies();
+requestAnimationFrame(frame);
+
+/* ===================== debug/API surface for lab instrumentation ===================== */
+window.LAB = {
+  setBoard:setBoard, boardName:function(){ return cur.name; },
+  setMode:setMode, mode:function(){ return mode; },
+  slotXY:function(i){ return { x:cur.slots[i].x, y:cur.slots[i].y }; },
+  n:function(){ return cur.n; },
+  adj:function(i){ return cur.adj[i].slice(); },
+  balls:function(){ return cur.balls.map(function(b){ return b?{c:b.c,lvl:b.lvl}:null; }); },
+  setBalls:function(arr){ cur.balls=arr.map(function(v,i){
+    if(v==null || (cur.hole&&cur.hole[i])) return null;
+    return typeof v==="string"? {c:v,lvl:1,born:now()-999} : {c:v.c,lvl:v.lvl||1,born:now()-999}; }); },
+  holes:function(){ return cur.hole? Object.keys(cur.hole).map(Number) : []; },
+  windows:function(){ return windowsOf(cur).map(function(w){ return w.slice(); }); },
+  countValid:function(){ return countValidWindows(cur); },
+  planted:function(){ return spot.win? spot.win.slice():null; },
+  finds:function(){ return spot.finds.slice(); },
+  avgs:function(){ return { ring:avgs.ring, rack:avgs.rack, grid:avgs.grid }; },
+  stats:function(){ return JSON.parse(JSON.stringify(stats)); },
+  castLog:function(){ return castLog.slice(); },
+  hintActive:function(){ return hintActive(now()); },
+  setHint:function(v){ if(v!==hintOn) document.getElementById("btnHint").click(); },
+  enemies:function(){ return enemies.map(function(e){ return { hp:e.hp, max:e.max, dead:e.dead }; }); }
+};
+
+})();
+</script>
+</body>
+</html>

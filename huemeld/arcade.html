@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f3ead6" />
+<title>Huemeld Arcade (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  --font-d:'Fredoka',sans-serif; --font-u:'Nunito',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.055) 1.2px, transparent 1.3px);
+  background-size:22px 22px;
+  font-family:var(--font-u); color:var(--ink);
+  display:flex; flex-direction:column; align-items:center;
+  overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none;
+  overscroll-behavior:none;
+}
+.top{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 8px; }
+.brand{ display:flex; align-items:baseline; gap:8px; }
+.brand a{ text-decoration:none; color:var(--ink); }
+h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
+.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--ink); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
+.scores{ display:flex; gap:8px; }
+.sc{ background:var(--card); border:2.5px solid var(--line); border-radius:12px; box-shadow:0 3px 0 var(--shadow); padding:4px 12px; text-align:center; min-width:74px; }
+.sc span{ display:block; font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); }
+.sc b{ font-family:var(--font-d); font-size:17px; line-height:1.1; }
+.mutebtn{ width:36px; height:36px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; }
+
+/* the piece tray — the incoming 2x2 hovers here; drag to aim, tap to spin, flick down to drop */
+.minibar{ width:min(94vw,420px); display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-bottom:3px; min-height:24px; }
+.nlab{ font-size:9.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); }
+.mini2{ display:grid; grid-template-columns:repeat(2,11px); grid-auto-rows:11px; gap:2px; }
+.mini2 i{ width:11px; height:11px; border:1.5px solid var(--line); border-radius:3px; }
+.tray{ position:relative; width:min(94vw,420px); aspect-ratio:7/2; margin-bottom:8px; touch-action:none; }
+.tray .guide{ position:absolute; inset:2px; border:2.5px dashed rgba(44,39,51,.16); border-radius:14px; }
+.piece{ position:absolute; top:0; left:0; transition:transform .13s cubic-bezier(.3,1.2,.6,1); cursor:grab; }
+.piece .pchip{
+  position:absolute; border:3px solid var(--line);
+  border-radius:24% 30% 26% 32% / 28% 24% 32% 26%;
+  box-shadow:1.5px 2px 0 var(--shadow);
+}
+.piece .pchip::after{ content:""; position:absolute; top:14%; left:16%; width:34%; height:22%; border-radius:50%; background:rgba(255,255,255,.4); }
+.piece.nope{ animation:pieceNope .3s; }
+@keyframes pieceNope{ 0%,100%{margin-left:0} 30%{margin-left:-5px} 70%{margin-left:5px} }
+
+.wellwrap{ position:relative; width:min(94vw,420px); }
+.well{
+  position:relative; width:100%; aspect-ratio:7/9;
+  background:var(--card); border:3px solid var(--line); border-radius:18px;
+  box-shadow:0 5px 0 var(--shadow); overflow:hidden;
+}
+.well .ghostcol{ position:absolute; top:0; bottom:0; background:rgba(44,39,51,.06); pointer-events:none; display:none; }
+.well.danger{ animation:dangerPulse .8s ease-in-out infinite; }
+@keyframes dangerPulse{ 0%,100%{border-color:var(--line)} 50%{border-color:#ef4a5a; box-shadow:0 5px 0 rgba(239,74,90,.5)} }
+.well.shake{ animation:wellShake .3s; }
+@keyframes wellShake{ 0%,100%{transform:translate(0,0)} 25%{transform:translate(-4px,2px)} 55%{transform:translate(4px,-2px)} 80%{transform:translate(-2px,1px)} }
+
+.t{ position:absolute; left:0; top:0; transition:transform .19s cubic-bezier(.3,1.25,.6,1); will-change:transform; }
+.t .b{
+  display:block; width:100%; height:100%;
+  background:var(--pc); border:3px solid var(--line);
+  border-radius:24% 30% 26% 32% / 28% 24% 32% 26%;
+  box-shadow:1.5px 2px 0 var(--shadow);
+  transform:rotate(var(--rot,0deg));
+  transition:transform .1s, border-radius .22s, background .2s;
+  position:relative;
+}
+.t .b::after{ content:""; position:absolute; top:14%; left:16%; width:34%; height:22%; border-radius:50%; background:rgba(255,255,255,.4); }
+.t.S .b{ border-radius:50%; }
+.t.lift .b{ transform:rotate(var(--rot,0deg)) scale(1.14); box-shadow:0 0 0 2px #fff, 0 4px 8px var(--shadow); }
+.t.mixed .b{ animation:mixb .28s cubic-bezier(.3,1.4,.6,1); }
+@keyframes mixb{ 0%{transform:scale(.7)} 55%{transform:scale(1.3)} 100%{transform:scale(1)} }
+.t.nope .b{ animation:nopeb .3s; }
+@keyframes nopeb{ 0%,100%{transform:translateX(0) rotate(var(--rot,0deg))} 30%{transform:translateX(-4px) rotate(var(--rot,0deg))} 70%{transform:translateX(4px) rotate(var(--rot,0deg))} }
+.t.pop{ z-index:4; }
+.t.pop .b{ animation:popb .26s cubic-bezier(.36,.07,.6,1) forwards; }
+@keyframes popb{ 0%{transform:scale(1)} 40%{transform:scale(1.28)} 100%{transform:scale(.05); opacity:0} }
+
+.float{
+  position:absolute; z-index:6; pointer-events:none;
+  font-family:var(--font-d); font-weight:700; font-size:17px; color:var(--ink);
+  text-shadow:0 0 4px #fff, 0 0 8px #fff;
+  animation:rise .75s ease-out forwards;
+}
+@keyframes rise{ 0%{transform:translateY(0); opacity:0} 15%{opacity:1} 100%{transform:translateY(-34px); opacity:0} }
+
+.chain{
+  position:absolute; left:50%; top:38%; transform:translate(-50%,-50%) scale(.4) rotate(-4deg);
+  z-index:7; pointer-events:none; opacity:0;
+  font-family:var(--font-d); font-weight:700; font-size:34px; color:#fff;
+  -webkit-text-stroke:2px var(--ink); text-shadow:0 4px 0 var(--shadow);
+}
+.chain.show{ animation:chainIn .7s cubic-bezier(.3,1.4,.6,1) forwards; }
+@keyframes chainIn{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.4) rotate(-4deg)} 25%{opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(-4deg)} 70%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-4deg)} 100%{opacity:0; transform:translate(-50%,-56%) scale(1) rotate(-4deg)} }
+
+.ov{
+  position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+  background:rgba(243,234,214,.9); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.ov.show{ opacity:1; pointer-events:auto; }
+.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 24px; text-align:center; max-width:88%; }
+.panel h2{ font-family:var(--font-d); font-weight:700; font-size:26px; margin-bottom:8px; }
+.panel p{ font-size:13px; font-weight:700; color:var(--ink-soft); line-height:1.55; }
+.panel .bigscore{ font-family:var(--font-d); font-weight:700; font-size:34px; margin:6px 0 2px; }
+.panel .newbest{ color:#2f7d3a; font-weight:800; font-size:13px; }
+.howrow{ display:flex; align-items:center; justify-content:center; gap:5px; margin:10px 0 2px; font-family:var(--font-d); font-weight:700; color:var(--ink-soft); }
+.chip{ width:20px; height:20px; border:2.5px solid var(--line); border-radius:6px; box-shadow:0 2px 0 var(--shadow); }
+.chip.ci{ border-radius:50%; }
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:#ffd15c; border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); height:48px; padding:0 30px; font-size:17px; margin-top:14px;
+  transition:transform .08s, box-shadow .08s; touch-action:manipulation;
+}
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:9px; line-height:1.45; }
+.tip b{ color:var(--ink); }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">ARCADE</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="scores">
+        <div class="sc"><span>score</span><b id="score">0</b></div>
+        <div class="sc"><span>best</span><b id="best">0</b></div>
+      </div>
+      <button class="mutebtn" id="mute" aria-label="Sound">♪</button>
+    </div>
+  </div>
+  <div class="minibar"><span class="nlab">next</span><div class="mini2" id="nextmini"></div></div>
+  <div class="tray" id="tray"><div class="guide"></div></div>
+  <div class="wellwrap">
+    <div class="well" id="well"><div class="ghostcol" id="gc1"></div><div class="ghostcol" id="gc2"></div></div>
+    <div class="chain" id="chain"></div>
+    <div class="ov show" id="ovStart">
+      <div class="panel">
+        <h2>Huemeld Arcade</h2>
+        <div class="howrow"><span class="chip" style="background:#ef4a5a"></span>+<span class="chip" style="background:#f6c445"></span>=<span class="chip ci" style="background:#f2913d"></span></div>
+        <p><b>Drag</b> the block sideways, <b>tap</b> to spin it, <b>flick down</b> to drop.<br>Paint poured <b>onto</b> a different paint blends into a circle — <b>spin</b> the block to choose its chemistry!<br>One rule: a <b>2×2 square</b> or <b>4-in-a-row</b> of any colour <b>POPS!</b><br>Circles score <b>4×</b> what plain paint does. Don't overflow!</p>
+        <button class="mk" id="btnStart">Play</button>
+      </div>
+    </div>
+    <div class="ov" id="ovOver">
+      <div class="panel">
+        <h2 id="overTitle2">The well is full!</h2>
+        <div class="bigscore" id="finalScore">0</div>
+        <p class="newbest" id="newBest" style="display:none">★ new best! ★</p>
+        <p id="overStats"></p>
+        <button class="mk" id="btnAgain">Again</button>
+      </div>
+    </div>
+  </div>
+  <p class="tip">pour <b>onto</b> a different colour to blend · <b>square it (2×2)</b> or <b>line it (4)</b> to pop · circles pay <b>4×</b></p>
+
+<script>
+(function(){
+"use strict";
+var COLS=7, ROWS=9;
+var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6"};
+var MIXMAP={RY:"O",BR:"P",BY:"G"};
+var PRIMS=["R","Y","B"];
+function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
+function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+/* iOS Safari ignores user-scalable=no — block pinch (gesture events + multi-touch moves) and double-tap zoom */
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+var lastTouchEnd=0;
+document.addEventListener("touchend", function(e){
+  var now=Date.now();
+  if(now-lastTouchEnd<300 && !e.target.closest("button")) e.preventDefault();   // kill double-tap zoom; buttons may still rapid-tap
+  lastTouchEnd=now;
+}, {passive:false});
+
+var well=document.getElementById("well"), tray=document.getElementById("tray"),
+    nextMiniEl=document.getElementById("nextmini"), chainEl=document.getElementById("chain"),
+    scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"),
+    gc1=document.getElementById("gc1"), gc2=document.getElementById("gc2");
+
+var grid=[], state="menu", busy=false;
+var score=0, best=+(localStorage.getItem("hm_arc_hi")||0), pops=0, maxChain=0, piecesDropped=0;
+var piece=null, nextP=null, pieceCol=2, pieceEl=null;   // piece = [tl,tr,bl,br] colours; pieceCol = left column (0..COLS-2)
+bestEl.textContent=best;
+
+/* ---------- audio ---------- */
+var actx=null, muted=localStorage.getItem("hm_arc_mute")==="1";
+document.getElementById("mute").style.opacity=muted?"0.45":"1";
+function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
+function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
+function sfxMix(){ beep(430,0.07,"triangle",0.05); setTimeout(function(){ beep(650,0.09,"triangle",0.04); },55); }
+function sfxDrop(){ beep(240,0.1,"sine",0.05); setTimeout(function(){ beep(180,0.12,"sine",0.045); },60); }
+function sfxSpin(){ beep(520,0.05,"triangle",0.035); }
+function sfxPop(n,chain){ var b=380+chain*120; for(var i=0;i<Math.min(n,5);i++)(function(i){ setTimeout(function(){ beep(b*Math.pow(1.22,i),0.09,"triangle",0.05); }, i*45); })(i); }
+function sfxOver(){ [440,330,220].forEach(function(f,i){ setTimeout(function(){ beep(f,0.22,"sine",0.05); }, i*160); }); }
+document.getElementById("mute").addEventListener("click",function(e){ muted=!muted; ensureAudio(); localStorage.setItem("hm_arc_mute",muted?"1":"0"); e.currentTarget.style.opacity=muted?"0.45":"1"; if(!muted) sfxMix(); });
+
+/* ---------- layout ---------- */
+function cellSize(){ return well.clientWidth/COLS; }
+function placeEl(t){ var cs=cellSize(), pad=cs*0.06; t.el.style.width=(cs-pad*2)+"px"; t.el.style.height=(cs-pad*2)+"px"; t.el.style.transform="translate("+(t.col*cs+pad)+"px,"+(t.row*cs+pad)+"px)"; }
+window.addEventListener("resize", function(){ forAll(placeEl); renderPiece(); });
+function forAll(fn){ for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++) if(grid[r][c]) fn(grid[r][c]); }
+
+/* ---------- tiles ---------- */
+function makeTile(col,row,color,fromTop){
+  var el=document.createElement("div"); el.className="t"+(isPrim(color)?"":" S");
+  var b=document.createElement("i"); b.className="b"; b.style.background=HEX[color];
+  b.style.setProperty("--rot",((col*7+row*13)%5-2)+"deg");
+  el.appendChild(b); well.appendChild(el);
+  var t={col:col,row:row,color:color,el:el,b:b};
+  grid[row][col]=t;
+  var cs=cellSize(), pad=cs*0.06;
+  el.style.width=(cs-pad*2)+"px"; el.style.height=(cs-pad*2)+"px";
+  if(fromTop){ el.style.transition="none"; el.style.transform="translate("+(col*cs+pad)+"px,"+(-cs)+"px)"; void el.offsetWidth; el.style.transition=""; }
+  placeEl(t);
+  return t;
+}
+function setColor(t,color){ t.color=color; t.b.style.background=HEX[color]; t.el.classList.toggle("S", !isPrim(color)); }
+function removeTile(t){ if(grid[t.row][t.col]===t) grid[t.row][t.col]=null; t.el.remove(); }
+
+/* ---------- gravity ---------- */
+function gravity(){
+  var moved=false;
+  for(var c=0;c<COLS;c++){
+    var stack=[];
+    for(var r=ROWS-1;r>=0;r--) if(grid[r][c]) stack.push(grid[r][c]);
+    for(var r2=0;r2<ROWS;r2++) grid[r2][c]=null;
+    for(var k=0;k<stack.length;k++){
+      var t=stack[k], nr=ROWS-1-k;
+      grid[nr][c]=t;
+      if(t.row!==nr){ t.row=nr; placeEl(t); moved=true; }
+    }
+  }
+  return moved;
+}
+
+/* ---------- pops & cascades ---------- */
+/* THE pop rule (the only one): same colour — ANY colour — arranged as a 2x2 square or 4+ in a straight line pops.
+   Overlaps pop wholesale (a run of 5 pops all 5; a 2x3 clump pops all 6). Circles score 4x what primaries do. */
+function findPatterns(){
+  var mark={};
+  for(var r=0;r<ROWS;r++){   // horizontal runs >=4
+    var run=1;
+    for(var c=1;c<=COLS;c++){
+      var same = c<COLS && grid[r][c] && grid[r][c-1] && grid[r][c].color===grid[r][c-1].color;
+      if(same) run++;
+      else { if(run>=4){ for(var k=c-run;k<c;k++) mark[r+","+k]=1; } run=1; }
+    }
+  }
+  for(var c2=0;c2<COLS;c2++){   // vertical runs >=4
+    var run2=1;
+    for(var r2=1;r2<=ROWS;r2++){
+      var same2 = r2<ROWS && grid[r2][c2] && grid[r2-1][c2] && grid[r2][c2].color===grid[r2-1][c2].color;
+      if(same2) run2++;
+      else { if(run2>=4){ for(var k2=r2-run2;k2<r2;k2++) mark[k2+","+c2]=1; } run2=1; }
+    }
+  }
+  for(var r3=0;r3<ROWS-1;r3++) for(var c3=0;c3<COLS-1;c3++){   // 2x2 squares
+    var a=grid[r3][c3]; if(!a) continue;
+    var b=grid[r3][c3+1], d=grid[r3+1][c3], e=grid[r3+1][c3+1];
+    if(b&&d&&e && b.color===a.color && d.color===a.color && e.color===a.color){
+      mark[r3+","+c3]=1; mark[r3+","+(c3+1)]=1; mark[(r3+1)+","+c3]=1; mark[(r3+1)+","+(c3+1)]=1;
+    }
+  }
+  var out=[];
+  for(var key in mark){ var p=key.split(","); out.push(grid[+p[0]][+p[1]]); }
+  return out;
+}
+function floatScore(px,py,txt){ var f=document.createElement("div"); f.className="float"; f.textContent=txt; f.style.left=px+"px"; f.style.top=py+"px"; well.appendChild(f); setTimeout(function(){ f.remove(); },800); }
+function showChain(n){ chainEl.textContent="CHAIN ×"+n+"!"; chainEl.classList.remove("show"); void chainEl.offsetWidth; chainEl.classList.add("show"); well.classList.remove("shake"); void well.offsetWidth; well.classList.add("shake"); }
+function addScore(n){ score+=n; scoreEl.textContent=score; if(score>best){ best=score; bestEl.textContent=best; } }
+
+function mergePass(){   // POUR-TO-MERGE: a primary resting on a DIFFERENT primary pours into it (upper blends into lower)
+  var events=[];
+  for(var c=0;c<COLS;c++){
+    for(var r=ROWS-2;r>=0;r--){   // bottom-up: the earliest landing reacts first; consuming the upper stops double-fires
+      var upper=grid[r][c], lower=grid[r+1][c];
+      if(!upper||!lower) continue;
+      if(isPrim(upper.color) && isPrim(lower.color) && upper.color!==lower.color){
+        events.push({upper:upper, lower:lower, mix:mixOf(upper.color,lower.color)});
+        grid[r][c]=null;
+      }
+    }
+  }
+  return events;
+}
+async function resolve(){
+  busy=true;
+  var chain=0;
+  while(true){
+    if(gravity()) await sleep(210);
+    var merges=mergePass();
+    if(merges.length){   // landings blend before anything pops — then re-settle, which can trigger MORE landings
+      var mcs=cellSize(), mpad=mcs*0.06;
+      merges.forEach(function(m){
+        m.upper.el.style.zIndex=5;
+        m.upper.el.style.transform="translate("+(m.lower.col*mcs+mpad)+"px,"+(m.lower.row*mcs+mpad)+"px)";
+        m.upper.b.style.transform="scale(.4)";
+      });
+      sfxMix();
+      await sleep(170);
+      merges.forEach(function(m){
+        m.upper.el.remove();
+        setColor(m.lower, m.mix);
+        m.lower.el.classList.remove("mixed"); void m.lower.el.offsetWidth; m.lower.el.classList.add("mixed");
+      });
+      await sleep(120);
+      continue;
+    }
+    var marked=findPatterns();
+    if(!marked.length) break;
+    var cs=cellSize();
+    chain++; if(chain>maxChain) maxChain=chain;   // every pattern pass is a real pop now — one rule, one multiplier
+    var base=0, sx=0, sy=0;
+    marked.forEach(function(t){
+      t.el.classList.add("pop"); pops++;
+      base += isPrim(t.color) ? 10 : 40;   // circles are manufactured — they pay 4x
+      sx+=t.col; sy+=t.row;
+    });
+    var pts=base*chain;
+    addScore(pts);
+    floatScore((sx/marked.length)*cs+cs*0.1, (sy/marked.length)*cs-6, "+"+pts);
+    if(chain>=2) showChain(chain);
+    sfxPop(marked.length, chain);
+    await sleep(250);
+    marked.forEach(removeTile);
+  }
+  busy=false;
+  updateDanger();
+  return chain;
+}
+function updateDanger(){
+  var danger=false;
+  for(var c=0;c<COLS;c++) if(grid[1] && grid[1][c]){ danger=true; break; }
+  well.classList.toggle("danger", danger && state==="playing");
+}
+
+/* ---------- the piece: a 2x2 of primaries YOU place ---------- */
+function rollPiece(){ return [PRIMS[(Math.random()*3)|0], PRIMS[(Math.random()*3)|0], PRIMS[(Math.random()*3)|0], PRIMS[(Math.random()*3)|0]]; }
+function rotatePiece(){ if(!piece||busy||state!=="playing") return; piece=[piece[2],piece[0],piece[3],piece[1]]; sfxSpin(); renderPiece(); }
+function freeIn(c){ var n=0; for(var r=0;r<ROWS;r++) if(!grid[r][c]) n++; return n; }
+function canPlaceAt(a){ return freeIn(a)>=2 && freeIn(a+1)>=2; }
+function canPlace(){ for(var a=0;a<COLS-1;a++) if(canPlaceAt(a)) return true; return false; }
+function renderPiece(){
+  if(!pieceEl){ pieceEl=document.createElement("div"); pieceEl.className="piece"; tray.appendChild(pieceEl); }
+  if(!piece || state!=="playing"){ pieceEl.style.display="none"; gc1.style.display="none"; gc2.style.display="none"; return; }
+  var cs=cellSize(), pad=cs*0.06;
+  pieceEl.style.display="block";
+  pieceEl.style.width=(cs*2)+"px"; pieceEl.style.height=(cs*2)+"px";
+  pieceEl.style.transform="translate("+(pieceCol*cs)+"px,0)";
+  var h="";
+  var posn=[[0,0],[1,0],[0,1],[1,1]];   // tl,tr,bl,br
+  for(var i=0;i<4;i++){
+    h+='<span class="pchip" style="left:'+(posn[i][0]*cs+pad)+'px; top:'+(posn[i][1]*cs+pad)+'px; width:'+(cs-pad*2)+'px; height:'+(cs-pad*2)+'px; background:'+HEX[piece[i]]+'"></span>';
+  }
+  pieceEl.innerHTML=h;
+  gc1.style.display="block"; gc2.style.display="block";
+  gc1.style.left=(pieceCol*cs)+"px"; gc1.style.width=cs+"px";
+  gc2.style.left=((pieceCol+1)*cs)+"px"; gc2.style.width=cs+"px";
+  renderMini();
+}
+function renderMini(){
+  if(!nextP){ nextMiniEl.innerHTML=""; return; }
+  var h="";
+  [0,1,2,3].forEach(function(i){ h+='<i style="background:'+HEX[nextP[i]]+'"></i>'; });
+  nextMiniEl.innerHTML=h;
+}
+function spawnInto(c,color){ var nr=-1; for(var r=ROWS-1;r>=0;r--) if(!grid[r][c]){ nr=r; break; } if(nr>=0) makeTile(c,nr,color,true); }
+async function dropPiece(){
+  if(busy || state!=="playing" || !piece) return;
+  if(!canPlace()){ gameOver(); return; }   // the block fits NOWHERE — that's the end, not an endless nope
+  if(!canPlaceAt(pieceCol)){ pieceEl.classList.remove("nope"); void pieceEl.offsetWidth; pieceEl.classList.add("nope"); beep(160,0.08,"square",0.03); return; }
+  busy=true; piecesDropped++;
+  var a=pieceCol, b=pieceCol+1;
+  spawnInto(a, piece[2]); spawnInto(a, piece[0]);   // bottom-left lands first, top-left stacks on it
+  spawnInto(b, piece[3]); spawnInto(b, piece[1]);
+  sfxDrop();
+  piece=nextP; nextP=rollPiece();
+  renderPiece();
+  await sleep(230);
+  busy=false;
+  await resolve();   // landings blend, trios pop, collapses re-pour — the whole reaction is one drop's consequence
+  if(state!=="playing") return;
+  updateDanger();
+  if(!canPlace()) gameOver();   // dropping is the only verb now — nowhere to drop = the end
+}
+
+/* ---------- tray input: drag to aim, tap to spin, flick down to drop ---------- */
+var tgest=null;
+tray.addEventListener("pointerdown", function(e){
+  if(state!=="playing"||busy||!e.isPrimary) return; ensureAudio();
+  tgest={x0:e.clientX, y0:e.clientY, col0:pieceCol, moved:false, dropped:false};
+  try{ tray.setPointerCapture(e.pointerId); }catch(_e){}
+});
+tray.addEventListener("pointermove", function(e){
+  if(!tgest||!e.isPrimary||tgest.dropped) return;
+  var dx=e.clientX-tgest.x0, dy=e.clientY-tgest.y0, cs=cellSize();
+  if(Math.abs(dx)>7||Math.abs(dy)>7) tgest.moved=true;
+  if(dy>cs*0.7 && dy>Math.abs(dx)){ tgest.dropped=true; dropPiece(); return; }   // flick down = drop
+  var nc=Math.max(0, Math.min(COLS-2, tgest.col0+Math.round(dx/cs)));
+  if(nc!==pieceCol){ pieceCol=nc; renderPiece(); }
+});
+tray.addEventListener("pointerup", function(e){
+  if(!tgest||!e.isPrimary) return;
+  var g=tgest; tgest=null;
+  if(!g.moved && !g.dropped) rotatePiece();   // a clean tap spins the piece
+});
+tray.addEventListener("pointercancel", function(){ tgest=null; });
+tray.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+/* the well is pure consequence now — pouring happens by DROPPING, so the tray is the only input surface */
+well.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+/* ---------- game flow ---------- */
+function clearBoard(){ for(var r=0;r<ROWS;r++){ for(var c=0;c<COLS;c++){ if(grid[r]&&grid[r][c]) grid[r][c].el.remove(); } } grid=[]; for(var r2=0;r2<ROWS;r2++){ grid[r2]=[]; for(var c2=0;c2<COLS;c2++) grid[r2][c2]=null; } }
+function start(){
+  clearBoard();
+  score=0; pops=0; maxChain=0; piecesDropped=0; scoreEl.textContent="0";
+  document.getElementById("ovStart").classList.remove("show");
+  document.getElementById("ovOver").classList.remove("show");
+  state="playing"; busy=false; tgest=null;
+  piece=rollPiece(); nextP=rollPiece(); pieceCol=2;
+  renderPiece();
+  updateDanger();
+}
+function gameOver(){
+  state="over";
+  well.classList.remove("danger");
+  renderPiece();   // hides the piece + ghosts
+  sfxOver();
+  var isBest = score>=best && score>0 && score>=+(localStorage.getItem("hm_arc_hi")||0);
+  if(score>+(localStorage.getItem("hm_arc_hi")||0)) localStorage.setItem("hm_arc_hi",""+score);
+  document.getElementById("overTitle2").textContent="The well is full!";
+  document.getElementById("finalScore").textContent=score;
+  document.getElementById("newBest").style.display=isBest?"block":"none";
+  document.getElementById("overStats").textContent=piecesDropped+" blocks · "+pops+" pops · best chain ×"+Math.max(1,maxChain);
+  document.getElementById("ovOver").classList.add("show");
+}
+document.getElementById("btnStart").addEventListener("click",function(){ ensureAudio(); start(); });
+document.getElementById("btnAgain").addEventListener("click",function(){ ensureAudio(); start(); });
+
+clearBoard();
+
+/* debug hooks for automated testing (harmless in production) */
+window.__arc={
+  grid:function(){ return grid.map(function(row){ return row.map(function(t){ return t?t.color:"."; }).join(""); }); },
+  place:function(c,r,color){ if(grid[r][c]) removeTile(grid[r][c]); return makeTile(c,r,color,false); },
+  resolve:resolve, start:start,
+  piece:function(){ return {cur:piece?piece.slice():null, next:nextP?nextP.slice():null, col:pieceCol}; },
+  setPiece:function(cols){ piece=cols.slice(); renderPiece(); },
+  setCol:function(c){ pieceCol=c; renderPiece(); },
+  rotate:rotatePiece, drop:dropPiece,
+  state:function(){ return {state:state, score:score, busy:busy, pops:pops, maxChain:maxChain, pieces:piecesDropped, canPlace:canPlace()}; },
+  tileAt:function(c,r){ return grid[r][c]; }
+};
+})();
+</script>
+</body>
+</html>

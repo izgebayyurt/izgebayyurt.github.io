@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f3ead6" />
+<title>Huemeld Flow (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  --font-d:'Fredoka',sans-serif; --font-u:'Nunito',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.055) 1.2px, transparent 1.3px);
+  background-size:22px 22px;
+  font-family:var(--font-u); color:var(--ink);
+  display:flex; flex-direction:column; align-items:center;
+  overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+}
+.top{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 8px; }
+.brand{ display:flex; align-items:baseline; gap:8px; }
+.brand a{ text-decoration:none; color:var(--ink); }
+h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
+.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--ink); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
+.topbtns{ display:flex; gap:7px; }
+.mkk{ height:38px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; font-family:var(--font-d); font-weight:600; padding:0 13px; color:var(--ink); }
+.mkk:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.lvbar{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.lvname{ font-family:var(--font-d); font-weight:700; font-size:17px; }
+.cov{ font-size:11.5px; font-weight:800; color:var(--ink-soft); letter-spacing:.5px; }
+.boardwrap{ position:relative; width:min(94vw,420px); }
+.board{
+  position:relative; width:100%; aspect-ratio:1;
+  background:var(--card); border:3px solid var(--line); border-radius:18px;
+  box-shadow:0 5px 0 var(--shadow); overflow:hidden; touch-action:none;
+}
+.gridlayer,.dotlayer{ position:absolute; inset:0; pointer-events:none; }
+.pathlayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.gcell{ position:absolute; }
+.gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.12; }
+.dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
+.dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
+.dot.ci{ border-radius:50%; }
+.dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
+.dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
+@keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
+.dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
+@keyframes starSpin{ to{ transform:rotate(360deg) } }
+.dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
+@keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+.dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
+.toast{
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
+  background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
+  padding:7px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s; white-space:nowrap;
+}
+.toast.show{ opacity:1; }
+.ov{
+  position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+  background:rgba(243,234,214,.9); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.ov.show{ opacity:1; pointer-events:auto; }
+.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 26px; text-align:center; max-width:88%; }
+.panel h2{ font-family:var(--font-d); font-weight:700; font-size:24px; margin-bottom:8px; }
+.panel p{ font-size:13px; font-weight:700; color:var(--ink-soft); line-height:1.5; }
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:#ffd15c; border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); height:46px; padding:0 28px; font-size:16px; margin-top:13px;
+  transition:transform .08s, box-shadow .08s; touch-action:manipulation;
+}
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.pkgrid{ display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-top:10px; max-width:280px; }
+#ovPick{ position:fixed; }
+#ovPick .panel{ max-height:86vh; display:flex; flex-direction:column; }
+#ovPick .pkgrid{ overflow-y:auto; overflow-x:hidden; padding:6px 4px; min-height:0; }
+.pkbtn{
+  width:52px; height:52px; border:3px solid var(--line); border-radius:14px; background:var(--card);
+  box-shadow:0 3px 0 var(--shadow); cursor:pointer; font-family:var(--font-d); font-weight:700; font-size:17px; color:var(--ink);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1;
+}
+.pkbtn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
+.pkbtn.cur{ background:#ffd15c; }
+.tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
+.tip b{ color:var(--ink); }
+.cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
+.cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
+.cdots i.on{ background:var(--ink); }
+.coachmix{ display:flex; gap:14px; justify-content:center; align-items:center; margin-bottom:10px; min-height:0; flex-wrap:wrap; }
+.coachmix .mx{ display:flex; align-items:center; gap:3px; font-family:var(--font-d); font-weight:700; font-size:15px; color:var(--ink-soft); }
+.coachmix .sw{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:1px 1.5px 0 var(--shadow); }
+.coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
+/* demo "ghost hand" + caption banner + skip */
+.ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1); }
+.demoban{ width:min(94vw,420px); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--ink); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
+.demoban.show{ display:flex; }
+.demoskip{ display:none; margin:10px auto 0; }
+.demoskip.show{ display:block; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">FLOW</span></div>
+    <div class="topbtns">
+      <button class="mkk" id="btnHelp" title="How to play">?</button>
+      <button class="mkk" id="btnPick">☰ levels</button>
+      <button class="mkk" id="btnReset" title="Reset level">↻</button>
+    </div>
+  </div>
+  <div class="lvbar">
+    <button class="mkk" id="btnPrev">←</button>
+    <div style="text-align:center"><div class="lvname" id="lvName">Level 1</div><div class="cov" id="cov">0/25 painted</div></div>
+    <button class="mkk" id="btnNext">→</button>
+  </div>
+  <div class="demoban" id="demoban"></div>
+  <div class="boardwrap">
+    <div class="board" id="board">
+      <div class="gridlayer" id="gridlayer"></div>
+      <canvas class="pathlayer" id="pathcanvas"></canvas>
+      <div class="dotlayer" id="dotlayer"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="ov" id="ovWin">
+      <div class="panel">
+        <h2>Solved! ✦</h2>
+        <p id="winMsg">Every cell painted.</p>
+        <button class="mk" id="btnWinNext">Next →</button>
+      </div>
+    </div>
+    <div class="ov" id="ovPick">
+      <div class="panel">
+        <h2>Levels</h2>
+        <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:4px">Watch tutorial</button>
+        <div class="pkgrid" id="pkgrid"></div>
+        <button class="mk" id="btnPickClose">Close</button>
+      </div>
+    </div>
+    <div class="ov" id="ovHelp">
+      <div class="panel">
+        <h2>How to play</h2>
+        <div class="coachmix" id="helpMix"></div>
+        <p style="margin-top:2px">Drag a line out of each coloured <b>square</b>. Every square feeds <b>two</b> blends, so pull <b>two lines</b> from it. Where two colours <b>meet</b> they mix; carry the blend to its matching <b>✦</b>. <b>Fill every square</b> to win.</p>
+        <button class="mk" id="btnHelpClose">Got it</button>
+      </div>
+    </div>
+    <div class="ghost" id="ghost"></div>
+  </div>
+  <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
+
+<script>
+(function(){
+"use strict";
+var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6"};
+var MIXMAP={RY:"O",BR:"P",BY:"G"};
+function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
+
+/* iOS zoom guards */
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+var lastTE=0;
+document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-lastTE<300 && !e.target.closest("button")) e.preventDefault(); lastTE=now; }, {passive:false});
+
+/* ---------- levels: ONE emitter each of R/Y/B, ONE receiver each of O/G/P.
+   Every emitter splits into two lines (fork at the dot or branch mid-line; branches
+   never rejoin). Machine-generated: each level has a verified full-coverage solution
+   (16x 5x5, 26x 6x6, 8x 7x7), ordered easiest-first. TUTORIAL is a gentle 5x5. */
+var TUTORIAL={ n:5, ems:[["R",2,3],["Y",3,3],["B",4,4]], tgts:[["O",2,1],["G",0,2],["P",0,1]] };
+var LEVELS=[
+  { n:5, ems:[["R",1,2],["Y",4,2],["B",0,2]], tgts:[["O",4,3],["G",1,1],["P",4,4]] },
+  { n:5, ems:[["R",2,2],["Y",1,3],["B",4,2]], tgts:[["O",3,3],["G",0,0],["P",2,1]] },
+  { n:5, ems:[["R",3,3],["Y",1,3],["B",3,0]], tgts:[["O",2,2],["G",1,4],["P",4,0]] },
+  { n:5, ems:[["R",0,2],["Y",1,3],["B",4,0]], tgts:[["O",3,3],["G",3,1],["P",2,1]] },
+  { n:5, ems:[["R",3,0],["Y",1,1],["B",1,4]], tgts:[["O",0,2],["G",3,2],["P",3,1]] },
+  { n:5, ems:[["R",2,3],["Y",2,2],["B",4,1]], tgts:[["O",0,0],["G",1,1],["P",3,2]] },
+  { n:5, ems:[["R",0,2],["Y",3,2],["B",1,0]], tgts:[["O",2,3],["G",1,2],["P",0,0]] },
+  { n:5, ems:[["R",0,4],["Y",2,4],["B",4,1]], tgts:[["O",2,2],["G",3,1],["P",2,1]] },
+  { n:5, ems:[["R",0,1],["Y",2,0],["B",1,3]], tgts:[["O",0,0],["G",2,2],["P",4,4]] },
+  { n:5, ems:[["R",3,2],["Y",1,4],["B",4,0]], tgts:[["O",1,2],["G",1,3],["P",2,0]] },
+  { n:5, ems:[["R",3,4],["Y",3,0],["B",1,4]], tgts:[["O",4,4],["G",1,0],["P",3,1]] },
+  { n:5, ems:[["R",1,1],["Y",0,2],["B",4,4]], tgts:[["O",2,0],["G",0,4],["P",4,0]] },
+  { n:5, ems:[["R",2,3],["Y",4,3],["B",0,0]], tgts:[["O",0,4],["G",4,0],["P",0,3]] },
+  { n:5, ems:[["R",2,4],["Y",0,2],["B",3,0]], tgts:[["O",0,4],["G",2,3],["P",3,3]] },
+  { n:5, ems:[["R",3,4],["Y",2,0],["B",0,2]], tgts:[["O",2,2],["G",1,0],["P",0,3]] },
+  { n:5, ems:[["R",4,4],["Y",3,0],["B",0,0]], tgts:[["O",3,2],["G",2,2],["P",0,4]] },
+  { n:6, ems:[["R",3,4],["Y",1,1],["B",4,3]], tgts:[["O",2,4],["G",4,1],["P",5,5]] },
+  { n:6, ems:[["R",2,4],["Y",2,5],["B",3,1]], tgts:[["O",1,0],["G",5,0],["P",4,2]] },
+  { n:6, ems:[["R",2,4],["Y",2,0],["B",5,5]], tgts:[["O",2,1],["G",0,2],["P",5,3]] },
+  { n:6, ems:[["R",0,1],["Y",2,4],["B",4,2]], tgts:[["O",4,1],["G",4,4],["P",1,2]] },
+  { n:6, ems:[["R",4,0],["Y",4,4],["B",1,0]], tgts:[["O",2,4],["G",2,5],["P",2,0]] },
+  { n:6, ems:[["R",5,0],["Y",2,3],["B",1,1]], tgts:[["O",1,5],["G",4,1],["P",0,5]] },
+  { n:6, ems:[["R",5,3],["Y",3,4],["B",3,1]], tgts:[["O",0,4],["G",0,0],["P",2,1]] },
+  { n:6, ems:[["R",1,2],["Y",1,5],["B",4,5]], tgts:[["O",1,1],["G",4,3],["P",3,3]] },
+  { n:6, ems:[["R",4,3],["Y",0,5],["B",2,1]], tgts:[["O",3,4],["G",1,4],["P",5,3]] },
+  { n:6, ems:[["R",4,4],["Y",2,4],["B",1,5]], tgts:[["O",4,1],["G",1,0],["P",2,0]] },
+  { n:6, ems:[["R",4,2],["Y",2,4],["B",0,2]], tgts:[["O",5,0],["G",2,1],["P",1,1]] },
+  { n:6, ems:[["R",5,2],["Y",3,0],["B",1,4]], tgts:[["O",2,2],["G",0,5],["P",2,3]] },
+  { n:6, ems:[["R",3,4],["Y",2,1],["B",5,1]], tgts:[["O",5,0],["G",3,3],["P",0,3]] },
+  { n:6, ems:[["R",1,4],["Y",0,0],["B",2,3]], tgts:[["O",5,5],["G",3,1],["P",1,2]] },
+  { n:6, ems:[["R",4,1],["Y",0,3],["B",4,3]], tgts:[["O",1,1],["G",1,2],["P",0,5]] },
+  { n:6, ems:[["R",5,3],["Y",2,3],["B",3,0]], tgts:[["O",1,5],["G",0,0],["P",4,2]] },
+  { n:6, ems:[["R",1,4],["Y",4,2],["B",0,4]], tgts:[["O",5,2],["G",1,1],["P",2,5]] },
+  { n:6, ems:[["R",4,1],["Y",0,3],["B",3,4]], tgts:[["O",2,3],["G",5,5],["P",4,0]] },
+  { n:6, ems:[["R",4,5],["Y",5,2],["B",2,1]], tgts:[["O",4,3],["G",4,2],["P",2,3]] },
+  { n:6, ems:[["R",5,0],["Y",1,2],["B",2,2]], tgts:[["O",5,4],["G",4,4],["P",3,1]] },
+  { n:6, ems:[["R",0,0],["Y",2,4],["B",4,0]], tgts:[["O",4,1],["G",4,3],["P",2,2]] },
+  { n:6, ems:[["R",1,3],["Y",4,0],["B",2,4]], tgts:[["O",1,1],["G",0,5],["P",4,3]] },
+  { n:6, ems:[["R",3,1],["Y",4,2],["B",1,5]], tgts:[["O",5,2],["G",2,2],["P",2,3]] },
+  { n:6, ems:[["R",1,5],["Y",1,2],["B",4,3]], tgts:[["O",3,1],["G",5,0],["P",1,4]] },
+  { n:6, ems:[["R",3,2],["Y",2,2],["B",1,4]], tgts:[["O",4,4],["G",0,1],["P",2,0]] },
+  { n:6, ems:[["R",4,3],["Y",0,4],["B",2,3]], tgts:[["O",3,5],["G",0,0],["P",2,1]] },
+  { n:7, ems:[["R",1,5],["Y",5,1],["B",2,0]], tgts:[["O",3,4],["G",3,5],["P",2,2]] },
+  { n:7, ems:[["R",0,3],["Y",4,4],["B",5,1]], tgts:[["O",2,4],["G",4,3],["P",4,0]] },
+  { n:7, ems:[["R",3,5],["Y",0,3],["B",2,3]], tgts:[["O",4,2],["G",1,3],["P",4,3]] },
+  { n:7, ems:[["R",4,3],["Y",2,1],["B",1,5]], tgts:[["O",3,1],["G",4,5],["P",6,4]] },
+  { n:7, ems:[["R",0,2],["Y",4,2],["B",6,4]], tgts:[["O",2,3],["G",4,4],["P",4,0]] },
+  { n:7, ems:[["R",3,3],["Y",6,4],["B",0,6]], tgts:[["O",5,4],["G",6,2],["P",3,1]] },
+  { n:7, ems:[["R",5,3],["Y",2,1],["B",3,5]], tgts:[["O",6,2],["G",3,3],["P",2,5]] },
+  { n:7, ems:[["R",5,2],["Y",1,2],["B",4,5]], tgts:[["O",4,3],["G",0,4],["P",6,4]] }
+];
+
+var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
+    shadowCanvas=document.createElement("canvas"), sctx=shadowCanvas.getContext("2d"),
+    dotL=document.getElementById("dotlayer"),
+    gridL=document.getElementById("gridlayer"), covEl=document.getElementById("cov"),
+    lvNameEl=document.getElementById("lvName"), toastEl=document.getElementById("toast"),
+    ovWin=document.getElementById("ovWin"), ovPick=document.getElementById("ovPick");
+
+var li=Math.min(+(localStorage.getItem("hm_flow_i")||0), LEVELS.length-1);
+var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
+var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
+var DBL_MS=340;
+var isTut=false;
+
+/* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
+var actx=null, master=null;
+function ensureAudio(){
+  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); master=actx.createGain(); master.gain.value=0.85; master.connect(actx.destination); }catch(e){ actx=null; } }
+  if(actx&&actx.state==="suspended") actx.resume();
+}
+/* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
+function voice(freq,dur,o){
+  if(!actx) return; o=o||{};
+  try{
+    var t=actx.currentTime, osc=actx.createOscillator(), f=actx.createBiquadFilter(), g=actx.createGain();
+    osc.type=o.type||"sine"; osc.frequency.setValueAtTime(freq,t);
+    if(o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30,o.to), t+(o.gl||dur*0.8));
+    f.type="lowpass"; f.frequency.setValueAtTime(o.lp||2400,t);
+    var peak=o.g||0.05, atk=o.atk||0.006;
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+atk); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(f); f.connect(g); g.connect(master||actx.destination); osc.start(t); osc.stop(t+dur+0.03);
+  }catch(e){}
+}
+/* a struck bell: fundamental + shimmering overtones */
+function bell(freq,dur,gain){ gain=gain||0.05; voice(freq,dur,{g:gain,lp:3200,atk:0.003}); voice(freq*2.01,dur*0.7,{g:gain*0.42,lp:4200,atk:0.003}); voice(freq*3.0,dur*0.45,{g:gain*0.16,lp:5200,atk:0.002}); }
+/* the drawing melody: a MEAN-REVERTING random walk over two octaves of major
+   pentatonic (14 notes). Each cell: roll a direction (biased back toward centre the
+   farther out you are), then a step size from a normal curve (|Z| notes, so 1 std = 1
+   note), clamped to a 5-note max jump. Sounds musical and alive, never repetitive. */
+var SCALE14=[0,2,4,7,9,12,14,16,19,21,24,26,28,31], MEL_BASE=196.00, MEL_C=6.5;   // G3 base, centre index
+var melIdx=6;
+function gauss(){ var u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.2831853*v); }
+function melodyReset(){ melIdx=3+Math.floor(Math.random()*8); }   // random start, away from the extremes
+function nextNote(){
+  var pUp=Math.max(0.12, Math.min(0.88, 0.5 - (melIdx-MEL_C)/MEL_C*0.55));   // pulled toward centre at the edges
+  var dir=Math.random()<pUp ? 1 : -1;
+  var step=Math.max(1, Math.min(5, Math.round(Math.abs(gauss()))));           // |Z| notes, capped at a 5-note leap
+  melIdx=Math.max(0, Math.min(SCALE14.length-1, melIdx+dir*step));
+  return MEL_BASE*Math.pow(2, SCALE14[melIdx]/12);
+}
+function sfxDraw(step,up){
+  if(!actx) return; var fq=nextNote();
+  voice(fq, 0.12, {type:"sine", to:fq*0.9, gl:0.1, lp:2600, g:up?0.045:0.03, atk:0.003});   // the note
+  voice(fq*2, 0.06, {type:"sine", g:0.009, lp:4200, atk:0.002});                             // faint sparkle
+}
+/* two paints merge: a watery plunk under a warm rising blend chord */
+function sfxJun(){
+  voice(320,0.24,{type:"sine", to:150, gl:0.15, lp:1300, g:0.07, atk:0.004});                     // plunk
+  voice(392,0.28,{type:"triangle", g:0.028, lp:2200, atk:0.02});
+  setTimeout(function(){ voice(587.33,0.3,{type:"triangle", g:0.028, lp:2400, atk:0.02}); },70);
+}
+/* blend reaches its target: a bright two-note bell */
+function sfxDone(){ bell(659.25,0.5,0.06); setTimeout(function(){ bell(987.77,0.62,0.05); },95); }   // E5 -> B5
+/* win: a rising bell arpeggio */
+function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.055); }, i*115); }); }
+
+/* ---------- level state ---------- */
+function applyLevel(L){
+  N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
+  blooms=[]; sweeps=[]; confetti=[]; drawSteps=0;
+  ems=L.ems.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
+  tgts=L.tgts.map(function(t){ return {sec:t[0], r:t[1], c:t[2], done:false}; });
+  ovWin.classList.remove("show"); ovPick.classList.remove("show");
+  buildGrid(); renderDots(); renderPaths();
+}
+function loadLevel(i){
+  stopDemo(); isTut=false;
+  li=Math.max(0, Math.min(LEVELS.length-1, i));
+  localStorage.setItem("hm_flow_i",""+li);
+  lvNameEl.textContent="Level "+(li+1);
+  applyLevel(LEVELS[li]);
+}
+function loadTutorial(demo){
+  isTut=true; lvNameEl.textContent="Tutorial";
+  if(demo===false) playTutorial(); else startDemo();
+}
+function playTutorial(){ stopDemo(); isTut=true; lvNameEl.textContent="Tutorial"; applyLevel(TUTORIAL); }
+
+/* ---------- SHOW-don't-tell tutorial: a ghost hand auto-plays the real tutorial solve,
+   teaching the core loop AND the two ways a colour makes its second line (branch / fork) ---------- */
+var demoing=false, demoFiring=false, demoTid=0, demoStrokes=null, demoSI=0, demoCI=0;
+var ghostEl=document.getElementById("ghost"), demoBanEl=document.getElementById("demoban"), demoSkipEl=document.getElementById("demoskip");
+/* the tutorial's verified full solution, as player gestures. Each colour is used twice:
+   R makes its 2nd line by BRANCHING off its first (stroke 3); Y makes its 2nd by FORKING
+   from its square (stroke 5) — so the demo shows both. */
+var DEMO_STROKES=[
+  { cap:"Drag a colour out of its square", cells:[[2,3],[2,2],[3,2]] },
+  { cap:"Lead another colour in. They mix!", cap2:"Now carry the blend to its ✦", cap2At:1, cells:[[3,3],[3,2],[3,1],[2,1]] },
+  { cap:"Each colour is used twice. Pull a 2nd line from its square", cells:[[2,3],[1,3],[1,2],[1,1],[1,0]] },
+  { cap:"", cells:[[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1]] },
+  { cap:"Every square splits into two lines", cells:[[3,3],[3,4]] },
+  { cap:"Every square must be filled to win", cells:[[4,4],[3,4],[2,4],[1,4],[0,4],[0,3],[0,2]] }
+];
+function moveGhost(cell){ var s=cs(); ghostEl.style.left=(cell[1]*s+s/2)+"px"; ghostEl.style.top=(cell[0]*s+s/2)+"px"; }
+function banner(msg){ if(!msg) return; demoBanEl.textContent=msg; demoBanEl.classList.add("show"); }
+function fireDemo(type,cell){
+  var rect=board.getBoundingClientRect(), s=cs(), x=rect.left+cell[1]*s+s/2, y=rect.top+cell[0]*s+s/2;
+  demoFiring=true;
+  try{ board.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:99,isPrimary:true,pointerType:"touch",pressure:type==="pointerup"?0:0.5,buttons:type==="pointerup"?0:1,clientX:x,clientY:y,button:0})); }catch(e){}
+  demoFiring=false;
+}
+function stopDemo(){ clearTimeout(demoTid); demoing=false; demoFiring=false; ghostEl.style.display="none"; demoBanEl.classList.remove("show"); demoSkipEl.classList.remove("show"); }
+function startDemo(){
+  stopDemo(); demoing=true; ensureAudio(); applyLevel(TUTORIAL);
+  demoStrokes=DEMO_STROKES; demoSI=0; demoCI=0; moveGhost(demoStrokes[0].cells[0]);
+  ghostEl.style.display="block"; demoSkipEl.classList.add("show");
+  demoTid=setTimeout(demoNext, 850);
+}
+function demoNext(){
+  if(!demoing) return;
+  if(demoSI>=demoStrokes.length){ finishDemo(); return; }
+  var stroke=demoStrokes[demoSI];
+  if(demoCI < stroke.cells.length){
+    var cell=stroke.cells[demoCI];
+    if(stroke.cap2 && demoCI===stroke.cap2At) banner(stroke.cap2);
+    moveGhost(cell);
+    if(demoCI===0){ banner(stroke.cap); demoCI++; demoTid=setTimeout(function(){ fireDemo("pointerdown",stroke.cells[0]); demoTid=setTimeout(demoNext,520); }, 560); return; }
+    fireDemo("pointermove",cell); demoCI++;
+    demoTid=setTimeout(demoNext, 500);
+  } else {
+    fireDemo("pointerup", stroke.cells[stroke.cells.length-1]);
+    demoSI++; demoCI=0; demoTid=setTimeout(demoNext, 950);
+  }
+}
+function finishDemo(){
+  ghostEl.style.display="none"; banner("That's a full solve! Now you try ✦");
+  demoSkipEl.classList.remove("show");
+  playWinCascade();                                     // celebrate the completed board
+  demoTid=setTimeout(function(){ demoBanEl.classList.remove("show"); playTutorial(); toast("Your turn ✦"); }, 2400);
+}
+function cs(){ return board.clientWidth/N; }
+function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
+function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
+function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) return i; return -1; }
+function tgtFor(sec){ for(var i=0;i<tgts.length;i++) if(tgts[i].sec===sec) return tgts[i]; return null; }
+
+function buildGrid(){
+  var h="", s=100/N;
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++)
+    h+='<div class="gcell" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
+  gridL.innerHTML=h;
+}
+/* seeded per-cell wobble — stable within a level, different each level (echoes the tiles' random tilt) */
+function jhash(a,b,salt){ var h=Math.imul(((a+11)*374761397) ^ ((b+7)*668265263) ^ ((salt+3)*2246822519), 2654435761)>>>0; h^=h>>>15; h=Math.imul(h,2246822519)>>>0; h^=h>>>13; return (h>>>0)/4294967295; }
+function jvec(r,c){ return [ (jhash(r,c,li*13+1)-0.5)*2, (jhash(r,c,li*13+2)-0.5)*2 ]; }
+function jbump(r,c){ return (jhash(r,c,li*13+3)-0.5)*2; }
+
+function occAt(r,c){
+  for(var j=0;j<junctions.length;j++){ if(same(junctions[j].cell,[r,c])) return {t:"jun", i:j}; }
+  for(var j2=0;j2<junctions.length;j2++){ var jd=indexIn(junctions[j2].leg,r,c); if(jd>=0) return {t:"jleg", i:j2, idx:jd}; }
+  for(var e=0;e<ems.length;e++){
+    if(ems[e].r===r && ems[e].c===c) return {t:"emdot", e:e};
+    for(var l=0;l<ems[e].legs.length;l++){ var idx=indexIn(ems[e].legs[l].cells,r,c); if(idx>=0) return {t:"em", e:e, l:l, idx:idx}; }
+  }
+  for(var t2=0;t2<tgts.length;t2++){ if(tgts[t2].r===r && tgts[t2].c===c) return {t:"tgt", i:t2}; }
+  return null;
+}
+function dropJunction(j){
+  var J=junctions[j]; if(!J) return;
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) Lg.jun=-1; else if(Lg.jun>j) Lg.jun--; }); });
+  var t=tgtFor(J.sec); if(t) t.done=false;
+  junctions.splice(j,1);
+}
+function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
+/* the single source of consistency — run after ANY structural change (retreat, truncate, etc.).
+   Deterministic: derives the valid set of legs/junctions from the raw cell paths. */
+function reconcile(){
+  // A) drop orphaned branch legs: a leg's root must be the emitter cell OR sit on a sibling leg.
+  //    looped, because removing a branch can orphan a branch-of-a-branch.
+  ems.forEach(function(E){
+    var changed=true;
+    while(changed){ changed=false;
+      for(var k=E.legs.length-1;k>=0;k--){
+        var lg=E.legs[k];
+        var bad=!lg.cells.length;
+        if(!bad){ var root=lg.cells[0], onE=(root[0]===E.r&&root[1]===E.c), onSib=false;
+          for(var m=0;m<E.legs.length&&!onSib;m++) if(m!==k && indexIn(E.legs[m].cells,root[0],root[1])>=0) onSib=true;
+          bad=!onE && !onSib; }
+        if(bad){ destroyJunctionOf(lg); E.legs.splice(k,1); changed=true; break; }
+      }
+    }
+  });
+  // B) drop junctions unless BOTH feeders still end exactly on the junction cell
+  for(var j=junctions.length-1;j>=0;j--){
+    var J=junctions[j], feeders=[];
+    ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg); }); });
+    var ok = feeders.length===2 && feeders.every(function(Lg){ var h=Lg.cells[Lg.cells.length-1]; return h && same(h,J.cell); });
+    if(!ok) dropJunction(j);
+  }
+}
+/* drop STRAY emitter legs (just the emitter cell, no pipe) left behind when a fork/branch
+   was started but not drawn — otherwise the phantom leg fills the 2-leg slot and locks the
+   square out of any new line until a double-tap reset. */
+function pruneStrayLegs(){
+  var changed=false;
+  ems.forEach(function(E){ for(var k=E.legs.length-1;k>=0;k--){ if(E.legs[k].cells.length<=1){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); changed=true; } } });
+  if(changed) reconcile();
+}
+/* reconcile, then re-anchor the in-flight drag to its (possibly re-indexed / removed) leg or junction */
+function reconcileAndFixDrag(){
+  var active=(drag && drag.t==="em" && ems[drag.e]) ? ems[drag.e].legs[drag.l] : null;
+  reconcile();
+  if(drag && drag.t==="em"){ var ni=active?ems[drag.e].legs.indexOf(active):-1; if(ni<0) drag=null; else drag.l=ni; }
+  else if(drag && drag.t==="jun"){ if(!junctions[drag.i]) drag=null; }
+}
+
+/* ---------- input ---------- */
+function cellAt(x,y){
+  var rect=board.getBoundingClientRect(), s=cs();
+  var c=Math.floor((x-rect.left)/s), r=Math.floor((y-rect.top)/s);
+  if(!inb(r,c)) return null;
+  return [r,c];
+}
+board.addEventListener("pointerdown", function(e){
+  if(demoing && !demoFiring) return;   // ignore real touches while the demo plays
+  if(!e.isPrimary || solved) return; ensureAudio();
+  var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
+  var o=occAt(cell[0],cell[1]);
+  if(!o) return;
+  drawSteps=0; melodyReset();
+  if(o.t==="jun"){
+    var J=junctions[o.i]; J.leg=[J.cell.slice()];
+    var tj=tgtFor(J.sec); if(tj) tj.done=false;
+    drag={t:"jun", i:o.i};
+  } else if(o.t==="jleg"){
+    var J2=junctions[o.i]; J2.leg=J2.leg.slice(0,o.idx+1);
+    var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
+    drag={t:"jun", i:o.i};
+  } else if(o.t==="emdot"){
+    var E=ems[o.e];
+    var now=Date.now(), isDbl=(lastEmTap.e===o.e && now-lastEmTap.t<DBL_MS);
+    lastEmTap={e:o.e, t:now};
+    if(isDbl){
+      // double-tap resets the whole emitter (both lines), and starts a fresh line so a
+      // double-tap-drag redraws immediately
+      while(E.legs.length){ destroyJunctionOf(E.legs[0]); E.legs.splice(0,1); }
+      E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0};
+      lastEmTap={e:-1, t:0};
+    }
+    else if(E.legs.length===0){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0}; }
+    else if(E.legs.length===1 && E.legs[0].cells.length<=1){ E.legs[0]={cells:[[E.r,E.c]], jun:-1}; drag={t:"em", e:o.e, l:0}; }
+    else if(E.legs.length===1){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:1}; }
+    else { drag=null; }   // two lines already out — a single tap must NOT reset (double-tap does)
+  } else if(o.t==="em"){
+    var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
+    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
+    else { drag=null; }   // a mid-pipe click does nothing — both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
+  } else return;
+  try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+  renderPaths();
+});
+board.addEventListener("pointermove", function(e){
+  if(demoing && !demoFiring) return;
+  if(!drag || !e.isPrimary) return;
+  var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
+  step(cell);
+});
+board.addEventListener("pointerup", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); renderPaths(); });
+board.addEventListener("pointercancel", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); renderPaths(); });
+board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+function legOf(d){ return d.t==="em" ? (ems[d.e].legs[d.l]&&ems[d.e].legs[d.l].cells) : (junctions[d.i]&&junctions[d.i].leg); }
+
+function step(cell){
+  var leg=legOf(drag); if(!leg){ drag=null; return; }
+  var head=leg[leg.length-1];
+  if(same(cell,head)) return;
+  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return; }
+  if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
+  var o=occAt(cell[0],cell[1]);
+  if(!o){ leg.push(cell); penTick(true); renderPaths(); return; }
+
+  if(drag.t==="jun" && (o.t==="em" || o.t==="emdot")){
+    // swiped back from the junction onto one of ITS feeder pipes (or the feeder's emitter dot,
+    // which is what you hit when the junction sits right next to the square) -> separate the merge
+    var fe=-1, fl=-1;
+    if(o.t==="em" && ems[o.e].legs[o.l] && ems[o.e].legs[o.l].jun===drag.i){ fe=o.e; fl=o.l; }
+    else if(o.t==="emdot"){ var Ee=ems[o.e]; for(var li=0;li<Ee.legs.length;li++){ if(Ee.legs[li].jun===drag.i){ fe=o.e; fl=li; break; } } }
+    if(fe>=0){
+      var jcell=junctions[drag.i].cell.slice();
+      var fleg=ems[fe].legs[fl];
+      destroyJunctionOf(fleg);   // un-merges both feeders (jun -> -1), removes junction + its blend leg
+      if(fleg.cells.length>1 && same(fleg.cells[fleg.cells.length-1], jcell)) fleg.cells.pop();
+      drag={t:"em", e:fe, l:fl};
+      sfxJun(); renderPaths(); return;
+    }
+  }
+  if(drag.t==="em" && o.t==="em" && o.e!==drag.e){
+    var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
+    var sec=mixOf(me.col, other.col);
+    var myLeg=me.legs[drag.l];
+    if(sec && myLeg.jun<0 && oleg.jun<0 && tgtFor(sec) && !tgtFor(sec).done){
+      // tap into the other pipe ANYWHERE (o.idx, not just its tip): the junction forms there,
+      // and everything on that pipe BEYOND the tap becomes the blend leg (recoloured to the blend)
+      myLeg.cells.push(cell);
+      var excess=oleg.cells.slice(o.idx+1);
+      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); })};
+      oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
+      junctions.push(J);
+      myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
+      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun();
+      // tip merge (no excess): keep drawing the blend. Mid merge: the excess IS the blend leg — end
+      // the drag so the finger doesn't fight the far-away head; grab the junction to reroute.
+      drag = excess.length ? null : {t:"jun", i:junctions.length-1};
+      renderPaths(); return;
+    }
+  }
+  if(drag.t==="jun" && o.t==="tgt"){
+    var T=tgts[o.i], J3=junctions[drag.i];
+    if(T.sec===J3.sec && !T.done){
+      J3.leg.push(cell); T.done=true;
+      addBloom(cell[0],cell[1], HEX[T.sec], 760); addSweep(J3.leg.slice(), "#fff", 0, 480);
+      var rd=[].slice.call(dotL.querySelectorAll(".dot")).filter(function(d){ return +d.dataset.dr===T.r && +d.dataset.dc===T.c; })[0];
+      if(rd){ rd.classList.remove("bounce"); void rd.offsetWidth; rd.classList.add("bounce"); }
+      drag=null;
+      sfxDone(); renderPaths(); checkWin(); return;
+    }
+  }
+}
+
+/* ---------- coverage & win ---------- */
+function coverage(){
+  var set={};
+  ems.forEach(function(E){ set[E.r+","+E.c]=1; E.legs.forEach(function(Lg){ Lg.cells.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); });
+  junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); });
+  tgts.forEach(function(T){ set[T.r+","+T.c]=1; });
+  return Object.keys(set).length;
+}
+function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
+function checkWin(){
+  if(demoing) return;   // the demo drives its own celebration + hand-off
+  if(!tgts.every(function(t){ return t.done; })) return;
+  var cov=coverage();
+  if(cov<N*N){ toast("All blended. Now fill every square!"); return; }
+  solved=true; sfxWin(); playWinCascade();
+  var wn=document.getElementById("btnWinNext");
+  if(isTut){
+    document.querySelector("#ovWin h2").textContent="You've got it! ✦";
+    document.getElementById("winMsg").textContent="That's the whole game. Ready for Level 1?";
+    wn.style.display=""; wn.textContent="Start ✦";
+    setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
+    return;
+  }
+  document.querySelector("#ovWin h2").textContent="Solved! ✦";
+  var done=JSON.parse(localStorage.getItem("hm_flow_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow_done", JSON.stringify(done));
+  document.getElementById("winMsg").textContent = "Every cell painted."+(li+1<LEVELS.length ? "" : " That's all the levels, for now!");
+  wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
+  setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
+}
+
+/* ---------- render: marker-style SVG pipes with blend gradients ---------- */
+function renderDots(){
+  var s=cs(), h="";
+  function dot(col,r,c,shape,star){
+    var sz=s*0.84, off=(s-sz)/2;
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+'</div>';
+  }
+  ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"sq",false); });
+  tgts.forEach(function(T){ h+=dot(T.sec,T.r,T.c,"ci",true); });
+  dotL.innerHTML=h;
+}
+/* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
+function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
+var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[];
+var drawSteps=0;
+function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
+function addBloom(r,c,color,dur){ blooms.push({r:r,c:c,color:color,t0:nowMs(),dur:dur||600}); }
+function polyCum(pts){ var cum=[0],tot=0; for(var i=1;i<pts.length;i++){ tot+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); cum.push(tot); } return {cum:cum,total:tot}; }
+function ptAtLen(pts,cum,len){ if(pts.length===1) return pts[0]; if(len<=0) return pts[0]; for(var i=1;i<pts.length;i++){ if(cum[i]>=len){ var seg=(cum[i]-cum[i-1])||1,t=(len-cum[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; }
+function addSweep(cells,color,delay,dur){ var s=cs(); var pts=cells.map(function(c){ return [c[1]*s+s/2, c[0]*s+s/2]; }); var m=polyCum(pts); sweeps.push({pts:pts,cum:m.cum,total:m.total,t0:nowMs()+(delay||0),dur:dur||520,color:color}); }
+function paintedSet(){ var set={}; ems.forEach(function(E){ set[E.r+","+E.c]=1; E.legs.forEach(function(Lg){ Lg.cells.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); }); junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); tgts.forEach(function(T){ set[T.r+","+T.c]=1; }); return set; }
+function roundRect(cx,x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function spawnConfetti(){ var W=board.clientWidth,H=board.clientHeight,cols=[HEX.O,HEX.G,HEX.P,HEX.R,HEX.Y,HEX.B],sz=Math.min(W,H)/N*0.17; for(var i=0;i<52;i++){ confetti.push({ x:W*(0.15+Math.random()*0.7), y:H*0.4+Math.random()*30, vx:(Math.random()-0.5)*260, vy:-120-Math.random()*220, rot:Math.random()*6.28, vr:(Math.random()-0.5)*12, color:cols[(Math.random()*cols.length)|0], t0:nowMs(), life:1500+Math.random()*1100, sz:sz }); } }
+function playWinCascade(){
+  var legList=[]; ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.cells.length>1) legList.push(Lg.cells); }); }); junctions.forEach(function(J){ if(J.leg.length>1) legList.push(J.leg); });
+  legList.forEach(function(cells,i){ addSweep(cells,"#fff", i*100, 560); });
+  dotL.querySelectorAll(".dot.ci").forEach(function(d){ d.classList.add("winspin"); });
+  spawnConfetti();
+}
+
+/* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
+   thickness (~half an emitter), round-capped strokes bridge consecutive circles — opaque overlap =
+   smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Living paint
+   glosses travel the pipes; a junction blooms on merge; delivery pulses; the win sweeps the whole
+   tree. Passes: shadow, ink, colour, living gloss + sweeps (clipped), blooms, shimmer, confetti. */
+function renderPaths(){
+  var s=cs(); if(!s) return;
+  var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
+  if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
+  var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
+  function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
+  // ADD a fixed bump at a junction (same for ink + colour) so the T bulges rounder & thicker
+  // but the outline WIDTH stays constant (a multiplier would fatten the border too)
+  function rad(cell, w){ var b=junSet[cell[0]+","+cell[1]]?JUNC_BUMP:0; return w*0.5 + b + jbump(cell[0],cell[1])*jR; }
+
+  var legs=[];
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){
+    legs.push({cells:Lg.cells, color:HEX[E.col], blend:(Lg.jun>=0&&junctions[Lg.jun])?HEX[junctions[Lg.jun].sec]:null});
+  }); });
+  junctions.forEach(function(J){ legs.push({cells:J.leg, color:HEX[J.sec], blend:null}); });
+
+  function line(pts,a,b){ ctx.beginPath(); ctx.moveTo(pts[a][0],pts[a][1]); for(var i=a+1;i<=b;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
+  function dab(cells,pts,i,w){ ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1], rad(cells[i],w),0,6.2832); ctx.fill(); }
+
+  function silhouette(cx,width){          // one flat silhouette for ALL legs -> overlaps merge into one shape
+    cx.lineWidth=width; cx.lineJoin="round"; cx.lineCap="round";
+    legs.forEach(function(L){ var pts=L.cells.map(P);
+      if(pts.length>1){ cx.beginPath(); cx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) cx.lineTo(pts[i][0],pts[i][1]); cx.stroke(); }
+      for(var k=0;k<pts.length;k++){ cx.beginPath(); cx.arc(pts[k][0],pts[k][1], rad(L.cells[k],width),0,6.2832); cx.fill(); } });
+  }
+  // 1 — shadow: render the silhouette OPAQUE offscreen, then stamp ONCE with alpha at an offset,
+  //     so overlapping strokes/dabs never stack into dark circles at cell centres
+  if(shadowCanvas.width!==canvas.width){ shadowCanvas.width=canvas.width; shadowCanvas.height=canvas.height; }
+  sctx.setTransform(dpr,0,0,dpr,0,0); sctx.clearRect(0,0,W,H);
+  sctx.strokeStyle=sctx.fillStyle="#2c2733"; silhouette(sctx, pipeInk);
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=0.24;
+  ctx.drawImage(shadowCanvas, Math.round(s*0.03*dpr), Math.round(s*0.05*dpr)); ctx.restore();
+  // 2 — ink silhouette (opaque: overlaps are fine)
+  ctx.strokeStyle="#2c2733"; ctx.fillStyle="#2c2733"; silhouette(ctx, pipeInk);
+  // 3 — colour (gradient into the blend on a feeder's final segment)
+  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+  legs.forEach(function(L){
+    var pts=L.cells.map(P), last=pts.length-1;
+    if(L.blend && pts.length>=2){
+      ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
+      if(last-1>=1) line(pts,0,last-1);
+      for(var k=0;k<last;k++) dab(L.cells,pts,k,pipeW);
+      var a=pts[last-1], b=pts[last], g=ctx.createLinearGradient(a[0],a[1],b[0],b[1]);
+      // reach FULL blend before the solid junction dab's edge (~0.18 cell => t~0.82) so there's
+      // no colour step at the dab rim — a smooth wash into the junction instead of a circular seam
+      g.addColorStop(0,L.color); g.addColorStop(0.72,L.blend);
+      ctx.strokeStyle=g; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+      ctx.fillStyle=L.blend; dab(L.cells,pts,last,pipeW);
+    } else {
+      ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
+      if(pts.length>1) line(pts,0,last);
+      for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
+    }
+  });
+  // 4 — living paint + delivery/win sweeps, CLIPPED to the pipes via source-atop so light flows INSIDE them
+  ctx.save(); ctx.globalCompositeOperation="source-atop";
+  legs.forEach(function(L,idx){
+    var pts=L.cells.map(P); if(!pts.length) return; var m=polyCum(pts); if(m.total<=0) return;
+    var travel=m.total+s*1.5, speed=s*2.5, off=((idx*0.41)%1)*travel;
+    var pos=(((animT/1000)*speed+off)%travel);
+    if(pos<=m.total){ var pt=ptAtLen(pts,m.cum,pos); var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.6);
+      rg.addColorStop(0,"rgba(255,255,255,0.28)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.6,0,6.2832); ctx.fill(); }
+  });
+  sweeps=sweeps.filter(function(sw){ return nowMs()-sw.t0<sw.dur; });
+  sweeps.forEach(function(sw){ var age=(nowMs()-sw.t0)/sw.dur; if(age<0||age>1) return; var pt=ptAtLen(sw.pts,sw.cum,age*sw.total);
+    var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.95); rg.addColorStop(0,"rgba(255,255,255,0.9)"); rg.addColorStop(0.55,"rgba(255,255,255,0.45)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.95,0,6.2832); ctx.fill(); });
+  ctx.restore();
+  // 5 — junction / delivery blooms (expanding ring + flash, on top)
+  blooms=blooms.filter(function(b){ return nowMs()-b.t0<b.dur; });
+  blooms.forEach(function(b){ var age=(nowMs()-b.t0)/b.dur, pt=P([b.r,b.c]), radius=pipeW*0.45+age*s*0.85;
+    ctx.save(); ctx.globalAlpha=(1-age)*0.75; ctx.strokeStyle=b.color; ctx.lineWidth=Math.max(1.5,(1-age)*s*0.13); ctx.beginPath(); ctx.arc(pt[0],pt[1],radius,0,6.2832); ctx.stroke();
+    if(age<0.4){ ctx.globalAlpha=(0.4-age)/0.4*0.6; ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.55*(1-age),0,6.2832); ctx.fill(); } ctx.restore(); });
+  // 6 — coverage shimmer: all blends delivered but board not full -> unpainted cells breathe
+  if(!solved && tgts.length && tgts.every(function(t){ return t.done; })){
+    var ps=paintedSet(), pulse=0.5+0.5*Math.sin(animT/330);
+    ctx.save(); ctx.fillStyle="#b7a883";
+    for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
+    ctx.restore();
+  }
+  // 7 — win confetti (marker chips, on top of everything)
+  confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
+  if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle="#2c2733"; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
+  covEl.textContent=coverage()+"/"+(N*N)+" painted";
+  var dots=dotL.querySelectorAll(".dot");
+  tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
+}
+window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
+/* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti */
+function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+
+/* ---------- level picker & controls ---------- */
+function renderPicker(){
+  var done=JSON.parse(localStorage.getItem("hm_flow_done")||"{}"), h="";
+  for(var i=0;i<LEVELS.length;i++)
+    h+='<button class="pkbtn'+(i===li?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+  document.getElementById("pkgrid").innerHTML=h;
+}
+document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio(); renderPicker(); ovPick.classList.add("show"); });
+document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
+document.getElementById("pkgrid").addEventListener("click", function(e){
+  var b=e.target.closest(".pkbtn"); if(!b) return;
+  ensureAudio(); loadLevel(+b.dataset.i);
+});
+document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); loadLevel(isTut?0:li-1); });
+document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); loadLevel(isTut?0:li+1); });
+document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(isTut) loadTutorial(false); else loadLevel(li); });
+document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); if(isTut) loadLevel(0); else loadLevel(li+1); });
+
+/* tutorial = the ghost-hand demo (defined above); "Watch tutorial" replays it */
+document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadTutorial(); });
+document.getElementById("demoskip").addEventListener("click", function(){ ensureAudio(); stopDemo(); playTutorial(); });
+/* ? = a quick always-on legend + rules */
+var ovHelp=document.getElementById("ovHelp");
+(function(){ function sw(col,sh){ return '<span class="sw '+sh+'" style="background:'+HEX[col]+'"></span>'; }
+  document.getElementById("helpMix").innerHTML =
+    '<div class="mx">'+sw("R","sq")+"+"+sw("Y","sq")+"="+sw("O","ci")+'</div>'
+   +'<div class="mx">'+sw("Y","sq")+"+"+sw("B","sq")+"="+sw("G","ci")+'</div>'
+   +'<div class="mx">'+sw("B","sq")+"+"+sw("R","sq")+"="+sw("P","ci")+'</div>'; })();
+document.getElementById("btnHelp").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.add("show"); });
+document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
+
+if(!localStorage.getItem("hm_flow_seen")){ localStorage.setItem("hm_flow_seen","1"); loadTutorial(); }
+else loadLevel(li);
+
+/* debug hooks for automated testing */
+window.__flow={
+  load:loadLevel,
+  tut:loadTutorial,
+  count:LEVELS.length,
+  state:function(){ return { li:li, n:N, solved:solved, coverage:coverage(),
+    tgts:tgts.map(function(t){ return {sec:t.sec, done:t.done}; }),
+    junctions:junctions.map(function(j){ return {sec:j.sec, cell:j.cell, legLen:j.leg.length}; }),
+    ems:ems.map(function(E){ return {col:E.col, legs:E.legs.map(function(l){ return {len:l.cells.length, jun:l.jun, root:l.cells[0]}; })}; }) }; },
+  cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), s=cs(); return {x:rect.left+c*s+s/2, y:rect.top+r*s+s/2}; },
+  winFx:function(){ playWinCascade(); },
+  fx:function(){ return {blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
+  render:function(){ renderPaths(); }
+};
+})();
+</script>
+</body>
+</html>

@@ -2,505 +2,1200 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0A0B14" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f3ead6" />
 <title>Huemeld · İzge Bayyurt</title>
-<meta name="description" content="Mix primaries, connect four, pop. A glassy colour-melding puzzle." />
+<meta name="description" content="Meld primary paints into a suspended combo, then detonate it. A hand-drawn colour puzzle." />
 <meta property="og:title" content="Huemeld" />
-<meta property="og:description" content="Mix primaries, connect four, pop. A glassy colour-melding puzzle." />
+<meta property="og:description" content="Meld primary paints into a suspended combo, then detonate it. A hand-drawn colour puzzle." />
 <meta property="og:type" content="website" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230A0B14'/%3E%3Crect x='5' y='5' width='10' height='10' rx='3' fill='%23FF4D6D'/%3E%3Crect x='17' y='5' width='10' height='10' rx='3' fill='%234D9BFF'/%3E%3Crect x='11' y='17' width='10' height='10' rx='5' fill='%235BE38A'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f3ead6'/%3E%3Crect x='4' y='4' width='11' height='11' rx='3' fill='%23ef4a5a' stroke='%232c2733' stroke-width='2'/%3E%3Crect x='17' y='6' width='10' height='10' rx='3' fill='%233d8bdf' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='16' cy='23' r='6' fill='%2357c268' stroke='%232c2733' stroke-width='2'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <style>
 :root{
-  --base:#0A0B14; --surface:#15172B; --raised:#1E2142;
-  --ink:#EEF0FF; --ink-dim:#9FA3CE; --hairline:#2A2E55;
-  --primary:#7A5CFF; --primary-2:#6A45F0; --coin:#FFC44D;
-  --font-display:"Bricolage Grotesque", system-ui, sans-serif;
-  --font-ui:"Hanken Grotesk", system-ui, sans-serif;
-  --ease-pop:cubic-bezier(.34,1.56,.64,1);
-  --ease-calm:cubic-bezier(.4,0,.2,1);
-  --gap:8px;
+  --paper:#f0e6cf; --paper2:#fbf5e6; --card:#fffdf6;
+  --ink:#2c2733; --ink-soft:#6b6472; --line:#2c2733;
+  --shadow:rgba(44,39,51,.9);
+  --font-d:"Fredoka", system-ui, sans-serif;
+  --font-u:"Nunito", system-ui, sans-serif;
+  --pop:cubic-bezier(.34,1.7,.6,1); --calm:cubic-bezier(.4,0,.2,1);
+  --ripen:900ms;
 }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body{ margin:0; padding:0; }
 body{
-  min-height:100dvh;
-  background:
-    radial-gradient(120% 70% at 50% -8%, #171a3a 0%, #0c0d1c 46%, var(--base) 100%);
-  color:var(--ink);
-  font-family:var(--font-ui);
+  min-height:100dvh; color:var(--ink); font-family:var(--font-u);
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.05) 1px, transparent 1.4px);
+  background-size:7px 7px;
   -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
   display:flex; flex-direction:column; align-items:center;
-  padding:calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 14px);
+  padding:calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 16px);
 }
-.app{ width:100%; max-width:460px; }
-::selection{ background:rgba(176,125,255,.3); }
+.app{ width:100%; max-width:470px; }
+::selection{ background:rgba(155,98,214,.25); }
+h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; letter-spacing:.2px; }
 
-/* Header */
-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
-.brand{ display:flex; align-items:center; gap:11px; min-width:0; }
-.logo{ position:relative; width:38px; height:38px; flex:none; }
-.logo i{ position:absolute; width:16px; height:16px; border-radius:5px; box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 3px 8px rgba(0,0,0,.4); }
-.logo i:nth-child(1){ left:0; top:1px; background:linear-gradient(150deg,rgba(255,255,255,.5),transparent 50%),#FF4D6D; animation:hmFloat 4.2s var(--ease-calm) infinite; }
-.logo i:nth-child(2){ right:0; top:3px; background:linear-gradient(150deg,rgba(255,255,255,.5),transparent 50%),#4D9BFF; animation:hmFloat 4.2s var(--ease-calm) .5s infinite; }
-.logo i:nth-child(3){ left:11px; bottom:0; border-radius:50%; background:linear-gradient(150deg,rgba(255,255,255,.5),transparent 50%),#5BE38A; animation:hmFloat 4.2s var(--ease-calm) 1s infinite; }
-h1{ font-family:var(--font-display); font-weight:800; font-size:25px; letter-spacing:-.02em; line-height:1; margin:0; }
-.tag{ margin:3px 0 0; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-dim); font-weight:600; }
-.tools{ display:flex; gap:7px; flex:none; }
-.ico{
-  position:relative;
-  width:38px; height:38px; border-radius:12px; flex:none;
-  background:var(--surface); border:1px solid var(--hairline); color:#C9CCF0;
-  font-size:17px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  transition:transform .12s var(--ease-calm), background .18s, border-color .18s;
-  touch-action:manipulation; font-family:var(--font-ui); font-weight:700;
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:var(--card); border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); transition:transform .08s var(--calm), box-shadow .08s var(--calm);
+  touch-action:manipulation;
 }
-.ico:hover{ background:var(--raised); border-color:#34386B; }
-.ico:active{ transform:scale(.93); }
-.ico.on{ color:var(--coin); border-color:#3a3a5e; }
-.ico.muted{ color:#8388B8; }
-.ico.muted::after{ content:""; position:absolute; left:8px; right:8px; top:calc(50% - 1px); height:2px; border-radius:2px; background:currentColor; transform:rotate(-38deg); }
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.mk.big{ height:54px; font-size:19px; border-radius:16px; padding:0 22px; }
+.mk.accent{ background:#ffd15c; }
+.icobtn{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; padding:0; }
 
-/* Stat chips */
-.stats{ display:flex; gap:8px; margin-bottom:14px; }
-.chip{
-  flex:1; background:var(--surface); border:1px solid var(--hairline); border-radius:14px;
-  padding:9px 13px; display:flex; flex-direction:column; gap:1px; min-width:0;
-}
-.chip span{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-dim); font-weight:700; }
-.chip b{ font-family:var(--font-display); font-weight:800; font-size:20px; line-height:1.05; color:#F2F3FF; letter-spacing:-.01em; }
-.chip.lvl b{ color:var(--coin); }
+/* ---------- level select ---------- */
+#screen-levels .top{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:4px; }
+.logo{ position:relative; width:44px; height:40px; flex:none; }
+.logo i{ position:absolute; width:18px; height:18px; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
+.logo i:nth-child(1){ left:0; top:3px; background:#ef4a5a; border-radius:40% 55% 50% 48%; transform:rotate(-6deg); }
+.logo i:nth-child(2){ right:0; top:0; background:#3d8bdf; border-radius:52% 45% 50% 55%; transform:rotate(5deg); }
+.logo i:nth-child(3){ left:13px; bottom:0; background:#57c268; border-radius:50%; }
+h1{ font-size:30px; line-height:1; }
+.tagline{ font-family:var(--font-u); font-weight:700; color:var(--ink-soft); font-size:12.5px; margin-top:3px; }
+.progress{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink); background:var(--paper2); border:2.5px solid var(--line); border-radius:999px; padding:5px 13px; box-shadow:0 3px 0 var(--shadow); white-space:nowrap; }
+.grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; margin-top:16px; }
+.tut-btn{ grid-column:1 / -1; min-height:50px; font-size:17px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:9px; background:#ffd15c; }
+.tut-btn .tstars{ font-size:13px; letter-spacing:1px; color:#b9791a; }
+.lvl-card{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:6px; border-width:3px; position:relative; }
+.lvl-card .lnum{ font-family:var(--font-d); font-weight:700; font-size:clamp(20px,7.5vw,28px); line-height:1; }
+.lvl-card .lstars{ font-size:13px; letter-spacing:1.5px; color:#f0a92c; line-height:1; }
+.lvl-card .lstars .d{ color:rgba(44,39,51,.2); }
+/* border colour = difficulty tier */
+.lvl-card.easy{ border-color:#57c268; }
+.lvl-card.med{ border-color:#f0a92c; }
+.lvl-card.hard{ border-color:#ef4a5a; }
+.lvl-card.xhard{ border-color:#9b62d6; }
+.lvl-card.lock{ background:#e9e0cb; opacity:.7; cursor:default; }
+.lvl-card.lock .lnum{ color:var(--ink-soft); }
+.lvl-card.lock:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.modes{ text-align:center; margin-top:18px; }
+.modelinks{ margin-top:9px; font-family:var(--font-d); font-weight:600; font-size:13px; color:var(--ink-soft); }
+.modelinks a{ color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
+.modelinks span{ margin:0 8px; opacity:.55; }
+.credit{ text-align:center; margin-top:16px; font-size:12px; }
+.credit a{ color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
 
-/* Board */
+/* ---------- game ---------- */
+#screen-game{ display:none; }
+.gtop{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.gtitle{ flex:1; min-width:0; }
+.gtitle h2{ font-size:19px; line-height:1.05; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gtitle .sub{ font-family:var(--font-u); font-weight:700; font-size:11.5px; color:var(--ink-soft); }
+.moves{ display:flex; flex-direction:column; align-items:center; justify-content:center; width:60px; height:52px; border:2.5px solid var(--line); border-radius:14px; background:#ffd15c; box-shadow:0 3px 0 var(--shadow); flex:none; }
+.moves b{ font-family:var(--font-d); font-weight:700; font-size:23px; line-height:1; }
+.moves span{ font-family:var(--font-u); font-weight:800; font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink); opacity:.7; }
+.goals{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.goal{ display:flex; align-items:center; gap:7px; background:var(--paper2); border:2.5px solid var(--line); border-radius:12px; padding:5px 11px 5px 8px; box-shadow:0 3px 0 var(--shadow); }
+.goal .swatch{ width:21px; height:21px; border:2px solid var(--line); border-radius:6px; }
+.goal .swatch.round{ border-radius:50%; }
+.goal b{ font-family:var(--font-d); font-weight:600; font-size:16px; min-width:14px; text-align:center; }
+.goal.done{ background:#d7f0d0; }
+.goal.done b{ color:#2f7d3a; }
+
+/* liquid tubes: vertical meters that fill with wobbling paint as you cash combos */
+.tubes{ display:flex; gap:16px; justify-content:center; align-items:flex-end; margin-bottom:12px; }
+.tube-wrap{ display:flex; flex-direction:column; align-items:center; gap:5px; }
+.tube{ position:relative; width:36px; height:88px; border:3px solid var(--line); border-radius:13px; background:#fffdf6; overflow:hidden; box-shadow:0 3px 0 var(--shadow); }
+.tube .liquid{ position:absolute; left:0; right:0; bottom:0; height:0%; background:var(--tc); transition:height .55s var(--pop); }
+.tube .liquid::before{ content:""; position:absolute; top:-5px; left:-25%; width:150%; height:10px; background:var(--tc); border-radius:50%; animation:hmWave 2.4s ease-in-out infinite; }
+.tube .liquid::after{ content:""; position:absolute; top:4px; left:5px; width:7px; height:38%; background:rgba(255,255,255,.42); border-radius:6px; }
+.tube.splash .liquid{ animation:hmSplash .5s var(--pop); }
+.tube.full{ box-shadow:0 3px 0 var(--shadow), 0 0 0 3px #ffd15c; }
+.tube.full::after{ content:"✓"; position:absolute; top:3px; left:0; right:0; text-align:center; font-family:var(--font-d); font-weight:700; font-size:15px; color:#fff; -webkit-text-stroke:1px var(--line); z-index:3; }
+.tube-dot{ width:13px; height:13px; border:2px solid var(--line); border-radius:50%; }
+@keyframes hmWave{ 0%,100%{transform:translateX(0)} 50%{transform:translateX(9px)} }
+@keyframes hmSplash{ 0%{transform:scaleY(1)} 35%{transform:scaleY(1.12)} 100%{transform:scaleY(1)} }
+
+/* rationed-primary readout: how much of the scarce colour is left to allocate */
+.ration{ display:none; align-items:center; justify-content:center; gap:8px; margin:-2px 0 12px; font-family:var(--font-d); font-weight:600; font-size:14.5px; color:var(--ink); }
+.ration .dot{ width:17px; height:17px; border-radius:50%; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
+.ration b{ font-weight:700; font-size:16px; }
+.ration.low{ color:#c0392b; }
+.ration.low .dot{ animation:hmReady .8s ease-in-out infinite; }
+
+/* recipe pillboxes: every recipe shown up front — its colour dots + done/count, green when met */
+.recipes{ display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+.pill{ display:inline-flex; align-items:center; gap:5px; background:var(--paper2); border:2.5px solid var(--line); border-radius:999px; padding:4px 9px; box-shadow:0 3px 0 var(--shadow); }
+.pill .pdot{ width:16px; height:16px; border:2px solid var(--line); border-radius:50%; }
+.pill .pn{ font-family:var(--font-d); font-weight:700; font-size:13px; margin-left:2px; min-width:20px; text-align:center; }
+.pill.full{ background:#d7f0d0; border-color:#2f7d3a; }
+.pill.full .pn{ color:#2f7d3a; font-size:15px; }
+/* the traced tiles glow while you build the chain */
+.tile.rlink{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 14px 3px rgba(255,209,92,.75); z-index:5; }
+
+/* powerup bars (charged by chaining primaries; the payoff layer comes later) */
+.pups{ display:flex; gap:8px; margin-bottom:12px; }
+.pup{ flex:1; display:flex; align-items:center; gap:6px; }
+.pup .dot{ width:14px; height:14px; border-radius:50%; border:2px solid var(--line); flex:none; }
+.pup .track{ flex:1; height:10px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; box-shadow:0 2px 0 var(--shadow); }
+.pup .fill{ height:100%; width:0; border-radius:999px; transition:width .28s var(--pop); }
+.pup.ready{ animation:hmReady .9s ease-in-out infinite; }
+.pup.ready .track{ border-color:#f0a92c; }
+
 .stage{ position:relative; }
 .board{
-  display:grid; grid-template-columns:repeat(7,1fr); gap:var(--gap);
-  padding:14px; border-radius:24px;
-  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
-  border:1px solid #20233F;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 18px 40px rgba(0,0,0,.45);
+  display:grid; grid-template-columns:repeat(var(--cols,7),1fr); gap:2px;
+  padding:12px; border-radius:20px; background:var(--paper2);
+  border:3px solid var(--line); box-shadow:0 5px 0 var(--shadow);
   touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  transition:box-shadow .18s var(--calm);
 }
-.cell{
-  position:relative; aspect-ratio:1; border-radius:14px;
-  background:linear-gradient(165deg,#20222f,#131519);
-  box-shadow:inset 0 3px 7px rgba(0,0,0,.55), inset 0 -1.5px 0 rgba(255,255,255,.06);
-}
-.pane{
-  position:absolute; inset:0; overflow:hidden;
+.board.suspended{ box-shadow:0 5px 0 var(--shadow), 0 0 0 3px #ffd15c, 0 0 24px 5px rgba(255,209,92,.55); }
+.cell{ position:relative; aspect-ratio:1; }
+/* a faint dot marks every square so an emptied (suspended) cell reads as an intentional socket, not a gap; a filled tile sits on top and covers it */
+.cell::before{ content:""; position:absolute; left:50%; top:50%; width:20%; height:20%; transform:translate(-50%,-50%); border-radius:50%; background:var(--line); opacity:.15; }
+.cell.wall::before{ display:none; }   /* non-playable cells are invisible gaps, no socket dot */
+/* 1-second-left warning: a shake ripples across the board from one corner, telling you the suspended tiles are about to fall */
+.cell.shakewarn{ --amp:2.5px; animation:hmShake .42s var(--calm); }
+.tile{
+  position:absolute; inset:7%;
+  background:var(--pc); border:3px solid var(--line);
+  border-radius:22% 28% 24% 30% / 26% 22% 30% 24%;
+  box-shadow:1.5px 2px 0 rgba(44,39,51,.28);
+  transform:rotate(var(--rot,0deg));
   display:flex; align-items:center; justify-content:center;
-  border-radius:30%;
-  background:linear-gradient(150deg, rgba(255,255,255,.45), transparent 48%), var(--pc);
-  box-shadow:
-    0 4px 10px rgba(var(--pr),var(--pg),var(--pb),.4),
-    0 0 22px rgba(var(--pr),var(--pg),var(--pb),.34),
-    inset 0 1px 0 rgba(255,255,255,.55),
-    inset 0 -3px 6px rgba(0,0,0,.16);
-  cursor:pointer; will-change:transform;
+  cursor:pointer; will-change:transform, filter;
 }
-.pane.sec{ border-radius:50%; }
-.pane::before{
-  content:""; position:absolute; inset:0 0 auto 0; height:54%; border-radius:inherit;
-  background:linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0) 96%);
-  pointer-events:none;
-}
-.pane .sym{ position:relative; z-index:2; font:700 clamp(12px,3.4vw,17px)/1 var(--font-ui); color:#fff; -webkit-text-stroke:.6px rgba(0,0,0,.85); text-shadow:0 0 2px rgba(0,0,0,.9), 0 1px 1px rgba(0,0,0,.9), 0 -1px 1px rgba(0,0,0,.9); }
-.pane.sel{
-  outline:3px solid #CDBBFF; outline-offset:-2px; transform:scale(1.06); z-index:4;
-  box-shadow:
-    0 0 20px rgba(176,125,255,.75),
-    0 4px 10px rgba(var(--pr),var(--pg),var(--pb),.4),
-    inset 0 1px 0 rgba(255,255,255,.55);
-}
-.pane.clr{ animation:hmPop .24s var(--ease-calm) forwards; z-index:2; }
-.pane.new{ animation:hmDrop .2s var(--ease-pop); }
-.pane.mixed{ animation:hmMix .26s var(--ease-pop); z-index:3; }
+.tile.sec{ border-radius:50%; }
+/* inert crate block: break it by clearing (same-colour pop) right next to it */
+.tile.crate{ background:#c58f52; border-color:#5b3d1e; border-radius:15%;
+  background-image:linear-gradient(rgba(91,61,30,.30) 2px,transparent 2px),linear-gradient(90deg,rgba(91,61,30,.22) 2px,transparent 2px);
+  background-size:100% 34%,34% 100%;
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.10),1.5px 2px 0 rgba(44,39,51,.28); cursor:default; }
+.tile.crate .streak{ display:none; }
+.tile.crate::after{ content:""; position:absolute; inset:0; border-radius:14%; pointer-events:none; background-repeat:no-repeat; }
+.tile.crate.dmg1::after{ background-image:linear-gradient(52deg, transparent 45%, rgba(52,28,10,.6) 45%, rgba(52,28,10,.6) 55%, transparent 55%); }   /* one crack */
+.tile.crate.dmg2{ filter:brightness(.9); }
+.tile.crate.dmg2::after{ background-image:linear-gradient(52deg, transparent 45%, rgba(52,28,10,.72) 45%, rgba(52,28,10,.72) 55%, transparent 55%),linear-gradient(-52deg, transparent 45%, rgba(52,28,10,.72) 45%, rgba(52,28,10,.72) 55%, transparent 55%); }   /* crossed cracks, about to break */
+/* crate counter in the goals row */
+.pill.crate-pill{ gap:6px; }
+.pill .kbox{ width:15px; height:15px; border-radius:4px; background:#c58f52; border:2px solid #5b3d1e; }
+.tile .streak{ position:absolute; top:15%; left:17%; width:32%; height:20%; border-radius:50%; background:rgba(255,255,255,.4); pointer-events:none; }
+.tile .sym{ position:relative; z-index:2; font-family:var(--font-d); font-weight:700; font-size:clamp(11px,3.2vw,16px); color:#fff; -webkit-text-stroke:.8px var(--line); }
+.tile.dim{ filter:saturate(.2) brightness(1.08) opacity(.45); }
+.tile.incombo{ box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 0 15px 3px rgba(255,255,255,.65); z-index:4; animation:hmBob .7s ease-in-out infinite; }
+.tile.clr{ animation:hmPop .26s var(--calm) forwards; z-index:2; }
+.tile.new{ animation:hmDrop .22s var(--pop); }
+.tile.mixed{ animation:hmMix .28s var(--pop); z-index:4; }
+.tile.squish{ animation:hmSquish .3s var(--pop); }
+.tile.nope{ animation:hmNope .32s var(--calm); }
+/* the carried tile lifts the instant you press and leans toward your finger — merging feels smooth and continuous, not a snap */
+.tile.lift{ transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(1.14); z-index:6; box-shadow:0 0 0 3px #fff, 0 0 0 6px var(--ink), 0 7px 12px rgba(44,39,51,.32); transition:transform .09s linear; }
+/* square-to-circle + colour tint on the meld target (same-colour joins get a gentle pulse) */
+.tile.morph{ transition:background .22s var(--calm), border-radius .26s var(--calm); }
+/* the metaball goo overlay: two blurred, alpha-thresholded blobs fuse with a liquid neck */
+.mixfx{ position:absolute; display:none; pointer-events:none; z-index:6; overflow:visible; }
+/* one combo counter floats ABOVE each merged blob (each merge keeps its own) */
+#comboBadges{ position:absolute; inset:0; pointer-events:none; z-index:9; }
+.combo-badge{ position:absolute; display:flex; align-items:center; justify-content:center; min-width:30px; height:30px; padding:0 8px; transform:translate(-50%,-135%); font-family:var(--font-d); font-weight:700; font-size:16px; color:#fff; -webkit-text-stroke:.7px var(--line); border:2.5px solid var(--line); border-radius:999px; box-shadow:0 2px 0 var(--shadow); pointer-events:none; animation:hmBadge .22s var(--pop); }
+@keyframes hmBadge{ 0%{transform:translate(-50%,-135%) scale(.4)} 60%{transform:translate(-50%,-135%) scale(1.18)} 100%{transform:translate(-50%,-135%) scale(1)} }
 
-/* Overlays */
+.combo-meter{ position:absolute; left:14px; right:14px; top:-7px; height:12px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; opacity:0; transition:opacity .15s; z-index:8; box-shadow:0 2px 0 var(--shadow); }
+.combo-meter.show{ opacity:1; }
+.combo-meter .fill{ height:100%; width:0; background:#ffc234; }
+.combo-meter.warn{ border-color:#ef4a5a; }
+.combo-meter.warn .fill{ background:#ef4a5a; }
+.combo-meter.run .fill{ width:100%; transition:width var(--ripen) linear; }
+
 .toast{
-  position:absolute; left:50%; top:16px; transform:translateX(-50%);
-  padding:9px 18px; border-radius:999px; pointer-events:none; opacity:0; white-space:nowrap;
-  background:rgba(20,22,42,.95); border:1px solid var(--primary-2); color:#EEF0FF;
-  font-weight:700; font-size:14px; box-shadow:0 0 24px rgba(122,92,255,.45); z-index:8;
+  position:absolute; left:50%; top:12px; transform:translateX(-50%);
+  font-family:var(--font-d); font-weight:600; font-size:15px; white-space:nowrap;
+  background:#ffd15c; border:2.5px solid var(--line); border-radius:999px; padding:6px 15px;
+  box-shadow:0 3px 0 var(--shadow); opacity:0; pointer-events:none; z-index:9;
 }
-.banner{
-  position:absolute; left:50%; top:44%; transform:translate(-50%,-50%);
-  font-family:var(--font-display); font-weight:800; font-size:40px; letter-spacing:-.02em;
-  color:#fff; opacity:0; pointer-events:none; text-align:center; z-index:8;
-  text-shadow:0 0 30px rgba(122,92,255,.6), 0 6px 20px rgba(0,0,0,.5);
-}
-.sheet{
-  position:absolute; inset:0; z-index:9; display:none;
-  align-items:center; justify-content:center; padding:20px; border-radius:24px;
-  background:rgba(8,9,18,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
-}
-.sheet.show{ display:flex; }
-.card{
-  width:100%; max-width:320px; border-radius:24px; padding:24px;
-  background:linear-gradient(180deg,#1A1C36,#0F1124); border:1px solid #2E3260;
-  box-shadow:0 24px 60px rgba(0,0,0,.6); text-align:center;
-}
-.card h2{ font-family:var(--font-display); font-weight:800; font-size:24px; margin:0 0 4px; letter-spacing:-.01em; }
-.card p{ font-size:13.5px; line-height:1.55; color:var(--ink-dim); margin:0 0 14px; }
-.rules{ text-align:left; margin:0 0 18px; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px; }
-.rules li{ display:flex; align-items:center; gap:12px; font-size:13.5px; line-height:1.4; color:#D6D9F5; }
-.demo{ width:38px; height:38px; flex:none; position:relative; }
-.dp{ position:absolute; width:17px; height:17px; border-radius:5px; box-shadow:inset 0 1px 0 rgba(255,255,255,.5); }
-.dp.round{ border-radius:50%; }
-.btn{
-  width:100%; height:52px; border-radius:16px; border:1px solid #9C84FF; cursor:pointer;
-  background:linear-gradient(180deg,#8B6BFF,#6A45F0); color:#fff; font-weight:700; font-size:17px;
-  font-family:var(--font-ui); box-shadow:0 10px 26px rgba(122,92,255,.5), inset 0 1px 0 rgba(255,255,255,.35);
-  transition:transform .12s var(--ease-calm); touch-action:manipulation;
-}
-.btn:active{ transform:scale(.97); }
+.over{ position:absolute; inset:0; z-index:10; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(240,230,207,.72); border-radius:20px; }
+.over.show{ display:flex; }
+.panel{ width:100%; max-width:300px; text-align:center; padding:22px 22px 20px; background:var(--card); border:3px solid var(--line); border-radius:22px; box-shadow:0 6px 0 var(--shadow); }
+.panel h2{ font-size:27px; }
+.panel p{ font-family:var(--font-u); font-weight:700; color:var(--ink-soft); font-size:13.5px; margin:6px 0 14px; }
+.stars{ font-size:34px; letter-spacing:4px; color:#f0a92c; margin:2px 0 6px; }
+.stars .dim{ color:rgba(44,39,51,.18); }
+.panel .row{ display:flex; gap:9px; margin-top:12px; }
+.panel .row .mk{ flex:1; height:46px; font-size:15px; border-radius:13px; }
 
-/* Footer */
-footer{ margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.hint{ font-size:12px; color:var(--ink-dim); line-height:1.4; }
-footer a{ font-size:12px; color:var(--ink-dim); text-decoration:none; border-bottom:1px solid rgba(159,163,206,.35); white-space:nowrap; }
-footer a:hover{ color:var(--ink); }
+/* the End-turn button — appears only while the board is suspended (mid-combo) */
+.turnbtn{ display:none; width:100%; height:48px; font-size:17px; margin-top:11px; background:#ffd15c; }
+.turnbtn.show{ display:block; animation:hmReady 1.4s ease-in-out infinite; }
+.ghint{ display:none; text-align:center; font-size:12px; color:var(--ink-soft); margin:11px 2px 0; line-height:1.4; }
+.ghint b{ font-weight:700; color:var(--ink); }
+/* tutorial coach — a step-through card that teaches the mechanics on the tutorial level */
+.coach{ display:none; margin:14px 2px 0; background:var(--card); border:2.5px solid var(--line); border-radius:16px; box-shadow:0 3px 0 var(--shadow); padding:14px 16px; }
+.coach .ctext{ font-family:var(--font-u); font-weight:600; font-size:14px; line-height:1.5; color:var(--ink); }
+.coach .ctext b{ font-weight:800; }
+.cmix{ display:none; flex-wrap:wrap; gap:16px; justify-content:center; margin:13px 0 3px; }
+.cmix.show{ display:flex; }
+.cmix .eq{ display:flex; align-items:center; gap:5px; font-family:var(--font-d); font-weight:700; font-size:16px; color:var(--ink-soft); }
+.cchip{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
+.cchip.sq{ border-radius:6px; }
+.cchip.ci{ border-radius:50%; }
+.cchip.lg{ width:34px; height:34px; }
+.cswipe{ display:none; align-items:center; justify-content:center; gap:6px; margin:14px 0 4px; }
+.cswipe.show{ display:flex; }
+.cdrag{ width:52px; height:0; border-top:3px dashed var(--ink-soft); position:relative; }
+.cdrag::after{ content:""; position:absolute; right:-3px; top:-7px; border-left:10px solid var(--ink-soft); border-top:6px solid transparent; border-bottom:6px solid transparent; }
+.coach .crow{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+.cdots{ display:flex; gap:6px; }
+.cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
+.cdots i.on{ background:var(--ink); }
+.coach #coachNext{ height:40px; padding:0 22px; font-size:15px; }
 
-@keyframes hmPop{ 0%{transform:scale(1)} 42%{transform:scale(1.14)} 100%{transform:scale(.08); opacity:0} }
-@keyframes hmDrop{ from{transform:translateY(-14px); opacity:.15} to{transform:translateY(0); opacity:1} }
-@keyframes hmMix{ 0%{transform:scale(1)} 45%{transform:scale(1.22); filter:brightness(1.7)} 100%{transform:scale(1); filter:brightness(1)} }
-@keyframes hmFloat{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-@keyframes hmToast{ 0%{transform:translateX(-50%) translateY(8px) scale(.9); opacity:0} 16%{transform:translateX(-50%) translateY(0) scale(1); opacity:1} 78%{opacity:1} 100%{transform:translateX(-50%) translateY(-12px); opacity:0} }
-@keyframes hmBanner{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.7)} 22%{opacity:1; transform:translate(-50%,-50%) scale(1)} 76%{opacity:1} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.08)} }
-@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; } }
-@media (max-width:380px){
-  :root{ --gap:5px; }
-  .board{ padding:10px; }
-  body{ padding:calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px); }
-}
+@keyframes hmPop{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 42%{transform:rotate(var(--rot,0deg)) scale(1.18)} 100%{transform:rotate(var(--rot,0deg)) scale(.05); opacity:0} }
+@keyframes hmDrop{ from{transform:translateY(-15px) rotate(var(--rot,0deg)); opacity:.2} to{transform:translateY(0) rotate(var(--rot,0deg)); opacity:1} }
+@keyframes hmMix{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 45%{transform:rotate(0deg) scale(1.28)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmBob{ 0%,100%{transform:rotate(var(--rot,0deg)) scale(1.02)} 50%{transform:rotate(var(--rot,0deg)) scale(1.1)} }
+@keyframes hmSquish{ 0%{transform:rotate(var(--rot,0deg)) scale(1)} 40%{transform:rotate(var(--rot,0deg)) scaleX(1.25) scaleY(.72)} 100%{transform:rotate(var(--rot,0deg)) scale(1)} }
+@keyframes hmNope{ 0%,100%{transform:rotate(var(--rot,0deg)) translateX(0)} 25%{transform:rotate(var(--rot,0deg)) translateX(-3px)} 75%{transform:rotate(var(--rot,0deg)) translateX(3px)} }
+@keyframes hmReady{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+@keyframes hmToast{ 0%{transform:translateX(-50%) translateY(6px) scale(.85); opacity:0} 18%{transform:translateX(-50%) translateY(0) scale(1); opacity:1} 76%{opacity:1} 100%{transform:translateX(-50%) translateY(-12px); opacity:0} }
+
+/* detonation firework: tier-scaled shake (--amp set per combo) + a celebratory tier callout */
+@keyframes hmShake{ 0%,100%{transform:translate(0,0)} 14%{transform:translate(calc(var(--amp,3px)*-1),1px)} 32%{transform:translate(var(--amp,3px),-2px)} 52%{transform:translate(calc(var(--amp,3px)*-.7),2px)} 72%{transform:translate(calc(var(--amp,3px)*.7),-1px)} 90%{transform:translate(calc(var(--amp,3px)*-.4),1px)} }
+.board.shake{ animation:hmShake .44s var(--calm); }
+.burst{ position:absolute; left:50%; top:44%; transform:translate(-50%,-50%) scale(.4); font-family:var(--font-d); font-weight:700; font-size:38px; color:#fff; -webkit-text-stroke:2.6px var(--line); opacity:0; pointer-events:none; z-index:9; white-space:nowrap; letter-spacing:1px; }
+.burst.show{ animation:hmBurst .95s var(--pop) forwards; }
+@keyframes hmBurst{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.3) rotate(-8deg)} 22%{opacity:1; transform:translate(-50%,-50%) scale(1.18) rotate(-4deg)} 66%{opacity:1; transform:translate(-50%,-50%) scale(1) rotate(-4deg)} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.06) translateY(-16px) rotate(-4deg)} }
+
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; } .tile.incombo{ animation:none; } }
 </style>
 </head>
 <body>
 <div class="app">
-  <header>
-    <div class="brand">
-      <div class="logo" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div>
-        <h1>Huemeld</h1>
-        <p class="tag">Mix · connect four · pop</p>
+
+  <section id="screen-levels">
+    <div class="top">
+      <div style="display:flex; align-items:center; gap:11px;">
+        <div class="logo" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div>
+          <h1>Huemeld</h1>
+        </div>
+      </div>
+      <div class="progress" id="progress">0 / 0</div>
+    </div>
+    <div class="grid" id="levelGrid"></div>
+    <div class="modes">
+      <a class="mk" href="flow2.html" style="display:inline-flex; align-items:center; gap:8px; height:50px; padding:0 22px; font-size:16px; background:#ffd15c; text-decoration:none;">
+        <span aria-hidden="true">✦</span> Play Huemeld <b style="font-weight:700">Flow</b> <span style="font-weight:600; color:var(--ink-soft); font-size:12.5px;">· one-solution puzzles</span>
+      </a>
+      <div class="modelinks">
+        <a href="blitz.html">Blitz</a><span>·</span><a href="arcade.html">Arcade</a>
       </div>
     </div>
-    <div class="tools">
-      <button class="ico" id="btnAid" title="Colour aid (letters)" aria-label="Colour aid" aria-pressed="false">◐</button>
-      <button class="ico on" id="btnSound" title="Sound on/off" aria-label="Sound" aria-pressed="true">♪</button>
-      <button class="ico" id="btnHelp" title="How to play" aria-label="How to play">?</button>
-      <button class="ico" id="btnNew" title="New board" aria-label="New board">↻</button>
+    <div class="credit"><a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a></div>
+  </section>
+
+  <section id="screen-game">
+    <div class="gtop">
+      <button class="mk icobtn" id="btnBack" title="Levels" aria-label="Back to levels">←</button>
+      <div class="gtitle">
+        <h2 id="gName">Level</h2>
+      </div>
+      <button class="mk icobtn" id="btnAid" title="Colour aid" aria-label="Colour aid" aria-pressed="false">◐</button>
+      <button class="mk icobtn" id="btnSound" title="Sound" aria-label="Sound" aria-pressed="true">♪</button>
+      <button class="mk icobtn" id="btnRestart" title="Restart" aria-label="Restart level">↻</button>
+      <div class="moves"><b id="movesN">0</b><span>moves</span></div>
     </div>
-  </header>
-
-  <div class="stats">
-    <div class="chip"><span>Score</span><b id="score">0</b></div>
-    <div class="chip"><span>Best</span><b id="best">0</b></div>
-    <div class="chip lvl"><span>Level</span><b id="level">1</b></div>
-  </div>
-
-  <div class="stage">
-    <div class="board" id="board" aria-label="Game board"></div>
-    <div class="toast" id="toast"></div>
-    <div class="banner" id="banner"></div>
-    <div class="sheet" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
-      <div class="card">
-        <h2 id="helpTitle">How to play</h2>
-        <p>Only three paints exist — red, yellow, blue. Mix them into the colours you need, then group four to clear.</p>
-        <ul class="rules">
-          <li>
-            <span class="demo"><span class="dp" style="left:0;top:10px;background:#FF4D6D"></span><span class="dp" style="right:0;top:10px;background:#FFC44D"></span></span>
-            Move a <b>square</b> onto a different square to <b>mix</b> — the second tile becomes the blend (red + yellow = orange).
-          </li>
-          <li>
-            <span class="demo"><span class="dp round" style="left:0;top:2px;background:#FF8A3C"></span><span class="dp round" style="right:2px;top:2px;background:#FF8A3C"></span><span class="dp round" style="left:10px;bottom:0;background:#FF8A3C"></span></span>
-            Connect <b>four or more</b> of one colour and they <b>pop</b> on their own. Chains score big.
-          </li>
-          <li>
-            <span class="demo"><span class="dp round" style="left:0;top:10px;background:#5BE38A"></span><span class="dp" style="right:0;top:10px;background:#4D9BFF"></span></span>
-            Anything already mixed just <b>swaps</b> — slide circles around to line up your groups.
-          </li>
-        </ul>
-        <button class="btn" id="btnPlay">Play</button>
+    <div class="goals" id="goals"></div>
+    <div class="ration" id="ration"></div>
+    <div class="pups" id="pups"></div>
+    <div class="stage">
+      <div class="board" id="board"></div>
+      <svg class="mixfx" id="mixfx" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <filter id="goo"><feGaussianBlur id="gooBlur" in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/></filter>
+        </defs>
+        <g filter="url(#goo)"><rect id="gtgtInk" fill="#2c2733"/><rect id="gsrcInk" fill="#2c2733"/></g>
+        <g filter="url(#goo)"><rect id="gtgt"/><rect id="gsrc"/></g>
+      </svg>
+      <div id="comboBadges"></div>
+      <div class="combo-meter" id="meter"><div class="fill"></div></div>
+      <div class="burst" id="burst"></div>
+      <div class="toast" id="toast"></div>
+      <div class="over" id="over">
+        <div class="panel">
+          <h2 id="overTitle">Cleared!</h2>
+          <div class="stars" id="overStars"></div>
+          <p id="overMsg"></p>
+          <div class="row" id="overRow"></div>
+        </div>
       </div>
     </div>
-  </div>
+    <button class="mk turnbtn" id="btnTurn">⤓ &nbsp;End turn</button>
+    <p class="ghint" id="ghint">Drag a paint onto a <b>different</b> paint to mix a circle. Then <b>drag across</b> circles that spell a recipe to solve it. When you're done comboing, tap <b>⤓ End turn</b> — chaining 2+ recipes in one turn earns <b>+2 moves</b> each!</p>
+    <div class="coach" id="coach">
+      <div class="ctext" id="coachText"></div>
+      <div class="cmix" id="coachMix">
+        <span class="eq"><span class="cchip sq" style="background:#ef4a5a"></span>+<span class="cchip sq" style="background:#f6c445"></span>=<span class="cchip ci" style="background:#f2913d"></span></span>
+        <span class="eq"><span class="cchip sq" style="background:#f6c445"></span>+<span class="cchip sq" style="background:#3d8bdf"></span>=<span class="cchip ci" style="background:#57c268"></span></span>
+        <span class="eq"><span class="cchip sq" style="background:#ef4a5a"></span>+<span class="cchip sq" style="background:#3d8bdf"></span>=<span class="cchip ci" style="background:#9b62d6"></span></span>
+      </div>
+      <div class="cswipe" id="coachSwipe">
+        <span class="cchip ci lg" style="background:#9b62d6"></span>
+        <span class="cdrag" aria-hidden="true"></span>
+        <span class="cchip ci lg" style="background:#f2913d"></span>
+      </div>
+      <div class="crow"><div class="cdots" id="coachDots"></div><button class="mk accent" id="coachNext">Next →</button></div>
+    </div>
+  </section>
 
-  <footer>
-    <div class="hint">Tap a tile, then a neighbour — or drag onto it.</div>
-    <a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a>
-  </footer>
 </div>
 
+<script src="engine.js?v=5"></script>
+<script src="levels.js"></script>
 <script>
 (function(){
   "use strict";
-  var COLS=7, ROWS=8, POP_MIN=4;
-  var ALL=["R","Y","B","O","G","P"];
-  var HEX={R:"#FF4D6D",Y:"#FFC44D",B:"#4D9BFF",O:"#FF8A3C",G:"#5BE38A",P:"#B07DFF"};
-  var RGB={R:[255,77,109],Y:[255,196,77],B:[77,155,255],O:[255,138,60],G:[91,227,138],P:[176,125,255]};
-  var MIX={RY:"O",BR:"P",BY:"G"};
-  function isPrim(c){ return c==="R"||c==="Y"||c==="B"; }
-  function mix(a,b){ return MIX[[a,b].sort().join("")]||null; }
-  function rnd(){ return ALL[(Math.random()*ALL.length)|0]; }
-  function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+  var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
 
-  var grid=[], sel=null, busy=false, score=0, best=0, level=1;
-  var clearing=new Set(), fresh=new Set(), mixed=new Set();
+  /* iOS Safari ignores user-scalable=no — block pinch (gesture events + multi-touch moves) and double-tap zoom */
+  document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+  document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+  document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+  var lastTouchEnd=0;
+  document.addEventListener("touchend", function(e){
+    var now=Date.now();
+    if(now-lastTouchEnd<300 && !e.target.closest("button")) e.preventDefault();   // kill double-tap zoom; buttons may still rapid-tap
+    lastTouchEnd=now;
+  }, {passive:false});
+  /* Liquid Tubes preview — a flagged test level (goal:"tubes"): three vertical
+     tubes (O/G/P) fill as you cash combos of that colour, and a big combo pours
+     FAR more than small ones (triangular). Fill all three to win. Appended here
+     so it needs no levels.js rebuild and can't disturb the shipped levels. */
+  var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
+    shape:["#######","#######","#######","#######","#######","#######","#######"],
+    spawn:{ R:4, Y:4, B:4 }, moves:18, goal:"tubes", objectives:[],
+    tubes:{ O:10, G:10, P:10 } };   // tight budget: a swoop of N fills n(n+1)/2, so only BIG swoops are efficient enough to win — small combos can't
+  /* Recipe Chain preview (goal:"recipe"): each level lists RECIPES — ordered
+     colour sequences you must trace through connected secondaries to score.
+     Mix primaries into circles to populate the board, then drag a connected
+     path that spells the recipe (e.g. orange -> green -> purple) to cash it. */
+  /* 20 recipe levels (goal:"recipe"), escalating: more recipes, longer sequences,
+     higher counts, more primaries mixed in. Deterministic (seeded) so each level
+     plays the same every time. Each recipe = {seq:[colours], count:times}. */
+  function genRecipeLevels(){
+    var S=["O","G","P"], P=["R","Y","B"];
+    var seed=987654321; function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+    function pick(a){ return a[(rnd()*a.length)|0]; }
+    var isP=HM.isPrim;
+    // Board-shape library — 7x7 masks ("#"=play, "."=wall). Every column's playable cells
+    // are CONTIGUOUS so gravity never drops a tile across a gap.
+    var SHAPES=[
+      ["#######","#######","#######","#######","#######","#######","#######"],   // full 49
+      [".#####.","#######","#######","#######","#######","#######",".#####."],   // notched corners 45
+      ["#######","#######","#######","#######","#######",".#####.","..###.."],   // bowl 43
+      ["..###..",".#####.",".#####.","#######","#######","#######","#######"],   // trapezoid up 41
+      ["#######","#######","#######","#######",".#####.",".#####.","..###.."],   // trapezoid down 41
+      ["###....","####...","#####..","######.","#######","#######","#######"],   // stair 39
+      ["....###","...####","..#####",".######","#######","#######","#######"],   // stair mirror 39
+      ["..###..",".#####.","#######","#######","#######",".#####.","..###.."],   // octagon 37
+      [".#####.",".#####.",".#####.",".#####.",".#####.",".#####.",".#####."],   // narrow 35
+      ["..###..","..###..","#######","#######","#######","..###..","..###.."],   // plus 33
+      ["...#...","..###..",".#####.","#######",".#####.","..###..","...#..."]    // diamond 25
+    ];
+    function cellCount(sh){ var n=0,r,c; for(r=0;r<sh.length;r++) for(c=0;c<sh[r].length;c++) if(sh[r][c]==="#") n++; return n; }
+    var SHINFO=SHAPES.map(function(sh){ return {sh:sh, n:cellCount(sh)}; });
+    var out=[];
+    for(var i=0;i<100;i++){
+      var L=i+1;
+      // NON-LINEAR difficulty: a slowly-rising floor + wide variance, so consecutive levels
+      // zig-zag in hardness (an easy breather can follow a spike) while the baseline still
+      // climbs enough to stay unlockable. The first ~8 are kept gentle for onboarding.
+      var floorD=0.22+0.50*(i/99);
+      var amp=(i<5)?0.12:0.32;
+      var d=Math.max(0.03, Math.min(1, floorD+(rnd()*2-1)*amp));
+      if(i<10) d=Math.min(d, 0.52);   // no HARD/XHARD walls in the first 10 (post-tutorial onboarding)
+      var nRec=Math.max(1, Math.min(6, Math.round(1+d*5)));
+      var recipes=[];
+      for(var k=0;k<nRec;k++){
+        // deliberate SIZE MIX: one big recipe up front, one small at the end — the game is packing
+        // the giant build and the cheap quickies into SHARED turns, cashing several per drop
+        var len;
+        if(nRec>=2 && k===0) len=Math.min(4, 3+(rnd()<d?1:0));
+        else if(nRec>=2 && k===nRec-1) len=2;
+        else len=Math.max(2, Math.min(4, 2+Math.floor(d*2+rnd())));
+        var seq=[pick(S)];   // first colour is a secondary — an unambiguous trace start
+        for(var j=1;j<len;j++) seq.push( rnd() < (0.1+0.3*d) ? pick(P) : pick(S) );
+        var count=Math.max(1, Math.min(5, Math.round(1 + d*2*rnd() + rnd()*1.2 + d)));   // higher counts — multi-recipe turns are the norm, not the trick
+        recipes.push({ seq:seq, count:count });
+      }
+      var solves=0, buildCost=0;   // buildCost = un-refundable mixes: each secondary slot in every required trace
+      for(var m=0;m<recipes.length;m++){ solves+=recipes[m].count; var sc=0, sq=recipes[m].seq; for(var q=0;q<sq.length;q++) if(!isP(sq[q])) sc++; buildCost+=recipes[m].count*sc; }
+      // pick a board with enough room for the work, varied among the valid ones
+      var need=Math.max(24, buildCost+solves+12);
+      var valid=SHINFO.filter(function(x){ return x.n>=need; });
+      if(!valid.length) valid=[SHINFO[0]];
+      var shp=valid[(rnd()*valid.length)|0], cells=shp.n;
+      // budget = work + slack; smaller/odd boards get a little more slack (routing friction).
+      // The hardest levels (d>0.82, past the intro) are COMBO-GATED: slack pulled <=0 so you must
+      // chain. A safety floor keeps every level winnable (build everything, then chain the traces).
+      var crates = (d>0.35 && rnd()<0.5) ? Math.min(3, Math.max(1, Math.round(d*3))) : 0;   // fewer but TOUGHER inert blocks on ~half of medium+ levels
+      var crateHp = d>0.65 ? 3 : 2;                          // hits to crack through before it breaks (Candy-Crush-style)
+      // NO TIMER — budgets assume you CHAIN. A full board sustains ~10 mixes per turn, so the level
+      // takes ~ceil(buildCost/10) turns; every solve beyond one-per-turn is expected to bank its +2.
+      // Perfect play costs buildCost + solves - 2*(solves - turns); budget = that + a small shrinking slack.
+      var turns=Math.max(Math.ceil(buildCost/10), Math.ceil(solves/3), 1);   // a turn holds ~10 mixes and ~3 cash-ins
+      var slack=Math.round(5-2*d)+Math.round((49-cells)/12);
+      var gated=(d>0.80 && L>20);
+      if(gated) slack-=2;
+      var moves=buildCost + solves - 2*Math.max(0, solves-turns) + Math.max(3, slack) + crates*crateHp;
+      out.push({ id:L, name:"Level "+L, shape:shp.sh, spawn:{R:4,Y:4,B:4}, moves:moves, goal:"recipe", objectives:[], recipes:recipes, crates:crates, crateHp:crateHp, gated:gated, diff:d });
+    }
+    return out;
+  }
+  LEVELS = genRecipeLevels();
+  // Tutorial: a gentle guided level (its own full-width button atop the picker). Teaches mix -> trace with room to spare.
+  var TUTORIAL = { id:"T", tutorial:true, name:"Tutorial", shape:["#######","#######","#######","#######","#######","#######","#######"],
+    spawn:{R:4,Y:4,B:4}, moves:20, goal:"recipe", objectives:[], recipes:[{ seq:["P","O"], count:1 }], gated:false };
+  var HEX=HM.HEX, NAME=HM.NAME;
+  var PRIMS=["R","Y","B"];
+  var ING={ O:["R","Y"], G:["Y","B"], P:["R","B"] };   // a merge session's live ingredient primaries
+  var RIPEN_MS=1800;   // generous window to keep adding to the combo before it detonates
+
+  var state=null, curLevel=null, curIndex=0, busy=false;
   var aid=false, muted=false;
+  var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches);
+  var cells=[];          // persistent DOM: cells[r][c] = {cell, tile} (built once per level)
+  var geom=null;         // cached cell centres for index-math hit-testing (per gesture)
+  var sess=null;         // engine combo session, persists across gestures until it ripens
+  var gest=null;         // the current finger drag
+  var resolveTid=0;
 
   var board=document.getElementById("board");
-  var scoreEl=document.getElementById("score");
-  var bestEl=document.getElementById("best");
-  var levelEl=document.getElementById("level");
+  var goalsEl=document.getElementById("goals");
+  var pupsEl=document.getElementById("pups");
+  var meterEl=document.getElementById("meter");
+  var movesN=document.getElementById("movesN");
   var toastEl=document.getElementById("toast");
-  var bannerEl=document.getElementById("banner");
-  var helpEl=document.getElementById("help");
+  var over=document.getElementById("over");
+  var screenLevels=document.getElementById("screen-levels");
+  var screenGame=document.getElementById("screen-game");
+  var mixfx=document.getElementById("mixfx"), gooBlur=document.getElementById("gooBlur");
+  var gsrc=document.getElementById("gsrc"), gtgt=document.getElementById("gtgt");
+  var gsrcInk=document.getElementById("gsrcInk"), gtgtInk=document.getElementById("gtgtInk");
+  var comboBadges=document.getElementById("comboBadges");
+  var burstEl=document.getElementById("burst");
+  var rationEl=document.getElementById("ration");
 
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
   function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-
-  /* ---------- board logic ---------- */
-  function findPops(){
-    var seen=new Set(), comps=[], r,c;
-    for(r=0;r<ROWS;r++) for(c=0;c<COLS;c++){
-      var key=r+","+c, v=grid[r][c];
-      if(!v||seen.has(key)) continue;
-      var stack=[[r,c]], comp=[];
-      seen.add(key);
-      while(stack.length){
-        var cur=stack.pop(), y=cur[0], x=cur[1];
-        comp.push(y+","+x);
-        var nb=[[y+1,x],[y-1,x],[y,x+1],[y,x-1]];
-        for(var i=0;i<4;i++){
-          var ny=nb[i][0], nx=nb[i][1], nk=ny+","+nx;
-          if(ny<0||nx<0||ny>=ROWS||nx>=COLS) continue;
-          if(seen.has(nk)||grid[ny][nx]!==v) continue;
-          seen.add(nk); stack.push([ny,nx]);
-        }
-      }
-      if(comp.length>=POP_MIN) comps.push(comp);
-    }
-    return comps;
-  }
-  function gravity(){
-    fresh=new Set();
-    for(var c=0;c<COLS;c++){
-      var stack=[];
-      for(var r=ROWS-1;r>=0;r--) if(grid[r][c]) stack.push(grid[r][c]);
-      for(var r2=ROWS-1,i=0;r2>=0;r2--,i++){
-        if(i<stack.length){ grid[r2][c]=stack[i]; }
-        else { grid[r2][c]=rnd(); fresh.add(r2+","+c); }
-      }
-    }
-  }
-  function silentSettle(){
-    var guard=0;
-    while(guard++<80){
-      var comps=findPops();
-      if(!comps.length) break;
-      for(var i=0;i<comps.length;i++) for(var j=0;j<comps[i].length;j++){
-        var p=comps[i][j].split(","); grid[p[0]][p[1]]=null;
-      }
-      gravity();
-    }
-    fresh=new Set();
-  }
-
-  /* ---------- render ---------- */
-  function render(){
-    var h="", r, c;
-    for(r=0;r<ROWS;r++) for(c=0;c<COLS;c++){
-      var v=grid[r][c], key=r+","+c;
-      h+='<div class="cell" data-r="'+r+'" data-c="'+c+'">';
-      if(v){
-        var cls="pane"+(isPrim(v)?"":" sec");
-        if(sel&&sel.r===r&&sel.c===c) cls+=" sel";
-        if(clearing.has(key)) cls+=" clr";
-        if(fresh.has(key)) cls+=" new";
-        if(mixed.has(key)) cls+=" mixed";
-        var g=RGB[v];
-        var st="--pc:"+HEX[v]+";--pr:"+g[0]+";--pg:"+g[1]+";--pb:"+g[2];
-        h+='<div class="'+cls+'" style="'+st+'">'+(aid?'<span class="sym">'+v+'</span>':'')+'</div>';
-      }
-      h+='</div>';
-    }
-    board.innerHTML=h;
-  }
-  function updateHud(){
-    scoreEl.textContent=score.toLocaleString();
-    bestEl.textContent=Math.max(best,score).toLocaleString();
-    levelEl.textContent=level;
-  }
-  function toast(t){
-    toastEl.textContent=t;
-    toastEl.style.animation="none"; void toastEl.offsetWidth;
-    toastEl.style.animation="hmToast 1.15s var(--ease-pop) forwards";
-  }
-  function banner(t){
-    bannerEl.textContent=t;
-    bannerEl.style.animation="none"; void bannerEl.offsetWidth;
-    bannerEl.style.animation="hmBanner 1.6s var(--ease-pop) forwards";
-  }
+  function loadProg(){ try{ return JSON.parse(lsGet("hm_prog")||"{}"); }catch(e){ return {}; } }
+  function saveProg(p){ lsSet("hm_prog", JSON.stringify(p)); }
+  function unlocked(i){ return true; }   // all levels open — free exploration (non-linear difficulty means you can pick your challenge)
+  function starsFor(level, movesLeft){ var r=movesLeft/level.moves; return r>=0.5?3:(r>=0.2?2:1); }
+  function starStr(n){ return '<span>'+"★★★".slice(0,n)+'</span><span class="dim">'+"☆☆☆".slice(0,3-n)+'</span>'; }
 
   /* ---------- audio ---------- */
   var actx=null;
-  function ensureAudio(){
-    if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } }
-    if(actx&&actx.state==="suspended"){ actx.resume(); }
-  }
-  function beep(freq,dur,type,gain){
+  function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended") actx.resume(); }
+  function beep(f,d,t,g){ if(muted||!actx) return; try{ var o=actx.createOscillator(),v=actx.createGain(),n=actx.currentTime; o.type=t||"sine"; o.frequency.value=f; o.connect(v); v.connect(actx.destination); v.gain.setValueAtTime(0.0001,n); v.gain.linearRampToValueAtTime(g||0.05,n+0.01); v.gain.exponentialRampToValueAtTime(0.0001,n+d); o.start(n); o.stop(n+d+0.03); }catch(e){} }
+  function sfxMix(n){ var b=430+Math.min(n||0,12)*30; beep(b,0.07,"triangle",0.05); setTimeout(function(){ beep(b*1.5,0.09,"triangle",0.04); },55); }
+  function sfxEat(n){ beep(520+Math.min(n,14)*24, 0.06, "sine", 0.045); }
+  /* detonation = a rising arpeggio; the bigger the combo, the longer and higher
+     the run climbs, so a fat combo literally sounds like a bigger payoff */
+  function sfxPop(n){
     if(muted||!actx) return;
-    try{
-      var o=actx.createOscillator(), v=actx.createGain(), t=actx.currentTime;
-      o.type=type||"sine"; o.frequency.value=freq;
-      o.connect(v); v.connect(actx.destination);
-      v.gain.setValueAtTime(0.0001,t);
-      v.gain.linearRampToValueAtTime(gain||0.05,t+0.01);
-      v.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-      o.start(t); o.stop(t+dur+0.03);
-    }catch(e){}
+    var steps=Math.max(2, Math.min(8, Math.round(n)+1));
+    var scale=[0,2,4,7,9,12,14,16], base=300+Math.min(n,10)*10;
+    beep(base/2,0.20,"sine",0.05);   // low body thump under the run
+    for(var i=0;i<steps;i++){ (function(i){ setTimeout(function(){
+      beep(base*Math.pow(2, scale[Math.min(i,scale.length-1)]/12), 0.13, "triangle", 0.05);
+    }, i*55); })(i); }
+    if(n>=10) setTimeout(function(){ beep(base*4,0.3,"sine",0.045); }, steps*55+40);   // HUEMELD sparkle
   }
-  function sfxSwap(){ beep(300,0.09,"sine",0.035); }
-  function sfxMix(){ beep(440,0.08,"triangle",0.05); setTimeout(function(){ beep(660,0.11,"triangle",0.045); },70); }
-  function sfxPop(combo){ var base=360+combo*95; beep(base,0.13,"sine",0.06); beep(base*1.5,0.15,"sine",0.03); }
+  function sfxWin(){ [0,120,240,420].forEach(function(t,i){ setTimeout(function(){ beep(440+i*140,0.16,"triangle",0.05); },t); }); }
+  function sfxFill(n){ var b=300+Math.min(n,10)*22; beep(b,0.1,"sine",0.05); setTimeout(function(){ beep(b*1.34,0.12,"sine",0.045); },70); }   // a rising pour
+  function sfxWarn(){ beep(392,0.10,"triangle",0.045); setTimeout(function(){ beep(294,0.17,"triangle",0.05); },95); }   // descending "uh-oh" — the suspended board is about to fall
 
-  /* ---------- turn resolution ---------- */
-  function adjacent(a,b){ return Math.abs(a.r-b.r)+Math.abs(a.c-b.c)===1; }
-
-  async function resolve(){
-    var combo=0, total=0;
-    while(true){
-      var comps=findPops();
-      if(!comps.length) break;
-      combo++;
-      clearing=new Set();
-      var gain=0;
-      for(var i=0;i<comps.length;i++){
-        var n=comps[i].length, over=n-POP_MIN;
-        gain += Math.round((n*12 + over*over*16) * combo);
-        for(var j=0;j<comps[i].length;j++) clearing.add(comps[i][j]);
-      }
-      total+=gain; score+=gain;
-      render(); updateHud(); sfxPop(combo);
-      if(combo>=2) toast(combo+"× chain   +"+gain.toLocaleString());
-      await sleep(230);
-      clearing.forEach(function(k){ var p=k.split(","); grid[p[0]][p[1]]=null; });
-      clearing=new Set(); render(); await sleep(60);
-      gravity(); render(); await sleep(165);
+  /* ---------- persistent-DOM board ----------
+     Built ONCE per level; every later change mutates existing nodes (class/
+     style), never innerHTML. This is the fix for the v2 fast-drag bug: the
+     node under the finger is never destroyed mid-gesture. */
+  function tileRot(r,c){ return ((r*7+c*13)%5)-2; }
+  function buildBoard(){
+    board.style.setProperty("--cols", state.W);
+    board.classList.remove("suspended");
+    var html="";
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){
+      if(!state.mask[r][c]){ html+='<div class="cell wall"></div>'; continue; }
+      html+='<div class="cell" data-r="'+r+'" data-c="'+c+'"><div class="tile" style="--rot:'+tileRot(r,c)+'deg"><span class="streak"></span><span class="sym"></span></div></div>';
     }
-    clearing=new Set(); fresh=new Set();
-    if(total>0){ saveBest(); checkLevel(); }
+    board.innerHTML=html;   // the ONLY innerHTML write; never called mid-session
+    cells=[];
+    for(var r2=0;r2<state.H;r2++){ cells[r2]=[]; for(var c2=0;c2<state.W;c2++){
+      var cell=board.querySelector('.cell[data-r="'+r2+'"][data-c="'+c2+'"]');
+      cells[r2][c2]=cell?{cell:cell, tile:cell.querySelector(".tile")}:null;
+    }}
+    paintAll();
   }
-  function saveBest(){
-    if(score>best){ best=score; lsSet("hm_best",String(best)); }
-    updateHud();
+  function paintTile(r,c){
+    var ref=cells[r]&&cells[r][c]; if(!ref) return;
+    var t=ref.tile, v=state.grid[r][c];
+    t.className="tile";   // reset transient state (dim/incombo/clr/mixed/lift...)
+    t.style.removeProperty("--dx"); t.style.removeProperty("--dy"); t.style.removeProperty("animation-delay");
+    if(!v){ t.style.visibility="hidden"; return; }
+    t.style.visibility="";
+    if(v && v.charAt(0)==="K"){ var hp=(+v.slice(1))||1; t.classList.add("crate"); if(hp<=1) t.classList.add("dmg2"); else if(hp===2) t.classList.add("dmg1"); t.querySelector(".sym").textContent=""; ref.col=v; return; }   // inert crate; cracks show as hp drops
+    t.style.setProperty("--pc", HEX[v]);
+    if(!HM.isPrim(v)) t.classList.add("sec");
+    t.querySelector(".sym").textContent = aid ? v : "";
+    ref.col=v;
   }
-  function checkLevel(){
-    var nl=Math.floor(score/1500)+1;
-    if(nl>level){ level=nl; banner("Level "+level); }
-    updateHud();
+  function paintAll(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(cells[r]&&cells[r][c]) paintTile(r,c); }
+  function placeCrates(s, n, hp){   // overwrite n random primary cells with inert crates (hp hits each), leaving >=8 primaries to work with
+    if(!n) return;
+    var pool=[]; for(var r=0;r<s.H;r++) for(var c=0;c<s.W;c++) if(HM.playable(s,r,c) && HM.isPrim(s.grid[r][c])) pool.push([r,c]);
+    for(var i=pool.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+    var k=Math.min(n, Math.max(0, pool.length-8));
+    for(var m=0;m<k;m++){ s.grid[pool[m][0]][pool[m][1]]="K"+(hp||2); }
   }
+  function setAnim(t, cls, ms){ if(!t) return; t.classList.remove(cls); void t.offsetWidth; t.classList.add(cls); setTimeout(function(){ t.classList.remove(cls); }, ms); }
 
-  async function commit(from,to){
-    if(busy) return;
-    busy=true; sel=null;
-    var a=grid[from.r][from.c], b=grid[to.r][to.c];
-    if(isPrim(a)&&isPrim(b)&&a!==b){
-      grid[to.r][to.c]=mix(a,b);
-      mixed=new Set([to.r+","+to.c]);
-      clearing=new Set([from.r+","+from.c]);
-      render(); sfxMix(); await sleep(215);
-      grid[from.r][from.c]=null; mixed=new Set(); clearing=new Set();
-      gravity(); render(); await sleep(155);
-    } else {
-      grid[from.r][from.c]=b; grid[to.r][to.c]=a;
-      render(); sfxSwap(); await sleep(140);
+  function renderGoals(){
+    var h="";
+    for(var i=0;i<state.obj.length;i++){ var o=state.obj[i];
+      h+='<div class="goal"><span class="swatch'+(HM.isPrim(o.color)?"":" round")+'" style="background:'+HEX[o.color]+'"></span><b>'+o.need+'</b></div>';
     }
-    await resolve();
-    busy=false; render();
+    goalsEl.className="goals"; goalsEl.innerHTML=h;
+  }
+  function updateGoals(){
+    var chips=goalsEl.children;
+    for(var i=0;i<state.obj.length;i++){ var o=state.obj[i], rem=Math.max(0,o.need-o.have), chip=chips[i];
+      chip.querySelector("b").textContent = rem>0 ? rem : "✓"; chip.classList.toggle("done", rem===0);
+    }
+  }
+  /* liquid tubes (goal:"tubes"): render once, then raise the paint on each cash */
+  var TUBE_ORDER=["O","G","P"];
+  function tubeCols(){ var a=[]; for(var i=0;i<TUBE_ORDER.length;i++){ var k=TUBE_ORDER[i]; if(state.tubes&&state.tubes[k]) a.push(k); } return a; }
+  function renderTubes(){
+    var cols=tubeCols(), h="";
+    for(var i=0;i<cols.length;i++){ var c=cols[i];
+      h+='<div class="tube-wrap"><div class="tube" data-c="'+c+'"><div class="liquid" style="--tc:'+HEX[c]+'"></div></div><span class="tube-dot" style="background:'+HEX[c]+'"></span></div>';
+    }
+    goalsEl.className="tubes"; goalsEl.innerHTML=h; updateTubes(null);
+  }
+  function updateTubes(splashColor){
+    var cols=tubeCols();
+    for(var i=0;i<cols.length;i++){ var c=cols[i], t=state.tubes[c], pct=Math.min(100,Math.round(t.have/t.need*100));
+      var wrap=goalsEl.children[i]; if(!wrap) continue; var tube=wrap.querySelector(".tube"), liq=wrap.querySelector(".liquid");
+      liq.style.height=pct+"%"; tube.classList.toggle("full", t.have>=t.need);
+      if(splashColor===c){ tube.classList.remove("splash"); void tube.offsetWidth; tube.classList.add("splash"); }
+    }
+  }
+  /* rationed primary: show how much of the scarce colour is left to spend (its
+     finite reserve + the tiles of it still on the board) */
+  function scarceColor(){ if(!state.reserve) return null; for(var k in state.reserve) if(state.reserve.hasOwnProperty(k)) return k; return null; }
+  function renderRation(){ if(!state||!state.reserve){ rationEl.style.display="none"; return; } rationEl.style.display="flex"; updateRation(); }
+  function updateRation(){
+    var sc=scarceColor(); if(!sc){ rationEl.style.display="none"; return; }
+    var n=state.reserve[sc];
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++) if(state.grid[r][c]===sc) n++;
+    rationEl.innerHTML='<span class="dot" style="background:'+HEX[sc]+'"></span><b>'+n+'</b> '+NAME[sc]+' left';
+    rationEl.classList.toggle("low", n<=4);
   }
 
-  /* ---------- input ---------- */
-  function tileFromPoint(x,y){
-    var el=document.elementFromPoint(x,y);
-    if(!el) return null;
-    var cell=el.closest(".cell");
-    if(!cell||!board.contains(cell)) return null;
-    return { r:+cell.dataset.r, c:+cell.dataset.c };
+  /* ---------- recipe chains (goal:"recipe") ----------
+     Every recipe shows up front as a PILLBOX: its colour circles + done/count,
+     turning green with a ✓ when its count is met. TRACE a connected path of tiles
+     matching a recipe's colour sequence to score one of it (recipes may include
+     primaries, but never two primaries first, so a trace-start can't be confused
+     with a mix). Mixing SUSPENDS the board — for as long as you like, NO TIMER.
+     The board only falls when the player presses ⤓ End turn. Solve 2+ recipes in
+     one turn and each extra one banks +2 moves; budgets assume you chain, so the
+     game is packing big and small recipes into shared turns. */
+  var suspended=false, winRecipes=0;
+  function renderRecipe(){
+    if(!state.recipes){ goalsEl.className="goals"; goalsEl.innerHTML=""; return; }
+    goalsEl.className="recipes";
+    var h="";
+    for(var i=0;i<state.recipes.length;i++){ var R=state.recipes[i], full=R.done>=R.count;
+      h+='<div class="pill'+(full?" full":"")+'">';
+      for(var j=0;j<R.seq.length;j++) h+='<span class="pdot" style="background:'+HEX[R.seq[j]]+'"></span>';
+      h+='<b class="pn">'+(full?"✓":(R.done+"/"+R.count))+'</b></div>';
+    }
+    if(state.crateTotal){ var kl=HM.cratesLeft(state), kfull=kl===0;   // crate-break progress
+      h+='<div class="pill crate-pill'+(kfull?" full":"")+'"><span class="kbox"></span><b class="pn">'+(kfull?"✓":((state.crateTotal-kl)+"/"+state.crateTotal))+'</b></div>';
+    }
+    goalsEl.innerHTML=h;
   }
-  function handleTap(t){
-    if(!sel){ sel=t; render(); return; }
-    if(sel.r===t.r&&sel.c===t.c){ sel=null; render(); return; }
-    if(adjacent(sel,t)){ var s=sel; sel=null; commit(s,t); return; }
-    sel=t; render();
+  function inTrace(r,c){ if(!gest||!gest.trace) return false; for(var i=0;i<gest.trace.length;i++) if(gest.trace[i].r===r&&gest.trace[i].c===c) return true; return false; }
+  function matchRecipe(c0,c1){   // the incomplete recipe (if any) starting with colours [c0,c1]
+    if(!state.recipes) return null;
+    for(var i=0;i<state.recipes.length;i++){ var R=state.recipes[i]; if(R.done>=R.count) continue; if(R.seq[0]===c0 && R.seq[1]===c1) return R; }
+    return null;
   }
-  var downTile=null;
-  board.addEventListener("pointerdown",function(e){
-    if(!e.isPrimary) return;
+  function recipeStartHere(tp,col){   // could a trace start here? (col is some incomplete recipe's seq[0] with an adjacent seq[1])
+    if(!state.recipes) return false;
+    var nbs=[[tp.r+1,tp.c],[tp.r-1,tp.c],[tp.r,tp.c+1],[tp.r,tp.c-1]];
+    for(var i=0;i<state.recipes.length;i++){ var R=state.recipes[i]; if(R.done>=R.count||R.seq[0]!==col) continue;
+      for(var j=0;j<4;j++){ var n=nbs[j]; if(HM.playable(state,n[0],n[1]) && state.grid[n[0]][n[1]]===R.seq[1]) return true; } }
+    return false;
+  }
+  function startRecipeTrace(from,to,rec){
+    setLift(from,false);
+    gest.mode="recipe"; gest.rec=rec; gest.trace=[{r:from.r,c:from.c},{r:to.r,c:to.c}]; gest.step=2; gest.rtarget=null; gest.t=0; gest.anchor={r:to.r,c:to.c};
+    var f=cells[from.r]&&cells[from.r][from.c], t=cells[to.r]&&cells[to.r][to.c];
+    if(f) f.tile.classList.add("rlink"); if(t) t.tile.classList.add("rlink");
+    sfxEat(2);
+    if(gest.step>=rec.seq.length) completeRecipe();
+  }
+  function updateTargetRecipe(px,py){
+    var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A||!gest.rec){ gest.rtarget=null; gest.t=0; return; }
+    var need=gest.rec.seq[gest.step], nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.12;
+    for(var i=0;i<4;i++){ var B=nb[i]; if(!HM.playable(state,B.r,B.c)) continue;
+      if(state.grid[B.r][B.c]!==need || inTrace(B.r,B.c)) continue;
+      var Bg=geomOf(B.r,B.c); if(!Bg) continue;
+      var vx=Bg.cx-A.cx, vy=Bg.cy-A.cy, len2=vx*vx+vy*vy;
+      var proj=((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp=Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2);
+      if(proj>bestProj && perp<A.s*0.62){ best=B; bestProj=proj; }
+    }
+    gest.rtarget=best; gest.t=best?Math.min(1,bestProj):0;
+  }
+  function extendRecipe(){
+    var to=gest.rtarget; if(!to) return;
+    gest.trace.push({r:to.r,c:to.c}); gest.step++;
+    gest.anchor={r:to.r,c:to.c};
+    var ref=cells[to.r]&&cells[to.r][to.c]; if(ref) ref.tile.classList.add("rlink");
+    gest.rtarget=null; gest.t=0;
+    sfxEat(gest.step);
+    if(gest.step>=gest.rec.seq.length) completeRecipe();
+  }
+  function clearRlinks(){ for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.classList.remove("rlink"); } }
+  function abandonRecipe(){ clearRlinks(); }
+  var turnBtn=document.getElementById("btnTurn");
+  function setSuspended(on){ suspended=!!on; turnBtn.classList.toggle("show", suspended); }
+  /* ⤓ END TURN — the player says "done comboing". Replaces the 3s timer entirely:
+     the board hangs for as long as you like and only falls when you press this. Free. */
+  async function endTurn(){
+    if(busy || gest || !state || state.goal!=="recipe" || !suspended) return;
     ensureAudio();
-    if(busy){ downTile=null; return; }
-    downTile=tileFromPoint(e.clientX,e.clientY);
-  });
-  board.addEventListener("pointerup",function(e){
-    if(!e.isPrimary) return;
-    if(busy){ downTile=null; return; }
-    var up=tileFromPoint(e.clientX,e.clientY), dn=downTile;
-    downTile=null;
-    if(!up){ if(dn) handleTap(dn); return; }
-    if(dn && (dn.r!==up.r||dn.c!==up.c) && adjacent(dn,up)){ commit(dn,up); return; }
-    handleTap(up);
-  });
-  board.addEventListener("pointercancel",function(){ downTile=null; });
-  board.addEventListener("contextmenu",function(e){ e.preventDefault(); });
-
-  /* ---------- controls ---------- */
-  function newGame(){
-    grid=[];
-    for(var r=0;r<ROWS;r++){ var row=[]; for(var c=0;c<COLS;c++) row.push(rnd()); grid.push(row); }
-    silentSettle();
-    sel=null; clearing=new Set(); fresh=new Set(); mixed=new Set(); busy=false;
-    score=0; level=1;
-    updateHud(); render();
+    winRecipes=0; busy=true; setSuspended(false);
+    var fresh=HM.gravity(state, Math.random);                    // the turn ends — everything falls
+    if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+    paintAll();
+    Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+    sfxFill(Object.keys(fresh).length);
+    busy=false;
+    HM.checkEnd(state);
+    if(state.won) showEnd(true, state.movesLeft);
+    else if(state.movesLeft<=0) showEnd(false, 0);
   }
-  document.getElementById("btnNew").addEventListener("click",function(){ ensureAudio(); newGame(); });
+  turnBtn.addEventListener("click", endTurn);
+  async function completeRecipe(){
+    if(busy){ return; }
+    var trace=gest.trace, rec=gest.rec, mySt=state; gest=null; busy=true;
+    spendMove();
+    trace.forEach(function(c){ var ref=cells[c.r]&&cells[c.r][c.c]; if(ref){ ref.tile.classList.remove("rlink"); ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
+    sfxPop(trace.length);
+    await sleep(280);
+    if(state!==mySt){ busy=false; return; }
+    trace.forEach(function(c){ state.grid[c.r][c.c]=null; });   // pop the traced tiles — holes stay suspended until the window falls
+    rec.done++; winRecipes++;
+    if(winRecipes>=2){ state.movesLeft+=2; toast("chain! +2 moves"); } else { toast("recipe!"); }
+    clearRlinks(); paintAll(); updateMoves(); renderRecipe();
+    await sleep(120);
+    if(state!==mySt){ busy=false; return; }
+    busy=false;
+    HM.checkEnd(state);
+    if(state.won){ showEnd(true, state.movesLeft); return; }
+    if(state.movesLeft<=0){ showEnd(false, 0); return; }
+    setSuspended(true);   // the turn stays open — chain the next recipe whenever you're ready
+  }
+  function renderBars(){
+    var h="";
+    for(var i=0;i<PRIMS.length;i++){ var c=PRIMS[i];
+      h+='<div class="pup" data-c="'+c+'"><span class="dot" style="background:'+HEX[c]+'"></span><span class="track"><span class="fill" style="background:'+HEX[c]+'"></span></span></div>';
+    }
+    pupsEl.innerHTML=h;
+  }
+  function updateBars(){
+    var kids=pupsEl.children;
+    for(var i=0;i<PRIMS.length;i++){ var c=PRIMS[i], pct=Math.min(1, state.bars[c]/state.barMax);
+      kids[i].querySelector(".fill").style.width=(pct*100)+"%";
+      kids[i].classList.toggle("ready", state.bars[c]>=state.barMax);
+    }
+  }
+  function updateMoves(){ movesN.textContent=Math.max(0,state.movesLeft); }
+  function toast(t){ toastEl.textContent=t; toastEl.style.animation="none"; void toastEl.offsetWidth; toastEl.style.animation="hmToast 1.2s var(--pop) forwards"; }
+
+  /* ---------- hit-testing: index math from cached geometry (no elementFromPoint,
+     no per-move getBoundingClientRect). Geometry is cached once per gesture at
+     pointerdown — the board never relayouts during a suspended session. */
+  function cacheGeom(){
+    geom=[]; var br=board.getBoundingClientRect();
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(!ref) continue;
+      var cr=ref.cell.getBoundingClientRect();
+      geom.push({ r:r, c:c, cx:cr.left+cr.width/2, cy:cr.top+cr.height/2, s:cr.width,
+                  bx:cr.left-br.left+cr.width/2, by:cr.top-br.top+cr.height/2 });   // board-relative, for the goo overlay
+    }
+  }
+  function cellAt(x,y){
+    if(!geom) return null;
+    var best=null, bd=1e9;
+    for(var i=0;i<geom.length;i++){ var g=geom[i], dx=x-g.cx, dy=y-g.cy, d=dx*dx+dy*dy;
+      if(d<bd && Math.abs(dx)<g.s*0.62 && Math.abs(dy)<g.s*0.62){ bd=d; best=g; }
+    }
+    return best?{r:best.r,c:best.c}:null;
+  }
+
+  /* ---------- combo session ---------- */
+  function liveSet(){
+    if(!sess||sess.color==null) return null;
+    if(sess.hadMerge){ var s={}; s[sess.color]=1; (ING[sess.color]||[]).forEach(function(p){ s[p]=1; }); return s; }
+    var o={}; o[sess.color]=1; return o;   // chain: only its own colour
+  }
+  function applyDim(){
+    var live=liveSet();
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(!ref) continue;
+      var v=state.grid[r][c], dim = live && v && !live[v] && !sess.collected[r+","+c];
+      ref.tile.classList.toggle("dim", !!dim);
+    }
+    board.classList.toggle("suspended", !!live);
+  }
+  function clearDim(){
+    for(var r=0;r<state.H;r++) for(var c=0;c<state.W;c++){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("dim","incombo","lift"); ref.tile.style.removeProperty("--dx"); ref.tile.style.removeProperty("--dy"); } }
+    board.classList.remove("suspended"); hideCount(); finishAnim();
+  }
+  function markCollected(r,c){ var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.classList.remove("lift"); ref.tile.classList.add("incombo"); } }
+  /* Each merge keeps ITS OWN counter, floating above that blob. A blob = one
+     contiguous drag's fuses; a fresh gesture starts a fresh blob + badge, and
+     older blobs' badges stay put (they don't move or pool across unrelated
+     merges). All badges clear when the combo detonates. */
+  function hideCount(){ comboBadges.innerHTML=""; }
+  function bumpBlob(startAt){
+    if(!gest) return;
+    gest.blobN = gest.blobN ? gest.blobN+1 : startAt;   // this gesture's blob grows
+    if(gest.blobN<2) return;                              // a lone meld isn't a combo yet
+    if(!gest.blobBadge){ gest.blobBadge=document.createElement("div"); gest.blobBadge.className="combo-badge"; comboBadges.appendChild(gest.blobBadge); }
+    var a=gest.anchor, ref=cells[a.r]&&cells[a.r][a.c]; if(!ref) return;
+    var br=board.getBoundingClientRect(), cr=ref.cell.getBoundingClientRect();
+    gest.blobBadge.style.left=(board.offsetLeft + cr.left-br.left + cr.width/2)+"px";
+    gest.blobBadge.style.top=(board.offsetTop + cr.top-br.top + cr.height/2)+"px";
+    gest.blobBadge.style.background=HEX[sess.color];
+    gest.blobBadge.textContent=gest.blobN;
+  }
+  function geomOf(r,c){ if(!geom) return null; for(var i=0;i<geom.length;i++) if(geom[i].r===r&&geom[i].c===c) return geom[i]; return null; }
+  function setLift(p,on){ var ref=p&&cells[p.r]&&cells[p.r][p.c]; if(!ref) return; var t=ref.tile;
+    if(on){ t.classList.remove("incombo"); t.classList.add("lift"); }
+    else { t.classList.remove("lift"); }
+  }
+  function landMove(){ if(!gest.counted){ gest.counted=true; sess.moves++; state.movesLeft--; updateMoves(); } }
+
+  /* ---------- swipe to merge, then watch the fuse ----------
+     A swipe registers and COMMITS the merge the instant your drag crosses toward
+     an adjacent tile (SWIPE_T) — no hold. The gooey fuse then plays as a
+     fire-and-forget 0.5s animation (its own rAF, decoupled from your finger), so
+     you can flick-and-release and still watch it. Attribute-based SVG so it
+     renders everywhere including Safari. */
+  var ANIM_MS=500, SWIPE_T=0.5, MIN_SWIPE=0.34, anim=null;
+  function hx(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+  function lerpHex(h1,h2,t){ var a=hx(h1),b=hx(h2); return "rgb("+Math.round(a[0]+(b[0]-a[0])*t)+","+Math.round(a[1]+(b[1]-a[1])*t)+","+Math.round(a[2]+(b[2]-a[2])*t)+")"; }
+  function placeRect(el,cx,cy,half,rad,rr,fill){ el.setAttribute("x",(cx-half).toFixed(1)); el.setAttribute("y",(cy-half).toFixed(1)); el.setAttribute("width",(half*2).toFixed(1)); el.setAttribute("height",(half*2).toFixed(1)); var rq=Math.min(rad,half).toFixed(1); el.setAttribute("rx",rq); el.setAttribute("ry",rq); el.setAttribute("transform","rotate("+rr+" "+cx.toFixed(1)+" "+cy.toFixed(1)+")"); if(fill) el.setAttribute("fill",fill); }
+  function hideTile(r,c){ var ref=cells[r]&&cells[r][c]; if(ref) ref.tile.style.visibility="hidden"; }
+  function revealTile(r,c){ var ref=cells[r]&&cells[r][c]; if(ref && state.grid[r][c]) ref.tile.style.visibility=""; }
+  function playMergeAnim(from,to,colA,colB,blend,sp,tp){
+    if(anim) finishAnim();   // cut any in-flight fuse (its tiles are already in final state)
+    var A=geomOf(from.r,from.c), B=geomOf(to.r,to.c); if(!A||!B) return;
+    anim={ from:{r:from.r,c:from.c}, to:{r:to.r,c:to.c}, ax:A.bx, ay:A.by, bx:B.bx, by:B.by, s:A.s,
+           colA:colA, colB:colB, blend:blend, sp:sp, tp:tp, p:0, last:performance.now() };
+    hideTile(from.r,from.c); hideTile(to.r,to.c);
+    drawAnim();   // draw frame 0 synchronously so the cells never flash empty
+    anim.raf=requestAnimationFrame(animTick);
+  }
+  function animTick(now){
+    if(!anim) return;
+    anim.p=Math.min(1, anim.p + (now-anim.last)/ANIM_MS); anim.last=now;
+    drawAnim();
+    if(anim.p>=1){ finishAnim(); return; }
+    anim.raf=requestAnimationFrame(animTick);
+  }
+  function drawAnim(){
+    if(!anim) return;
+    mixfx.style.left=board.offsetLeft+"px"; mixfx.style.top=board.offsetTop+"px";
+    mixfx.style.width=board.offsetWidth+"px"; mixfx.style.height=board.offsetHeight+"px";
+    mixfx.setAttribute("viewBox","0 0 "+board.offsetWidth+" "+board.offsetHeight);
+    var e=0.35+0.65*anim.p, R=anim.s*0.40;   // start already ~1/3 fused — the merge just committed, so never show the two tiles fully apart/unblended
+    gooBlur.setAttribute("stdDeviation",(R*(0.30+0.34*e)).toFixed(1));   // liquid neck grows as they fuse
+    var sx=anim.ax+(anim.bx-anim.ax)*e, sy=anim.ay+(anim.by-anim.ay)*e;
+    var colS=lerpHex(anim.colA, anim.blend, e), colT=lerpHex(anim.colB, anim.blend, e);
+    var srcRad=anim.sp? R*(0.26+0.74*e) : R, tgtRad=anim.tp? R*(0.26+0.74*e) : R;   // primaries morph square->circle
+    placeRect(gtgtInk, anim.bx,anim.by, R+3, tgtRad+3, tileRot(anim.to.r,anim.to.c), "#2c2733");
+    placeRect(gsrcInk, sx,sy, R+3, srcRad+3, tileRot(anim.from.r,anim.from.c), "#2c2733");
+    placeRect(gtgt, anim.bx,anim.by, R, tgtRad, tileRot(anim.to.r,anim.to.c), colT);
+    placeRect(gsrc, sx,sy, R, srcRad, tileRot(anim.from.r,anim.from.c), colS);
+    mixfx.style.display="block";
+  }
+  function finishAnim(){
+    if(!anim) return;
+    if(anim.raf) cancelAnimationFrame(anim.raf);
+    mixfx.style.display="none";
+    revealTile(anim.from.r,anim.from.c); revealTile(anim.to.r,anim.to.c);
+    var tt=cells[anim.to.r]&&cells[anim.to.r][anim.to.c]; if(tt) setAnim(tt.tile,"mixed",280);   // a little pop as it settles
+    anim=null;
+  }
+
+  /* two verbs: MIX two DIFFERENT primaries -> a secondary (spends a move, drops
+     the board, no pop); FUSE a secondary onto a SAME-colour secondary -> the
+     combo (free, confined to this one dragged tile). Nothing else is legal. */
+  function classifyDrag(nbColor){
+    var carry=gest.carry;
+    if(HM.isPrim(carry)){
+      if(HM.isPrim(nbColor)) return nbColor!==carry ? "mix" : "clear";   // different primaries mix; SAME primaries clear
+      if(state.goal==="recipe" && matchRecipe(carry, nbColor)) return "recipe";   // primary onto a secondary that starts a recipe
+      return null;
+    }
+    if(state.goal==="recipe") return matchRecipe(carry, nbColor) ? "recipe" : null;   // a secondary starts a recipe trace
+    return (nbColor===carry && !HM.isPrim(nbColor)) ? "fuse" : null;   // tube levels: same-colour secondary swoop
+  }
+  function updateTarget(px,py){
+    var A=geomOf(gest.anchor.r,gest.anchor.c); if(!A){ gest.target=null; gest.t=0; gest.targetType=null; return; }
+    var nb=[{r:A.r+1,c:A.c},{r:A.r-1,c:A.c},{r:A.r,c:A.c+1},{r:A.r,c:A.c-1}], best=null, bestProj=0.12;
+    for(var i=0;i<4;i++){ var B=nb[i]; if(!HM.playable(state,B.r,B.c)||!state.grid[B.r][B.c]) continue;
+      var Bg=geomOf(B.r,B.c); if(!Bg) continue;
+      var vx=Bg.cx-A.cx, vy=Bg.cy-A.cy, len2=vx*vx+vy*vy;
+      var proj=((px-A.cx)*vx+(py-A.cy)*vy)/len2, perp=Math.abs((px-A.cx)*vy-(py-A.cy)*vx)/Math.sqrt(len2);
+      if(proj>bestProj && perp<A.s*0.62){ best=B; bestProj=proj; }
+    }
+    if(!best){ gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; return; }
+    var tc=state.grid[best.r][best.c], type=classifyDrag(tc);
+    gest.target=best; gest.t=Math.min(1,bestProj); gest.targetType=type;
+    gest.sec = type==="mix" ? HM.mix(gest.carry,tc) : (type==="fuse" ? gest.carry : null);
+    var k=best.r+","+best.c;
+    if(!type){ if(gest.nopeCell!==k){ gest.nopeCell=k; var nt=cells[best.r]&&cells[best.r][best.c]; if(nt) setAnim(nt.tile,"nope",340); } }
+    else gest.nopeCell=null;
+  }
+  function commitSwipe(){
+    var from={ r:gest.anchor.r, c:gest.anchor.c }, to=gest.target, type=gest.targetType;
+    if(!to || !type) return;
+    var tc=state.grid[to.r][to.c];
+    if(!tc || classifyDrag(tc)!==type) return;   // re-validate: the target could have shifted before this commit
+    gest.target=null; gest.t=0; gest.targetType=null; gest.sec=null; gest.nopeCell=null;
+    if(type==="mix") applyMixNow(from,to);            // atomic: spends a move, then the board drops
+    else if(type==="clear") applyClearNow(from,to);   // pop the connected same-colour primary cluster (1 move) — churns the board
+    else if(type==="recipe") startRecipeTrace(from, to, matchRecipe(gest.carry, tc));   // begin a recipe trace
+    else applyComboFuse(from,to);                     // secondary swoop (tube levels): adds this tile to the swoop
+  }
+  function spendMove(){ if(state.movesLeft>0){ state.movesLeft--; updateMoves(); } }
+  function adjDiffPrim(tp,col){
+    var nb=[[tp.r+1,tp.c],[tp.r-1,tp.c],[tp.r,tp.c+1],[tp.r,tp.c-1]];
+    for(var i=0;i<4;i++){ var r=nb[i][0],c=nb[i][1]; if(HM.playable(state,r,c)){ var v=state.grid[r][c]; if(v&&HM.isPrim(v)&&v!==col) return true; } }
+    return false;
+  }
+  function finishTurn(){   // win when the goal is met; lose when out of moves (both a mix and a combo cost one)
+    HM.checkEnd(state);
+    if(state.won){ showEnd(true, state.movesLeft); return; }
+    if(state.movesLeft<=0){ showEnd(false, 0); }
+  }
+  /* MIX (spends a move): two different primaries fuse into their blend secondary,
+     which STAYS on the board; then gravity drops everything once. One at a time. */
+  function applyMixNow(from,to){
+    if(busy) return;
+    var carry=gest.carry, tcol=state.grid[to.r][to.c];
+    var colA=HEX[carry], colB=HEX[tcol], blend=HM.mix(carry,tcol);
+    busy=true; gest.spent=true;
+    HM.applyMix(state, from, to);              // grid: from -> null, to -> blend (no gravity yet)
+    spendMove();
+    paintTile(from.r,from.c);
+    var t=cells[to.r][to.c].tile; t.classList.add("sec"); t.style.setProperty("--pc",HEX[blend]); t.querySelector(".sym").textContent = aid ? blend : "";
+    setLift(from,false); setLift(to,false);
+    playMergeAnim(from, to, colA, colB, HEX[blend], true, true);   // goo: two squares morph into a circle
+    sfxMix(1);
+    var myState=state;
+    setTimeout(function(){
+      if(state!==myState){ busy=false; return; }
+      finishAnim();
+      if(state.goal==="recipe"){
+        paintAll();      // SUSPENDED: the new circle stays where placed, source stays a hole — nothing falls
+        setSuspended(true);   // the board hangs until ⤓ End turn — build at your own pace
+      } else {
+        var fresh=HM.gravity(state, Math.random);                   // things fall
+        if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+        paintAll();
+        Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+      }
+      updateRation();
+      busy=false;
+      finishTurn();
+    }, ANIM_MS+30);
+  }
+  /* COMBO fuse (free): collect this same-colour secondary into the swoop. The
+     board suspends for the drag; nothing pops until you lift (resolveCombo). */
+  function applyComboFuse(from,to){
+    if(!sess){ sess=HM.newSession("chain", gest.carry); sess.moves=0; }   // open the combo lazily on the first fuse
+    var col=HEX[state.grid[to.r][to.c]];
+    HM.sessionCollect(state,sess,from.r,from.c);
+    HM.sessionCollect(state,sess,to.r,to.c);
+    state.grid[from.r][from.c]=null;           // consume the swiped tile — can't be dragged back onto
+    paintTile(from.r,from.c);
+    cells[to.r][to.c].tile.classList.remove("dim");
+    setLift(from,false); gest.anchor={ r:to.r, c:to.c }; setLift(gest.anchor,true);
+    sess.epR=to.r; sess.epC=to.c;
+    applyDim(); bumpBlob(2);
+    playMergeAnim(from, to, col, col, col, false, false);   // two circles fuse, no colour change
+    sfxMix(sess.count);
+  }
+  /* CLEAR (spends a move): swipe a primary onto a SAME-colour primary and the
+     whole connected cluster pops, then the board drops. Churns the board so you
+     can refresh/reposition when a recipe needs a colour you can't reach. */
+  function applyClearNow(from,to){
+    if(busy) return;
+    busy=true; gest.spent=true;
+    var group=HM.groupAt(state, to.r, to.c);   // connected same-colour cluster (from is in it — same colour, adjacent)
+    spendMove();
+    var crates=[], seenK={};                                // crates orthogonally adjacent to the popped cluster take ONE hit
+    group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1];
+      [[r+1,c],[r-1,c],[r,c+1],[r,c-1]].forEach(function(nb){ var v=HM.playable(state,nb[0],nb[1])?state.grid[nb[0]][nb[1]]:null; if(v && v.charAt(0)==="K"){ var kk=nb[0]+","+nb[1]; if(!seenK[kk]){ seenK[kk]=1; crates.push({r:nb[0], c:nb[1], hp:(+v.slice(1))||1}); } } });
+    });
+    group.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(ref){ ref.tile.style.removeProperty("animation-delay"); ref.tile.classList.add("clr"); } });
+    crates.forEach(function(K){ var ref=cells[K.r]&&cells[K.r][K.c]; if(!ref) return; if(K.hp<=1) ref.tile.classList.add("clr"); else setAnim(ref.tile,"squish",300); });   // 1 hp left -> pop; otherwise crack (squish)
+    setLift(from,false); setLift(to,false);
+    sfxPop(group.length + crates.length);
+    var myState=state;
+    setTimeout(function(){
+      if(state!==myState){ busy=false; return; }
+      group.forEach(function(k){ var p=k.split(","); state.grid[+p[0]][+p[1]]=null; });
+      crates.forEach(function(K){ if(K.hp<=1) state.grid[K.r][K.c]=null; else state.grid[K.r][K.c]="K"+(K.hp-1); });   // break at 1 hp, otherwise crack down one
+      if(state.goal==="recipe"){
+        paintAll();                                          // SUSPENDED like a mix: the cleared cells stay holes, board doesn't fall
+        if(crates.length) renderRecipe();                    // refresh the crate counter
+        updateRation(); busy=false; setSuspended(true); finishTurn();   // a clear is a merge too — the turn stays open
+      } else {
+        var fresh=HM.gravity(state, Math.random);
+        if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+        paintAll();
+        Object.keys(fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+        updateRation(); busy=false; finishTurn();
+      }
+    }, 300);
+  }
+
+  function stopMeter(){ if(resolveTid){ clearTimeout(resolveTid); resolveTid=0; } meterEl.classList.remove("run","show"); }
+
+  /* combo tiers: 2-3 normal · 4-6 GOOD · 7-9 SWEET · 10+ HUEMELD. n is the
+     session count (how many melds/fuses piled into this one detonation). */
+  function comboTier(n){
+    if(n>=10) return { i:3, name:"HUEMELD!", col:"#ef4a5a" };
+    if(n>=7)  return { i:2, name:"SWEET!",   col:"#8b5cc7" };
+    if(n>=4)  return { i:1, name:"GOOD!",    col:"#3d8bdf" };
+    return { i:0, name:"", col:"#ffd15c" };
+  }
+  function showBurst(tier){
+    burstEl.textContent=tier.name; burstEl.style.color=tier.col; burstEl.style.fontSize=(34+tier.i*8)+"px";
+    burstEl.classList.remove("show"); void burstEl.offsetWidth; burstEl.classList.add("show");
+  }
+  function shakeBoard(i){
+    board.style.setProperty("--amp",(i*2+2)+"px");
+    board.classList.remove("shake"); void board.offsetWidth; board.classList.add("shake");
+    setTimeout(function(){ board.classList.remove("shake"); }, 460);
+  }
+
+  async function resolveCombo(){   // the swoop: pop everything collected; the whole combo costs ONE move total, fires the juice
+    if(!sess||busy) return;
+    var mySess=sess, myState=state;   // pin what we're resolving — a mid-await level change must not corrupt a fresh board
+    busy=true; finishAnim();
+    spendMove();   // one move for the entire swoop, no matter how many tiles it pops
+    var keys=Object.keys(mySess.collected), n=mySess.count;
+    var color=mySess.color;
+    var tier=comboTier(n);
+    // wave-pop: tiles burst in ripples outward from where the finger lifted
+    var ep=(mySess.epR!=null)?{r:mySess.epR,c:mySess.epC}:null, STEP=45, maxD=0;
+    keys.forEach(function(k){ var p=k.split(","), r=+p[0], c=+p[1]; var ref=cells[r]&&cells[r][c]; if(!ref) return;
+      var d=ep?Math.min(6,Math.abs(r-ep.r)+Math.abs(c-ep.c)):0; if(d>maxD) maxD=d;
+      ref.tile.style.animationDelay=(d*STEP)+"ms"; ref.tile.classList.add("clr");
+    });
+    sfxPop(n);
+    if(tier.i>0){ showBurst(tier); if(!reduceMotion) shakeBoard(tier.i); }
+    await sleep(250 + maxD*STEP);
+    if(sess!==mySess || state!==myState){ busy=false; return; }   // level left/restarted during the pop
+    var res=HM.resolveSession(state, mySess, Math.random);   // pops collected, credits, scores, gravity+fill (one RNG draw)
+    if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);   // keep the always-playable invariant after refill
+    sess=null;
+    clearDim(); paintAll();
+    // fresh-drop animation on refilled cells
+    Object.keys(res.fresh).forEach(function(k){ var p=k.split(","); var ref=cells[+p[0]]&&cells[+p[0]][+p[1]]; if(ref) setAnim(ref.tile,"new",240); });
+    if(state.goal==="tubes"){ updateTubes(res.tube?res.tube.color:null); if(res.tube){ sfxFill(n); toast("+"+res.tube.add+" "+NAME[res.tube.color]); } }
+    else { updateGoals(); if(res.gain>0 && n>=2) toast((n>=3?"×"+n+"  ":"")+"+"+res.gain+" "+NAME[color]); }
+    updateBars(); updateRation();
+    await sleep(180);
+    if(state!==myState){ busy=false; return; }
+    busy=false;
+    finishTurn();
+  }
+
+  board.addEventListener("pointerdown", function(e){
+    if(!e.isPrimary || busy || !state || gest) return; ensureAudio();   // one active gesture at a time — a stray second press must not hijack it
+    cacheGeom();
+    var tp=cellAt(e.clientX,e.clientY);
+    if(!tp || !state.grid[tp.r][tp.c]) return;
+    var col=state.grid[tp.r][tp.c];
+    if(state.movesLeft<=0){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // out of moves — every action costs one
+    if(state.goal==="recipe"){
+      var okMerge = HM.isPrim(col) && (adjDiffPrim(tp,col) || primedPair(tp,col));   // a primary can mix or clear
+      if(!okMerge && !recipeStartHere(tp,col)){ setAnim(cells[tp.r][tp.c].tile, HM.isPrim(col)?"nope":"squish", 320); if(!HM.isPrim(col)) sfxEat(3); return; }
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      gest={ anchor:tp, carry:col, mode:"mix", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };   // generic: classifyDrag decides mix / clear / recipe on the swipe
+      setLift(tp,true);
+    } else if(HM.isPrim(col)){
+      if(!adjDiffPrim(tp,col) && !primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"nope",340); return; }   // can mix (different) or clear (same)
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      gest={ anchor:tp, carry:col, mode:"mix", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
+      setLift(tp,true);
+    } else {
+      if(!primedPair(tp,col)){ setAnim(cells[tp.r][tp.c].tile,"squish",300); sfxEat(3); return; }   // lone secondary = squish toy
+      try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+      gest={ anchor:tp, carry:col, mode:"combo", spent:false, target:null, targetType:null, sec:null, t:0, nopeCell:null, blobN:0, blobBadge:null };
+      setLift(tp,true);
+    }
+  });
+  function primedPair(tp,col){
+    return (HM.playable(state,tp.r+1,tp.c)&&state.grid[tp.r+1][tp.c]===col)||(HM.playable(state,tp.r-1,tp.c)&&state.grid[tp.r-1][tp.c]===col)||
+           (HM.playable(state,tp.r,tp.c+1)&&state.grid[tp.r][tp.c+1]===col)||(HM.playable(state,tp.r,tp.c-1)&&state.grid[tp.r][tp.c-1]===col);
+  }
+  board.addEventListener("pointermove", function(e){
+    if(!gest || !e.isPrimary || gest.spent) return;   // a mix uses up the gesture; ignore further motion
+    if(gest.mode==="recipe"){ updateTargetRecipe(e.clientX, e.clientY); if(gest.rtarget && gest.t>SWIPE_T) extendRecipe(); return; }
+    updateTarget(e.clientX, e.clientY);
+    if(gest.targetType && gest.t>SWIPE_T) commitSwipe();   // swipe registers instantly, no hold
+  });
+  function abandonCombo(){   // interrupted mid-swoop: put the tiles we had consumed back, spend nothing, pop nothing
+    if(sess){ Object.keys(sess.collected).forEach(function(k){ var p=k.split(","); var r=+p[0],c=+p[1]; if(!state.grid[r][c]) state.grid[r][c]=sess.color; }); }
+    sess=null; clearDim(); paintAll(); updateRation();
+  }
+  function endGesture(abandon){
+    if(!gest) return;
+    if(gest.mode==="recipe"){ gest=null; abandonRecipe(); return; }   // an incomplete trace just drops (a completed one already ended itself)
+    if(!abandon && !gest.spent && gest.targetType && gest.t>MIN_SWIPE) commitSwipe();   // a quick flick released early still counts
+    if(!gest) return;                                                 // commitSwipe consumed it (mix/clear resolving, or a 2-length recipe completed)
+    if(gest.mode==="recipe"){ gest=null; abandonRecipe(); return; }   // a longer trace just started on release — can't continue, abandon
+    setLift(gest.anchor,false);
+    var wasCombo=(gest.mode==="combo");
+    gest=null;
+    if(wasCombo && sess && sess.count>0 && !abandon) resolveCombo();   // lift = the swoop pops (costs one move)
+    else if(sess) abandonCombo();                                       // pointercancel / stray release — restore the board
+  }
+  board.addEventListener("pointerup", function(e){ if(!e.isPrimary) return; if(gest && !gest.spent && gest.mode!=="recipe") updateTarget(e.clientX, e.clientY); endGesture(); });   // a fast flick may fire NO pointermove — read the swipe from the release point
+  board.addEventListener("pointercancel", function(){ endGesture(true); });   // interrupt = abandon the swoop, don't pop it
+  board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+  /* ---------- screens ---------- */
+  function tierOf(L){ var d=L.diff||0; return d>0.80?"xhard":(d>0.56?"hard":(d>0.30?"med":"easy")); }   // border colour = this level's OWN difficulty
+  function miniStars(n){ n=n||0; return "★★★".slice(0,n)+'<span class="d">'+"☆☆☆".slice(0,3-n)+'</span>'; }
+  function renderLevelSelect(){
+    var p=loadProg(), done=0, h="";
+    var td=p[TUTORIAL.id];
+    h+='<button class="mk tut-btn" data-tut="1">▶ Tutorial'+((td&&td.done)?' <span class="tstars">'+miniStars(td.stars)+'</span>':'')+'</button>';
+    for(var i=0;i<LEVELS.length;i++){
+      var L=LEVELS[i], d=p[L.id], lock=!unlocked(i);
+      if(d&&d.done) done++;
+      h+='<button class="mk lvl-card '+tierOf(L)+(lock?" lock":"")+'" data-i="'+i+'"'+(lock?" disabled":"")+'>';
+      h+='<div class="lnum">'+L.id+'</div>';
+      h+='<div class="lstars">'+miniStars((d&&d.done)?d.stars:0)+'</div>';
+      h+='</button>';
+    }
+    document.getElementById("levelGrid").innerHTML=h;
+    document.getElementById("progress").textContent=done+" / "+LEVELS.length;
+  }
+  function showLevels(){ screenGame.style.display="none"; screenLevels.style.display="block"; stopMeter(); renderLevelSelect(); }
+  function goalSub(L){ if(L.goal==="recipe") return L.gated ? "Chain recipes to survive!" : "Trace the recipes in order"; if(L.goal==="tubes") return "Fill every tube"; return "Make "+L.objectives.map(function(o){ return o.count+" "+NAME[o.color]; }).join(" + "); }
+
+  /* ---------- tutorial coach: a step-through walkthrough shown on the tutorial level ---------- */
+  var COACH=[
+    { t:"<b>Red, blue, and yellow</b> tiles are primary colors. Swipe one up/down/left/right onto a different colored tile to merge them." },
+    { t:"Mixing two primaries makes a <b>secondary color</b>. Here's every mix:", mix:true },
+    { t:"This recipe wants a <b>purple</b> merged into an <b>orange</b>. Create both side by side, then merge them in the right order to complete it.", swipe:true },
+    { t:"Merges <b>hang in the air</b> while you build — take all the time you want. Tap <b>⤓ End turn</b> when you're done and the tiles fall. Deliver <b>2 or more recipes</b> in one turn and you get <b>extra moves!</b>" },
+    { t:"Swipe onto a <b>same-colored</b> tile to clear every connected tile of that color and break out of a jam. Don't forget that this <b>spends a move!</b>" },
+    { t:"Clear <b>every recipe</b> before you run out of moves. You've got this!" }
+  ];
+  var coachStep=0;
+  var coachEl=document.getElementById("coach"), coachTextEl=document.getElementById("coachText"),
+      coachMixEl=document.getElementById("coachMix"), coachSwipeEl=document.getElementById("coachSwipe"), coachDotsEl=document.getElementById("coachDots"), coachNextEl=document.getElementById("coachNext");
+  function showCoach(){
+    var s=COACH[coachStep];
+    coachTextEl.innerHTML=s.t;
+    coachMixEl.classList.toggle("show", !!s.mix);
+    coachSwipeEl.classList.toggle("show", !!s.swipe);
+    var dh=""; for(var i=0;i<COACH.length;i++) dh+='<i class="'+(i===coachStep?"on":"")+'"></i>';
+    coachDotsEl.innerHTML=dh;
+    coachNextEl.textContent = coachStep===COACH.length-1 ? "Play! ✦" : "Next →";
+  }
+  function startCoach(){ coachStep=0; coachEl.style.display="block"; showCoach(); }
+  coachNextEl.addEventListener("click", function(){ ensureAudio(); coachStep++; if(coachStep>=COACH.length){ coachEl.style.display="none"; } else showCoach(); });
+
+  function startLevel(level, idx){
+    curIndex=(idx==null?-1:idx); curLevel=level;
+    state=HM.newState(curLevel); HM.fill(state, Math.random);
+    placeCrates(state, curLevel.crates||0, curLevel.crateHp||2); state.crateTotal=HM.cratesLeft(state);   // seed inert blocks (some overwrite primaries); count what actually landed
+    if(!HM.hasFusePair(state)) HM.reshufflePrimaries(state, Math.random);
+    busy=false; sess=null; gest=null; geom=null; stopMeter(); hideCount(); finishAnim();
+    setSuspended(false); winRecipes=0;
+    over.classList.remove("show");
+    document.getElementById("gName").textContent=curLevel.name || ("Level "+curLevel.id);
+    document.getElementById("ghint").style.display="none";
+    if(curLevel.tutorial) startCoach(); else coachEl.style.display="none";   // the coach walkthrough shows only on the tutorial
+    screenLevels.style.display="none"; screenGame.style.display="block";
+    if(curLevel.goal==="tubes") renderTubes();
+    else if(curLevel.goal==="recipe") renderRecipe();
+    else { renderGoals(); updateGoals(); }
+    renderBars(); updateBars();
+    pupsEl.style.display = (curLevel.goal==="tubes"||curLevel.goal==="recipe") ? "none" : "";   // powerup bars are a collect-level placeholder; hide on tube/recipe
+    updateMoves(); buildBoard(); renderRation();
+  }
+
+  function showEnd(win, spared){
+    setSuspended(false);
+    if(spared==null) spared=state.movesLeft;
+    document.getElementById("overTitle").textContent = win ? "Cleared!" : "Out of moves";
+    var stars = win ? starsFor(curLevel, spared) : 0;
+    document.getElementById("overStars").innerHTML = win ? starStr(stars) : "";
+    document.getElementById("overMsg").textContent = win
+      ? (spared+" move"+(spared===1?"":"s")+" to spare")
+      : "You needed a few more moves — try again.";
+    if(win){
+      sfxWin();
+      var p=loadProg(); var rec=p[curLevel.id]||{done:false,stars:0};
+      rec.done=true; rec.stars=Math.max(rec.stars||0, stars); p[curLevel.id]=rec; saveProg(p);
+    }
+    var row=document.getElementById("overRow"), h="";
+    if(win && curIndex+1<LEVELS.length) h+='<button class="mk accent" id="obNext">Next →</button>';
+    h+='<button class="mk" id="obReplay">Replay</button>';
+    h+='<button class="mk" id="obLevels">Levels</button>';
+    row.innerHTML=h;
+    var nx=document.getElementById("obNext"); if(nx) nx.addEventListener("click",function(){ ensureAudio(); startLevel(LEVELS[curIndex+1], curIndex+1); });
+    document.getElementById("obReplay").addEventListener("click",function(){ ensureAudio(); startLevel(curLevel, curIndex); });
+    document.getElementById("obLevels").addEventListener("click",function(){ ensureAudio(); showLevels(); });
+    over.classList.add("show");
+  }
+
+  /* ---------- wiring ---------- */
+  document.getElementById("levelGrid").addEventListener("click",function(e){
+    if(e.target.closest(".tut-btn")){ ensureAudio(); startLevel(TUTORIAL, -1); return; }
+    var card=e.target.closest(".lvl-card"); if(!card||card.classList.contains("lock")) return;
+    ensureAudio(); startLevel(LEVELS[+card.dataset.i], +card.dataset.i);
+  });
+  document.getElementById("btnBack").addEventListener("click",function(){ if(!busy) showLevels(); });
+  document.getElementById("btnRestart").addEventListener("click",function(){ if(!busy) startLevel(curLevel, curIndex); });
   document.getElementById("btnAid").addEventListener("click",function(e){
-    aid=!aid; e.currentTarget.classList.toggle("on",aid);
-    e.currentTarget.setAttribute("aria-pressed",aid?"true":"false");
-    lsSet("hm_aid",aid?"1":"0"); render();
+    aid=!aid; e.currentTarget.classList.toggle("on",aid); e.currentTarget.setAttribute("aria-pressed",aid?"true":"false");
+    lsSet("hm_aid",aid?"1":"0"); if(state) paintAll();
   });
   document.getElementById("btnSound").addEventListener("click",function(e){
-    muted=!muted; ensureAudio();
-    e.currentTarget.classList.toggle("muted",muted);
-    e.currentTarget.classList.toggle("on",!muted);
-    e.currentTarget.setAttribute("aria-pressed",muted?"false":"true");
-    lsSet("hm_mute",muted?"1":"0");
-    if(!muted) sfxSwap();
+    muted=!muted; ensureAudio(); e.currentTarget.setAttribute("aria-pressed",muted?"false":"true");
+    e.currentTarget.style.opacity=muted?"0.45":"1"; lsSet("hm_mute",muted?"1":"0"); if(!muted) sfxMix(2);
   });
-  function showHelp(){ helpEl.classList.add("show"); var p=document.getElementById("btnPlay"); if(p) p.focus(); }
-  function hideHelp(){ helpEl.classList.remove("show"); lsSet("hm_seen","1"); }
-  document.getElementById("btnHelp").addEventListener("click",showHelp);
-  document.getElementById("btnPlay").addEventListener("click",function(){ ensureAudio(); hideHelp(); document.getElementById("btnHelp").focus(); });
-  helpEl.addEventListener("click",function(e){ if(e.target===helpEl) hideHelp(); });
-  document.addEventListener("keydown",function(e){
-    if(e.key==="Escape"&&helpEl.classList.contains("show")){ hideHelp(); document.getElementById("btnHelp").focus(); }
-  });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&!busy&&screenGame.style.display!=="none"&&!over.classList.contains("show")) showLevels(); });
 
   /* ---------- init ---------- */
-  best=parseInt(lsGet("hm_best")||"0",10)||0;
-  aid=lsGet("hm_aid")==="1";
-  muted=lsGet("hm_mute")==="1";
-  var ab=document.getElementById("btnAid");
-  ab.classList.toggle("on",aid); ab.setAttribute("aria-pressed",aid?"true":"false");
-  var sb=document.getElementById("btnSound");
-  sb.classList.toggle("muted",muted); sb.classList.toggle("on",!muted);
-  sb.setAttribute("aria-pressed",muted?"false":"true");
-  newGame();
-  if(lsGet("hm_seen")!=="1") showHelp();
+  aid=lsGet("hm_aid")==="1"; muted=lsGet("hm_mute")==="1";
+  document.getElementById("btnAid").setAttribute("aria-pressed",aid?"true":"false");
+  var sb=document.getElementById("btnSound"); sb.setAttribute("aria-pressed",muted?"false":"true"); sb.style.opacity=muted?"0.45":"1";
+  if(!LEVELS.length){ document.getElementById("levelGrid").innerHTML='<p style="grid-column:1/-1;color:var(--ink-soft)">No levels found — run tools/feeltest.mjs to generate levels.js.</p>'; }
+  showLevels();
 })();
 </script>
 </body>

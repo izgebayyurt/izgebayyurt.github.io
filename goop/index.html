@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Goop -- sling test</title>
+<style>
+  :root{color-scheme:light;}
+  html,body{margin:0;height:100%;background:#efe7d6;overflow:hidden;color:#2a2622;
+    font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;cursor:crosshair;}
+  #bar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:9px;}
+  .ammo{position:relative;width:72px;padding:9px 6px 7px;text-align:center;cursor:pointer;background:#fbf6ea;
+    border:2.5px solid #2a2622;border-radius:13px;box-shadow:2px 3px 0 #2a2622;transition:transform .06s,box-shadow .06s;}
+  .ammo:active{transform:translate(1px,2px);box-shadow:1px 1px 0 #2a2622;}
+  .ammo.sel{background:#fff3d6;box-shadow:2px 3px 0 #2a2622,0 0 0 3px #ffce5c inset;}
+  .ammo .sw{width:24px;height:24px;margin:0 auto 5px;border:2.5px solid #2a2622;border-radius:7px;}
+  .ammo .nm{font-size:11.5px;font-weight:800;}
+  .ammo .dl{font-size:9px;color:#8a8170;margin-top:1px;}
+  .tool{background:#fbf6ea;border:2.5px solid #2a2622;border-radius:13px;box-shadow:2px 3px 0 #2a2622;
+    font:800 13px ui-rounded,system-ui;color:#2a2622;cursor:pointer;padding:0 14px;}
+  .tool:active{transform:translate(1px,2px);box-shadow:1px 1px 0 #2a2622;}
+  #hint{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#8a8170;
+    background:#fbf6ea;border:2px solid #2a2622;border-radius:11px;padding:6px 12px;box-shadow:2px 2px 0 #2a2622;}
+  #hint b{color:#2a2622;}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hint">Pull back from the slingshot and release. <b>Oil</b> trails, <b>Water</b> lobs, <b>Fire</b> ignites.</div>
+  <div id="bar">
+    <div class="ammo sel" data-t="oil"><div class="sw" style="background:#4a3f63"></div><div class="nm">Oil</div><div class="dl">trail</div></div>
+    <div class="ammo" data-t="water"><div class="sw" style="background:#3f8be6"></div><div class="nm">Water</div><div class="dl">lob</div></div>
+    <div class="ammo" data-t="fire"><div class="sw" style="background:#ff7a33"></div><div class="nm">Fire</div><div class="dl">bolt</div></div>
+    <button class="tool" id="clear">Clear</button>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const SC = 8;                       // screen px per sim cell (chunky)
+  let W, H, gw, gh, mat, life, moved, off, octx, img, data;
+  const EMPTY = 0, WALL = 1, OIL = 2, WATER = 3, FIRE = 4, STEAM = 5;
+  // material base colours (marker palette, flat -- no glow)
+  const COL = { 0: [239, 231, 214], 1: [107, 93, 73], 2: [74, 63, 99], 3: [63, 139, 230], 4: [255, 122, 51], 5: [205, 205, 215] };
+  const INK = '#2a2622';
+  const FIRE_LIFE = 38, STEAM_LIFE = 60;
+
+  function build() {
+    W = cv.width = innerWidth; H = cv.height = innerHeight;
+    gw = Math.floor(W / SC); gh = Math.floor(H / SC);
+    mat = new Uint8Array(gw * gh); life = new Uint8Array(gw * gh); moved = new Uint8Array(gw * gh);
+    off = document.createElement('canvas'); off.width = gw; off.height = gh; octx = off.getContext('2d');
+    img = octx.createImageData(gw, gh); data = img.data;
+    terrain();
+  }
+  const gi = (x, y) => y * gw + x;
+  const inb = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh;
+  function setRect(cx, cy, w, h, m) { for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) if (inb(x, y)) mat[gi(x, y)] = m; }
+  function terrain() {
+    mat.fill(0);
+    setRect(0, gh - 3, gw, 3, WALL);                       // ground
+    setRect(Math.floor(gw * 0.30), Math.floor(gh * 0.52), Math.floor(gw * 0.26), 3, WALL);  // ledge
+    setRect(Math.floor(gw * 0.60), Math.floor(gh * 0.68), Math.floor(gw * 0.30), 3, WALL);  // lower ledge
+    setRect(Math.floor(gw * 0.05), Math.floor(gh * 0.74), Math.floor(gw * 0.16), 3, WALL);  // catch basin lip
+  }
+
+  // ---------- falling-sand sim ----------
+  const passable = (m) => m === EMPTY || m === STEAM;       // liquids sink through these
+  function tryMove(i, nx, ny) {
+    if (!inb(nx, ny)) return false; const ni = gi(nx, ny);
+    if (moved[ni] || !passable(mat[ni])) return false;
+    const tm = mat[ni], tl = life[ni];
+    mat[ni] = mat[i]; life[ni] = life[i]; mat[i] = tm; life[i] = tl;
+    moved[ni] = 1; moved[i] = 1; return true;
+  }
+  function neigh(x, y, m) { for (const [dx, dy] of N4) { if (inb(x + dx, y + dy) && mat[gi(x + dx, y + dy)] === m) return true; } return false; }
+  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let frame = 0;
+  function step() {
+    moved.fill(0); const dir = (frame & 1) ? 1 : -1;
+    for (let y = gh - 1; y >= 0; y--) for (let k = 0; k < gw; k++) {
+      const x = dir > 0 ? k : gw - 1 - k, i = gi(x, y), m = mat[i];
+      if (m === EMPTY || m === WALL || moved[i]) continue;
+      if (m === FIRE) {
+        if (neigh(x, y, WATER)) { mat[i] = STEAM; life[i] = STEAM_LIFE; continue; }
+        for (const [dx, dy] of N4) { if (inb(x + dx, y + dy)) { const ni = gi(x + dx, y + dy); if (mat[ni] === OIL && Math.random() < 0.5) { mat[ni] = FIRE; life[ni] = FIRE_LIFE; } } }
+        if (--life[i] <= 0) { mat[i] = Math.random() < 0.25 ? STEAM : EMPTY; life[i] = STEAM_LIFE; }
+        else if (Math.random() < 0.04) tryMove(i, x, y - 1);
+      } else if (m === STEAM) {
+        if (--life[i] <= 0) { mat[i] = EMPTY; continue; }
+        const lr = Math.random() < .5 ? -1 : 1;
+        tryMove(i, x, y - 1) || tryMove(i, x + lr, y - 1) || tryMove(i, x - lr, y - 1) || tryMove(i, x + lr, y);
+      } else { // OIL / WATER liquid
+        // oil floats on water (less dense): let water below swap up
+        if (m === WATER && inb(x, y - 1) && mat[gi(x, y - 1)] === OIL && !moved[gi(x, y - 1)]) { mat[gi(x, y - 1)] = WATER; mat[i] = OIL; moved[gi(x, y - 1)] = 1; moved[i] = 1; continue; }
+        const lr = Math.random() < .5 ? 1 : -1;
+        tryMove(i, x, y + 1) || tryMove(i, x + lr, y + 1) || tryMove(i, x - lr, y + 1) || tryMove(i, x + lr, y) || tryMove(i, x - lr, y);
+      }
+    }
+    frame++;
+  }
+  function stamp(cx, cy, r, m) { for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (dx * dx + dy * dy > r * r + 1) continue; const x = cx + dx, y = cy + dy; if (inb(x, y) && mat[gi(x, y)] !== WALL && (m === FIRE || mat[gi(x, y)] === EMPTY || mat[gi(x, y)] === STEAM)) { mat[gi(x, y)] = m; if (m === FIRE) life[gi(x, y)] = FIRE_LIFE; } } }
+
+  // ---------- projectiles ----------
+  let projs = [];
+  const G = 1000;
+  function update(dt) {
+    for (let s = 0; s < 2; s++) step();        // 2 sim substeps/frame for liveliness
+    for (let i = projs.length - 1; i >= 0; i--) {
+      const p = projs[i]; p.vy += G * dt; const steps = 3;
+      for (let s = 0; s < steps; s++) {
+        p.x += p.vx * dt / steps; p.y += p.vy * dt / steps;
+        const cx = Math.floor(p.x / SC), cy = Math.floor(p.y / SC);
+        if (p.trail) stamp(cx, cy, 1, p.type);
+        if (!inb(cx, cy) || (inb(cx, cy) && (mat[gi(cx, cy)] === WALL || (mat[gi(cx, cy)] !== EMPTY && mat[gi(cx, cy)] !== STEAM && !p.trail))) || p.y > H) {
+          stamp(cx, cy, p.type === 'fire' ? 3 : 4, MAT[p.type]); projs.splice(i, 1); break;
+        }
+      }
+    }
+  }
+  const MAT = { oil: OIL, water: WATER, fire: FIRE };
+
+  // ---------- slingshot ----------
+  let ax, ay, aiming = false, pull = null, ammo = 'oil';
+  function anchor() { ax = Math.max(70, W * 0.12); ay = H - Math.max(80, H * 0.16); }
+  cv.addEventListener('pointerdown', e => { aiming = true; pull = [e.clientX, e.clientY]; });
+  cv.addEventListener('pointermove', e => { if (aiming) pull = [e.clientX, e.clientY]; });
+  cv.addEventListener('pointerup', e => { if (!aiming) return; aiming = false; launch(); pull = null; });
+  function launchVel() { let dx = ax - pull[0], dy = ay - pull[1]; const l = Math.hypot(dx, dy), max = 260; if (l > max) { dx *= max / l; dy *= max / l; } return [dx * 7, dy * 7]; }
+  function launch() { if (!pull) return; const [vx, vy] = launchVel(); projs.push({ x: ax, y: ay, vx, vy, type: ammo, trail: ammo === 'oil' }); }
+
+  // ---------- render (marker: flat fills + ink outlines, no glow) ----------
+  function render() {
+    // material layer to offscreen, then scale up blocky
+    for (let i = 0; i < gw * gh; i++) { let c = COL[mat[i]]; if (mat[i] === FIRE) c = life[i] > 9 ? [255, 205, 74] : [255, 122, 51]; const j = i * 4; data[j] = c[0]; data[j + 1] = c[1]; data[j + 2] = c[2]; data[j + 3] = 255; }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, gw, gh, 0, 0, gw * SC, gh * SC);
+    // ink outlines around solid-ish blobs
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const m = mat[gi(x, y)]; if (m === EMPTY || m === STEAM) continue;
+      const px = x * SC, py = y * SC;
+      if (!inb(x, y - 1) || edge(mat[gi(x, y - 1)])) { ctx.moveTo(px, py); ctx.lineTo(px + SC, py); }
+      if (!inb(x, y + 1) || (y + 1 < gh && edge(mat[gi(x, y + 1)]))) { ctx.moveTo(px, py + SC); ctx.lineTo(px + SC, py + SC); }
+      if (!inb(x - 1, y) || edge(mat[gi(x - 1, y)])) { ctx.moveTo(px, py); ctx.lineTo(px, py + SC); }
+      if (!inb(x + 1, y) || (x + 1 < gw && edge(mat[gi(x + 1, y)]))) { ctx.moveTo(px + SC, py); ctx.lineTo(px + SC, py + SC); }
+    }
+    ctx.stroke();
+    // projectiles (chunky marker blobs)
+    for (const p of projs) { ctx.fillStyle = `rgb(${COL[MAT[p.type]].join(',')})`; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke(); }
+    // slingshot
+    drawSling();
+  }
+  const edge = (m) => m === EMPTY || m === STEAM;
+  function drawSling() {
+    ctx.strokeStyle = INK; ctx.fillStyle = '#fbf6ea'; ctx.lineWidth = 4;
+    // posts (a chunky Y)
+    ctx.beginPath(); ctx.moveTo(ax, ay + 46); ctx.lineTo(ax, ay + 8); ctx.moveTo(ax - 14, ay - 14); ctx.lineTo(ax, ay + 8); ctx.lineTo(ax + 14, ay - 14); ctx.stroke();
+    if (aiming && pull) {
+      const [vx, vy] = launchVel();
+      // band
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ax - 14, ay - 14); ctx.lineTo(pull[0], pull[1]); ctx.lineTo(ax + 14, ay - 14); ctx.stroke();
+      // pouch blob
+      ctx.fillStyle = `rgb(${COL[MAT[ammo]].join(',')})`; ctx.beginPath(); ctx.arc(pull[0], pull[1], 8, 0, 7); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+      // trajectory dots
+      let sx = ax, sy = ay, svx = vx, svy = vy; ctx.fillStyle = 'rgba(42,38,34,.5)';
+      for (let t = 0; t < 26; t++) { svy += G * 0.03; sx += svx * 0.03; sy += svy * 0.03; if (t % 2 === 0) { ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, 7); ctx.fill(); } if (sy > H) break; }
+    }
+  }
+
+  // ---------- loop ----------
+  let last = 0;
+  function loop(ts) { const dt = Math.min(.04, (ts - last) / 1000 || 0); last = ts; update(dt); ctx.fillStyle = `rgb(${COL[0].join(',')})`; ctx.fillRect(0, 0, W, H); render(); requestAnimationFrame(loop); }
+
+  // ---------- ui ----------
+  document.querySelectorAll('.ammo').forEach(el => el.onclick = () => { ammo = el.dataset.t; document.querySelectorAll('.ammo').forEach(a => a.classList.toggle('sel', a === el)); });
+  document.getElementById('clear').onclick = () => terrain();
+  addEventListener('resize', () => { build(); anchor(); });
+  build(); anchor();
+  requestAnimationFrame(loop);
+  window.__sb = { counts() { let o = 0, w = 0, f = 0, s = 0; for (let i = 0; i < gw * gh; i++) { const m = mat[i]; if (m === OIL) o++; else if (m === WATER) w++; else if (m === FIRE) f++; else if (m === STEAM) s++; } return { oil: o, water: w, fire: f, steam: s, projs: projs.length }; }, fire(vx, vy, type) { projs.push({ x: ax, y: ay, vx, vy, type, trail: type === 'oil' }); }, stampCell(cx, cy, r, type) { stamp(cx, cy, r, MAT[type]); }, dims() { return { gw, gh }; } };
+})();
+</script>
+</body>
+</html>

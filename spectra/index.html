@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Spectra</title>
+<style>
+  :root{
+    --paper:#f4eee1; --paper2:#efe7d8; --surface:#fffdf8; --ink:#2a211a; --ink-dim:#8b8170;
+    --hairline:#e4dccb; --shadow:0 10px 26px rgba(60,46,30,.16);
+  }
+  html,body{margin:0;height:100%;background:var(--paper);overflow:hidden;color:var(--ink);
+    font:14px/1.45 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;cursor:pointer;}
+  #top{position:fixed;top:13px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:9px;align-items:center;}
+  .btn{background:var(--surface);border:1.5px solid var(--hairline);border-radius:11px;color:var(--ink);
+    font:800 13px ui-rounded,system-ui;padding:7px 13px;cursor:pointer;box-shadow:0 2px 0 var(--hairline);
+    transition:transform .11s cubic-bezier(.34,1.56,.64,1),box-shadow .11s,filter .11s;}
+  .btn:hover{filter:brightness(1.03);}
+  .btn:active{transform:translateY(2px) scale(.96);box-shadow:none;}
+  .btn.pri{background:#6a45f0;border-color:#5a3ce0;color:#fff;box-shadow:0 2px 0 #4a31c0;}
+  #hint{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);z-index:5;color:var(--ink-dim);
+    font-size:12.5px;text-align:center;max-width:92%;line-height:1.5;}
+  /* level select */
+  #select{position:fixed;inset:0;z-index:8;background:var(--paper);overflow-y:auto;display:none;
+    flex-direction:column;align-items:center;padding:18px 14px 40px;}
+  #select h1{font-size:30px;letter-spacing:.18em;margin:6px 0 18px;font-weight:900;
+    background:linear-gradient(90deg,#e2685f,#e0a23a,#5aae6e,#4f86e0,#8a63d8);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #help{position:fixed;top:14px;right:14px;z-index:9;width:38px;height:38px;padding:0;border-radius:50%;font-size:18px;}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,62px);gap:11px;justify-content:center;max-width:520px;width:100%;}
+  .lvl{width:62px;height:68px;border-radius:15px;border:2px solid var(--hairline);background:var(--surface);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:0 4px 0 var(--hairline);position:relative;}
+  .lvl:active{transform:translateY(2px);box-shadow:0 2px 0 var(--hairline);}
+  .lvl .n{font-size:19px;font-weight:900;color:var(--ink);}
+  .lvl .st{font-size:12px;font-weight:900;color:#5aae6e;height:12px;line-height:12px;}
+  .lvl.done{border-color:#a9d8b6;background:#f3faf4;}
+  .lvl .tg{position:absolute;top:-6px;right:-5px;width:11px;height:11px;border-radius:50%;border:2px solid var(--paper);}
+  .lvl.t0 .tg{background:#5aae6e;} .lvl.t1 .tg{background:#e0a23a;} .lvl.t2 .tg{background:#e2685f;}
+  #won{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:9;text-align:center;opacity:0;
+    transition:opacity .3s,transform .42s cubic-bezier(.34,1.56,.64,1);pointer-events:none;}
+  #won.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto;}
+  #won.show .wmark{animation:wpop .5s cubic-bezier(.34,1.56,.64,1) both;}
+  @keyframes wpop{0%{transform:scale(0) rotate(-25deg);}60%{transform:scale(1.18) rotate(6deg);}100%{transform:scale(1) rotate(0);}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+  #won .card{background:var(--surface);border:2px solid var(--hairline);border-radius:20px;padding:24px 32px;box-shadow:var(--shadow);}
+  #won h2{margin:0;font-size:25px;letter-spacing:.06em;background:linear-gradient(90deg,#e2685f,#e0a23a,#5aae6e,#4f86e0,#8a63d8);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  #won .wmark{font-size:34px;line-height:1;margin:10px auto 6px;color:#fff;background:#5aae6e;width:54px;height:54px;
+    border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(90,174,110,.4);}
+  #won p{margin:0 0 16px;color:var(--ink-dim);font-size:13px;}
+  #won .row{display:flex;gap:10px;justify-content:center;}
+  /* intro card stack */
+  #intro{position:fixed;inset:0;z-index:12;background:rgba(40,30,18,.34);display:none;align-items:center;justify-content:center;padding:18px;}
+  #intro.show{display:flex;}
+  .icard{background:var(--surface);border:2px solid var(--hairline);border-radius:22px;box-shadow:var(--shadow);
+    width:min(380px,92vw);padding:22px 22px 18px;display:flex;flex-direction:column;align-items:center;}
+  .icard .art{width:100%;}
+  .icard .art svg{width:100%;height:auto;display:block;}
+  .icard .cap{font-size:15px;font-weight:700;color:var(--ink);text-align:center;margin:14px 6px 4px;min-height:42px;line-height:1.45;}
+  .icard .cap b{color:#c8743f;}
+  .dots{display:flex;gap:7px;margin:8px 0 14px;}
+  .dots i{width:8px;height:8px;border-radius:50%;background:var(--hairline);}
+  .dots i.on{background:#6a45f0;}
+  .inav{display:flex;gap:10px;width:100%;justify-content:space-between;}
+  /* in-level coach marks */
+  #coach{position:fixed;inset:0;z-index:11;display:none;}
+  #coach.show{display:block;}
+  .cring{position:absolute;border:3px solid #6a45f0;border-radius:50%;box-shadow:0 0 0 4px rgba(106,69,240,.16);
+    animation:cpulse 1.5s ease-in-out infinite;pointer-events:none;box-sizing:border-box;}
+  .cring.faint{border-color:rgba(106,69,240,.45);animation:none;box-shadow:none;}
+  @keyframes cpulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.13);opacity:.65;}}
+  .ctip{position:absolute;max-width:230px;background:var(--surface);border:2px solid var(--hairline);border-radius:14px;
+    padding:11px 15px;font-size:13.5px;font-weight:600;color:var(--ink);box-shadow:var(--shadow);text-align:center;
+    line-height:1.42;pointer-events:none;animation:crise .26s ease both;}
+  .ctip b{color:#6a45f0;}
+  .ctip.below{transform:translate(-50%,0);}
+  .ctip.above{transform:translate(-50%,-100%);}
+  @keyframes crise{from{opacity:0;transform:translate(-50%,6px);}to{opacity:1;}}
+  .ctip.above{animation:criseA .26s ease both;}
+  @keyframes criseA{from{opacity:0;transform:translate(-50%,calc(-100% + 6px));}to{opacity:1;transform:translate(-50%,-100%);}}
+  .chint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);color:var(--ink-dim);font-size:12.5px;font-weight:800;
+    animation:cblink 1.5s ease-in-out infinite;}
+  @keyframes cblink{0%,100%{opacity:.45;}50%{opacity:1;}}
+  .cchip{position:absolute;transform:translate(-50%,-50%);background:#6a45f0;color:#fff;font-size:10px;font-weight:800;
+    letter-spacing:.02em;padding:3px 8px;border-radius:8px;white-space:nowrap;pointer-events:none;box-shadow:0 3px 8px rgba(60,46,30,.2);}
+  .cfinger{position:absolute;left:0;top:0;font-size:30px;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(60,46,30,.35));
+    animation:cswipe 1.7s ease-in-out infinite;}
+  @keyframes cswipe{0%{transform:translate(var(--fx0),var(--fy0)) scale(.9);opacity:0;}
+    18%{opacity:1;transform:translate(var(--fx0),var(--fy0)) scale(1);}
+    75%{opacity:1;transform:translate(var(--fx1),var(--fy1)) scale(1);}
+    100%{opacity:0;transform:translate(var(--fx1),var(--fy1)) scale(.9);}}
+  #coach.dim{background:rgba(40,30,18,.3);}
+  .ccard{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);background:var(--surface);border:2px solid var(--hairline);
+    border-radius:18px;box-shadow:var(--shadow);padding:14px 14px 12px;width:min(310px,86vw);pointer-events:none;
+    animation:ccpop .3s cubic-bezier(.34,1.56,.64,1) both;}
+  .ccard-art svg{width:100%;height:auto;display:block;}
+  .ccard-cap{margin-top:8px;text-align:center;font-size:13px;font-weight:700;color:var(--ink);}
+  @keyframes ccpop{from{opacity:0;transform:translate(-50%,-50%) scale(.9);}to{opacity:1;transform:translate(-50%,-50%) scale(1);}}
+  /* colour-wheel guide button (bottom-right, during play) */
+  #guide{position:fixed;right:15px;bottom:15px;z-index:6;width:46px;height:46px;border-radius:50%;cursor:pointer;padding:0;display:none;
+    border:3px solid #fffdf8;box-shadow:0 4px 12px rgba(60,46,30,.28);
+    background:conic-gradient(from -90deg,#d62828,#f2801c,#f8d032,#2ca85c,#265ece,#964ed4,#d62828);}
+  #guide::after{content:'';position:absolute;inset:34%;background:#fffdf8;border-radius:50%;}
+  #guide:active{transform:scale(.94);}
+  #guide.pulse{animation:gpulse 1.1s ease-in-out infinite;}
+  @keyframes gpulse{0%,100%{box-shadow:0 4px 12px rgba(60,46,30,.28),0 0 0 0 rgba(106,69,240,.55);}
+    50%{box-shadow:0 4px 12px rgba(60,46,30,.28),0 0 0 13px rgba(106,69,240,0);}}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="top">
+    <button class="btn" id="menu">‹ Levels</button>
+    <button class="btn" id="undo">Undo</button>
+    <button class="btn" id="reset">Reset</button>
+  </div>
+  <div id="hint">Swipe a glass to slide or swap it.</div>
+
+  <div id="select">
+    <button class="btn" id="help" title="How to play">?</button>
+    <h1>SPECTRA</h1>
+    <div id="grid"></div>
+  </div>
+
+  <div id="intro"><div class="icard">
+    <div class="art" id="iart"></div>
+    <div class="cap" id="icap"></div>
+    <div class="dots" id="idots"></div>
+    <div class="inav"><button class="btn" id="iback">Back</button><button class="btn pri" id="inext">Next ›</button></div>
+  </div></div>
+
+  <div id="won"><div class="card"><h2>SOLVED</h2><div class="wmark">✓</div>
+    <div class="row"><button class="btn" id="wmenu">Levels</button><button class="btn pri" id="wnext">Next ›</button></div></div></div>
+
+  <div id="coach"></div>
+  <button id="guide" title="Colour guide"></button>
+
+<script>
+(function () {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const R = 1, Y = 2, B = 4;
+  // Red/Yellow/Blue primaries (intuitive paint-style mixes); all three = white.
+  const CMAP = {
+    1: [214, 40, 40],    // R  red
+    2: [248, 208, 50],   // Y  yellow
+    4: [38, 92, 206],    // B  blue
+    3: [242, 128, 24],   // R|Y orange
+    6: [44, 168, 92],    // Y|B green
+    5: [150, 74, 212],   // R|B purple
+    7: [255, 255, 255]   // R|Y|B white
+  };
+  const drk = (m) => { const c = CMAP[m]; return [c[0] * .55 | 0, c[1] * .55 | 0, c[2] * .55 | 0]; };
+  const rgb = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a == null ? 1 : a})`;
+
+  // Baked levels (100): r rows, c cols, g grid (0 empty, 1/2/4 glass, 8 = "/" mirror, 9 = "\\" mirror),
+  //                      b beams [srcSide, srcIdx, srcColour, tgtSide, tgtIdx, tgtColour]; sides 0=L 1=R 2=T 3=B.
+  const LV = [{"r":2,"c":3,"g":[[0,0,0],[0,1,0]],"b":[[0,0,7,1,0,1]]},{"r":2,"c":3,"g":[[1,4,0],[0,2,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,4]]},{"r":2,"c":3,"g":[[0,0,0],[0,4,0]],"b":[[0,0,6,1,0,4]]},{"r":2,"c":3,"g":[[0,2,1],[0,0,2]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,1]]},{"r":2,"c":3,"g":[[0,0,0],[2,2,4]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2]]},{"r":2,"c":3,"g":[[2,0,4],[4,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2]]},{"r":2,"c":3,"g":[[4,1,0],[1,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1]]},{"r":2,"c":3,"g":[[4,0,1],[1,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1]]},{"r":3,"c":3,"g":[[4,2,1],[0,4,0],[0,0,1]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,2],[0,2,7,1,2,5]]},{"r":3,"c":3,"g":[[0,4,2],[1,0,4],[0,4,0]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,5],[0,2,7,1,2,4]]},{"r":3,"c":3,"g":[[1,4,0],[2,1,2],[0,0,0]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,3],[0,2,7,1,2,1]]},{"r":3,"c":3,"g":[[0,1,1],[0,0,0],[2,1,4]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,3],[0,2,7,1,2,5]]},{"r":3,"c":3,"g":[[0,2,0],[1,0,1],[0,2,2]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,3],[0,2,7,1,2,2]]},{"r":3,"c":3,"g":[[0,4,0],[1,0,2],[0,2,2]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,6],[0,2,7,1,2,2]]},{"r":3,"c":3,"g":[[0,0,0],[2,0,2],[1,4,2]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,2],[0,2,7,1,2,6]]},{"r":3,"c":4,"g":[[0,0,2,2],[4,4,0,0],[1,2,1,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,6],[0,2,7,1,2,2]]},{"r":3,"c":3,"g":[[4,0,0],[2,0,0],[1,4,1]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1],[0,2,7,1,2,2]]},{"r":3,"c":4,"g":[[2,1,4,0],[0,2,0,0],[1,2,4,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,5],[0,2,7,1,2,6]]},{"r":3,"c":3,"g":[[2,2,0],[4,0,4],[4,0,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,4],[0,2,7,1,2,2]]},{"r":3,"c":4,"g":[[1,0,1,4],[1,2,0,0],[0,4,1,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,4],[0,2,7,1,2,1]]},{"r":3,"c":3,"g":[[2,4,0],[0,0,1],[4,0,2]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,6],[0,2,7,1,2,3]]},{"r":3,"c":4,"g":[[0,0,0,0],[2,2,4,0],[4,4,4,2]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,2],[0,2,7,1,2,4]]},{"r":3,"c":3,"g":[[1,4,0],[0,1,0],[0,2,2]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,4],[0,2,7,1,2,1]]},{"r":3,"c":4,"g":[[0,0,1,0],[2,1,4,2],[2,0,4,0]],"b":[[0,0,2,1,0,7],[0,1,7,1,1,3],[0,2,2,1,2,6]]},{"r":3,"c":4,"g":[[0,0,4,0],[2,0,0,1],[2,1,4,4]],"b":[[0,0,2,1,0,4],[0,1,4,1,1,7],[0,2,4,1,2,5]]},{"r":3,"c":4,"g":[[4,0,1,2],[2,4,0,0],[2,0,0,1]],"b":[[0,0,4,1,0,6],[0,1,2,1,1,7],[0,2,4,1,2,6]]},{"r":3,"c":4,"g":[[0,2,2,2],[4,0,1,1],[1,0,0,0]],"b":[[0,0,4,1,0,1],[0,1,1,1,1,7],[0,2,1,1,2,3]]},{"r":3,"c":4,"g":[[0,0,0,0],[4,1,4,4],[2,2,4,0]],"b":[[0,0,1,1,0,4],[0,1,2,1,1,6],[0,2,2,1,2,7]]},{"r":3,"c":4,"g":[[2,2,4,0],[2,0,0,0],[4,1,0,2]],"b":[[0,0,1,1,0,7],[0,1,2,1,1,2],[0,2,4,1,2,4]]},{"r":3,"c":4,"g":[[1,0,4,0],[2,0,0,0],[1,4,1,2]],"b":[[0,0,7,1,0,3],[0,1,4,1,1,5],[0,2,1,1,2,7]]},{"r":3,"c":3,"g":[[0,4,2],[4,0,1],[0,1,0]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,5],[0,2,7,1,2,1],[2,1,7,3,1,6]]},{"r":3,"c":3,"g":[[2,0,2],[4,2,0],[0,0,1]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,2],[2,2,7,3,2,3]]},{"r":3,"c":3,"g":[[0,1,4],[0,2,0],[1,0,1]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,1],[0,2,7,1,2,3],[2,2,7,3,2,7]]},{"r":3,"c":3,"g":[[0,0,0],[2,4,2],[4,1,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2],[0,2,7,1,2,5],[2,0,7,3,0,1]]},{"r":3,"c":3,"g":[[0,4,0],[1,4,0],[0,4,2]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,4],[0,2,7,1,2,7],[2,0,7,3,0,2]]},{"r":3,"c":3,"g":[[4,0,4],[2,0,4],[0,1,0]],"b":[[0,0,7,1,0,6],[0,1,7,1,1,5],[0,2,7,1,2,4],[2,0,7,3,0,4]]},{"r":3,"c":3,"g":[[2,2,0],[1,0,4],[0,0,2]],"b":[[0,0,7,1,0,6],[0,2,7,1,2,3],[2,0,7,3,0,2]]},{"r":3,"c":3,"g":[[2,1,0],[1,0,4],[0,2,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,2],[0,2,7,1,2,5],[2,2,7,3,2,1]]},{"r":3,"c":3,"g":[[2,0,2],[0,0,4],[1,4,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,2],[0,2,7,1,2,1],[2,1,7,3,1,6]]},{"r":3,"c":3,"g":[[4,4,0],[4,1,4],[0,0,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,4],[0,2,7,1,2,4],[2,0,7,3,0,4]]},{"r":3,"c":4,"g":[[1,1,0,0],[0,0,0,2],[1,2,4,1]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,1],[0,2,7,1,2,7],[2,1,7,3,1,4]]},{"r":3,"c":4,"g":[[0,0,0,4],[1,0,4,1],[4,4,2,0]],"b":[[0,0,7,1,0,4],[0,1,7,1,1,5],[0,2,7,1,2,4],[2,2,7,3,2,1]]},{"r":3,"c":4,"g":[[0,0,2,1],[0,4,2,0],[2,4,0,4]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,4],[0,2,7,1,2,2],[2,1,7,3,1,2]]},{"r":3,"c":4,"g":[[4,0,4,0],[0,0,2,1],[2,2,1,0]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,7],[0,2,7,1,2,2],[2,1,7,3,1,2]]},{"r":3,"c":4,"g":[[0,1,1,4],[0,0,2,1],[4,0,0,2]],"b":[[0,0,7,1,0,7],[0,1,7,1,1,7],[0,2,7,1,2,1],[2,0,7,3,0,4]]},{"r":3,"c":4,"g":[[4,0,4,4],[1,0,1,0],[1,4,0,0]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,5],[0,2,7,1,2,4],[2,0,7,3,0,4]]},{"r":3,"c":4,"g":[[2,1,0,0],[0,0,2,1],[1,1,2,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,3],[0,2,7,1,2,3],[2,0,7,3,0,2]]},{"r":3,"c":4,"g":[[1,2,2,2],[0,4,0,2],[0,1,0,0]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,6],[0,2,7,1,2,3],[2,1,7,3,1,5]]},{"r":3,"c":4,"g":[[0,0,1,1],[0,4,1,2],[0,2,2,0]],"b":[[0,0,7,1,0,3],[0,1,7,1,1,7],[0,2,7,1,2,3],[2,1,7,3,1,7]]},{"r":3,"c":4,"g":[[1,0,1,4],[2,2,0,0],[0,4,0,1]],"b":[[0,0,7,1,0,5],[0,1,7,1,1,3],[0,2,7,1,2,4],[2,1,7,3,1,5]]},{"r":3,"c":4,"g":[[0,0,4,4],[2,0,0,1],[1,1,2,0]],"b":[[0,0,4,1,0,4],[0,1,4,1,1,5],[0,2,1,1,2,3],[2,3,7,3,3,3],[2,0,7,3,0,1]]},{"r":3,"c":4,"g":[[0,0,0,4],[2,2,2,1],[0,4,0,4]],"b":[[0,0,4,1,0,6],[0,1,2,1,1,6],[0,2,4,1,2,5],[2,1,4,3,1,6],[2,3,7,3,3,4]]},{"r":3,"c":4,"g":[[0,2,1,1],[1,0,0,1],[0,0,2,4]],"b":[[0,0,1,1,0,1],[0,1,7,1,1,7],[0,2,7,1,2,1],[2,1,7,3,1,3],[2,2,4,3,2,6]]},{"r":3,"c":4,"g":[[0,1,2,0],[2,0,1,0],[2,4,1,0]],"b":[[0,0,7,1,0,3],[0,1,1,1,1,1],[0,2,2,1,2,3],[2,2,1,3,2,3],[2,1,2,3,1,6]]},{"r":3,"c":4,"g":[[1,0,1,0],[1,0,4,2],[1,0,2,0]],"b":[[0,0,7,1,0,1],[0,1,7,1,1,2],[0,2,1,1,2,1],[2,0,2,3,0,3],[2,2,7,3,2,1]]},{"r":3,"c":4,"g":[[0,4,0,0],[1,2,1,4],[0,1,1,0]],"b":[[0,0,2,1,0,3],[0,1,2,1,1,4],[0,2,7,1,2,1],[2,3,4,3,3,4],[2,0,7,3,0,6]]},{"r":3,"c":4,"g":[[0,1,2,0],[1,1,0,4],[1,4,0,0]],"b":[[0,0,2,1,0,1],[0,1,2,1,1,6],[0,2,2,1,2,3],[2,3,7,3,3,4],[2,1,2,3,1,1]]},{"r":3,"c":4,"g":[[2,0,1,0],[1,2,0,2],[4,0,0,4]],"b":[[0,0,7,1,0,2],[0,1,7,1,1,1],[0,2,2,1,2,4],[2,2,2,3,2,6],[2,3,1,3,3,7]]},{"r":3,"c":4,"g":[[1,0,1,0],[0,1,0,4],[0,2,4,4]],"b":[[0,0,7,1,0,1],[0,1,4,1,1,4],[0,2,2,1,2,5],[2,3,4,3,3,4],[2,2,7,3,2,1]]},{"r":3,"c":4,"g":[[2,0,4,2],[1,0,0,2],[4,2,0,0]],"b":[[0,0,2,1,0,2],[0,1,4,1,1,4],[0,2,4,1,2,2],[2,1,7,3,1,3],[2,2,2,3,2,2]]},{"r":4,"c":4,"g":[[2,1,4,1],[4,0,4,0],[0,2,4,0],[0,0,4,2]],"b":[[0,0,1,1,0,1],[0,1,4,1,1,2],[0,2,4,1,2,4],[0,3,7,1,3,4],[2,3,4,3,3,4],[2,0,2,3,0,6]]},{"r":4,"c":4,"g":[[4,0,4,1],[0,1,0,2],[2,0,2,0],[4,1,0,2]],"b":[[0,0,7,1,0,5],[0,1,4,1,1,6],[0,2,4,1,2,3],[0,3,7,1,3,2],[2,3,1,3,3,2],[2,2,1,3,2,1]]},{"r":4,"c":4,"g":[[0,1,0,0],[2,2,0,4],[4,0,4,0],[4,1,2,1]],"b":[[0,0,4,1,0,5],[0,1,2,1,1,3],[0,2,7,1,2,4],[0,3,2,1,3,6],[2,3,4,3,3,6],[2,1,7,3,1,7]]},{"r":4,"c":4,"g":[[1,2,4,1],[4,4,2,0],[0,0,0,2],[1,0,0,1]],"b":[[0,0,4,1,0,3],[0,1,2,1,1,4],[0,2,4,1,2,7],[0,3,4,1,3,5],[2,2,7,3,2,3],[2,0,4,3,0,1]]},{"r":4,"c":4,"g":[[1,1,0,0],[2,4,1,0],[1,0,0,2],[0,4,1,2]],"b":[[0,0,2,1,0,2],[0,1,2,1,1,2],[0,2,1,1,2,1],[0,3,7,1,3,3],[2,1,7,3,1,6],[2,3,7,3,3,2]]},{"r":4,"c":4,"g":[[4,0,0,2],[0,2,4,4],[4,4,0,1],[0,0,2,4]],"b":[[0,0,4,1,0,6],[0,1,2,1,1,6],[0,2,1,1,2,5],[0,3,4,1,3,4],[2,3,2,3,3,2],[2,1,1,3,1,2]]},{"r":4,"c":4,"g":[[0,2,0,4],[0,0,0,0],[2,4,4,1],[4,1,1,4]],"b":[[0,0,4,1,0,5],[0,1,1,1,1,7],[0,2,7,1,2,4],[0,3,2,1,3,5],[2,0,2,3,0,4],[2,2,4,3,2,5]]},{"r":4,"c":4,"g":[[4,4,2,2],[2,0,4,4],[0,2,0,0],[1,2,0,0]],"b":[[0,0,2,1,0,2],[0,1,7,1,1,4],[0,2,2,1,2,2],[0,3,2,1,3,3],[2,2,1,3,2,7],[2,1,2,3,1,6]]},{"r":4,"c":4,"g":[[2,0,4,0],[2,0,4,1],[4,0,4,4],[1,0,0,1]],"b":[[0,0,7,1,0,7],[0,1,1,1,1,4],[0,2,7,1,2,5],[0,3,1,1,3,1],[2,3,7,3,3,1],[2,1,2,3,1,3]]},{"r":4,"c":4,"g":[[0,0,2,1],[2,1,0,1],[1,1,0,0],[0,4,2,2]],"b":[[0,0,2,1,0,1],[0,1,1,1,1,3],[0,2,1,1,2,3],[0,3,4,1,3,6],[2,1,2,3,1,7],[2,0,4,3,0,5]]},{"r":3,"c":3,"g":[[0,0,1],[1,2,0],[9,0,2]],"b":[[3,0,1,2,0,3],[1,2,7,2,1,3]]},{"r":3,"c":3,"g":[[8,0,0],[4,1,1],[0,0,4]],"b":[[1,1,4,3,1,5],[3,0,2,2,0,6]]},{"r":3,"c":3,"g":[[2,0,1],[0,2,9],[0,1,0]],"b":[[2,1,4,3,1,6],[2,2,4,1,2,5]]},{"r":3,"c":3,"g":[[4,0,0],[0,8,1],[2,0,2]],"b":[[3,1,1,1,2,3],[0,1,1,1,1,3]]},{"r":3,"c":3,"g":[[0,2,0],[8,4,0],[4,1,0]],"b":[[1,1,7,0,1,1],[1,0,4,3,0,4]]},{"r":3,"c":3,"g":[[8,0,1],[0,2,0],[1,1,0]],"b":[[3,2,4,2,2,5],[1,0,2,3,1,1]]},{"r":3,"c":3,"g":[[0,4,1],[0,9,0],[1,1,0]],"b":[[3,0,4,2,0,4],[2,1,4,1,0,5]]},{"r":3,"c":3,"g":[[0,9,2],[1,0,0],[2,4,0]],"b":[[1,2,2,0,2,6],[1,1,2,2,0,3]]},{"r":3,"c":3,"g":[[0,4,0],[1,4,0],[8,0,1]],"b":[[1,2,4,3,0,5],[3,1,1,2,1,1]]},{"r":3,"c":3,"g":[[4,0,0],[0,2,2],[9,0,4]],"b":[[3,0,1,0,1,5],[3,1,1,2,1,7]]},{"r":3,"c":3,"g":[[0,0,4],[8,0,2],[0,2,1]],"b":[[3,0,7,1,0,4],[1,2,4,0,2,5]]},{"r":3,"c":3,"g":[[4,0,0],[0,4,2],[1,9,0]],"b":[[2,0,1,3,0,5],[0,1,2,3,1,6]]},{"r":3,"c":3,"g":[[0,1,2],[0,0,9],[0,2,1]],"b":[[0,1,7,3,1,1],[2,1,1,1,1,3]]},{"r":3,"c":3,"g":[[0,4,2],[8,2,0],[0,4,0]],"b":[[0,1,4,2,1,6],[0,2,7,1,2,4]]},{"r":3,"c":3,"g":[[1,0,2],[1,0,0],[2,8,0]],"b":[[1,0,7,0,0,1],[0,2,2,2,0,1]]},{"r":4,"c":4,"g":[[2,8,0,0],[2,4,8,1],[0,0,4,0],[0,4,1,0]],"b":[[2,2,5,3,1,4],[0,2,2,1,2,5],[3,2,4,1,1,4]]},{"r":4,"c":4,"g":[[4,4,0,1],[4,8,2,0],[0,9,1,0],[0,0,0,4]],"b":[[2,1,7,1,2,7],[2,2,3,3,2,2],[2,3,7,3,3,5]]},{"r":4,"c":4,"g":[[1,1,0,2],[9,0,2,0],[4,0,1,0],[0,0,2,8]],"b":[[1,0,2,2,0,2],[0,1,3,1,1,3],[0,3,5,2,3,3]]},{"r":4,"c":4,"g":[[1,0,2,9],[0,0,8,0],[4,0,4,4],[2,2,0,0]],"b":[[3,2,1,2,2,5],[1,2,4,0,2,4],[3,1,6,3,3,6]]},{"r":4,"c":4,"g":[[0,2,9,2],[1,0,0,0],[0,4,0,1],[2,8,0,4]],"b":[[2,0,3,3,0,5],[3,3,4,2,3,7],[0,0,1,3,1,3]]},{"r":4,"c":4,"g":[[4,1,4,0],[0,0,0,4],[0,4,8,1],[0,0,1,1]],"b":[[2,3,1,3,3,1],[3,2,7,1,2,5],[2,2,7,0,2,1]]},{"r":4,"c":4,"g":[[8,0,1,2],[1,2,2,0],[0,0,0,8],[0,1,4,0]],"b":[[2,2,2,0,0,3],[3,0,3,2,0,1],[2,1,1,0,1,3]]},{"r":4,"c":4,"g":[[4,0,0,2],[0,9,1,0],[0,2,4,8],[4,0,1,0]],"b":[[2,3,3,2,1,7],[0,1,7,1,1,2],[0,3,7,1,3,5]]},{"r":4,"c":4,"g":[[1,8,9,0],[0,4,2,0],[0,2,0,4],[0,0,4,1]],"b":[[1,3,7,0,3,4],[3,3,6,2,3,3],[0,0,3,3,1,3]]},{"r":4,"c":4,"g":[[0,0,0,4],[4,2,0,0],[2,8,0,1],[1,0,1,9]],"b":[[3,3,6,0,3,3],[2,3,7,1,3,1],[2,2,6,3,2,5]]},{"r":4,"c":4,"g":[[0,0,0,4],[2,4,8,0],[0,8,2,4],[0,0,2,4]],"b":[[1,1,3,3,2,2],[3,0,3,2,0,6],[3,1,1,1,3,7]]},{"r":4,"c":4,"g":[[4,0,4,8],[0,1,0,1],[0,0,0,4],[2,2,0,9]],"b":[[3,1,4,2,1,7],[0,2,3,1,2,2],[0,0,2,2,2,6]]},{"r":4,"c":4,"g":[[0,1,0,0],[0,0,2,2],[8,4,4,4],[0,8,0,1]],"b":[[3,2,7,1,3,4],[0,2,6,1,2,6],[1,0,2,0,0,3]]},{"r":4,"c":4,"g":[[0,2,1,0],[0,2,2,0],[0,0,1,0],[4,8,4,9]],"b":[[0,1,2,1,1,2],[2,0,4,0,3,6],[1,2,5,0,2,5]]},{"r":4,"c":4,"g":[[4,2,1,1],[1,1,0,4],[0,8,0,0],[0,0,8,0]],"b":[[3,3,7,2,3,1],[0,2,4,2,1,4],[0,0,7,1,0,7]]},{"r":2,"c":3,"g":[[0,2,4],[2,4,1]],"b":[[0,0,3,1,0,3],[0,1,6,1,1,6],[2,0,7,3,0,4],[2,1,3,3,1,1],[2,2,4,3,2,2]]},{"r":2,"c":3,"g":[[0,1,2],[4,2,1]],"b":[[0,0,7,1,0,1],[0,1,5,1,1,2],[2,0,4,3,0,7],[2,1,7,3,1,6],[2,2,7,3,2,1]]},{"r":2,"c":3,"g":[[1,4,2],[9,2,0]],"b":[[0,0,5,1,0,1],[0,1,3,3,2,2],[2,0,5,3,0,4],[2,1,2,3,1,2],[2,2,6,1,1,7]]},{"r":2,"c":3,"g":[[2,4,2],[9,1,0]],"b":[[0,0,2,1,0,7],[0,1,1,3,2,2],[2,0,7,3,0,6],[2,1,1,3,1,3],[2,2,6,1,1,7]]},{"r":2,"c":4,"g":[[1,1,4,2],[1,4,0,2]],"b":[[0,0,6,1,0,2],[0,1,3,1,1,1],[2,0,7,3,0,1],[2,1,3,3,1,3],[2,2,6,3,2,4],[2,3,2,3,3,3]]},{"r":2,"c":4,"g":[[2,4,4,0],[9,1,2,0]],"b":[[0,0,4,3,1,5],[0,1,3,1,1,2],[2,0,3,3,0,7],[2,1,6,1,0,4],[2,2,5,3,2,7],[2,3,3,3,3,2]]},{"r":3,"c":3,"g":[[1,8,1],[2,0,0],[2,4,4]],"b":[[0,0,7,1,0,7],[0,2,5,1,2,5],[2,0,1,3,0,7],[2,1,6,3,1,4],[2,2,6,0,1,2]]},{"r":3,"c":3,"g":[[9,2,1],[4,4,4],[4,2,0]],"b":[[0,0,4,1,0,6],[0,1,5,1,1,4],[0,2,7,3,2,3],[2,0,5,3,0,6],[2,1,2,3,1,7],[2,2,6,1,2,4]]},{"r":2,"c":4,"g":[[4,1,1,9],[4,4,1,0]],"b":[[0,0,7,3,1,4],[0,1,5,1,1,5],[2,0,4,3,0,5],[2,1,6,1,0,4],[2,2,3,3,2,1],[2,3,3,3,3,4]]},{"r":3,"c":3,"g":[[0,2,4],[4,2,2],[1,1,2]],"b":[[0,0,3,1,0,1],[0,1,1,1,1,2],[0,2,7,1,2,6],[2,0,5,3,0,2],[2,1,6,3,1,6],[2,2,5,3,2,7]]},{"r":3,"c":3,"g":[[0,2,2],[9,1,1],[1,4,4]],"b":[[0,0,3,1,0,3],[0,1,2,1,1,6],[0,2,6,3,2,1],[2,0,2,3,0,7],[2,1,5,3,1,1],[2,2,1,1,2,3]]},{"r":2,"c":4,"g":[[4,0,2,1],[2,4,2,1]],"b":[[0,0,6,1,0,2],[0,1,3,1,1,7],[2,0,7,3,0,3],[2,1,1,3,1,5],[2,2,1,3,2,7],[2,3,4,3,3,6]]},{"r":3,"c":3,"g":[[0,4,1],[4,1,9],[1,1,2]],"b":[[0,0,3,1,0,5],[0,1,6,3,0,7],[0,2,5,1,2,5],[2,0,3,1,1,1],[2,1,2,3,1,2],[2,2,1,3,2,5]]},{"r":2,"c":4,"g":[[1,4,2,2],[1,0,1,9]],"b":[[0,0,7,1,0,1],[0,1,7,3,1,4],[2,0,2,3,0,6],[2,1,2,1,1,3],[2,2,4,3,2,7],[2,3,4,3,3,1]]},{"r":3,"c":3,"g":[[2,1,1],[2,1,4],[0,1,2]],"b":[[0,0,1,1,0,3],[0,1,5,1,1,3],[0,2,1,1,2,1],[2,0,5,3,0,5],[2,1,5,3,1,2],[2,2,5,3,2,1]]},{"r":2,"c":4,"g":[[1,2,2,0],[1,4,4,4]],"b":[[0,0,4,1,0,1],[0,1,1,1,1,2],[2,0,4,3,0,6],[2,1,4,3,1,4],[2,2,7,3,2,5],[2,3,5,3,3,3]]}];
+  const LEVELS = LV.length;
+
+  let W, H, cs, gx, gy, cols, rows, screen = 'select';
+  let grid, tiles, beams, history = [], won = false, curLevel = 0;
+  let solved = load('spectra_solved_v3');     // pure puzzles: just track which levels are beaten
+  // ---- juice / game-feel state ----
+  let T = 0;                                  // seconds clock, fed by the render loop
+  const effects = [];                         // transient particles / pulses
+  let litState = [];                          // per-beam lit memory, to fire a connect burst on false->true
+  let flash = 0, shake = 0;                   // win screen feedback
+  const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } }
+  function saveSolved() { try { localStorage.setItem('spectra_solved_v3', JSON.stringify(solved)); } catch (e) {} }
+
+  function layout() {
+    W = cv.width = innerWidth; H = cv.height = innerHeight;
+    // Reserve gutters on all four sides (beams can enter/exit any edge) so nothing clips off-screen.
+    cs = Math.min((W - 24) / (cols + 3.0), (H - 150) / (rows + 3.0), 100);
+    gx = (W - cols * cs) / 2; gy = (H - rows * cs) / 2 + 10;
+  }
+  const cx0 = (c) => gx + c * cs, cy0 = (r) => gy + r * cs, ccx = (c) => gx + (c + .5) * cs, ccy = (r) => gy + (r + .5) * cs;
+  const inb = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows;
+  const cloneG = (g) => g.map(row => row.slice());
+
+  // ---------- beam model ----------
+  // A beam enters from an edge and walks the grid. Glass filters colour (new colour mixes in; a colour
+  // it already has purifies down to that colour). Mirrors ('/'=8, '\'=9) bend it 90 degrees.
+  const isGlass = (v) => v === 1 || v === 2 || v === 4;
+  const isMirror = (v) => v === 8 || v === 9;
+  function entry(ss, si) { if (ss === 0) return [si, 0, 0, 1]; if (ss === 1) return [si, cols - 1, 0, -1]; if (ss === 2) return [0, si, 1, 0]; return [rows - 1, si, -1, 0]; }
+  // Walk a beam. Returns { cells:[{r,c,inDir,outDir,inCol,outCol}], exit:{side,idx,col}|null }.
+  function walk(g, ss, si, sc) {
+    let p = entry(ss, si), r = p[0], c = p[1], dr = p[2], dc = p[3], col = sc;
+    const cells = []; let steps = 0, max = rows * cols * 4 + 4;
+    while (r >= 0 && c >= 0 && r < rows && c < cols) {
+      if (++steps > max) return { cells, exit: null };
+      const v = g[r][c], inDir = [dr, dc], inCol = col;
+      if (v === 8) { const t = dr; dr = -dc; dc = -t; }
+      else if (v === 9) { const t = dr; dr = dc; dc = t; }
+      else if (isGlass(v)) { col = (col & v) ? v : (col | v); }
+      cells.push({ r, c, inDir, outDir: [dr, dc], inCol, outCol: col });
+      r += dr; c += dc;
+    }
+    const lr = r - dr, lc = c - dc; let side, idx;
+    if (dc === 1) { side = 1; idx = lr; } else if (dc === -1) { side = 0; idx = lr; } else if (dr === 1) { side = 3; idx = lc; } else { side = 2; idx = lc; }
+    return { cells, exit: { side, idx, col } };
+  }
+  function beamOK(g, b) { const e = walk(g, b[0], b[1], b[2]).exit; return !!e && e.side === b[3] && e.idx === b[4] && e.col === b[5]; }
+  function wonG(g) { for (const b of beams) if (!beamOK(g, b)) return false; return true; }
+
+  // ---------- level lifecycle ----------
+  function openLevel(i) {
+    curLevel = i; const L = LV[i];
+    rows = L.r; cols = L.c; beams = L.b.map(x => x.slice()); grid = cloneG(L.g);
+    layout(); history = []; won = false; buildTiles();
+    effects.length = 0; flash = 0; shake = 0;
+    litState = beams.map(beamOK.bind(null, grid));   // seed lit memory so pre-lit receivers don't fire a chime on open
+    document.getElementById('won').classList.remove('show');
+    document.getElementById('select').style.display = 'none';
+    document.getElementById('top').style.display = 'flex';
+    document.getElementById('hint').style.display = 'block';
+    screen = 'play'; aOn();
+    coachOn = false; document.getElementById('coach').classList.remove('show', 'dim'); document.getElementById('guide').classList.remove('pulse');
+    document.getElementById('guide').style.display = 'block';
+    let seenTut = false; try { seenTut = localStorage.getItem('spectra_tut_' + i) === '1'; } catch (e) {}
+    if (tutSteps(i) && !seenTut) { setTimeout(() => startCoach(i), 420); return; }   // guided tutorial level
+    // teach mirrors the first time one shows up
+    let mt = false; try { mt = localStorage.getItem('spectra_mirror_tip') === '1'; } catch (e) {}
+    if (!mt && grid.some(row => row.some(isMirror))) setTimeout(() => openDeck([MIRROR_TIP], 'spectra_mirror_tip'), 320);
+  }
+  function showMenu() {
+    screen = 'select';
+    coachOn = false; document.getElementById('coach').classList.remove('show', 'dim'); document.getElementById('guide').style.display = 'none';
+    document.getElementById('top').style.display = 'none';
+    document.getElementById('hint').style.display = 'none';
+    document.getElementById('won').classList.remove('show');
+    buildGrid(); document.getElementById('select').style.display = 'flex';
+  }
+  // colour the corner dot by difficulty band (index-based, since there is no par any more)
+  function tierOf(i) { return i < 26 ? 0 : i < 70 ? 1 : 2; }
+  function buildGrid() {
+    const el = document.getElementById('grid'); el.innerHTML = '';
+    for (let i = 0; i < LEVELS; i++) {
+      const d = document.createElement('div'); d.className = 'lvl t' + tierOf(i) + (solved[i] ? ' done' : '');
+      d.innerHTML = `<div class="tg"></div><div class="n">${i + 1}</div><div class="st">${solved[i] ? '✓' : ''}</div>`;
+      d.onclick = () => openLevel(i); el.appendChild(d);
+    }
+  }
+  const isMovable = (v) => v !== 0;   // glass and mirrors both move; only empty cells are fixed
+  function buildTiles() { tiles = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (isMovable(grid[r][c])) tiles.push({ c, r, col: grid[r][c], x: ccx(c), y: ccy(r) }); }
+
+  // ---------- input ----------
+  let down = null;
+  cv.addEventListener('pointerdown', e => {
+    if (screen !== 'play' || won) return; aOn();
+    const c = Math.floor((e.clientX - gx) / cs), r = Math.floor((e.clientY - gy) / cs);
+    if (inb(c, r) && isMovable(grid[r][c])) { const tt = tiles.find(o => o.c === c && o.r === r); down = { c, r, x: e.clientX, y: e.clientY, lift: 0, tile: tt }; }   // pick up any glass or mirror
+  });
+  cv.addEventListener('pointerup', e => {
+    if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y, d = down; down = null;
+    if (Math.hypot(dx, dy) < cs * 0.28) return;
+    if (coachOn) endCoach();   // first real swipe ends the guided tutorial
+    let dc = 0, dr = 0; if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
+    const nc = d.c + dc, nr = d.r + dr;
+    if (!inb(nc, nr) || grid[d.r][d.c] === grid[nr][nc]) {   // blocked: nudge the tile toward the wall and buzz
+      if (d.tile && !reduceMotion) { d.tile.vx = (d.tile.vx || 0) + dc * cs * 0.14; d.tile.vy = (d.tile.vy || 0) + dr * cs * 0.14; }
+      sfx('nope'); return;
+    }
+    doSwap(d.r, d.c, nr, nc);   // slide into a gap or swap with a neighbour
+  });
+  function doSwap(r1, c1, r2, c2) {
+    history.push(cloneG(grid));
+    const t = grid[r1][c1]; grid[r1][c1] = grid[r2][c2]; grid[r2][c2] = t;
+    // Move the actual tile objects by identity (no colour guessing -- fixes the triangular shuffle).
+    const a = tiles.find(o => o.c === c1 && o.r === r1), b = tiles.find(o => o.c === c2 && o.r === r2);
+    if (a) { a.c = c2; a.r = r2; } if (b) { b.c = c1; b.r = r1; }
+    sfx('move');
+    if (wonG(grid)) onWin();
+  }
+  function onWin() {
+    won = true;
+    solved[curLevel] = true; saveSolved();
+    document.getElementById('wnext').textContent = curLevel < LEVELS - 1 ? 'Next ›' : 'Levels';
+    if (!reduceMotion) { winBurst(); flash = 1; shake = 1; }
+    setTimeout(() => document.getElementById('won').classList.add('show'), reduceMotion ? 200 : 600); sfx('win');
+  }
+  function winBurst() {
+    const cxp = gx + cols * cs / 2, cyp = gy + rows * cs / 2, pal = beams.map(b => b[5]);
+    for (let i = 0; i < 56; i++) { const a = (i / 56) * 6.283 + Math.random() * .4, sp = 2 + Math.random() * 5.5; effects.push({ type: 'confetti', x: cxp, y: cyp, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.6, col: pal[i % pal.length], born: T, life: 1.0 + Math.random() * .7, rot: Math.random() * 6.283, vr: (Math.random() - .5) * .35 }); }
+    effects.push({ type: 'rays', x: cxp, y: cyp, born: T, life: .7 });
+  }
+  document.getElementById('undo').onclick = () => { if (won || !history.length) return; grid = history.pop(); buildTiles(); sfx('undo'); };
+  document.getElementById('reset').onclick = () => { if (won) return; if (!history.length) return; grid = history[0]; history = []; buildTiles(); sfx('undo'); };
+  document.getElementById('menu').onclick = showMenu;
+  document.getElementById('wmenu').onclick = showMenu;
+  document.getElementById('wnext').onclick = () => openLevel(Math.min(LEVELS - 1, curLevel + 1));
+
+  // ---------- in-level coach marks (guided tutorial across the first three levels) ----------
+  let coachOn = false, coachStep = 0, coachLast = 0, coachLvl = 0;
+  function tutSteps(i) {
+    const e = edgePt(0, 0), rc = edgePt(1, 0), c0 = ccx(0), c1 = ccx(1), yTop = ccy(0), yBot = ccy(1);
+    if (i === 0) return [
+      { x: e[0], y: e[1], r: cs * .34, place: 'below', text: 'This is an <b>emitter</b>. It beams out a ray of its own colour.' },
+      { x: rc[0], y: rc[1], r: cs * .32, place: 'below', text: 'This is a <b>receiver</b>. It lights up when a ray of the matching colour reaches it.' },
+      { x: c1, y: yBot, r: cs * .48, place: 'above', text: 'This is a <b>glass tile</b>. A ray that passes through it can change colour.' },
+      { x: c1, y: yBot, r: cs * .48, place: 'above', text: "A <b>white ray</b> turns into the tile's colour." },
+      { x: c1, y: yBot, r: cs * .48, place: 'above', text: 'Now <b>swipe the tile up</b> into the gap to colour the ray.', gesture: { x0: c1, y0: yBot, x1: c1, y1: yTop }, recap: true }
+    ];
+    if (i === 1) return [
+      { x: c0, y: yTop, r: cs * .5, place: 'above', text: 'Colours <b>combine</b> as a ray passes through them: red + yellow = <b>orange</b>.' },
+      { x: c1, y: yBot, r: cs * .5, place: 'below', text: 'You can <b>swap</b> two tiles by swiping one onto its neighbour. Swipe the yellow up.', gesture: { x0: c1, y0: yBot, x1: c1, y1: yTop } }
+    ];
+    if (i === 2) return [
+      { x: e[0], y: e[1], r: cs * .34, place: 'below', text: 'This emitter shoots <b>green</b> light (yellow and blue together).' },
+      { x: c1, y: yTop, r: cs * .5, place: 'above', text: 'A glass can <b>subtract</b>: a mix passing through one of its own colours drops to just that colour. Green through blue = <b>blue</b>.' },
+      { chart: true, text: 'And here are all the colour mixes.' },
+      { button: true, text: 'Need the colour guide later? Tap the <b>colour wheel</b>, bottom-right, any time.' },
+      { x: c1, y: yBot, r: cs * .5, place: 'below', text: 'Swipe the blue tile up to finish.', gesture: { x0: c1, y0: yBot, x1: c1, y1: yTop } }
+    ];
+    return null;
+  }
+  const coachRing = (x, y, r, faint) => `<div class="cring${faint ? ' faint' : ''}" style="left:${x - r}px;top:${y - r}px;width:${r * 2}px;height:${r * 2}px"></div>`;
+  const coachChip = (x, y, t) => `<div class="cchip" style="left:${Math.max(44, Math.min(W - 44, x))}px;top:${y}px">${t}</div>`;
+  function coachRender() {
+    if (!coachOn) return;
+    const steps = tutSteps(coachLvl); if (!steps) return;
+    const s = steps[coachStep], swipe = !!s.gesture, el = document.getElementById('coach'), guide = document.getElementById('guide');
+    el.style.pointerEvents = swipe ? 'none' : 'auto';
+    el.classList.toggle('dim', !!s.chart);
+    guide.classList.toggle('pulse', !!s.button);
+    let h = '';
+    if (s.chart) {
+      h += `<div class="ccard"><div class="ccard-art">${chart()}</div><div class="ccard-cap">${s.text}</div></div>`;
+    } else if (s.button) {
+      const gb = guide.getBoundingClientRect(), bx = gb.left + gb.width / 2, by = gb.top + gb.height / 2;
+      h += coachRing(bx, by, 33, false);
+      h += `<div class="ctip above" style="left:${Math.min(W - 120, bx)}px;top:${by - 42}px">${s.text}</div>`;
+    } else {
+      if (s.recap) {   // level 1 recap: label every part at once
+        const em = steps[0], re = steps[1];
+        h += coachRing(em.x, em.y, em.r, true) + coachChip(em.x, em.y + em.r + 12, 'emitter');
+        h += coachRing(re.x, re.y, re.r, true) + coachChip(re.x, re.y + re.r + 12, 'receiver');
+      }
+      h += coachRing(s.x, s.y, s.r, false);
+      const cx = Math.max(118, Math.min(W - 118, s.x)), ty = s.place === 'below' ? s.y + s.r + 14 : s.y - s.r - 14;
+      h += `<div class="ctip ${s.place}" style="left:${cx}px;top:${ty}px">${s.text}</div>`;
+      if (swipe) { const g = s.gesture; h += `<div class="cfinger" style="--fx0:${g.x0 - 11}px;--fy0:${g.y0 - 4}px;--fx1:${g.x1 - 11}px;--fy1:${g.y1 - 4}px">👆</div>`; }
+    }
+    if (!swipe) h += '<div class="chint">Tap to continue</div>';
+    el.innerHTML = h;
+  }
+  function startCoach(i) { coachLvl = i; coachOn = true; coachStep = 0; coachLast = 0; document.getElementById('hint').style.display = 'none'; document.getElementById('coach').classList.add('show'); coachRender(); }
+  function endCoach() { if (!coachOn) return; coachOn = false; const el = document.getElementById('coach'); el.classList.remove('show', 'dim'); document.getElementById('guide').classList.remove('pulse'); document.getElementById('hint').style.display = 'block'; try { localStorage.setItem('spectra_tut_' + coachLvl, '1'); } catch (e) {} }
+  document.getElementById('coach').addEventListener('click', () => {
+    if (!coachOn) return; aOn();
+    const now = (window.performance && performance.now) ? performance.now() : Date.now(); if (now - coachLast < 550) return; coachLast = now;
+    const steps = tutSteps(coachLvl); if (coachStep < steps.length - 1) { coachStep++; coachRender(); }
+  });
+  document.getElementById('guide').onclick = () => { if (coachOn) return; aOn(); openDeck([CARDS[4]], 'spectra_guide'); };
+
+  // ---------- render ----------
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  // Draw a beam as colour-runs: one continuous polyline per colour (no per-cell seams), round bends at mirrors.
+  // A run keeps butt end-caps (clean colour transitions) but round joins (smooth mirror bends).
+  function strokeRun(run, c, d, w) {
+    ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
+    const path = () => { ctx.beginPath(); ctx.moveTo(run[0][0], run[0][1]); for (let k = 1; k < run.length; k++) ctx.lineTo(run[k][0], run[k][1]); };
+    const nearWhite = c[0] + c[1] + c[2] > 700;
+    ctx.strokeStyle = rgb(c, .20); ctx.lineWidth = w * 2.4; path(); ctx.stroke();                                                  // soft outer glow
+    ctx.strokeStyle = nearWhite ? 'rgba(108,112,122,.95)' : rgb(d, .9); ctx.lineWidth = w + (nearWhite ? 3.4 : 2.4); path(); ctx.stroke();   // casing (stronger for white so it reads on paper)
+    ctx.strokeStyle = rgb(c, 1); ctx.lineWidth = w; path(); ctx.stroke();                                                          // solid core
+  }
+  // A brighter-ray-colour circle (no white highlight) glides along each beam border -- one on the top
+  // edge, one on the bottom edge -- with a same-colour glow. Each takes the LOCAL ray colour.
+  const bright = (c) => [Math.min(255, c[0] * 1.12 + 44), Math.min(255, c[1] * 1.12 + 44), Math.min(255, c[2] * 1.12 + 44)];
+  function beamDots(pts, segc, w) {
+    if (reduceMotion || pts.length < 2) return;
+    const seglen = [], cum = [0]; let total = 0;
+    for (let k = 0; k < pts.length - 1; k++) { const L = Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]); seglen.push(L); total += L; cum.push(total); }
+    if (total < cs * 0.3) return;
+    const speed = cs * 1.5, rad = Math.max(1.7, w * 0.3), off = w * 0.55;
+    const dist = (T * speed) % total;
+    for (let di = 0; di < 2; di++) {       // one circle on the top border, one on the bottom, travelling together
+      let k = 0;
+      while (k < seglen.length - 1 && dist > cum[k + 1]) k++;
+      const ax = pts[k][0], ay = pts[k][1], L = seglen[k] || 1, f = (dist - cum[k]) / L;
+      const dx = (pts[k + 1][0] - ax) / L, dy = (pts[k + 1][1] - ay) / L;            // unit direction along the beam
+      const sign = di === 0 ? 1 : -1;                                                // dot 0 -> one border, dot 1 -> the other
+      const x = ax + dx * (dist - cum[k]) - dy * off * sign, y = ay + dy * (dist - cum[k]) + dx * off * sign;
+      const c = CMAP[segc[Math.min(k, segc.length - 1)]];
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad * 2.8);                  // same-colour glow
+      g.addColorStop(0, rgb(c, .8)); g.addColorStop(1, rgb(c, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad * 2.8, 0, 7); ctx.fill();
+      ctx.fillStyle = rgb(bright(c)); ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();   // brighter ray-colour circle
+    }
+  }
+  function drawBeamRuns(pts, segc, w) {
+    let i = 0;
+    while (i < segc.length) {
+      let j = i; while (j + 1 < segc.length && segc[j + 1] === segc[i]) j++;
+      const m = segc[i]; strokeRun(pts.slice(i, j + 2), CMAP[m], drk(m), w); i = j + 1;
+    }
+  }
+
+  const PAD = () => cs * 0.5, GUT = () => cs * 0.62;
+  // a point just outside the board at an edge slot (side 0=L 1=R 2=T 3=B)
+  function edgePt(side, idx) { const g2 = PAD() + GUT(); if (side === 0) return [gx - g2, ccy(idx)]; if (side === 1) return [gx + cols * cs + g2, ccy(idx)]; if (side === 2) return [ccx(idx), gy - g2]; return [ccx(idx), gy + rows * cs + g2]; }
+  const inDirOf = (side) => side === 0 ? [0, 1] : side === 1 ? [0, -1] : side === 2 ? [1, 0] : [-1, 0];
+  function render() {
+    ctx.fillStyle = '#f4eee1'; ctx.fillRect(-30, -30, W + 60, H + 60);
+    if (screen === 'play') {
+      ctx.save();
+      if (shake > 0.02) { const s = shake * cs * 0.05; ctx.translate((Math.random() - .5) * s, (Math.random() - .5) * s); shake *= 0.86; } else shake = 0;
+      const pad = PAD();
+      // board panel with a soft drop shadow so it floats above the paper
+      ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.16)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 12;
+      ctx.fillStyle = '#fffdf8'; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 20); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = '#e4dccb'; ctx.lineWidth = 2; rr(gx - pad, gy - pad, cols * cs + pad * 2, rows * cs + pad * 2, 20); ctx.stroke();
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { ctx.fillStyle = 'rgba(60,46,30,.035)'; rr(cx0(c) + 4, cy0(r) + 4, cs - 8, cs - 8, 12); ctx.fill(); }
+      const bw = Math.max(5, cs * 0.11);
+      const traced = beams.map(b => { const w = walk(grid, b[0], b[1], b[2]); return { b, cells: w.cells, exit: w.exit }; });
+      // beam paths: emitter edge -> each cell centre -> exit edge, a colour per segment, drawn as same-colour runs
+      const beamPaths = [];
+      for (const Tr of traced) {
+        const cells = Tr.cells; if (!cells.length) continue;
+        const pts = [edgePt(Tr.b[0], Tr.b[1])];
+        for (const cell of cells) pts.push([ccx(cell.c), ccy(cell.r)]);
+        if (Tr.exit) pts.push(edgePt(Tr.exit.side, Tr.exit.idx));
+        else { const l = cells[cells.length - 1]; pts.push([ccx(l.c) + l.outDir[1] * cs / 2, ccy(l.r) + l.outDir[0] * cs / 2]); }
+        const segc = [cells[0].inCol]; for (const cell of cells) segc.push(cell.outCol);
+        drawBeamRuns(pts, segc, bw); beamPaths.push([pts, segc]);
+      }
+      for (const [pts, segc] of beamPaths) beamDots(pts, segc, bw);   // glowing dots ride on top of all beams
+      ctx.globalAlpha = 1;
+      // emitters + receivers; fire a connect burst + chime when a receiver newly lights
+      traced.forEach((Tr, i) => {
+        const b = Tr.b, ep = edgePt(b[0], b[1]); emitter(ep[0], ep[1], b[2], inDirOf(b[0]));
+        const rp = edgePt(b[3], b[4]), lit = !!Tr.exit && Tr.exit.side === b[3] && Tr.exit.idx === b[4] && Tr.exit.col === b[5];
+        if (lit && !litState[i]) { effects.push({ type: 'connect', x: rp[0], y: rp[1], col: b[5], born: T, life: .5 }); sfx('connect'); }
+        litState[i] = lit;
+        receiver(rp[0], rp[1], b[5], lit);
+      });
+      // movable pieces (glass + mirrors): spring-settle to their cells, lift while held
+      for (const t of tiles) {
+        if (reduceMotion) { t.x = ccx(t.c); t.y = ccy(t.r); }
+        else { t.vx = (t.vx || 0) + (ccx(t.c) - t.x) * 0.5; t.vx *= 0.62; t.x += t.vx; t.vy = (t.vy || 0) + (ccy(t.r) - t.y) * 0.5; t.vy *= 0.62; t.y += t.vy; }
+        const lift = (down && down.tile === t) ? (down.lift || 0) : 0;
+        if (isMirror(t.col)) mirror(t.x, t.y, t.col, lift); else tile(t.x, t.y, t.col, lift);
+      }
+      drawEffects();
+      ctx.restore();
+    }
+    if (flash > 0.02) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.3})`; ctx.fillRect(0, 0, W, H); flash *= 0.9; } else flash = 0;
+  }
+  // transient particles / pulses; updated + culled each frame
+  function drawEffects() {
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const e = effects[i], p = (T - e.born) / e.life;
+      if (p >= 1) { effects.splice(i, 1); continue; }
+      if (e.type === 'connect') {
+        ctx.strokeStyle = rgb(CMAP[e.col], (1 - p) * .8); ctx.lineWidth = (1 - p) * 6 + 1; ctx.beginPath(); ctx.arc(e.x, e.y, cs * .21 * (1 + 3 * p), 0, 7); ctx.stroke();
+      } else if (e.type === 'confetti') {
+        e.vy += 0.12; e.x += e.vx; e.y += e.vy; e.rot += e.vr;
+        const s = cs * 0.12 * (1 - p * .4); ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.globalAlpha = 1 - p * p; ctx.fillStyle = rgb(CMAP[e.col]); rr(-s / 2, -s / 2, s, s, s * .25); ctx.fill(); ctx.restore();
+      } else if (e.type === 'rays') {
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(T * 0.4); ctx.globalAlpha = (1 - p) * .18; ctx.fillStyle = '#fff';
+        for (let k = 0; k < 9; k++) { ctx.rotate(6.283 / 9); const len = cs * (2 + 6 * Math.min(1, p * 2)); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-cs * .12, -len); ctx.lineTo(cs * .12, -len); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function mirror(X, Y, kind, lift) {
+    // Translucent glass block: a movable piece you can still see the beam pass through and bend inside.
+    lift = lift || 0;
+    const sz = cs * 0.74 * (1 + 0.07 * lift), b = 16 * lift;
+    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.16)'; ctx.shadowBlur = 8 + b; ctx.shadowOffsetY = 3 + b * .5;
+    ctx.fillStyle = 'rgba(244,246,250,.26)'; rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = 'rgba(150,160,174,.95)'; ctx.lineWidth = Math.max(2, cs * .032); rr(X - sz / 2, Y - sz / 2, sz, sz, sz * .24); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(X - sz / 2 + sz * .14, Y - sz / 2 + sz * .13, sz * .42, sz * .12, 5); ctx.fill();   // glass glint
+    // the reflective diagonal surface
+    const s = cs * 0.3; let x0, y0, x1, y1;
+    if (kind === 8) { x0 = X - s; y0 = Y + s; x1 = X + s; y1 = Y - s; } else { x0 = X - s; y0 = Y - s; x1 = X + s; y1 = Y + s; }
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(60,46,30,.14)'; ctx.lineWidth = cs * 0.15; ctx.beginPath(); ctx.moveTo(x0, y0 + 2); ctx.lineTo(x1, y1 + 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,160,174,.95)'; ctx.lineWidth = cs * 0.12; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = cs * 0.04; ctx.beginPath(); ctx.moveTo(x0 + 1, y0 - 1); ctx.lineTo(x1 + 1, y1 - 1); ctx.stroke();
+  }
+
+  function tile(x, y, col, lift) {
+    lift = lift || 0;
+    const s = cs * 0.74 * (1 + 0.07 * lift), c = CMAP[col], d = drk(col), b = 18 * lift;
+    ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.22)'; ctx.shadowBlur = 9 + b; ctx.shadowOffsetY = 4 + b * .55;
+    const g = ctx.createLinearGradient(0, y - s / 2, 0, y + s / 2);
+    g.addColorStop(0, rgb([Math.min(255, c[0] + 26 + 18 * lift), Math.min(255, c[1] + 26 + 18 * lift), Math.min(255, c[2] + 26 + 18 * lift)]));
+    g.addColorStop(1, rgb(c));
+    ctx.fillStyle = g; rr(x - s / 2, y - s / 2, s, s, s * .24); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = rgb(d); ctx.lineWidth = Math.max(2, cs * 0.032); rr(x - s / 2, y - s / 2, s, s, s * .24); ctx.stroke();
+    // glassy top highlight
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; rr(x - s / 2 + s * .14, y - s / 2 + s * .13, s * .42, s * .14, 5); ctx.fill();
+  }
+  // Emitter: a projector that casts light along `dir` ([dr,dc] into the board). Distinct from the ring receiver.
+  function emitter(x, y, m, dir) {
+    const c = CMAP[m], d = drk(m), r = cs * .17, ang = Math.atan2(dir[0], dir[1]);
+    if (!reduceMotion) { ctx.fillStyle = rgb(c, .14); ctx.beginPath(); ctx.arc(x, y, r * (1.5 + 0.22 * Math.sin(T * 2.2 + (x + y) * .03)), 0, 7); ctx.fill(); }   // gentle breathing glow
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-r * .85, -r * 1.08); ctx.lineTo(r * 1.2, 0); ctx.lineTo(-r * .85, r * 1.08); ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.fillStyle = rgb(c); ctx.fill();
+    ctx.lineWidth = Math.max(2.4, cs * .032); ctx.strokeStyle = rgb(d); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.moveTo(-r * .5, -r * .5); ctx.lineTo(r * .1, -r * .12); ctx.lineTo(-r * .5, r * .05); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  // Receiver. Unlit: a flat hollow target ring showing the wanted colour. Lit: a raised, solid, drop-shadowed disc
+  // with a glow and a bold check. The shadow + check make the lit state obvious even for white (which is ~ the paper).
+  function receiver(x, y, t, ok) {
+    const c = CMAP[t], rad = cs * .21;
+    const lum = .299 * c[0] + .587 * c[1] + .114 * c[2];   // perceived brightness
+    const ink = 'rgba(58,44,30,.6)';
+    if (ok) {
+      ctx.fillStyle = rgb(c, .30); ctx.beginPath(); ctx.arc(x, y, rad * 1.95, 0, 7); ctx.fill();   // glow halo
+      ctx.save(); ctx.shadowColor = 'rgba(60,46,30,.45)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 3;
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = rgb(c); ctx.fill(); ctx.restore();   // raised solid disc
+      ctx.lineWidth = 3; ctx.strokeStyle = ink; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.stroke();
+      ctx.strokeStyle = lum > 150 ? '#2a211a' : '#fff'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(x - rad * .44, y); ctx.lineTo(x - rad * .08, y + rad * .4); ctx.lineTo(x + rad * .5, y - rad * .38); ctx.stroke();
+    } else {
+      const nearWhite = lum > 224;
+      // White targets get a solid white centre framed in dark so they read as "wants white" on the cream paper;
+      // coloured targets show a bold colour band on a paper centre.
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = nearWhite ? '#ffffff' : '#fbf6ec'; ctx.fill();
+      ctx.lineWidth = cs * .14; ctx.strokeStyle = nearWhite ? 'rgba(150,160,174,.95)' : rgb(c); ctx.beginPath(); ctx.arc(x, y, rad * .6, 0, 7); ctx.stroke();   // colour band
+      ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(58,44,30,.35)'; ctx.beginPath(); ctx.arc(x, y, rad * .38, 0, 7); ctx.stroke();  // inner edge
+      ctx.lineWidth = 2.4; ctx.strokeStyle = ink; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.stroke();                  // outer frame
+    }
+  }
+
+  // ---------- intro card stack (visual, minimal text) ----------
+  const IHEX = { 1: '#d62828', 2: '#f8d032', 4: '#265ece', 3: '#f2801c', 6: '#2ca85c', 5: '#964ed4', 7: '#ffffff' };
+  function dk(hex) { const n = parseInt(hex.slice(1), 16); return `rgb(${(n >> 16 & 255) * .5 | 0},${(n >> 8 & 255) * .5 | 0},${(n & 255) * .5 | 0})`; }
+  const svg = (inner, h) => `<svg viewBox="0 0 320 ${h || 120}">${inner}</svg>`;
+  // beam bar between two x's
+  function ibar(x0, x1, y, m) { return `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${dk(IHEX[m])}" stroke-width="13"/><line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${IHEX[m]}" stroke-width="8"/>`; }
+  function igl(cx, cy, m, s) { s = s || 44; const x = cx - s / 2, yy = cy - s / 2; return `<rect x="${x}" y="${yy}" width="${s}" height="${s}" rx="${s * .27}" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3"/><rect x="${x + s * .16}" y="${yy + s * .16}" width="${s * .36}" height="${s * .12}" rx="3" fill="rgba(255,255,255,.55)"/>`; }
+  function itri(cx, cy, m) { const r = 16; return `<polygon points="${cx - r * .85},${cy - r * 1.08} ${cx + r * 1.2},${cy} ${cx - r * .85},${cy + r * 1.08}" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3" stroke-linejoin="round"/>`; }
+  function irc(cx, cy, m, ok, r) { r = r || 17; let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ok ? IHEX[m] : 'rgba(60,46,30,.08)'}" stroke="${dk(IHEX[m])}" stroke-width="3"/>`; if (ok) s += `<path d="M ${cx - r * .42} ${cy} L ${cx - r * .1} ${cy + r * .32} L ${cx + r * .48} ${cy - r * .34}" fill="none" stroke="${m === 7 ? '#2a211a' : '#fff'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`; else s += `<circle cx="${cx}" cy="${cy}" r="${r * .42}" fill="none" stroke="${dk(IHEX[m])}" stroke-width="2.4"/>`; return s; }
+  function osq(cx, cy, m) { const s = 24, x = cx - s / 2, yy = cy - s / 2; return `<rect x="${x}" y="${yy}" width="${s}" height="${s}" rx="7" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="2.5"/>`; }
+  function ivbar(x, y0, y1, m) { return `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" stroke="${dk(IHEX[m])}" stroke-width="13"/><line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" stroke="${IHEX[m]}" stroke-width="8"/>`; }
+  function itriD(cx, cy, m) { const r = 16; return `<polygon points="${cx - r * 1.08},${cy - r * .85} ${cx + r * 1.08},${cy - r * .85} ${cx},${cy + r * 1.2}" fill="${IHEX[m]}" stroke="${dk(IHEX[m])}" stroke-width="3" stroke-linejoin="round"/>`; }
+  function imir(cx, cy, slash) { const s = 18; const x0 = cx - s, x1 = cx + s, y0 = slash ? cy + s : cy - s, y1 = slash ? cy - s : cy + s; return `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="#9aa6b2" stroke-width="9" stroke-linecap="round"/><line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,255,255,.85)" stroke-width="3" stroke-linecap="round"/>`; }
+  // one "light -> glass -> result" row; beams meet the glass edges, result exits the tile
+  function eqRow(y, inM, gM, outM) { return ibar(20, 108, y, inM) + igl(126, y, gM, 36) + ibar(144, 214, y, outM) + irc(240, y, outM, true, 16); }
+  // full light x glass result chart (screen 5)
+  function chart() {
+    const glass = [1, 2, 4], inc = [1, 2, 4, 3, 6, 5, 7], colx = [158, 218, 278], lx = 70;
+    const hy = 53, y0 = 84, dy = 31;
+    let s = `<text x="${lx}" y="28" font-size="12" fill="#8b8170" text-anchor="middle">light</text><text x="${colx[1]}" y="28" font-size="12" fill="#8b8170" text-anchor="middle">glass</text>`;
+    for (let j = 0; j < 3; j++) s += igl(colx[j], hy, glass[j], 30);
+    for (let r = 0; r < inc.length; r++) {
+      const y = y0 + r * dy;
+      s += ibar(lx - 34, lx + 34, y, inc[r]);
+      for (let j = 0; j < 3; j++) { const out = (inc[r] & glass[j]) ? glass[j] : (inc[r] | glass[j]); s += osq(colx[j], y, out); }
+    }
+    return svg(s, y0 + (inc.length - 1) * dy + 28);
+  }
+  const CARDS = [
+    // 1: emitters & receivers (beam runs behind the triangle; result exits the glass edge)
+    { art: svg(ibar(16, 128, 54, 7) + igl(150, 54, 4) + ibar(172, 264, 54, 4) + irc(288, 54, 4, true) + itri(30, 54, 7) +
+        '<text x="30" y="92" font-size="12" fill="#8b8170" text-anchor="middle">emitter</text><text x="288" y="92" font-size="12" fill="#8b8170" text-anchor="middle">receiver</text>'),
+      cap: 'Light flows from an <b>emitter</b> to a <b>receiver</b>. Direct the correct colour to each receiver.' },
+    // 2: moving glass
+    { art: svg('<text x="48" y="30" font-size="22">👆</text>' +
+        igl(110, 50, 4, 38) + '<text x="158" y="58" font-size="24" fill="#8b8170" text-anchor="middle">→</text>' +
+        '<rect x="186" y="31" width="38" height="38" rx="10" fill="none" stroke="#c9bfa9" stroke-width="2.5" stroke-dasharray="5 5"/>' +
+        igl(118, 98, 1, 38) + '<text x="160" y="106" font-size="24" fill="#8b8170" text-anchor="middle">⇄</text>' + igl(202, 98, 2, 38)),
+      cap: 'Swipe a glass up, down, left or right. It slides into an empty space, or swaps with the tile beside it.' },
+    // 3: light changes colour + mixes
+    { art: svg(eqRow(30, 7, 1, 1) + eqRow(76, 1, 4, 5) + eqRow(122, 2, 4, 6) + eqRow(168, 1, 2, 3), 198),
+      cap: 'Light through a glass changes colour. White takes the glass colour. Two primaries mix: red + yellow = orange, yellow + blue = green, red + blue = purple.' },
+    // 4: combination drops back to a component
+    { art: svg(eqRow(46, 6, 2, 2) + eqRow(96, 6, 4, 4), 142),
+      cap: 'A combined colour passing through one of its parts drops back to that part. Green through yellow is yellow, green through blue is blue.' },
+    // 5: full reference chart
+    { art: chart(),
+      cap: 'Every light and glass combination.' }
+  ];
+  // Shown contextually the first time a level contains a mirror. Beam goes down then turns right -> a '\' mirror.
+  const MIRROR_TIP = { art: svg(
+      itriD(120, 18, 7) + ivbar(120, 32, 58, 7) + igl(120, 58, 1) + ivbar(120, 80, 110, 1) +
+      imir(120, 110, false) + ibar(132, 250, 110, 1) + irc(278, 110, 1, true),
+      150),
+    cap: 'Mirrors bend a beam ninety degrees. Slide and swap them like glass to route the light.' };
+
+  let icur = 0, deck = CARDS, deckKey = 'spectra_intro_v2';
+  function renderIntro() {
+    document.getElementById('iart').innerHTML = deck[icur].art;
+    document.getElementById('icap').innerHTML = deck[icur].cap;
+    const dots = document.getElementById('idots'); dots.style.display = deck.length === 1 ? 'none' : 'flex';
+    dots.innerHTML = deck.map((_, i) => `<i class="${i === icur ? 'on' : ''}"></i>`).join('');
+    document.getElementById('iback').style.visibility = icur === 0 ? 'hidden' : 'visible';
+    document.getElementById('inext').textContent = icur === deck.length - 1 ? (deck.length === 1 ? 'Got it' : 'Play ›') : 'Next ›';
+  }
+  function openDeck(cards, key) { deck = cards; deckKey = key; icur = 0; renderIntro(); document.getElementById('intro').classList.add('show'); }
+  function closeIntro() { document.getElementById('intro').classList.remove('show'); try { localStorage.setItem(deckKey, '1'); } catch (e) {} }
+  document.getElementById('inext').onclick = () => { if (icur < deck.length - 1) { icur++; renderIntro(); } else closeIntro(); };
+  document.getElementById('iback').onclick = () => { if (icur > 0) { icur--; renderIntro(); } };
+  document.getElementById('help').onclick = () => openDeck(CARDS, 'spectra_intro_v2');
+
+  // ---------- audio ---------- (synthesized, no assets; everything runs through a soft lowpass bus)
+  let ac = null, bus = null;
+  function aOn() {
+    try {
+      if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200; const m = ac.createGain(); m.gain.value = .5; lp.connect(m); m.connect(ac.destination); bus = lp; }
+      if (ac.state === 'suspended') ac.resume();
+    } catch (e) {}
+  }
+  // tone with optional pitch glide + attack
+  function tone(f, dur, type, g, glide, atk) { if (!ac) return; const o = ac.createOscillator(), n = ac.createGain(), s = ac.currentTime; o.type = type || 'sine'; o.frequency.setValueAtTime(f, s); if (glide) o.frequency.exponentialRampToValueAtTime(glide, s + dur); n.gain.setValueAtTime(.0001, s); n.gain.exponentialRampToValueAtTime(g || .05, s + (atk || .012)); n.gain.exponentialRampToValueAtTime(.0001, s + dur); o.connect(n); n.connect(bus || ac.destination); o.start(s); o.stop(s + dur + .02); }
+  function noise(dur, g, fType, freq) { if (!ac) return; const s = ac.currentTime, len = Math.max(1, (ac.sampleRate * dur) | 0), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len); const src = ac.createBufferSource(); src.buffer = buf; const f = ac.createBiquadFilter(); f.type = fType || 'highpass'; f.frequency.value = freq || 1200; const n = ac.createGain(); n.gain.value = g || .05; src.connect(f); f.connect(n); n.connect(bus || ac.destination); src.start(s); }
+  function sfx(name) {
+    if (!ac) return;
+    if (name === 'move') { tone(330, .07, 'triangle', .05, null, .004); tone(334, .06, 'sine', .022, null, .004); }                 // soft wooden click
+    else if (name === 'connect') { tone(880, .18, 'sine', .06, 1320, .004); setTimeout(() => tone(1760, .12, 'triangle', .03), 22); noise(.05, .018, 'highpass', 3200); }  // bright "ting"
+    else if (name === 'undo') { tone(520, .16, 'sine', .045, 390); }                                                                // gentle downglide
+    else if (name === 'nope') { tone(200, .09, 'sine', .04, 150); }                                                                 // soft thunk
+    else if (name === 'win') {
+      tone(262, 1.2, 'sine', .04, null, .4);                                                                                        // warm pad under it
+      [392, 523, 587, 784, 880, 1047].forEach((f, i) => setTimeout(() => { tone(f, .4, 'triangle', .05); tone(f * 2, .3, 'sine', .02); }, i * 90));   // harp run
+      setTimeout(() => { tone(1568, .5, 'triangle', .03); tone(2093, .5, 'sine', .018); }, 6 * 90);                                  // shimmer tail
+    }
+  }
+
+  function loop(now) {
+    T = (now || 0) * 0.001;
+    if (down && !reduceMotion) down.lift = (down.lift || 0) + (1 - (down.lift || 0)) * 0.3;
+    render(); requestAnimationFrame(loop);
+  }
+  addEventListener('resize', () => { if (screen === 'play') { layout(); for (const t of (tiles || [])) { t.x = ccx(t.c); t.y = ccy(t.r); } if (coachOn) coachRender(); } });
+  // First run drops straight into the guided level 1; afterwards open the menu.
+  let seenTut0 = false; try { seenTut0 = localStorage.getItem('spectra_tut_0') === '1'; } catch (e) {}
+  if (seenTut0) showMenu(); else openLevel(0);
+  requestAnimationFrame(loop);
+  window.__sp = { levels: LEVELS, open: (i) => openLevel(i), solved: () => wonG(grid), win: () => onWin(),
+    swap: (r1, c1, r2, c2) => doSwap(r1, c1, r2, c2), tiles: () => tiles.map(t => ({ c: t.c, r: t.r, col: t.col })), grid: () => grid, beams: () => beams.map(x => x.slice()) };
+})();
+</script>
+</body>
+</html>
