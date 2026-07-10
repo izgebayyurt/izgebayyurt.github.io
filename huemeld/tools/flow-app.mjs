@@ -22,7 +22,7 @@ function makeLevel(base) {
   const g = genGate({ tries: 6000, ...base }, rng);
   if (!g) return null;
   const L = g.L;
-  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls || [], gates: L.gates }, edges: g.edges };
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls || [], gates: L.gates }, edges: g.edges, gest: g.gest };
 }
 
 function buildSet(ramp, label) {
@@ -37,7 +37,7 @@ function buildSet(ramp, label) {
       const lv = r.lv;
       const sig = JSON.stringify([lv.n, lv.sq, lv.ci, lv.walls, lv.gates]);
       if (sigs.has(sig)) continue;
-      sigs.add(sig); set.push(lv); SOL[label].push({ lv, edges: r.edges }); made++;
+      sigs.add(sig); set.push(lv); SOL[label].push({ lv, edges: r.edges, gest: r.gest }); made++;
     }
     if (made < count) process.stderr.write(`  (${label} tier short ${made}/${count} n${base.n} ${base.type})\n`);
   }
@@ -74,6 +74,8 @@ const DAILY = [
 
 const campaign = buildSet(CAMPAIGN, "campaign");
 const daily = buildSet(DAILY, "daily");
+// level 1 carries its solution gestures so the shell can play the ghost-hand demo
+if (campaign.length && SOL.campaign[0].gest) campaign[0].demo = SOL.campaign[0].gest;
 // side packs use their own rng stream so campaign/daily stay byte-identical per seed
 const pk = genPacks(seed + 777);
 SOL.packs = pk.sols;

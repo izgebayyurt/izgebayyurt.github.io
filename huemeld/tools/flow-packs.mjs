@@ -48,11 +48,28 @@ function spreadPick(cands, want, rng) {
 
 /* ---- per-pack level makers (return {lv, gest} or null) ---- */
 
+/* place `spec.gates` colour gates on the solution (first `spec.arrows` of them
+   directional), keeping clear of endpoints, junctions, and prisms */
+function placeGates(L, spec, rng) {
+  const skip = keepOut(L, true);
+  (L.prisms || []).forEach(([, r, c]) => { skip.add(key(r, c));
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => skip.add(key(r + dr, c + dc))); });
+  const cands = pathInteriors(L.gest).filter((x) => !skip.has(key(x.r, x.c)));
+  const picked = spreadPick(cands, spec.gates, rng);
+  if (!picked) return null;
+  return picked.map((x, i) => {
+    const col = L.paint.get(key(x.r, x.c));
+    return (spec.arrows && i < spec.arrows) ? [col, x.r, x.c, DIRL(x.din)] : [col, x.r, x.c];
+  });
+}
+
 function makeBrown(spec, rng) {
   const L = buildChainLevel(spec.n, rng, { looseness: spec.looseness || 1.0, minCells: 12 });
   if (!L) return null;
   if (spec.n * spec.n - L.walls.length < spec.minOpen) return null;
-  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [] }, gest: L.gest };
+  let gates = [];
+  if (spec.gates) { gates = placeGates(L, spec, rng); if (!gates) return null; }
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates }, gest: L.gest };
 }
 
 function makeArrows(spec, rng) {
@@ -60,15 +77,8 @@ function makeArrows(spec, rng) {
   const L = build(spec.n, rng, { looseness: spec.looseness == null ? 0.95 : spec.looseness });
   if (!L) return null;
   if (spec.n * spec.n - L.walls.length < spec.minOpen) return null;
-  const skip = keepOut(L, true);
-  const cands = pathInteriors(L.gest).filter((x) => !skip.has(key(x.r, x.c)));
-  const picked = spreadPick(cands, spec.gates, rng);
-  if (!picked) return null;
-  // most gates get the arrow (the pack's point); the rest stay plain colour gates
-  const gates = picked.map((x, i) => {
-    const col = L.paint.get(key(x.r, x.c));
-    return i < spec.arrows ? [col, x.r, x.c, DIRL(x.din)] : [col, x.r, x.c];
-  });
+  const gates = placeGates(L, spec, rng);
+  if (!gates) return null;
   return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates }, gest: L.gest };
 }
 
@@ -86,9 +96,14 @@ function makeIce(spec, rng) {
 }
 
 function makePortals(spec, rng) {
-  const L = buildJunctionLevel(spec.n, rng, { looseness: spec.looseness == null ? 0.95 : spec.looseness, jump: 1 });
+  const L = buildJunctionLevel(spec.n, rng, { looseness: spec.looseness == null ? 0.95 : spec.looseness, jump: spec.jump || 1 });
   if (!L || !L.portals) return null;
   if (spec.n * spec.n - L.walls.length < spec.minOpen) return null;
+  // no cell may serve two pairs (a chained warp would strand the line)
+  const seen = new Set();
+  for (const [a, b, c, d] of L.portals) {
+    for (const k2 of [key(a, b), key(c, d)]) { if (seen.has(k2)) return null; seen.add(k2); }
+  }
   return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [], portals: L.portals }, gest: L.gest };
 }
 
@@ -103,7 +118,9 @@ function makePrisms(spec, rng) {
   const L = buildPrismLevel(spec.n, rng, { looseness: spec.looseness == null ? 1.0 : spec.looseness, minCells: 12 });
   if (!L) return null;
   if (spec.n * spec.n - L.walls.length < spec.minOpen) return null;
-  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [], prisms: L.prisms }, gest: L.gest };
+  let gates = [];
+  if (spec.gates) { gates = placeGates(L, spec, rng); if (!gates) return null; }
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates, prisms: L.prisms }, gest: L.gest };
 }
 
 /* ---- assembly ---- */
@@ -112,33 +129,51 @@ const RAMPS = {
     [4, { n: 5, minOpen: 22, looseness: 1.0 }],
     [4, { n: 6, minOpen: 31, looseness: 1.0 }],
     [2, { n: 7, minOpen: 42, looseness: 1.0 }],
+    // hard: bigger chains, then gates on top of the chain
+    [3, { n: 7, minOpen: 43, looseness: 1.0 }],
+    [3, { n: 7, minOpen: 43, looseness: 1.0, gates: 2 }],
   ] },
   arrows: { name: "Arrows", icon: "➤", desc: "Gates with a direction", make: makeArrows, tiers: [
     [3, { n: 5, type: "junction", minOpen: 24, gates: 2, arrows: 1 }],
     [3, { n: 6, type: "junction", minOpen: 33, gates: 3, arrows: 2 }],
     [2, { n: 6, type: "fork", minOpen: 31, gates: 3, arrows: 2 }],
     [2, { n: 7, type: "fork", minOpen: 44, gates: 4, arrows: 3 }],
+    // hard: arrow-dense big forks
+    [3, { n: 7, type: "fork", minOpen: 44, gates: 5, arrows: 4 }],
+    [3, { n: 7, type: "fork", minOpen: 45, gates: 6, arrows: 5 }],
   ] },
   ice: { name: "Ice", icon: "❄", desc: "Cross frozen cells straight", make: makeIce, tiers: [
     [3, { n: 5, type: "junction", minOpen: 24, ice: 2 }],
     [3, { n: 6, type: "junction", minOpen: 33, ice: 3 }],
     [2, { n: 6, type: "fork", minOpen: 31, ice: 3 }],
     [2, { n: 7, type: "fork", minOpen: 44, ice: 4 }],
+    // hard: heavy frost on the biggest boards
+    [3, { n: 7, type: "fork", minOpen: 44, ice: 5 }],
+    [3, { n: 8, type: "junction", minOpen: 55, ice: 5 }],
   ] },
   portals: { name: "Portals", icon: "◎", desc: "Lines warp between twins", make: makePortals, tiers: [
     [4, { n: 5, minOpen: 23 }],
     [4, { n: 6, minOpen: 32 }],
     [2, { n: 7, minOpen: 43 }],
+    // hard: TWO warps per board
+    [3, { n: 6, minOpen: 31, jump: 2 }],
+    [3, { n: 7, minOpen: 42, jump: 2 }],
   ] },
   bridges: { name: "Bridges", icon: "⌗", desc: "Lines cross over each other", make: makeBridges, tiers: [
     [4, { n: 5, minOpen: 23, bridge: 1 }],
     [4, { n: 6, minOpen: 32, bridge: 1 }],
     [2, { n: 7, minOpen: 43, bridge: 2 }],
+    // hard: multiple crossings
+    [3, { n: 6, minOpen: 31, bridge: 2 }],
+    [3, { n: 7, minOpen: 42, bridge: 3 }],
   ] },
   prisms: { name: "Prisms", icon: "◈", desc: "Split a blend back apart", make: makePrisms, tiers: [
     [4, { n: 5, minOpen: 22 }],
     [4, { n: 6, minOpen: 31 }],
     [2, { n: 7, minOpen: 42 }],
+    // hard: prisms plus colour gates
+    [3, { n: 6, minOpen: 30, gates: 2 }],
+    [3, { n: 7, minOpen: 41, gates: 3 }],
   ] },
 };
 
