@@ -224,6 +224,31 @@ body{
 .pack-hd{ font-family:var(--font-d); font-weight:700; font-size:12px; color:#8a5a12; text-align:center; margin:0 0 7px; letter-spacing:.03em; }
 .rcard.offer.packchoice{ padding:9px 11px; }
 .rcard.offer.packchoice .rarity{ margin-left:auto; }
+/* ---------- ATTUNEMENTS: three compact per-sweep-length cards, side by side (fit 390px) ---------- */
+.attunerow{ display:flex; gap:7px; margin-top:6px; }
+.atune{ flex:1 1 0; min-width:0; text-align:left; background:var(--paper2); border:2.5px solid var(--ink);
+  border-radius:13px; box-shadow:0 3px 0 var(--shadow); padding:8px 8px 8px; position:relative;
+  cursor:pointer; transition:transform .08s var(--calm), box-shadow .08s var(--calm); }
+.atune:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.atune .adots{ display:flex; gap:3px; align-items:center; height:9px; margin-bottom:4px; flex-wrap:wrap; }
+.atune .adots i{ width:7px; height:7px; border-radius:50%; background:var(--ink); flex:none; }
+.atune .aname{ font-family:var(--font-d); font-weight:700; font-size:12.5px; color:var(--ink); line-height:1.1; }
+.atune .abonus{ font-family:var(--font-u); font-weight:800; font-size:9.5px; letter-spacing:.02em;
+  color:var(--ink-soft); margin:2px 0 6px; line-height:1.15; }
+.atune .apips{ display:flex; gap:3px; margin-bottom:7px; }
+.atune .apips b{ font-family:var(--font-u); font-weight:800; font-size:8px; letter-spacing:.04em;
+  color:var(--ink-soft); border:1.5px solid var(--ink-soft); border-radius:4px; padding:0 3px; opacity:.5; }
+.atune .apips b.on{ color:var(--ink); background:var(--accent); border-color:var(--ink); opacity:1; }
+.atune .aprice{ display:inline-flex; align-items:center; gap:4px; font-family:var(--font-d); font-weight:700;
+  font-size:12px; color:var(--ink); background:var(--card); border:2px solid var(--ink); border-radius:9px;
+  box-shadow:0 2px 0 var(--shadow); padding:2px 8px 2px 6px; }
+.atune .aprice i{ width:11px; height:11px; border-radius:50%; background:var(--accent); border:2px solid var(--ink); flex:none; }
+.atune.cant{ opacity:.5; cursor:default; }
+.atune.cant:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.atune.maxed{ cursor:default; background:#edf4ea; }
+.atune.maxed:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.atune .amax{ display:inline-block; font-family:var(--font-d); font-weight:700; font-size:11px; letter-spacing:.08em;
+  color:#57c268; border:2px solid #57c268; border-radius:8px; padding:1px 9px; transform:rotate(-5deg); }
 /* Retire slot */
 .retire-sec{ margin-top:9px; }
 .retire-row{ display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--paper2);
@@ -360,6 +385,10 @@ body{
       <div class="shopsec">
         <div class="seclabel">Take one</div>
         <div class="cards" id="rwCards"></div>
+      </div>
+      <div class="shopsec">
+        <div class="seclabel">Attune</div>
+        <div class="attunerow" id="rwAttune"></div>
       </div>
       <div class="shopsec">
         <div class="seclabel sale">For sale</div>
@@ -554,6 +583,7 @@ function newGame(){
     // ---- the Bazaar economy (all run-scoped; nothing persists) ----
     motes:0,                                        // in-run currency, drops off the dead
     exotics:[], reagents:{},                        // owned SIGIL names + reagent flags
+    attune:{3:0,4:0,5:0},                           // ATTUNEMENTS: purchased rank per sweep length (run-scoped, persists across waves)
     rituals:[],                                     // owned RITUAL names — share the 3-slot cap with exotics
     creations:[], pyre:null,                        // standing friendly entities (monuments) + the wave-scoped Pyre Ground zone
     warriors:[],                                    // mirror-summoned WARRIORS — wave-scoped, cap 2, separate from creations
@@ -930,6 +960,13 @@ function openBook(){
   });
   grid+='</table><small>A·B·A weak · A·B·B·A good (heart doubled) · A·B·B·B·A strong (heart tripled) — a canon recipe still outranks a mirror</small></div>';
   var gd=document.createElement("div"); gd.className="langwrap"; gd.innerHTML=grid; box.appendChild(gd);
+  // ATTUNEMENTS — owned per-sweep-length flat bonuses, noted in one line (information is free)
+  var attParts=[3,4,5].filter(function(l){ return attuneRank(l)>0; }).map(function(l){
+    return ATTUNE[l].label+" "+["I","II","III"][attuneRank(l)-1]+" ("+ATTUNE[l].glyph+"-ball +"+attuneBonus(l)+")"; });
+  var attTxt = attParts.length ? "ATTUNED: "+attParts.join(" · ")
+    : "ATTUNEMENTS: none yet — buy Triad/Tetrad/Pentad in the Bazaar for flat damage per sweep length";
+  var attWrap=document.createElement("div"); attWrap.className="langwrap";
+  attWrap.innerHTML='<div class="langgrid"><small>'+attTxt+'</small></div>'; box.appendChild(attWrap);
   // STRANGE MIRRORS — discovery rows (??? until first cast)
   STRANGE_BOOK.forEach(function(sm){
     var known=!!BOOK[sm.name];
@@ -1017,6 +1054,45 @@ function isLangCol(c){ return !!LANG_COL[c]; }
    0.8 puts a 3-ball mirror at ~1.0 effective coeff — below every canon spell, correctly outranked. */
 var MIR_BASE=0.8;
 function mirrorLenCoeff(mlen){ return mlen<=3 ? 1.0 : mlen===4 ? 1.8 : 3.0; }   // LADDER {3:1.0, 4:1.8, 5:3.0}
+/* ===================== ATTUNEMENTS (build 15) =====================
+   Run-scoped, purchasable per SWEEP-LENGTH tier (Triad/Tetrad/Pentad). Each rank adds a FLAT
+   damage bonus to every SPELL cast of that length (canon + mirror + strange). Summons, Transmute
+   and Fizzle are excluded — they have their own ladders / are not spells. The bonus is designed to
+   scale INVERSELY with how often that tier is actually cast, so every purchase adds ~equal total
+   damage per run and the choice is playstyle, not raw power.
+   ONE swappable table — PLACEHOLDER bonuses/prices below (economist finalizes). */
+var ATTUNE = {                       // sweep len → { flat bonus per rank, glyph dot-count, name }
+  3: { bonus:2, glyph:3, label:"Triad"  },   // PLACEHOLDER +2/rank
+  4: { bonus:6, glyph:4, label:"Tetrad" },   // PLACEHOLDER +6/rank
+  5: { bonus:3, glyph:5, label:"Pentad" }    // PLACEHOLDER +3/rank
+};
+var ATTUNE_MAX = 3;                  // each stackable to rank III
+var ATTUNE_C = 24, ATTUNE_STEP = 8;  // price = C + STEP·rank → 24 / 32 / 40  (PLACEHOLDER)
+function attuneRank(len){ return (S.attune && S.attune[len]) || 0; }
+function attuneBonus(len){ var d=ATTUNE[len]; return d ? d.bonus*attuneRank(len) : 0; }
+function attunePrice(len){ return ATTUNE_C + ATTUNE_STEP*attuneRank(len); }
+function attuneMaxed(len){ return attuneRank(len) >= ATTUNE_MAX; }
+/* strange mirrors don't route through impactSpell (they run bespoke field effects), so their
+   attunement bonus lands as a flat true-damage strike on the frontmost foe. */
+function attuneStrike(len){
+  var b=attuneBonus(len); if(b<=0) return 0;
+  var e=nearest(); if(!e) return 0;
+  var d=applyDmg(e, b, null, { trueDamage:true, reactable:false }) || 0;
+  if(d>0) spawnDmg(e.x, e.y-geo.ballR*0.6, d, false);
+  return d;
+}
+/* a spell's SWEEP LENGTH: mixed mirrors / whorl carry it explicitly (mirrorLen/slen); canon
+   3-ball recipes (Blast, Ember, Void, …) default to 3. Used for the flat attunement add. */
+function spellLen(sp){ return (sp && (sp.mirrorLen || sp.slen)) || 3; }
+function buyAttune(len){
+  if(!ATTUNE[len] || attuneMaxed(len)) return false;
+  var p=attunePrice(len); if(S.motes<p) return false;
+  S.motes-=p; moteHudSet();
+  S.attune[len]=attuneRank(len)+1;
+  sBoon(); vib(15);
+  if(document.getElementById("rwShop")) renderShop(); else renderAttune();   // refresh offers + attune together
+  return true;
+}
 /* build a MIXED-MIRROR language spell (wings A shape it, heart B fills it), length-scaled.
    mlen 3 = A·B·A (1 heart, weak floor) · 4 = A·B·B·A (2 hearts, doubled) · 5 = A·B·B·B·A (3 hearts,
    tripled). Real cast — flows through impactSpell. */
@@ -1040,6 +1116,7 @@ function whorlSpell(mlen, TL, hasW){
   var base=tripleSpell("W"); if(!base) return null;
   var sp={}; for(var k in base) sp[k]=base[k];
   sp.coeff = base.coeff*mirrorLenCoeff(mlen);
+  sp.slen = mlen;                       // tag sweep length so a 4/5-White Whorl attunes correctly
   return mkSpell(sp, TL, hasW);
 }
 function resolveSpell(balls){
@@ -1361,8 +1438,14 @@ function moteLand(){
 /* one resolved spell landing: damage, payloads (always apply on a valid cast), shake */
 function impactSpell(sp, hits, mul){
   mul = mul || 1;                                                                        // Mordant II passes 1.15 for its doubled casts
-  var base = (sp.kind==="all" && hits.length) ? Math.ceil(sp.dmg/hits.length) : sp.dmg;   // AoE splits damage
-  var per = mul===1 ? base : Math.max(1, Math.round(base*mul));
+  // ATTUNEMENT: a run-scoped FLAT damage add per sweep-length tier, applied POST-multipliers
+  // (sp.dmg already carries stale/fresh/perfect). Fizzle is never attuned. For split-AoE "all"
+  // spells the bonus joins the PRE-SPLIT total, so it is shared across enemies, not per-enemy.
+  var bonus = sp.fizzle ? 0 : attuneBonus(spellLen(sp));
+  var split = (sp.kind==="all" && hits.length) ? hits.length : 1;
+  var per;
+  if(mul===1){ per = Math.ceil((sp.dmg + bonus)/split); }
+  else { per = Math.max(1, Math.round(Math.ceil(sp.dmg/split)*mul)) + Math.ceil(bonus/split); }  // ×mul hits spell dmg only; flat add is post-multiplier
   var opts = { trueDamage:sp.trueDamage, eclipsePierce:sp.eclipsePierce, usedW:sp.usedW, reactable:true, pierceArmored:sp.pierceArmored };
   var dealt=0, kills=0, preservedAny=false;
   hits.forEach(function(e){
@@ -2264,6 +2347,7 @@ function castStrange(idxs, def, TL){
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
     def.cast(st, TL);
+    attuneStrike(5);   // ATTUNEMENT: a strange mirror is a 5-ball SPELL — its Pentad flat bonus bites the frontmost foe
     recordSpell({ name:def.name, fizzle:false, tint:def.bg }, false);
     if(!/INSCRIBED/.test((S.toast||{}).txt||"")) toast("✦ "+def.name.toUpperCase(), 1150, "#b9791a", "mid", true);
     S.shake=Math.min(20, 6+TL*0.8);
@@ -2871,7 +2955,28 @@ function renderShop(){
     if(afford) el.addEventListener("click", function(){ buyOffer(o); });
     box.appendChild(el);
   });
+  renderAttune();   // keep the attune row's affordability in sync with the lighter purse
   renderRetire();
+}
+/* ---------- ATTUNEMENTS: three compact per-sweep-length upgrade cards (Triad/Tetrad/Pentad) ---------- */
+function renderAttune(){
+  var box=document.getElementById("rwAttune"); if(!box) return; box.innerHTML="";
+  [3,4,5].forEach(function(len){
+    var def=ATTUNE[len], rank=attuneRank(len), maxed=attuneMaxed(len), price=attunePrice(len);
+    var afford = !maxed && S.motes>=price;
+    var el=document.createElement("div");
+    el.className="atune"+(maxed?" maxed":(afford?"":" cant"));
+    var dots=""; for(var k=0;k<def.glyph;k++) dots+="<i></i>";                     // 3/4/5 tiny ink dots = the glyph
+    var pips=""; for(var r=1;r<=ATTUNE_MAX;r++) pips+='<b class="'+(r<=rank?"on":"")+'">'+["I","II","III"][r-1]+'</b>';
+    var shown = rank>0 ? attuneBonus(len) : def.bonus;                             // current total when owned; the per-rank value when unowned
+    var foot = maxed ? '<span class="amax">MAX</span>' : '<span class="aprice"><i></i>'+price+'</span>';
+    el.innerHTML='<div class="adots">'+dots+'</div>'+
+      '<div class="aname">'+def.label+'</div>'+
+      '<div class="abonus">'+def.glyph+'-ball +'+shown+'</div>'+
+      '<div class="apips">'+pips+'</div>'+ foot;
+    if(afford) el.addEventListener("click", function(){ buyAttune(len); });
+    box.appendChild(el);
+  });
 }
 /* ---------- RETIRE SLOT (Peglin curation): remove an owned arcanum for an escalating fee ---------- */
 function retireFee(){ return 6 + 10*(S.retireN||0); }                 // 6, 16, 26... per use this run (first use 6, +10 each)
@@ -3014,6 +3119,8 @@ function gameOver(){
   if(st.creations) row("Creations", st.creations);
   if(st.prisms) row("Prisms minted", st.prisms);
   if(st.motes) row("Motes earned", st.motes);
+  var attWon=[3,4,5].filter(function(l){ return (S.attune&&S.attune[l])>0; });   // ATTUNEMENTS bought (nonzero only)
+  if(attWon.length) row("Attuned", attWon.map(function(l){ return ATTUNE[l].label+" "+["I","II","III"][S.attune[l]-1]; }).join(" · "));
   document.getElementById("ovStats").innerHTML = rows.join("");
   show("vOver");
 }
@@ -4391,7 +4498,8 @@ function gesturePreview(){
       }
       sub += " — or keep weaving…";
       if(CFG.realtime && S.cool>0){ sub="cooling..."; col=greyTint(col); }
-      return { big:sp.name, sub:sub, small:sp.name.length>9, col:col, chips:chips };
+      var ab3 = sp.fizzle ? 0 : attuneBonus(3);   // ATTUNEMENT surfacing: append the flat bonus (info is free)
+      return { big:sp.name+(ab3>0?" +"+ab3:""), sub:sub, small:sp.name.length>9, col:col, chips:chips };
     }
   } else if(v.length>=4){
     /* the weave: 4-5 balls is a dangling (dangerous) chain, 6 is a doublecast */
@@ -4407,8 +4515,8 @@ function gesturePreview(){
         if(suP) return { big:summonName(suP.colour,suP.tier), small:true, sub:cooling?"cooling...":"summon! — release", col:cooling?greyTint(SUMMON_TINT):SUMMON_TINT, chips:chips };
         var mirP=resolveMirror(swb);                             // then the MIXED MIRROR / STRANGE answers a 4-5 sweep
         if(mirP){
-          if(mirP.type==="spell"){ var mln=mirP.sp.mirrorLen||v.length, sw=mln>=5?"strong":"good"; return { big:mirP.sp.name+" ("+mln+")", small:true, sub:cooling?"cooling...":("longer = "+sw+" — release!"), col:"#b9791a", chips:chips }; }
-          if(mirP.type==="strange"){ var known=!!BOOK[mirP.def.name]; return { big:known?("✦ "+mirP.def.name):"✦ ? ? ?", small:true, sub:cooling?"cooling...":(known?"strange mirror — release!":"an unknown mirror — release to discover!"), col:"#b9791a", chips:chips }; }
+          if(mirP.type==="spell"){ var mln=mirP.sp.mirrorLen||v.length, sw=mln>=5?"strong":"good", abm=attuneBonus(mln); return { big:mirP.sp.name+" ("+mln+")"+(abm>0?" +"+abm:""), small:true, sub:cooling?"cooling...":("longer = "+sw+" — release!"), col:"#b9791a", chips:chips }; }
+          if(mirP.type==="strange"){ var known=!!BOOK[mirP.def.name], abs=attuneBonus(5); return { big:(known?("✦ "+mirP.def.name):"✦ ? ? ?")+(known&&abs>0?" +"+abs:""), small:true, sub:cooling?"cooling...":(known?"strange mirror — release!":"an unknown mirror — release to discover!"), col:"#b9791a", chips:chips }; }
           if(mirP.type==="stranger") return { big:"a stranger mirror", small:true, sub:"its magic eludes you", col:"#b9b2a6", chips:chips };
         }
         var riM=matchRitual(chips);                              // then an owned RITUAL (order-agnostic)
@@ -4803,6 +4911,20 @@ window.__whx = {
   },
   applyDmg: function(e, amt, el, opts){ return applyDmg(e, amt, el, opts); },
   impactSpell: function(sp, hits, mul){ return impactSpell(sp, hits, mul); },
+  /* ---- build-15 harness: ATTUNEMENTS ---- */
+  ATTUNE: ATTUNE, ATTUNE_MAX: ATTUNE_MAX,
+  attune: function(){ return S.attune; },
+  attuneRank: function(len){ return attuneRank(len); },
+  attuneBonus: function(len){ return attuneBonus(len); },
+  attunePrice: function(len){ return attunePrice(len); },
+  buyAttune: function(len){ return buyAttune(len); },
+  setAttune: function(o){ S.attune={ 3:(o&&o[3])||0, 4:(o&&o[4])||0, 5:(o&&o[5])||0 }; },
+  spellLen: function(sp){ return spellLen(sp); },
+  renderAttune: function(){ return renderAttune(); },
+  castStrange: function(name){ var key=null; for(var k in STRANGE){ if(STRANGE[k].name===name){ key=k; break; } }
+    if(!key) return false; castStrange([0,1,2,3,4], STRANGE[key], 5); return true; },
+  deathStats: function(){ gameOver(); return document.getElementById("ovStats").innerHTML; },
+  newGame: function(){ return newGame(); },
   dotTick: function(e){ return dotTick(e); },
   stepEnemy: function(e){ return stepEnemy(e); },
   /* ---- build-13 harness: resolve / warriors / merge / scanner ---- */
