@@ -97,6 +97,8 @@ body{
     <div class="stat"><b id="stWhorls">0</b><small>whorls</small></div>
     <div class="stat"><b id="stWhites">0</b><small>whites</small></div>
     <div class="stat"><b id="stWords">0</b><small>words</small></div>
+    <div class="stat"><b id="stSwaps">0</b><small>swaps</small></div>
+    <div class="stat"><b id="stBurned">0</b><small>burned</small></div>
   </div>
 </div>
 
@@ -198,11 +200,13 @@ let warriors = [];
 let puffs = [];
 let dmgPops = [];
 let alchFx = [];   // {x,y,t0,dur,from:[prims],to,col}
+let swapFx = [];   // swap smears {ax,ay,bx,by,ca,cb,t0,dur,popped}
+let burnFx = [];   // reagent burns {x,y,col,t0,dur}
 let shocks = [];   // whorl rings {x,y,r,maxr,t0,dur}
 let spawnT = 0;
 let cooldown = 0;  // remaining cast cooldown (s)
 let lockout = 0;   // remaining fizzle lockout (s)
-let stats = { casts:0, fizzles:0, kills:0, leaks:0, words:0, totalLen:0, whorls:0, whites:0 };
+let stats = { casts:0, fizzles:0, kills:0, leaks:0, words:0, totalLen:0, whorls:0, whites:0, swaps:0, burned:0 };
 
 // ---------------- input / selection ----------------
 let dragging=false, moved=false;
@@ -323,11 +327,19 @@ function castFromSelection(vec){
     // MIXED MIRROR — trace rule: transform heart ball(s) into the merge
     const merged = mergeColours(word);
     const contribs = [...new Set(word.flatMap(c=>DECOMP[c]))];
+    const heartSet = new Set(heartIndices(cls.len));
     for(const h of heartIndices(cls.len)){
       const bi=sel[h]; const b=balls[bi];
       const prev=b.c; b.c=merged; b.wob=1.2;
       alchFx.push({x:b.x,y:b.y,t0:performance.now(),dur:600,from:contribs.slice(),to:merged});
       if(merged==='W' && prev!=='W') stats.whites++;
+    }
+    // REAGENT BURN — every non-heart secondary/white ball is one-use: it burns
+    // to a poof of its own colour and refills as a random primary (~0.6s).
+    for(let k=0;k<sel.length;k++){
+      if(heartSet.has(k)) continue;
+      const b=balls[sel[k]];
+      if(b.c==='O'||b.c==='G'||b.c==='P'||b.c==='W'){ burnReagent(sel[k]); stats.burned++; }
     }
     launchSpell(cls, o, v);
   }
@@ -380,6 +392,29 @@ function rot(v,a){ const c=Math.cos(a),s=Math.sin(a); return {x:v.x*c-v.y*s,y:v.
 function doFizzle(sel){
   for(const i of sel){ const b=balls[i]; for(let k=0;k<3;k++){ const p=mkPuff(b.x,b.y,HEX[b.c]); p.life*=0.7; puffs.push(p); } }
   vibrate([12,30,12]);
+}
+// reagent burn: flame/poof of the ball's own colour, then refill as a primary
+function burnReagent(bi){
+  const b=balls[bi];
+  for(let k=0;k<7;k++){ const p=mkPuff(b.x,b.y,HEX[b.c]); p.vy-=40; p.life+=0.15; puffs.push(p); }
+  burnFx.push({x:b.x,y:b.y,col:b.c,t0:performance.now(),dur:520});
+  b.consumed=true; b.refillT=REFILL_DUR;   // reuse the pure-run refill mechanism
+}
+// SWAP: two selected balls trade colours; costs a full cooldown (a turn not casting)
+function doSwap(sel){
+  if(cooldown>0){ clearSelection(); return {result:'cooldown'}; }
+  const a=sel[0], b=sel[1];
+  const ba=balls[a], bb=balls[b];
+  if(!ba||!bb||ba.consumed||bb.consumed){ clearSelection(); return {result:'nofit'}; }
+  const ca=ba.c, cb=bb.c;
+  ba.c=cb; bb.c=ca; ba.wob=1.2; bb.wob=1.2;
+  // juice: goo-morph past each other + landing pops
+  swapFx.push({ax:ba.x,ay:ba.y,bx:bb.x,by:bb.y,ca,cb,t0:performance.now(),dur:340,popped:false});
+  stats.swaps++;
+  cooldown = CD_DUR;
+  vibrate(18);
+  clearSelection();
+  return {result:'swap'};
 }
 function mkPuff(x,y,col){ const a=Math.random()*6.28, sp=40+Math.random()*90;
   return {x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-30,life:0.5+Math.random()*0.3,max:0.8,r:4+Math.random()*5,col}; }
@@ -454,6 +489,11 @@ function update(dt){
   puffs=puffs.filter(p=>p.life>0);
   for(const d of dmgPops){ d.life-=dt; d.y-=34*dt; } dmgPops=dmgPops.filter(d=>d.life>0);
   alchFx=alchFx.filter(a=>now-a.t0<a.dur);
+  for(const s of swapFx){ const f=(now-s.t0)/s.dur;
+    if(!s.popped && f>=0.82){ s.popped=true;
+      for(let k=0;k<5;k++){ puffs.push(mkPuff(s.bx,s.by,HEX[s.ca])); puffs.push(mkPuff(s.ax,s.ay,HEX[s.cb])); } } }
+  swapFx=swapFx.filter(s=>now-s.t0<s.dur);
+  burnFx=burnFx.filter(s=>now-s.t0<s.dur);
   shocks=shocks.filter(s=>now-s.t0<s.dur);
 
   updateBlobs(dt);
@@ -483,6 +523,8 @@ function render(now){
   drawBalls(now);
   drawMetaChain(now);
   drawAlch(now);
+  drawSwapFx(now);
+  drawBurns(now);
   drawShocks(now);
   drawCooldown(now);
   drawPuffs();
@@ -593,6 +635,47 @@ function drawAlch(now){
     ctx.restore();
   }
 }
+function drawSwapFx(now){
+  for(const s of swapFx){
+    const f=Math.min(1,(now-s.t0)/s.dur);
+    const e=f<0.5?2*f*f:1-Math.pow(-2*f+2,2)/2;   // easeInOutQuad
+    const dx=s.bx-s.ax, dy=s.by-s.ay; const len=Math.hypot(dx,dy)||1;
+    const px=-dy/len, py=dx/len; const arc=Math.sin(f*Math.PI)*ballRad*0.55;
+    const x1=s.ax+dx*e+px*arc, y1=s.ay+dy*e+py*arc;   // ca travelling a->b (bulge +)
+    const x2=s.bx-dx*e-px*arc, y2=s.by-dy*e-py*arc;   // cb travelling b->a (bulge -)
+    const rr=ballRad*0.7*(1-0.18*Math.sin(f*Math.PI));
+    ctx.save();
+    // metaball smear bridging the two travelling spots
+    const grd=ctx.createLinearGradient(x1,y1,x2,y2);
+    grd.addColorStop(0,HEX[s.ca]); grd.addColorStop(1,HEX[s.cb]);
+    ctx.strokeStyle=grd; ctx.lineWidth=rr*1.25*(1-f*0.5); ctx.lineCap='round';
+    ctx.globalAlpha=0.5*(1-f);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.globalAlpha=1;
+    stickerCircle(x1,y1,rr,HEX[s.ca],INK,2.5);
+    stickerCircle(x2,y2,rr,HEX[s.cb],INK,2.5);
+    ctx.beginPath(); ctx.arc(x1-rr*0.3,y1-rr*0.32,rr*0.22,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x2-rr*0.3,y2-rr*0.32,rr*0.22,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
+    ctx.restore();
+  }
+}
+function drawBurns(now){
+  for(const s of burnFx){
+    const f=Math.min(1,(now-s.t0)/s.dur);
+    const rise=f*ballRad*1.2;
+    const r=ballRad*0.55*(1-f*0.45);
+    ctx.save(); ctx.globalAlpha=(1-f);
+    ctx.beginPath(); ctx.ellipse(s.x, s.y-rise, r*0.72, r*1.25, 0, 0, 6.28);
+    ctx.fillStyle=HEX[s.col]; ctx.fill();
+    ctx.globalAlpha=(1-f)*0.85;
+    ctx.beginPath(); ctx.arc(s.x, s.y-rise-r*0.2, r*0.42, 0, 6.28);
+    ctx.fillStyle='rgba(255,240,205,.95)'; ctx.fill();
+    // ember ring
+    ctx.globalAlpha=(1-f)*0.6; ctx.beginPath(); ctx.arc(s.x,s.y,ballRad*(0.4+f*0.9),0,6.28);
+    ctx.strokeStyle=HEX[s.col]; ctx.lineWidth=2.5*(1-f); ctx.stroke();
+    ctx.restore();
+  }
+}
 function drawShocks(now){
   for(const s of shocks){
     const f=(now-s.t0)/s.dur; const r=f*s.maxr;
@@ -651,14 +734,19 @@ function drawDmgPops(){ for(const d of dmgPops){ const a=Math.max(0,d.life/0.9);
 function drawWord(now){
   if(selection.length===0) return;
   const word=selection.map(i=>balls[i].c);
+  const isSwap = selection.length===2;
   const cls=classify(word);
-  const valid=cls.type!=='fizzle';
-  const label = valid?nameFor(cls) : (word.length>=3?'…fizzle':'');
+  const valid = !isSwap && cls.type!=='fizzle';
+  // display text + colour
+  let disp='', dispCol=INK;
+  if(isSwap){ disp=' ⇄ swap'; dispCol=INK; }
+  else if(valid){ disp=' — '+nameFor(cls); dispCol=INK; }
+  else if(word.length>=3){ disp=' …fizzle'; dispCol='#ef4a5a'; }
   const y=leakY-30;
   ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
   const dotR=6, gap=18; const totalW=(word.length-1)*gap;
   ctx.font='700 14px Fredoka, sans-serif';
-  const lblW = label?ctx.measureText(' — '+label).width:0;
+  const lblW = disp?ctx.measureText(disp).width:0;
   const dotsW=totalW+dotR*2; const blockW=dotsW+lblW+8; let bx=W/2-blockW/2;
   ctx.save(); ctx.beginPath(); roundRect(bx-12,y-16,blockW+24,32,14);
   ctx.fillStyle=PAPER2; ctx.strokeStyle=INK; ctx.lineWidth=2.5; ctx.shadowColor='rgba(44,39,51,.25)'; ctx.shadowOffsetY=3;
@@ -667,8 +755,7 @@ function drawWord(now){
   for(let k=0;k<word.length;k++){ ctx.beginPath(); ctx.arc(cx,y,dotR,0,6.28);
     ctx.fillStyle=HEX[word[k]]; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=INK; ctx.stroke(); cx+=gap; }
   cx=cx-gap+dotR+4; ctx.textAlign='left';
-  if(!valid && word.length>=3){ ctx.fillStyle='#ef4a5a'; ctx.fillText(' …fizzle',cx,y); }
-  else if(valid){ ctx.fillStyle=INK; ctx.fillText(' — '+label,cx,y); }
+  if(disp){ ctx.fillStyle=dispCol; ctx.fillText(disp,cx,y); }
   ctx.restore();
 }
 function drawAim(now){
@@ -717,6 +804,10 @@ function onUp(ev){
     else if(b) b.wob=1;                        // tiny wobble on non-white tap
     clearSelection(); return;
   }
+  if(selection.length<2){                       // dragged a hair, no 2nd ball: no-op/tap
+    const b=balls[startIdx]; if(b) b.wob=1; clearSelection(); return;
+  }
+  if(selection.length===2){ doSwap(selection.slice()); return; }
   let vec = aiming ? aimVec : nearestEnemyVec(centroid(selection));
   castFromSelection(vec);
 }
@@ -754,6 +845,8 @@ function updateStatsUI(){
   document.getElementById('stWords').textContent=stats.words;
   document.getElementById('stWhorls').textContent=stats.whorls;
   document.getElementById('stWhites').textContent=stats.whites;
+  document.getElementById('stSwaps').textContent=stats.swaps;
+  document.getElementById('stBurned').textContent=stats.burned;
   document.getElementById('stAvg').textContent=(stats.words?(stats.totalLen/stats.words):0).toFixed(1);
 }
 
@@ -792,6 +885,7 @@ window.LAB = {
     selection=seg; syncBlobs();
     return castFromSelection(aimVec||null);
   },
+  swap(idxA,idxB){ if(!balls[idxA]||!balls[idxB]) return {result:'nofit'}; return doSwap([idxA,idxB]); },
   spawnEnemyAt(x,y,hp){ hp=hp||20; enemies.push({x,y,r:hp===20?18:24,hp,maxhp:hp,col:HEX.R,wob:0,dead:false,death:0}); },
   clearEnemies(){ enemies=[]; },
   rerollBoard(){ rerollBoard(); },
