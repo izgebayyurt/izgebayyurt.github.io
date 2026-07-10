@@ -675,7 +675,21 @@ function step(cell){
   var leg=legOf(drag); if(!leg){ drag=null; return; }
   var head=leg[leg.length-1];
   if(same(cell,head)) return;
-  if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return; }
+  if(leg.length>1 && same(cell, leg[leg.length-2])){
+    // if head and the previous cell aren't adjacent, the last step was a PORTAL WARP:
+    // the finger still hovering on the entry cell is NOT a retreat — ignore it,
+    // or the twin pops the instant it appears (the "portals don't teleport" bug).
+    var pv2=leg[leg.length-2];
+    if(Math.abs(head[0]-pv2[0])+Math.abs(head[1]-pv2[1])!==1) return;
+    leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return;
+  }
+  // retreating back PAST a portal (onto the cell before its entry) pops the warp pair
+  if(leg.length>2 && same(cell, leg[leg.length-3])){
+    var pv3=leg[leg.length-2];
+    if(Math.abs(head[0]-pv3[0])+Math.abs(head[1]-pv3[1])!==1){
+      leg.pop(); leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return;
+    }
+  }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
   if(leg.length>1 && tgtAt(head[0],head[1])) return;   // a terminal is an endpoint — no dragging THROUGH it (a prism RAY's root sits on one, hence length>1)
@@ -687,7 +701,11 @@ function step(cell){
   if(!o){
     leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true);   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
     var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
-    if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){ leg.push([tw[0],tw[1]]); addBloom(tw[0],tw[1],"#7fd4ee",520); }
+    if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){
+      leg.push([tw[0],tw[1]]);
+      addBloom(cell[0],cell[1],"#7fd4ee",420); addBloom(tw[0],tw[1],"#7fd4ee",560);
+      try{ voice(520,0.16,{type:"sine",to:1240,gl:0.12,lp:2800,g:0.045,atk:0.004}); }catch(_e){}
+    }
     renderPaths(); return;
   }
   // BRIDGE: a second line may cross an occupied bridge cell — perpendicular only
