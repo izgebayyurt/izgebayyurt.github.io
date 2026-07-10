@@ -571,7 +571,7 @@ function newGame(){
     // ---- FLOW MODE clocks (delta-accumulated; only advance while unpaused) ----
     cool:0, coolMax:CFG.castCd, coolPulse:0,        // cast cooldown
     chain:0, readyElapsed:0,                        // FLOW CHAINING: consecutive prompt-cast count + idle-since-ready timer
-    beatT:0, beatMax:4.0,                           // metronome for the horde
+    beatT:0, beatMax:5.0,                           // metronome for the horde
     paused:false, phaseRunning:false, phaseQueued:false,
     // ---- PRE-WAVE READOUT: the next wave's spec, pre-rolled at wave clear (preview === spawn) ----
     nextWaveSpec:null,
@@ -647,22 +647,34 @@ function alive(){ return S.enemies.filter(function(e){ return !e.dead; }); }
 /* rollWave(w) — the PURE spec generator. Given only a wave number it rolls the full spawn list
    (types, lanes, rungs, wards, hp, dmg) as plain data. No side effects, no DOM, no now(): the SAME
    spec drives both the Bazaar's NEXT-WAVE preview and the actual spawn, so they can never diverge. */
-/* ELITE CADENCE (FINAL — economist-approved schedule). The skilled ceiling regressed when deep-spawn
-   / arrival-grace shipped, so elites ACCELERATE past the mid-game: through wave 16 every 4th, waves
-   17-24 every 3rd, past 24 every 2nd — first elite stays at wave 8. Elite waves: 8,12,16,18,21,24,26,
-   28,30… This is the one knob — swap the body freely and the rest of rollWave follows. */
-function eliteCadence(w){
-  if(w<8) return false;                     // first elite at wave 8
+/* ELITE CADENCE (FINAL — economist-approved schedule). Difficulty-aware:
+   • Standard / Fierce: elites ACCELERATE past the mid-game — through wave 16 every 4th, waves 17-24
+     every 3rd, past 24 every 2nd — first elite at wave 8. Elite waves: 8,12,16,18,21,24,26,28,30…
+   • Gentle: elites arrive LATER and stay on a steady every-4th cadence with NO late-ramp tightening —
+     first elite at wave 10, then 10,14,18,22,26…
+   Pass a difficulty to force the schedule; defaults to the current run difficulty. This is the one
+   knob — swap the body freely and the rest of rollWave follows. */
+function eliteCadence(w, diff){
+  diff = diff || difficulty;
+  if(diff==="gentle") return w>=10 && ((w-10)%4)===0;   // Gentle: 10, 14, 18, 22 … (no acceleration)
+  if(w<8) return false;                     // Standard/Fierce: first elite at wave 8
   if(w<=16) return (w%4)===0;               // 8, 12, 16
   if(w<=24) return (w%3)===0;               // 18, 21, 24
   return (w%2)===0;                          // 26, 28, 30, ...
 }
 function rollWave(w){
   var D = diffMul();                       // difficulty multipliers (hp · count · dmg) — standard = identity
-  var elite = eliteCadence(w);            // accelerating elite schedule (see eliteCadence)
-  var count = Math.min(8, Math.ceil((2 + Math.ceil(0.6*w)) * D.count)) - (elite?2:0);
+  var elite = eliteCadence(w);            // difficulty-aware elite schedule (see eliteCadence)
+  /* FLOW EASING (canon, build 14): a gentler live-play calibration that STACKS multiplicatively on the
+     difficulty table. Gated on CFG.realtime so the retired turn mode (dev flag) keeps its own numbers. */
+  var FLOW = CFG.realtime;
+  var fCount   = FLOW ? 0.85 : 1;          // fewer bodies per wave
+  var fDmg     = FLOW ? 0.80 : 1;          // softer gate damage
+  var fHpTrash = FLOW ? 0.70 : 1;          // trash AND brutes take the deeper cut
+  var fHpElite = FLOW ? 0.90 : 1;          // elites take a lighter cut
+  var count = Math.max(1, Math.min(8, Math.ceil((2 + Math.ceil(0.6*w)) * D.count * fCount)) - (elite?2:0));
   var wardChance = Math.min(0.75, 0.05 + w*0.10);
-  var baseDmg = Math.max(1, Math.round((2 + Math.ceil(w/4)) * D.dmg));
+  var baseDmg = Math.max(1, Math.round((2 + Math.ceil(w/4)) * D.dmg * fDmg));
   var spread = 2;                        // spawns are ALWAYS the deepest two rungs (4-5) — one full field of runway every wave
   var used = {};
   var total = count + (elite?1:0);
@@ -687,7 +699,9 @@ function rollWave(w){
     }
     var warded = !isElite && !brute && !armored && !leech && !isHealer && Math.random()<wardChance;
     var ward = (isElite||warded) ? ["O","G","P"][(Math.random()*3)|0] : null;
-    var hp = isElite ? Math.round((16+8*w)*2.6) : brute ? (16+8*w) : Math.round(0.90*(4+3*w));
+    var hpEase = isElite ? fHpElite : fHpTrash;   // FLOW easing by kind: elites ×0.90, trash & brutes ×0.70
+    var hp = isElite ? (16+8*w)*2.6 : brute ? (16+8*w) : 0.90*(4+3*w);
+    hp = Math.round(hp * hpEase);                 // flow cut (turn mode: ×1 → original integer)
     hp = Math.max(1, Math.round(hp * D.hp));      // difficulty: enemy HP scaling
     list.push({
       lane:lane, rung:rung, hp:hp, maxhp:hp, ward:ward, brute:brute||isElite,
@@ -733,8 +747,8 @@ function spawnWave(spec){
   });
   st.actions = st.maxActions = CFG.actions + CFG.maxActionsUp + (st.reagents.quicksilver?(isII("quicksilver")?2:1):0);   // Quicksilver: +1/turn (II: +2)
   st.freeMerge = true;
-  // FLOW: the beat tightens each wave — 4.0s at wave 1, -0.1s/wave, floor 2.5s
-  st.beatMax = Math.max(2.5, 4.0 - (st.wave-1)*0.1);
+  // FLOW: the beat tightens each wave — 5.0s at wave 1, -0.10s/wave, floor 2.6s
+  st.beatMax = Math.max(2.6, 5.0 - (st.wave-1)*0.1);
   st.beatT = 0;
   st.chain = 0; st.readyElapsed = 0;      // a fresh wave resets the flow chain
   sHorn();
@@ -4810,7 +4824,7 @@ window.__whx = {
   summonTramples: function(e,w){ return summonTramples(e,w); },
   summonStats: function(tier,colour,TL){ return summonStats(tier,colour,TL); },
   warriorStrike: function(w,e){ return warriorStrike(w,e); },
-  eliteCadence: function(w){ return eliteCadence(w); },
+  eliteCadence: function(w, diff){ return eliteCadence(w, diff); },
   warriorAct: function(w){ return warriorAct(w); },
   liveWarriors: function(){ return liveWarriors(); },
   warriorAt: function(lane,rung){ return warriorAt(lane,rung); },
