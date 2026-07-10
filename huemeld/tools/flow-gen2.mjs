@@ -174,7 +174,7 @@ const inb = (n, r, c) => r >= 0 && c >= 0 && r < n && c < n;
    so the covered region never gains a shortcut adjacency → the routing is forced
    (unique). `forbidAdj` cells may not be touched by new cells either. Returns the
    arms (arrays of cells, not including center). */
-function growArms(n, rng, center, k, visited, share, maxCells, looseness) {
+function growArms(n, rng, center, k, visited, share, maxCells, looseness, jumper) {
   const forbid = share || new Set();
   const loose = looseness || 0;
   const starts = shuffle(NB4.map(([dr, dc]) => [center[0] + dr, center[1] + dc])
@@ -185,6 +185,25 @@ function growArms(n, rng, center, k, visited, share, maxCells, looseness) {
   let added = arms.length, guard = 0;
   const cap = maxCells || (n * n * 4);
   while (guard++ < n * n * 4 && added < cap) {
+    // PORTAL jump: occasionally an arm warps to a fresh free cell; the head becomes
+    // the portal's entry, the landing cell its exit. Growth carries on from there.
+    if (jumper && jumper.left > 0 && added > k && rng() < 0.14) {
+      const lands = [];
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+        if (visited.has(r + "," + c)) continue;
+        const clear = NB4.every(([dr, dc]) => { const nr = r + dr, nc = c + dc;
+          return !inb(n, nr, nc) || (!visited.has(nr + "," + nc) && !forbid.has(nr + "," + nc)); });
+        if (clear) lands.push([r, c]);
+      }
+      if (lands.length) {
+        const ai = (rng() * arms.length) | 0;
+        const h = arms[ai][arms[ai].length - 1];
+        const f = lands[(rng() * lands.length) | 0];
+        arms[ai].push(f); visited.add(f[0] + "," + f[1]); added++;
+        jumper.pairs.push([h[0], h[1], f[0], f[1]]); jumper.left--;
+        continue;
+      }
+    }
     const opts = [];
     arms.forEach((arm, ai) => {
       const h = arm[arm.length - 1];
@@ -225,23 +244,37 @@ function armEdges(center, arm, col) {
 }
 function levelWalls(n, visited) { const w = []; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (!visited.has(r + "," + c)) w.push([r, c]); return w; }
 
-/* Build a single-junction level (2 emitters + 1 secondary circle). */
+/* Build a single-junction level (2 emitters + 1 secondary circle).
+   spec.jump=1 threads ONE portal pair through an arm (the arm warps mid-route). */
 export function buildJunctionLevel(n, rng, spec = {}) {
   const J = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
   const visited = new Set([J[0] + "," + J[1]]);
-  const arms = growArms(n, rng, J, 3, visited, null, null, spec.looseness);
+  const jumper = spec.jump ? { left: spec.jump, pairs: [] } : null;
+  const arms = growArms(n, rng, J, 3, visited, null, null, spec.looseness, jumper);
   if (!arms || arms.length < 3) return null;
   if (visited.size < (spec.minCells || 10)) return null;
+  if (jumper && jumper.pairs.length < spec.jump) return null;   // the warp never happened
   const sec = SECS[(rng() * 3) | 0], [p1, p2] = COMP[sec];
   const o = shuffle([0, 1, 2], rng);
   const sq = [[p1, ...armEnd(arms[o[0]])], [p2, ...armEnd(arms[o[1]])]];
   const ci = [[sec, ...armEnd(arms[o[2]])]];
+  if (jumper) {   // a portal cell may not BE an endpoint (it must be crossed, not stopped on)
+    const stop = new Set([...sq, ...ci].map(([, r, c]) => r + "," + c));
+    for (const [r1, c1, r2, c2] of jumper.pairs) if (stop.has(r1 + "," + c1) || stop.has(r2 + "," + c2)) return null;
+  }
   const paint = new Map([[J[0] + "," + J[1], sec]]);
   arms[o[0]].forEach((c) => paint.set(c[0] + "," + c[1], p1));
   arms[o[1]].forEach((c) => paint.set(c[0] + "," + c[1], p2));
   arms[o[2]].forEach((c) => paint.set(c[0] + "," + c[1], sec));
   const edges = [...armEdges(J, arms[o[0]], p1), ...armEdges(J, arms[o[1]], p2), ...armEdges(J, arms[o[2]], sec)];
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J], edges };
+  // replayable gestures: feeder A to J, then feeder B to J carrying on down the blend
+  const gest = [
+    [...arms[o[0]].slice().reverse(), J],
+    [...arms[o[1]].slice().reverse(), J, ...arms[o[2]]],
+  ];
+  const out = { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J], edges, gest };
+  if (jumper) out.portals = jumper.pairs;
+  return out;
 }
 
 /* Build a fork level: one emitter (p) forks into two junctions, each mixing with
@@ -281,7 +314,58 @@ export function buildForkLevel(n, rng, spec = {}) {
     ...armEdges(J1, f1, q1), ...armEdges(J1, b1, sec1),
     ...armEdges(J2, f2, q2), ...armEdges(J2, b2, sec2),
   ];
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges };
+  // replayable gestures: the shared emitter's two rays first, then each feeder+blend
+  const gest = [
+    [[E[0], E[1]], ...legs[0]],
+    [[E[0], E[1]], ...legs[1]],
+    [...f1.slice().reverse(), J1, ...b1],
+    [...f2.slice().reverse(), J2, ...b2],
+  ];
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
+}
+
+/* Build a CHAIN level — the browN pack: two primaries meet at J1 making a secondary,
+   whose blend runs on to J2 where the THIRD primary joins it, mixing brown, which
+   carries on to the brown circle. 3 emitters, 1 brown circle, all three hues used. */
+export function buildChainLevel(n, rng, spec = {}) {
+  const J1 = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
+  const visited = new Set([J1[0] + "," + J1[1]]);
+  const lo = spec.looseness || 0;
+  // 3 arms out of J1: feeder A, feeder B, and the blend path (capped so J2 has room)
+  const blendMax = 3 + ((rng() * Math.max(2, n - 3)) | 0);
+  const arms = growArms(n, rng, J1, 3, visited, null, blendMax * 3, lo);
+  if (!arms || arms.length < 3) return null;
+  const o = shuffle([0, 1, 2], rng);
+  const armA = arms[o[0]], armB = arms[o[1]], armS = arms[o[2]];
+  if (armS.length < 2) return null;                       // the blend needs some travel before J2
+  const J2 = armEnd(armS);
+  if (Math.abs(J2[0] - J1[0]) + Math.abs(J2[1] - J1[1]) <= 1) return null;
+  const forbid = new Set([J1[0] + "," + J1[1]]);
+  const a2 = growArms(n, rng, J2, 2, visited, forbid, null, lo);   // feeder C + the brown run
+  if (!a2 || a2.length < 2) return null;
+  if (visited.size < (spec.minCells || 12)) return null;
+  const [armC, armN] = shuffle(a2.slice(), rng);
+  const sec = SECS[(rng() * 3) | 0], [pA, pB] = shuffle(COMP[sec].slice(), rng);
+  const pC = PRIMS.find((x) => !COMP[sec].includes(x));   // the missing primary completes brown
+  const sq = [[pA, ...armEnd(armA)], [pB, ...armEnd(armB)], [pC, ...armEnd(armC)]];
+  const ci = [["N", ...armEnd(armN)]];
+  const paint = new Map([[J1[0] + "," + J1[1], sec], [J2[0] + "," + J2[1], "N"]]);
+  armA.forEach((c) => paint.set(c[0] + "," + c[1], pA));
+  armB.forEach((c) => paint.set(c[0] + "," + c[1], pB));
+  armS.forEach((c) => paint.set(c[0] + "," + c[1], sec));
+  armC.forEach((c) => paint.set(c[0] + "," + c[1], pC));
+  armN.forEach((c) => paint.set(c[0] + "," + c[1], "N"));
+  const edges = [
+    ...armEdges(J1, armA, pA), ...armEdges(J1, armB, pB), ...armEdges(J1, armS, sec),
+    ...armEdges(J2, armC, pC), ...armEdges(J2, armN, "N"),
+  ];
+  // gestures: A to J1; B to J1 riding the blend out to J2; C to J2 riding brown home
+  const gest = [
+    [...armA.slice().reverse(), J1],
+    [...armB.slice().reverse(), J1, ...armS],
+    [...armC.slice().reverse(), J2, ...armN],
+  ];
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
 }
 
 /* Generate a clean single-emitter level with COLOUR GATES for challenge.

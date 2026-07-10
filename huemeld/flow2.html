@@ -92,6 +92,10 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 }
 .mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .pkgrid{ display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-top:10px; max-width:280px; }
+#ovPick .panel{ max-height:84%; overflow-y:auto; }
+.packtitle{ font-family:var(--font-d); font-weight:700; font-size:17px; margin:16px 0 2px; }
+.packhead{ font-family:var(--font-d); font-weight:600; font-size:14px; margin-top:10px; color:var(--ink); }
+.packhead .pksub{ font-size:12px; color:var(--ink-soft); font-weight:700; margin-left:6px; }
 #ovPick{ position:fixed; }
 #ovPick .panel{ max-height:86vh; display:flex; flex-direction:column; }
 #ovPick .pkgrid{ overflow-y:auto; overflow-x:hidden; padding:6px 4px; min-height:0; }
@@ -173,6 +177,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
         <button class="mk" id="btnDaily" style="background:#c9f0c0;margin-top:4px">★ Daily Puzzle</button>
         <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:8px">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
+        <div id="packsArea"></div>
         <button class="mk" id="btnPickClose">Close</button>
       </div>
     </div>
@@ -212,9 +217,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 <script>
 (function(){
 "use strict";
-var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6"};
-var MIXMAP={RY:"O",BR:"P",BY:"G"};
+var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6",N:"#a8703f"};
+/* primaries pair into secondaries; a secondary + its MISSING primary makes browN
+   (O+B, G+R, P+Y) — that's how "mix all three" levels chain two junctions. */
+var MIXMAP={RY:"O",BR:"P",BY:"G",BO:"N",GR:"N",PY:"N"};
 function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
+var CBGLYPH={R:"R",Y:"Y",B:"B",O:"O",G:"G",P:"P",N:"Br"};   // colour-blind letters
 
 /* iOS zoom guards */
 document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
@@ -246,6 +254,7 @@ var FALLBACK_LEVELS=LEVELS;
 var FLOWDATA=(typeof window!=="undefined" && window.HUEMELD_FLOW) ? window.HUEMELD_FLOW : null;
 LEVELS = (FLOWDATA && FLOWDATA.campaign && FLOWDATA.campaign.length) ? FLOWDATA.campaign : FALLBACK_LEVELS;
 var DAILY = (FLOWDATA && FLOWDATA.daily) ? FLOWDATA.daily : [];
+var PACKS = (FLOWDATA && FLOWDATA.packs) ? FLOWDATA.packs : [];   // side packs: new mechanics, à-la-carte
 
 var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
     shadowCanvas=document.createElement("canvas"), sctx=shadowCanvas.getContext("2d"),
@@ -257,6 +266,7 @@ var board=document.getElementById("board"), canvas=document.getElementById("path
 var li=Math.min(+(localStorage.getItem("hm_flow2_i")||0), LEVELS.length-1);
 var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
 var walls=[], wallSet={}, gates=[];
+var ices=[], iceSet={}, portals=[];      // pack mechanics: straight-through ice, paired warps
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
@@ -265,12 +275,12 @@ var undoStack=[], preGesture=null, UNDO_CAP=60;
 function snapState(){ return JSON.stringify({
   ems:ems.map(function(E){ return E.legs.map(function(l){ return {c:l.cells.map(function(x){return [x[0],x[1]];}), j:l.jun}; }); }),
   tg:tgts.map(function(t){ return t.done; }),
-  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];})}; })
+  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun)}; })
 }); }
 function restoreState(str){ var s=JSON.parse(str);
   s.ems.forEach(function(legs,i){ if(ems[i]) ems[i].legs=legs.map(function(l){ return {cells:l.c.map(function(x){return [x[0],x[1]];}), jun:l.j}; }); });
   s.tg.forEach(function(d,i){ if(tgts[i]) tgts[i].done=d; });
-  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];})}; });
+  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju)}; });
   drag=null; renderPaths(); updateUndoUI();
 }
 function pushUndo(){ if(preGesture!=null && preGesture!==snapState()){ undoStack.push(preGesture); if(undoStack.length>UNDO_CAP) undoStack.shift(); } preGesture=null; updateUndoUI(); }
@@ -353,7 +363,10 @@ function applyLevel(L){
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
   walls=(L.walls||[]).map(function(w){ return [w[0],w[1]]; });
   wallSet={}; walls.forEach(function(w){ wallSet[w[0]+","+w[1]]=1; });
-  gates=(L.gates||[]).map(function(g){ return {col:g[0], r:g[1], c:g[2]}; });
+  gates=(L.gates||[]).map(function(g){ return {col:g[0], r:g[1], c:g[2], dir:g[3]||null}; });
+  ices=(L.ice||[]).map(function(x){ return [x[0],x[1]]; });
+  iceSet={}; ices.forEach(function(x){ iceSet[x[0]+","+x[1]]=1; });
+  portals=(L.portals||[]).map(function(p){ return [p[0],p[1],p[2],p[3]]; });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
   buildGrid(); renderDots(); renderPaths(); updateUndoUI();
 }
@@ -375,6 +388,15 @@ function loadDaily(){
   document.getElementById("btnNext").style.visibility="hidden";
   applyLevel(L);
 }
+var curPack=-1, packIdx=0;
+function loadPackLevel(pi, k){
+  var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
+  isTut=false; mode="pack"; curPack=pi; packIdx=k;
+  lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
+  document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
+  document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
+  applyLevel(pk.levels[k]);
+}
 /* flow2 teaches via the ? legend (no ghost demo yet). these keep old references harmless. */
 var demoing=false, demoFiring=false;
 function stopDemo(){}
@@ -395,7 +417,37 @@ function colorAt(r,c){
   for(var e=0;e<ems.length;e++){ for(var l=0;l<ems[e].legs.length;l++){ if(indexIn(ems[e].legs[l].cells,r,c)>=0) return ems[e].col; } }
   return null;
 }
-function gatesSatisfied(){ for(var i=0;i<gates.length;i++){ if(colorAt(gates[i].r,gates[i].c)!==gates[i].col) return false; } return true; }
+function isIce(r,c){ return !!iceSet[r+","+c]; }
+function portTwin(r,c){ for(var i=0;i<portals.length;i++){ var p=portals[i];
+  if(p[0]===r&&p[1]===c) return [p[2],p[3]];
+  if(p[2]===r&&p[3]===c) return [p[0],p[1]]; } return null; }
+/* the pipe (junction blend or emitter ray) whose cells include (r,c) — {cells,idx} */
+function pathAt(r,c){
+  for(var j=0;j<junctions.length;j++){ var jd=indexIn(junctions[j].leg,r,c); if(jd>=0) return {cells:junctions[j].leg, idx:jd}; }
+  for(var e=0;e<ems.length;e++) for(var l=0;l<ems[e].legs.length;l++){ var id=indexIn(ems[e].legs[l].cells,r,c); if(id>=0) return {cells:ems[e].legs[l].cells, idx:id}; }
+  return null;
+}
+var DIRV={U:[-1,0],D:[1,0],L:[0,-1],R:[0,1]};
+/* a directional gate also demands the pipe crosses it MOVING the arrow's way */
+function dirOK(G){
+  if(!G.dir) return true;
+  var p=pathAt(G.r,G.c); if(!p) return false;
+  var v=DIRV[G.dir], cl=p.cells, i=p.idx;
+  if(i>0 && cl[i][0]-cl[i-1][0]===v[0] && cl[i][1]-cl[i-1][1]===v[1]) return true;
+  if(i<cl.length-1 && cl[i+1][0]-cl[i][0]===v[0] && cl[i+1][1]-cl[i][1]===v[1]) return true;
+  return false;
+}
+function gateOK(G){ return colorAt(G.r,G.c)===G.col && dirOK(G); }
+function gatesSatisfied(){ for(var i=0;i<gates.length;i++){ if(!gateOK(gates[i])) return false; } return true; }
+/* every ice cell must be crossed in a straight line — enter one side, leave the opposite */
+function iceOK(){
+  for(var i=0;i<ices.length;i++){ var p=pathAt(ices[i][0],ices[i][1]); if(!p) return false;
+    var cl=p.cells, k=p.idx;
+    if(k<=0 || k>=cl.length-1) return false;
+    if(cl[k+1][0]-cl[k][0]!==cl[k][0]-cl[k-1][0] || cl[k+1][1]-cl[k][1]!==cl[k][1]-cl[k-1][1]) return false;
+  }
+  return true;
+}
 function bounceDot(r,c){ var rd=[].slice.call(dotL.querySelectorAll(".dot")).filter(function(d){ return +d.dataset.dr===r && +d.dataset.dc===c; })[0]; if(rd){ rd.classList.remove("bounce"); void rd.offsetWidth; rd.classList.add("bounce"); } }
 
 function buildGrid(){
@@ -421,11 +473,18 @@ function occAt(r,c){
 }
 function dropJunction(j){
   var J=junctions[j]; if(!J) return;
+  if(J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<j) j--; J=junctions[j]; if(!J) return; }   // a chained child can't outlive its feeder
   ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) Lg.jun=-1; else if(Lg.jun>j) Lg.jun--; }); });
+  junctions.forEach(function(K,ki){ if(ki===j) return; if(K.jun===j) K.jun=-1; else if(K.jun!=null && K.jun>j) K.jun--; });
   var t=tgtFor(J.sec); if(t) t.done=false;
   junctions.splice(j,1);
 }
 function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
+/* re-grabbing a junction/blend severs any chained child it was feeding; returns the (possibly shifted) index */
+function dropChildOf(ji){ var J=junctions[ji];
+  if(J && J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<ji) ji--; }
+  return ji;
+}
 /* the single source of consistency — run after ANY structural change (retreat, truncate, etc.).
    Deterministic: derives the valid set of legs/junctions from the raw cell paths. */
 function reconcile(){
@@ -444,12 +503,17 @@ function reconcile(){
       }
     }
   });
-  // B) drop junctions unless BOTH feeders still end exactly on the junction cell
-  for(var j=junctions.length-1;j>=0;j--){
-    var J=junctions[j], feeders=[];
-    ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg); }); });
-    var ok = feeders.length===2 && feeders.every(function(Lg){ var h=Lg.cells[Lg.cells.length-1]; return h && same(h,J.cell); });
-    if(!ok) dropJunction(j);
+  // B) drop junctions unless BOTH feeders (emitter legs or a parent blend) still
+  //    end exactly on the junction cell. Looped: dropping one can orphan a chain.
+  var stable=false;
+  while(!stable){ stable=true;
+    for(var j=junctions.length-1;j>=0;j--){
+      var J=junctions[j], feeders=[];
+      ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg.cells); }); });
+      junctions.forEach(function(K,ki){ if(ki!==j && K.jun===j) feeders.push(K.leg); });
+      var ok = feeders.length===2 && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
+      if(!ok){ dropJunction(j); stable=false; break; }
+    }
   }
   recomputeTargets();
 }
@@ -501,13 +565,15 @@ board.addEventListener("pointerdown", function(e){
   preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
   drawSteps=0; melodyReset();
   if(o.t==="jun"){
-    var J=junctions[o.i]; J.leg=[J.cell.slice()];
+    var ji=dropChildOf(o.i);
+    var J=junctions[ji]; J.leg=[J.cell.slice()];
     var tj=tgtFor(J.sec); if(tj) tj.done=false;
-    drag={t:"jun", i:o.i};
+    drag={t:"jun", i:ji};
   } else if(o.t==="jleg"){
-    var J2=junctions[o.i]; J2.leg=J2.leg.slice(0,o.idx+1);
+    var ji2=dropChildOf(o.i);
+    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0,o.idx+1);
     var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
-    drag={t:"jun", i:o.i};
+    drag={t:"jun", i:ji2};
   } else if(o.t==="emdot"){
     var E=ems[o.e];
     var now=Date.now(), isDbl=(lastEmTap.e===o.e && now-lastEmTap.t<DBL_MS);
@@ -551,8 +617,17 @@ function step(cell){
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
   if(tgtAt(head[0],head[1])) return;    // a terminal is an endpoint — you can't drag a pipe THROUGH it
+  if(isIce(head[0],head[1]) && leg.length>1){   // no turning on ice — keep going straight
+    var pv=leg[leg.length-2];
+    if(cell[0]-head[0]!==head[0]-pv[0] || cell[1]-head[1]!==head[1]-pv[1]) return;
+  }
   var o=occAt(cell[0],cell[1]);
-  if(!o){ leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true); renderPaths(); return; }   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
+  if(!o){
+    leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true);   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
+    var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
+    if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){ leg.push([tw[0],tw[1]]); addBloom(tw[0],tw[1],"#7fd4ee",520); }
+    renderPaths(); return;
+  }
 
   if(drag.t==="jun" && (o.t==="em" || o.t==="emdot")){
     // swiped back from the junction onto one of ITS feeder pipes (or the feeder's emitter dot,
@@ -568,6 +643,25 @@ function step(cell){
       drag={t:"em", e:fe, l:fl};
       sfxJun(); renderPaths(); return;
     }
+    // CHAIN: the blend runs into a DIFFERENT primary line -> a deeper mix (browN)
+    if(o.t==="em"){
+      var MJ=junctions[drag.i], oleg2=ems[o.e].legs[o.l];
+      var ns=mixOf(MJ.sec, ems[o.e].col);
+      var oh2=oleg2.cells[oleg2.cells.length-1], oDel2=!!tgtAt(oh2[0],oh2[1]);
+      if(ns && (MJ.jun==null||MJ.jun<0) && oleg2.jun<0 && !oDel2 && tgtFor(ns) && !tgtFor(ns).done
+         && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+        MJ.leg.push(cell);
+        var exc2=oleg2.cells.slice(o.idx+1);
+        var NJ2={cell:cell.slice(), sec:ns, leg:oleg2.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+        oleg2.cells=oleg2.cells.slice(0, o.idx+1);
+        junctions.push(NJ2);
+        MJ.jun=junctions.length-1; oleg2.jun=junctions.length-1;
+        addBloom(cell[0],cell[1], HEX[ns], 660); drawSteps=0; sfxJun();
+        drag = exc2.length ? null : {t:"jun", i:junctions.length-1};
+        renderPaths(); return;
+      }
+      rejectMix(cell); return;
+    }
   }
   if(drag.t==="em" && o.t==="em" && o.e!==drag.e){
     var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
@@ -575,12 +669,15 @@ function step(cell){
     var myLeg=me.legs[drag.l];
     var oHead=oleg.cells[oleg.cells.length-1];
     var oDelivered=!!tgtAt(oHead[0],oHead[1]);   // the other pipe already delivers to a circle — it isn't free to hijack
-    if(sec && myLeg.jun<0 && oleg.jun<0 && !oDelivered && tgtFor(sec) && !tgtFor(sec).done){
+    // the blend is wanted if its own circle needs it, OR it's a stepping stone to a browN circle
+    var secWanted=(tgtFor(sec) && !tgtFor(sec).done) || (tgtFor("N") && !tgtFor("N").done);
+    if(sec && myLeg.jun<0 && oleg.jun<0 && !oDelivered && secWanted
+       && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
       // tap into the other pipe ANYWHERE (o.idx, not just its tip): the junction forms there,
       // and everything on that pipe BEYOND the tap becomes the blend leg (recoloured to the blend)
       myLeg.cells.push(cell);
       var excess=oleg.cells.slice(o.idx+1);
-      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); })};
+      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
       oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
       junctions.push(J);
       myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
@@ -591,6 +688,26 @@ function step(cell){
       renderPaths(); return;
     }
     rejectMix(cell); return;   // an illegal mix (blend already made, or the other pipe already feeds a circle)
+  }
+  // CHAIN (other direction): a primary line runs into an existing blend -> browN
+  if(drag.t==="em" && o.t==="jleg"){
+    var PJ=junctions[o.i], myL2=ems[drag.e].legs[drag.l];
+    var ns2=mixOf(ems[drag.e].col, PJ.sec);
+    var ph=PJ.leg[PJ.leg.length-1], pT=tgtAt(ph[0],ph[1]);
+    var pDel=!!(pT && pT.col===PJ.sec);   // that blend already feeds its circle — don't hijack it
+    if(ns2 && !pDel && myL2.jun<0 && (PJ.jun==null||PJ.jun<0) && tgtFor(ns2) && !tgtFor(ns2).done
+       && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      myL2.cells.push(cell);
+      var exc3=PJ.leg.slice(o.idx+1);
+      var NJ3={cell:cell.slice(), sec:ns2, leg:PJ.leg.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+      PJ.leg=PJ.leg.slice(0, o.idx+1);   // the parent blend now ends at the new junction (a feeder)
+      junctions.push(NJ3);
+      myL2.jun=junctions.length-1; PJ.jun=junctions.length-1;
+      addBloom(cell[0],cell[1], HEX[ns2], 660); drawSteps=0; sfxJun();
+      drag = exc3.length ? null : {t:"jun", i:junctions.length-1};
+      renderPaths(); return;
+    }
+    rejectMix(cell); return;
   }
   // DIRECT delivery: a primary line reaches a same-colour circle (no mixing)
   if(drag.t==="em" && o.t==="tgt"){
@@ -638,6 +755,7 @@ function checkWin(){
   if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
   if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
+  if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
   solved=true; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI();
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
@@ -647,6 +765,13 @@ function checkWin(){
     var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[todayKey()]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     document.getElementById("winMsg").textContent="Daily puzzle solved — see you tomorrow!";
     wn.style.display=""; wn.textContent="Back to levels";
+  } else if(mode==="pack"){
+    var pk=PACKS[curPack];
+    var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
+    (pd[pk.id]=pd[pk.id]||{})[packIdx]=1; localStorage.setItem("hm_flow2_packdone", JSON.stringify(pd));
+    var lastOne = packIdx+1>=pk.levels.length;
+    document.getElementById("winMsg").textContent = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length+(lastOne ? " — pack complete!" : "");
+    wn.style.display=""; wn.textContent = lastOne ? "Back to levels" : "Next →";
   } else {
     var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
     document.getElementById("winMsg").textContent = "Whole board covered."+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
@@ -660,7 +785,7 @@ function renderDots(){
   var s=cs(), h="";
   function dot(col,r,c,shape,star){
     var sz=s*0.84, off=(s-sz)/2;
-    var cb = cbOn ? '<span class="cb">'+col+'</span>' : '';
+    var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
     return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
   ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round…
@@ -718,11 +843,23 @@ function renderPaths(){
   // but the outline WIDTH stays constant (a multiplier would fatten the border too)
   function rad(cell, w){ var b=junSet[cell[0]+","+cell[1]]?JUNC_BUMP:0; return w*0.5 + b + jbump(cell[0],cell[1])*jR; }
 
+  // portal jumps make a leg's cell list non-contiguous — draw it as separate runs
+  function splitRuns(cells){
+    var runs=[], cur=[cells[0]];
+    for(var i=1;i<cells.length;i++){ var a=cells[i-1], b=cells[i];
+      if(Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])===1) cur.push(b);
+      else { runs.push(cur); cur=[b]; } }
+    runs.push(cur); return runs;
+  }
   var legs=[];
   ems.forEach(function(E){ E.legs.forEach(function(Lg){
-    legs.push({cells:Lg.cells, color:HEX[E.col], blend:(Lg.jun>=0&&junctions[Lg.jun])?HEX[junctions[Lg.jun].sec]:null});
+    if(!Lg.cells.length) return;
+    var bl=(Lg.jun>=0&&junctions[Lg.jun])?HEX[junctions[Lg.jun].sec]:null;
+    var runs=splitRuns(Lg.cells);
+    runs.forEach(function(rn,ri){ legs.push({cells:rn, color:HEX[E.col], blend:(ri===runs.length-1)?bl:null}); });
   }); });
-  junctions.forEach(function(J){ legs.push({cells:J.leg, color:HEX[J.sec], blend:null}); });
+  junctions.forEach(function(J){ if(!J.leg.length) return;
+    splitRuns(J.leg).forEach(function(rn){ legs.push({cells:rn, color:HEX[J.sec], blend:null}); }); });
 
   function line(pts,a,b){ ctx.beginPath(); ctx.moveTo(pts[a][0],pts[a][1]); for(var i=a+1;i<=b;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
   function dab(cells,pts,i,w){ ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1], rad(cells[i],w),0,6.2832); ctx.fill(); }
@@ -814,13 +951,46 @@ function renderPaths(){
     for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]||wallSet[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
     ctx.restore();
   }
-  // 6c — colour gates: a small ring the pipe through it must match. Pops (grows
-  //      then settles) the moment the right colour first runs through it.
+  // 6b' — ice tiles: frosted squares a line must cross in a straight line (over the pipe)
+  if(ices.length){
+    ctx.save(); ctx.lineJoin="round";
+    ices.forEach(function(icell){
+      var cx0=icell[1]*s+s/2, cy0=icell[0]*s+s/2, gs2=s*0.78, x0=cx0-gs2/2, y0=cy0-gs2/2, rr2=s*0.17;
+      ctx.globalAlpha=0.30; ctx.fillStyle="#cdeaff"; roundRect(ctx,x0,y0,gs2,gs2,rr2); ctx.fill();
+      ctx.globalAlpha=0.9; ctx.lineWidth=s*0.05; ctx.strokeStyle="#8fd0f0"; roundRect(ctx,x0,y0,gs2,gs2,rr2); ctx.stroke();
+      ctx.globalAlpha=0.85; ctx.strokeStyle="#eef9ff"; ctx.lineWidth=s*0.035; ctx.lineCap="round";
+      for(var ai=0;ai<3;ai++){ var an=ai*Math.PI/3, arm2=s*0.15;
+        ctx.beginPath(); ctx.moveTo(cx0-Math.cos(an)*arm2, cy0-Math.sin(an)*arm2); ctx.lineTo(cx0+Math.cos(an)*arm2, cy0+Math.sin(an)*arm2); ctx.stroke(); }
+    });
+    ctx.restore();
+  }
+  // 6b'' — portals: paired swirl rings; a line entering one comes out of its twin
+  if(portals.length){
+    var PCOLS=["#49c6e5","#ef9d3c","#b083e8","#6fcf7c"];
+    ctx.save();
+    portals.forEach(function(p,pi){
+      var pcol=PCOLS[pi%PCOLS.length];
+      [[p[0],p[1]],[p[2],p[3]]].forEach(function(pc){
+        var cx1=pc[1]*s+s/2, cy1=pc[0]*s+s/2, R=s*0.33;
+        ctx.globalAlpha=1; ctx.lineWidth=s*0.10; ctx.strokeStyle=INK;
+        ctx.beginPath(); ctx.arc(cx1,cy1,R,0,6.2832); ctx.stroke();
+        ctx.lineWidth=s*0.055; ctx.strokeStyle=pcol;
+        ctx.beginPath(); ctx.arc(cx1,cy1,R,0,6.2832); ctx.stroke();
+        var a0=animT/380 + pi*1.7;
+        ctx.lineWidth=s*0.045; ctx.globalAlpha=0.95;
+        ctx.beginPath(); ctx.arc(cx1,cy1,R*0.55,a0,a0+2.2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx1,cy1,R*0.55,a0+3.14,a0+5.34); ctx.stroke();
+      });
+    });
+    ctx.restore();
+  }
+  // 6c — colour gates: a small ring the pipe through it must match (and, for arrow
+  //      gates, must be crossed the arrow's way). Pops the moment it's satisfied.
   if(gates.length){
     var gp=0.5+0.5*Math.sin(animT/300), GPOP=380;
-    var gs0=s*0.56, rr0=s*0.14;                        // a touch bigger than before
+    var gs0=s*0.56, rr0=s*0.14;
     gates.forEach(function(G){
-      var col=HEX[G.col], ok=colorAt(G.r,G.c)===G.col;
+      var col=HEX[G.col], ok=gateOK(G);
       if(ok && !G.sat){ G.sat=true; G.satAt=nowMs(); if(soundOn) voice(880,0.13,{type:"sine",g:0.03,lp:3200,atk:0.003}); }
       else if(!ok) G.sat=false;
       var pop=1, age=(nowMs()-(G.satAt||-9999))/GPOP;
@@ -830,7 +1000,15 @@ function renderPaths(){
       ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
       ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
       if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.06; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
-      if(cbOn){ ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(G.col,cx,cy); ctx.fillText(G.col,cx,cy); }
+      if(G.dir){   // arrow gate: a chevron shows the demanded crossing direction
+        var v=DIRV[G.dir], ang=Math.atan2(v[0],v[1]), aa=s*0.17*pop;
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+        ctx.globalAlpha=1; ctx.fillStyle=col; ctx.strokeStyle=INK; ctx.lineWidth=s*0.03;
+        ctx.beginPath(); ctx.moveTo(aa*0.75,0); ctx.lineTo(-aa*0.45,-aa*0.62); ctx.lineTo(-aa*0.45,aa*0.62); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+      if(cbOn){ var ty=G.dir? y-s*0.10 : cy;
+        ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(CBGLYPH[G.col]||G.col,cx,ty); ctx.fillText(CBGLYPH[G.col]||G.col,cx,ty); }
       ctx.restore();
     });
   }
@@ -857,7 +1035,22 @@ function renderPicker(){
   var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
   var db=document.getElementById("btnDaily");
   db.textContent = dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle";
+  // side packs: new mechanics, tried here (purchase gating comes with the app build)
+  var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}"), ph="";
+  PACKS.forEach(function(pk,pi){
+    var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
+    ph+='<div class="packhead">'+(pk.icon||"")+' '+pk.name+'<span class="pksub">'+ndp+"/"+pk.levels.length+"</span></div>";
+    ph+='<div class="pkgrid">';
+    for(var k=0;k<pk.levels.length;k++)
+      ph+='<button class="pkbtn'+(mode==="pack"&&curPack===pi&&packIdx===k?" cur":"")+'" data-p="'+pi+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d[k]?"✓":"")+'</span></button>';
+    ph+='</div>';
+  });
+  document.getElementById("packsArea").innerHTML = ph ? '<div class="packtitle">Puzzle Packs</div>'+ph : "";
 }
+document.getElementById("packsArea").addEventListener("click", function(e){
+  var b=e.target.closest(".pkbtn"); if(!b || b.dataset.p==null) return;
+  ensureAudio(); loadPackLevel(+b.dataset.p, +b.dataset.k);
+});
 document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadDaily(); });
@@ -865,10 +1058,13 @@ document.getElementById("pkgrid").addEventListener("click", function(e){
   var b=e.target.closest(".pkbtn"); if(!b) return;
   ensureAudio(); loadLevel(+b.dataset.i);
 });
-document.getElementById("btnPrev").addEventListener("click", function(){ if(mode!=="campaign")return; ensureAudio(); loadLevel(li-1); });
-document.getElementById("btnNext").addEventListener("click", function(){ if(mode!=="campaign")return; ensureAudio(); loadLevel(li+1); });
-document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); mode==="daily"?loadDaily():loadLevel(li); });
-document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadLevel(li); else loadLevel(li+1); });
+document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li-1); else if(mode==="pack") loadPackLevel(curPack, packIdx-1); });
+document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li+1); else if(mode==="pack") loadPackLevel(curPack, packIdx+1); });
+document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadDaily(); else if(mode==="pack") loadPackLevel(curPack, packIdx); else loadLevel(li); });
+document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio();
+  if(mode==="daily") loadLevel(li);
+  else if(mode==="pack"){ if(packIdx+1<PACKS[curPack].levels.length) loadPackLevel(curPack, packIdx+1); else loadLevel(li); }
+  else loadLevel(li+1); });
 
 document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(undoStack.length) restoreState(undoStack.pop()); });
 
@@ -934,6 +1130,8 @@ window.__flow={
   render:function(){ renderPaths(); },
   mode:function(){ return mode; },
   daily:loadDaily,
+  pack:loadPackLevel,
+  packs:function(){ return PACKS; },
   undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
   undoDepth:function(){ return undoStack.length; },
   data:function(){ return { campaign:LEVELS, daily:DAILY }; },
