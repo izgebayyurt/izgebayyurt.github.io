@@ -99,6 +99,10 @@ body{
 .legend{ text-align:left; margin:4px 0 2px; font-weight:700; font-size:12.5px; color:var(--ink-soft); line-height:1.7; }
 .legend .k{ display:inline-block; font-family:var(--font-d); color:var(--ink); background:var(--paper2);
   border:2px solid var(--ink); border-radius:8px; padding:1px 7px; margin:0 1px; font-size:12px; }
+.tagline{ font-weight:700; color:var(--ink); font-size:14.5px; margin:6px 0 4px; letter-spacing:.2px; }
+.startfoot{ display:flex; align-items:center; justify-content:center; gap:14px; margin-top:14px; }
+.startfoot .chipbtn{ background:var(--card); border:2.5px solid var(--ink); box-shadow:0 3px 0 var(--shadow); border-radius:12px; }
+.startcredit{ font-size:11.5px; color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
 .credit{ margin-top:14px; font-size:11.5px; }
 .credit a{ color:var(--ink-soft); text-decoration:none; border-bottom:1.5px solid rgba(44,39,51,.3); }
 .row{ display:flex; gap:9px; margin-top:14px; }
@@ -263,6 +267,7 @@ body{
 .nw-ribbon{ display:block; font-family:var(--font-d); font-weight:700; font-size:13.5px; letter-spacing:.05em;
   color:#fffdf6; background:#ef4a5a; border:2.5px solid var(--ink); border-radius:10px 10px 10px 2px;
   box-shadow:0 2px 0 var(--shadow); padding:4px 8px; margin:0 0 9px; text-align:center; transform:rotate(-.9deg); }
+.nw-comp{ display:flex; flex-wrap:wrap; gap:9px 8px; align-items:center; padding:3px 2px 5px; }
 .nw-lanes{ display:flex; gap:6px; align-items:flex-start; }
 .nw-lane{ flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; min-height:22px; }
 .nw-lane .nw-ln{ font-family:var(--font-u); font-weight:800; font-size:8.5px; letter-spacing:.06em; color:rgba(44,39,51,.4); }
@@ -325,29 +330,23 @@ body{
   <div class="panel">
     <div class="ringlogo"><i></i><i></i><i></i><i></i></div>
     <h1>Whorl</h1>
-    <p>You are the last colour-alchemist. The wall holds while you turn light into spells.</p>
-    <div class="legend">
-      <b style="color:var(--ink)">Merge</b> — drag a ball into its <b>neighbour</b>.<br>
-      <span class="k">R</span>+<span class="k">B</span> = a secondary · <span class="k">R</span>+<span class="k">R</span> = level&nbsp;up (more power).<br>
-      <b style="color:var(--ink)">Cast</b> — sweep across <b>3 in a row</b>. Colours pick the spell; levels set the power.<br>
-      Merges and casts cost <b>1 action</b> each — but one <b>level-up merge per turn is free</b>.<br>
-      Shielded foes resist all but their <b>own colour</b>. Drag into the <b>hub</b> to cancel a sweep.<br>
-      A spell is its <b>exact recipe</b> — or a crafted pair. One of each primary weaves a <b>Prism</b>: it echoes the first colour you sweep.<br>
-      A <b>mirror</b> speaks a language: <span class="k">A·B·A</span> shapes a spell (wings shape, heart fills), <span class="k">A·B·B·A</span> forms a lane-holding <b>Warrior</b>.<br>
-      <b style="color:var(--ink)">Hold</b> a ball to lift and carry it — build the window you need.<br>
-      <b style="color:var(--ink)">Turns</b> — actions &amp; End-turn. <b style="color:var(--ink)">Flow</b> — real-time: cast on a cooldown, the horde steps on a beat.
-    </div>
-    <div class="row">
-      <button class="mk" id="btnStart" style="flex:1;height:52px;font-size:18px;">Turns</button>
-      <button class="mk" id="btnFlow" style="flex:1;height:52px;font-size:18px;">Flow</button>
-    </div>
+    <p class="tagline">Merge colours. Sweep mirrors. Hold the wall.</p>
     <div class="diffrow" id="diffRow">
       <span class="diff-lbl">Difficulty</span>
       <button class="mk diffbtn" data-diff="gentle">Gentle</button>
       <button class="mk diffbtn" data-diff="standard">Standard</button>
       <button class="mk diffbtn" data-diff="fierce">Fierce</button>
     </div>
-    <div class="credit"><a href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a></div>
+    <!-- DEV ONLY: the retired Turns/Flow toggle, restored by localStorage wh_turnmode="1" -->
+    <div class="row" id="devModeRow" style="display:none;">
+      <button class="mk" id="btnStart" style="flex:1;height:42px;font-size:15px;">Turns</button>
+      <button class="mk" id="btnFlow" style="flex:1;height:42px;font-size:15px;">Flow</button>
+    </div>
+    <div class="row"><button class="mk accent" id="btnBegin" style="flex:1;height:54px;font-size:19px;">Begin</button></div>
+    <div class="startfoot">
+      <button class="mk chipbtn" id="btnStartBook" title="Spellbook" aria-label="Spellbook">✦</button>
+      <a class="startcredit" href="/" title="İzge Bayyurt">İzge Bayyurt ↗</a>
+    </div>
   </div>
 </div>
 
@@ -408,9 +407,48 @@ var CFG = {
   spellPow: 1,
   castLevelBonus: 0,
   maxActionsUp: 0,
-  realtime: false,     // FLOW MODE: real-time variant (set by start-screen toggle)
+  realtime: true,      // FLOW IS CANON (build 14): the game always boots Flow. Turn mode survives behind a
+                       // hidden dev flag (localStorage wh_turnmode="1" restores the start-screen toggle).
   castCd: 2.2          // flow: base cast cooldown, seconds (Haste boon lowers it)
 };
+/* dev flag: restores the Turns/Flow toggle on the start screen (turn-mode code is all intact) */
+var DEV_TURNMODE = false; try{ DEV_TURNMODE = localStorage.getItem("wh_turnmode")==="1"; }catch(e){}
+/* ===================== THE OPEN FIELD (build 14) =====================
+   Lanes/rungs are retired for MOVEMENT: enemies carry continuous (x,y) + a speed, drift toward the wall
+   each beat (a smooth glide), and lock into melee with the nearest friendly troop they meet. Trample tiers
+   port over. laneX/rungY/rungPitch survive only as GEOMETRY helpers (spawn spread, troop homes, book art).
+   FIELD_GLIDE = the per-move glide window (ms); a beat resolves as one such glide. */
+var FIELD_GLIDE = 850;
+function fieldW(){ return W - 24; }
+function wallY(){ return geo.gateY; }
+function engageR(){ return rungPitch()*0.78; }          // melee-lock distance
+function sepR(){ return Math.min(geo.laneW, rungPitch())*0.60; }   // separation radius (blobs don't fully overlap)
+function corridorHalf(){ return geo.laneW*0.62; }       // Bolt/Pierce line half-width
+var CONE_HALF = 0.44;                                    // Spray/Venom cone half-angle (rad)
+/* ---- FLICK AIMING (change 2): a fast sweep-release AIMS directional spells along the release vector.
+   pendingFlick is set in up() and consumed by the next aimSpell (same synchronous tick). ---- */
+var FLICK_V = 0.62;                                      // px/ms release-speed threshold to count as a flick
+var pendingFlick = null;
+function consumeFlick(){ var f=pendingFlick; pendingFlick=null; return f; }
+/* ---- PERFECT RELEASE (change 3): holding a valid 3+ sweep tightens a gold ring toward a sweet band;
+   releasing inside the band is a PERFECT (×1.25 dmg / +25% summon stats). Universal across cast types. */
+var PERFECT_DELAY = 250, PERFECT_DUR = 900, PERFECT_LO = 0.65, PERFECT_HI = 0.80;
+var pendingPerfect = false, perfectFxT = 0;
+/* progress/band math — pure, so the harness can assert the window */
+function perfectWindow(holdMs){
+  var progress = holdMs>0 ? holdMs/PERFECT_DUR : 0;
+  return { progress:progress, perfect: progress>=PERFECT_LO && progress<=PERFECT_HI };
+}
+/* the shrink (0..1) of the perfect ring for a given hold — 0 before it begins, clamped at 1.15 */
+function perfectShrink(holdMs){ return Math.max(0, Math.min(1.15, holdMs>0 ? holdMs/PERFECT_DUR : 0)); }
+function consumePerfect(){ var p=pendingPerfect; pendingPerfect=false; if(p) perfectFxT=now(); return p ? 1.25 : 1; }
+/* the PERFECT payoff moment — a gold micro-callout, a pitch-up chime, an extra hub flash */
+function perfectCallout(){
+  toast("Perfect!", 900, "#b9791a", "mid", true);
+  beep(1040,.09,"triangle",.05); setTimeout(function(){ beep(1560,.11,"sine",.045); },70);
+  boom(geo.cx, geo.cy, "#ffd15c", 1.4); S.fx.push({ star:true, x:geo.cx, y:geo.cy, t:now(), tint:"#ffd15c" });
+  vib([10,30,10]);
+}
 
 /* ===================== DIFFICULTY (selector plumbing) =====================
    ONE multiplier table, applied in rollWave (enemy hp · wave count ceil · gate damage).
@@ -485,6 +523,22 @@ function rungY(rung){
   return geo.fieldTop + t*(geo.gateY-geo.fieldTop);
 }
 function rungPitch(){ return (geo.gateY-geo.fieldTop)/(CFG.rungs-1); }
+/* keep the DERIVED lane/rung cells in sync with continuous (x,y) so legacy readers (pyre cell, leech
+   range, intel, healer skittish) still work while movement is fully continuous. */
+function syncCell(e){
+  e.rung = Math.max(0, Math.min(CFG.rungs-1, Math.round((geo.gateY-e.y)/rungPitch())));
+  e.lane = Math.max(0, Math.min(CFG.lanes-1, Math.round((e.x-geo.fieldL)/geo.laneW - 0.5)));
+}
+/* friendly TROOPS = summons (warriors) + standing creations. Enemies path to the nearest one. */
+function troopList(){ return liveWarriors().concat(liveCreations()); }
+function nearestTroop(e){
+  var best=null, bd=Infinity;
+  troopList().forEach(function(w){ var d=Math.hypot(w.x-e.x, w.y-e.y); if(d<bd){ bd=d; best=w; } });
+  return best ? { w:best, d:bd } : null;
+}
+/* arm a smooth glide from the current spot to (tx,ty) — resolved over FIELD_GLIDE ms in the draw loop. */
+function moveGlide(e, tx, ty){ e.mx0=e.x; e.my0=e.y; e.tx=tx; e.ty=ty; e.moveT=now(); }
+function dist2d(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
 
 /* ===================== state ===================== */
 var S=null, gameId=0;
@@ -521,6 +575,8 @@ function newGame(){
     paused:false, phaseRunning:false, phaseQueued:false,
     // ---- PRE-WAVE READOUT: the next wave's spec, pre-rolled at wave clear (preview === spawn) ----
     nextWaveSpec:null,
+    // ---- FIRST-RUN COACH: up to four contextual one-liners, each dismissed by doing the thing ----
+    coach:null, coachT:0,
     // ---- run stats (for the death-screen readout; only nonzero rows show) ----
     stats:{ waves:0, bestCast:null, doublecasts:0, creations:0, motes:0, prisms:0 }
   };
@@ -529,7 +585,35 @@ function newGame(){
   moteHudSet();
   applyModeUI();
   updatePauseBtn();
+  coachStart();
   nextWave();
+}
+/* ===================== FIRST-RUN COACH (change 5) =====================
+   Four one-line prompts, in order, each shown in the hub and dismissed by DOING the thing:
+     1 run start  → "drag a ball onto a different colour — they mix"   (dismiss: first merge)
+     2 first merge→ "sweep three in a row to cast"                      (dismiss: first cast)
+     3 first cast → "three of one colour summons a warrior"            (dismiss: first summon)
+     4 first summon→"open the book ✦ for everything else"              (dismiss: opening the book)
+   Completion persists in localStorage wh_coach; once done it never shows again. */
+var COACH_LINES = [
+  "drag a ball onto a different colour — they mix",
+  "sweep three in a row to cast",
+  "three of one colour summons a warrior",
+  "open the book ✦ for everything else"
+];
+function coachDone(){ try{ return localStorage.getItem("wh_coach")==="1"; }catch(e){ return true; } }
+function coachStart(){
+  if(coachDone()){ S.coach=null; return; }
+  S.coach=0; S.coachT=now();       // step 0 = first line, shown immediately
+}
+/* advance the coach when the player performs the current step's action. `ev` names what just happened. */
+function coachHit(ev){
+  if(!S || S.coach==null) return;
+  var want = ["merge","cast","summon","book"][S.coach];
+  if(ev!==want) return;
+  S.coach++;
+  if(S.coach>=COACH_LINES.length){ S.coach=null; try{ localStorage.setItem("wh_coach","1"); }catch(e){} }
+  else S.coachT=now();
 }
 function freshBall(){
   var keys=["R","Y","B"];
@@ -625,13 +709,20 @@ function spawnWave(spec){
   st.aurumSpent=false;                    // Aurum: rechargeable once per wave
   st.pyre=null;                           // Pyre Ground is wave-scoped (creations persist — they're monuments)
   st.firstTransmuteUsed=false; st.catFree=0;   // Catalyst: free transmute(s) reset each wave/turn
+  var total=spec.enemies.length;
   spec.enemies.forEach(function(es,k){
+    // OPEN FIELD: spawn spread along the TOP edge (spread out), drift down to the wall
+    var fx = geo.fieldL + (total<=1 ? 0.5 : (k+0.5)/total)*fieldW() + (es.jit||0);
+    fx = Math.max(geo.fieldL+18, Math.min(geo.fieldL+fieldW()-18, fx));
+    var fy = geo.fieldTop + ((k%2)?rungPitch()*0.32:0);   // slight vertical stagger so the top edge reads organic
+    var spd = (es.brute||es.elite) ? 0.5 : 1;             // brutes/elites at half-speed (the old alternating-beat feel)
     st.enemies.push({
-      lane:es.lane, rung:es.rung, x:laneX(es.lane), y:rungY(es.rung),
+      x:fx, y:fy, tx:fx, ty:fy, mx0:fx, my0:fy, moveT:0, spd:spd, wallT:0, engaged:null,
+      lane:es.lane, rung:es.rung,                          // DERIVED cells (kept in sync from x,y for legacy readers)
       hp:es.hp, maxhp:es.maxhp, ward:es.ward, brute:es.brute,
       elite:es.elite, armored:es.armored, healer:es.healer, leech:es.leech,
       dmg:es.dmg, freeze:0, frImm:0, poison:0, burn:0, chill:false,
-      slow:es.slow, slowT:0, seed:es.seed, jit:es.jit,
+      slow:0, slowT:0, seed:es.seed, jit:es.jit,
       arrived:false,                                                 // ARRIVAL GRACE: settle in — skip the first enemy-phase advance
       spawn: now()+k*80, hit:0, dotT:0, stepT:0, dead:false, deadAt:0
     });
@@ -764,6 +855,7 @@ function inscribe(name){
 var bookOpen=false;
 function openBook(){
   cancelGesture();                          // opening the book abandons any live sweep
+  if(S) coachHit("book");                   // FIRST-RUN COACH: opening the book completes the last step
   bookOpen=true;
   var box=document.getElementById("bookRows"); box.innerHTML="";
   var totalCasts=0;
@@ -1007,8 +1099,9 @@ function fizzleOf(balls){
 
 /* ===================== combat ===================== */
 function nearest(){
+  // OPEN FIELD: the frontmost foe = the one closest to the wall (largest y); tie → leftmost
   var best=null;
-  alive().forEach(function(e){ if(!best || e.rung<best.rung || (e.rung===best.rung && e.lane<best.lane)) best=e; });
+  alive().forEach(function(e){ if(!best || e.y>best.y || (e.y===best.y && e.x<best.x)) best=e; });
   return best;
 }
 /* ward: matching colour x2 (x3 with Weakness), any other element halved.
@@ -1055,33 +1148,95 @@ function applyDmg(e, amt, el, opts){
         spawnDmg(near.x, near.y-geo.ballR*0.9, share, false, false, true); });
     }
   } else if(e.healer && !e.dead){
-    // SKITTISH: a healer that survives a hit bolts one rung deeper and spends its next
-    // move recovering (fled). chasing it costs casts; ignoring it lets the horde regen.
-    if(e.rung < CFG.rungs-1) e.rung++;
+    // SKITTISH: a healer that survives a hit flees a short distance UP-FIELD (away from the wall) and
+    // spends its next move recovering. Chasing it costs casts; ignoring it lets the horde regen.
+    var flee=rungPitch()*0.85;
+    moveGlide(e, e.x, Math.max(geo.fieldTop, e.y-flee));
     e.fled = true; e.stepT = now();
     boom(e.x, e.y, "#c9c1b4", .5);   // dust boom as it scrambles back
     beep(700, .09, "sine", .045);    // squeak
   }
   return amt;                        // damage actually dealt (post-ward/frost) — fed to the best-cast tally
 }
-/* Void's "assassin" seeks the toughest foe alive (highest maxhp) — ignores tgt */
-function targetsFor(sp, tgt){
-  if(sp.kind==="assassin"){
-    var best=null; alive().forEach(function(e){ if(!best || e.maxhp>best.maxhp) best=e; });
-    return best ? [best] : [];
-  }
-  if(!tgt) return [];
-  if(sp.kind==="single") return [tgt];
-  if(sp.kind==="all") return alive();
-  if(sp.kind==="lane") return alive().filter(function(e){ return e.lane===tgt.lane; });
-  if(sp.kind==="splash"){ var rad=sp.radius||1; return alive().filter(function(e){ return Math.abs(e.lane-tgt.lane)<=rad && Math.abs(e.rung-tgt.rung)<=rad; }); }
-  if(sp.kind==="cluster") return alive().filter(function(e){ return Math.abs(e.lane-tgt.lane)<=1 && e.rung<=tgt.rung+1; });
-  return [tgt];
+/* ===================== OPEN-FIELD SPELL GEOMETRY (change 1 + flick change 2) =====================
+   Strike = nearest / flick-aimed single · Burst = radius around a point · Bolt/Pierce = a straight
+   corridor LINE from the wall (or the flick ray from the hub) · Spray = a cone · Radiance/all = split.
+   Canon maps: Blast=burst, Lance=line, Venom=cone, Frost/Sunburst/Overgrowth/Eclipse=all, Pyre=big
+   burst, Void=assassin (furthest-HP single), Whorl=all. aimSpell stashes the geometry in _lastAim so
+   castFx can draw the matching shape (+ flick ghost-arrow). */
+var _lastAim=null;
+function furthestHP(){ var best=null; alive().forEach(function(e){ if(!best || e.hp>best.hp) best=e; }); return best; }
+function nearestToPt(px,py){ var best=null,bd=Infinity; alive().forEach(function(e){ var d=Math.hypot(e.x-px,e.y-py); if(d<bd){ bd=d; best=e; } }); return best; }
+/* enemies within a straight CORRIDOR of the ray O + t·D (D unit) — perp dist ≤ half, ahead of O */
+function corridorHits(ox,oy,dx,dy,half){
+  return alive().filter(function(e){
+    var vx=e.x-ox, vy=e.y-oy, along=vx*dx+vy*dy;
+    if(along < -geo.ballR) return false;
+    return Math.abs(vx*dy - vy*dx) <= half;
+  });
 }
-/* pick the aiming target + the hit set for a resolved spell (assassin ignores nearest) */
+function burstHits(px,py,R){ return alive().filter(function(e){ return Math.hypot(e.x-px,e.y-py)<=R; }); }
+function coneHits(ox,oy,dx,dy,ha,len){
+  return alive().filter(function(e){
+    var vx=e.x-ox, vy=e.y-oy, d=Math.hypot(vx,vy)||1;
+    if(d>len) return false;
+    return Math.acos(Math.max(-1,Math.min(1,(vx*dx+vy*dy)/d))) <= ha;
+  });
+}
+/* the foe the flick ray strikes first (roughly along the ray, nearest along it) */
+function nearestAlongRay(ox,oy,dx,dy){
+  var best=null,bd=Infinity;
+  alive().forEach(function(e){
+    var vx=e.x-ox, vy=e.y-oy, along=vx*dx+vy*dy;
+    if(along<0) return;
+    if(Math.abs(vx*dy - vy*dx) > corridorHalf()*1.3) return;
+    if(along<bd){ bd=along; best=e; }
+  });
+  return best;
+}
+/* legacy compat: hit-set for a resolved spell aimed at nearest (used by non-flick auto paths) */
+function targetsFor(sp, tgt){ return aimSpell(sp).hits; }
+/* resolve the aim (flick or auto), the hit set, and the geometry for the FX */
 function aimSpell(sp){
-  if(sp.kind==="assassin"){ var h=targetsFor(sp); return { tgt:h[0]||null, hits:h }; }
-  var tgt=nearest(); return { tgt:tgt, hits:targetsFor(sp,tgt) };
+  var fl=consumeFlick();
+  var hubO={ x:geo.cx, y:geo.cy };
+  if(sp.kind==="assassin"){ var h=furthestHP(); _lastAim={ kind:"single", pt:h?{x:h.x,y:h.y}:null }; return { tgt:h, hits:h?[h]:[], aim:_lastAim }; }
+  if(sp.kind==="all"){ _lastAim={ kind:"all" }; return { tgt:nearest(), hits:alive(), aim:_lastAim }; }
+  var nA=nearest();
+  var ox,oy,dx,dy,focus;
+  if(fl){ ox=hubO.x; oy=hubO.y; dx=fl.dx; dy=fl.dy;
+    var na=nearestAlongRay(ox,oy,dx,dy);
+    if(na){ var al=(na.x-ox)*dx+(na.y-oy)*dy; focus={ x:ox+dx*al, y:oy+dy*al }; }
+    else { var md=(geo.gateY-geo.fieldTop); focus={ x:ox+dx*md, y:oy+dy*md }; }
+  } else if(nA){
+    focus={ x:nA.x, y:nA.y };
+    if(sp.kind==="lane"){ ox=nA.x; oy=geo.gateY; dx=0; dy=-1; }              // vertical corridor at the nearest foe
+    else { ox=hubO.x; oy=hubO.y; var vd=Math.hypot(nA.x-ox,nA.y-oy)||1; dx=(nA.x-ox)/vd; dy=(nA.y-oy)/vd; }
+  } else { ox=hubO.x; oy=hubO.y; dx=0; dy=-1; focus={ x:geo.cx, y:geo.fieldTop }; }
+  if(sp.kind==="single"){
+    var tgt = fl ? (nearestAlongRay(ox,oy,dx,dy) || nA) : nA;
+    _lastAim={ kind:"single", pt: tgt?{x:tgt.x,y:tgt.y}:focus, flick:!!fl };
+    return { tgt:tgt, hits:tgt?[tgt]:[], aim:_lastAim };
+  }
+  if(sp.kind==="lane"){
+    var lh=corridorHits(ox,oy,dx,dy,corridorHalf());
+    _lastAim={ kind:"line", ox:ox,oy:oy,dx:dx,dy:dy, flick:!!fl };
+    return { tgt:lh[0]||nA, hits:lh, aim:_lastAim };
+  }
+  if(sp.kind==="splash"){
+    var R=rungPitch()*(sp.radius?1.0+sp.radius*0.5:1.15);
+    var bh=burstHits(focus.x,focus.y,R);
+    _lastAim={ kind:"burst", pt:focus, r:R, flick:!!fl };
+    return { tgt:nearestToPt(focus.x,focus.y)||nA, hits:bh, aim:_lastAim };
+  }
+  if(sp.kind==="cluster"){
+    var len=Math.hypot(focus.x-ox,focus.y-oy)+rungPitch()*1.6;
+    var ch=coneHits(ox,oy,dx,dy,CONE_HALF,len);
+    _lastAim={ kind:"cone", ox:ox,oy:oy,dx:dx,dy:dy, ha:CONE_HALF, len:len, flick:!!fl };
+    return { tgt:ch[0]||nA, hits:ch, aim:_lastAim };
+  }
+  _lastAim={ kind:"single", pt:focus };
+  return { tgt:nA, hits:nA?[nA]:[], aim:_lastAim };
 }
 function hitPt(e){ return { x:e.x, y:e.y, lane:e.lane }; }
 /* stale casts: repeating the same spell this wave dulls it; switching sharpens it.
@@ -1247,6 +1402,9 @@ function cast(idxs){
   else if(S.actions<=0) return;
   if(CFG.realtime) startCool();
   applyStale(st, sp);
+  var pmul=consumePerfect(), perfect=pmul>1;                              // PERFECT RELEASE: ×1.25 damage
+  if(perfect && !sp.fizzle) sp.dmg=Math.max(1,Math.round(sp.dmg*pmul));
+  coachHit("cast");
   var dbl = (!sp.fizzle && doublePending()); if(dbl) S.pendingDouble--;   // Mordant: this cast fires twice (counter down)
   var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;                       // Mordant II: each doubled cast also deals +15%
   st.busy=true; st.phase="cast";
@@ -1269,6 +1427,7 @@ function cast(idxs){
       var label = sp.tl>=6 ? "L"+sp.tl+" "+sp.name.toUpperCase()+"!" : sp.name+(sp.tl>3?" · L"+sp.tl:"");
       toast(label, 1000, sp.tint==="#ffd15c"?"#b9791a":sp.tint, "low", sp.tl>=6);
     }
+    if(perfect && !sp.fizzle) perfectCallout();   // PERFECT: gold micro-callout + chime + flash (overrides the label)
     recordSpell(sp, false);   // journal it — a first cast fires the INSCRIBED moment, overriding the label
   },230);
   setTimeout(function(){ if(S!==st||st.over) return;
@@ -1286,6 +1445,8 @@ function castMirrorSpell(idxs, sp){
   if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
   else if(st.actions<=0) return;
   applyStale(st, sp);
+  var pmul=consumePerfect(), perfect=pmul>1; if(perfect) sp.dmg=Math.max(1,Math.round(sp.dmg*pmul));   // PERFECT ×1.25
+  coachHit("cast");
   var dbl = doublePending(); if(dbl) S.pendingDouble--;
   var dblMul = (dbl && isII("Mordant")) ? 1.15 : 1;
   st.busy=true; st.phase="cast";
@@ -1300,6 +1461,7 @@ function castMirrorSpell(idxs, sp){
     if(dbl){ var aim2=aimSpell(sp); castFx(sp, aim2.tgt, aim2.hits.map(hitPt)); impactSpell(sp, aim2.hits, dblMul); S.shake=Math.min(24,S.shake+5); }
     var reacted=(now()-_reactBannerT)<80;
     if(!reacted) toast(sp.name+"!", 1100, "#b9791a", "mid", true);
+    if(perfect) perfectCallout();
     S.shake=Math.min(22, S.shake+4);
     recordSpell(sp, false);
   },230);
@@ -1324,6 +1486,7 @@ function transmuteFx(slot){
 }
 function transmute(idxs){
   var st=S;
+  consumeFlick(); consumePerfect();   // a craft, not a strike — discard any aim/perfect from the release
   // Catalyst waives the action only for the FIRST transmute each turn (Turns); after that it costs normally
   var catCap = isII("catalyst") ? 2 : 1;                                    // II: first TWO transmutes/turn are free
   var freeCat = !CFG.realtime && st.reagents.catalyst && (st.catFree||0) < catCap;
@@ -1388,6 +1551,9 @@ function castWeave(idxs){
   else if(S.actions<=0) return;
   if(!spA.transmute) applyStale(st, spA);                   // transmute never touches the streak
   if(!spB.transmute) applyStale(st, spB);
+  var pmul=consumePerfect(), perfect=pmul>1;                // PERFECT ×1.25 on both real halves of the weave
+  if(perfect){ if(!spA.transmute) spA.dmg=Math.max(1,Math.round(spA.dmg*pmul)); if(!spB.transmute) spB.dmg=Math.max(1,Math.round(spB.dmg*pmul)); }
+  coachHit("cast");
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib([30,40,30,40,70]);
@@ -1403,6 +1569,7 @@ function castWeave(idxs){
     else { impactSpell(spA, aimA.hits); recordSpell(spA, true); }
     S.shake += 5;                                            // doublecast spectacle
     toast(weaveBanner(spA,spB), 1200, "#b9791a", "mid", true);   // one banner — spell toasts skipped
+    if(perfect) perfectCallout();
   },230);
   setTimeout(function(){ if(S!==st||st.over) return;
     if(spB.transmute){ transmuteFx(idxs[4]); }
@@ -1431,7 +1598,7 @@ function weaveCollapse(idxs, balls){
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // staggered slurp into the hub
   vib([8,60,8]);
-  var tgt = nearest(), hits = targetsFor(sp, tgt);
+  var wa=aimSpell(sp), tgt=wa.tgt, hits=wa.hits;
   setTimeout(function(){ if(S!==st||st.over) return;
     sCast(sp.tl); sFizzle();
     castFx(sp, tgt, hits.map(function(e){ return {x:e.x,y:e.y,lane:e.lane}; }));
@@ -1837,16 +2004,14 @@ function creationBolt(c, e){
 function creationAct(c){
   if(c.dead) return;
   if(c.kind==="golem"){
-    creationStrike(c, frontEnemyInLane(c.lane, c.rung));
+    var f=nearestEnemyTo(c, engageR()*1.7); if(f) creationStrike(c, f);
   } else if(c.kind==="colossus"){
-    [c.lane-1, c.lane, c.lane+1].forEach(function(l){
-      if(l<0 || l>=CFG.lanes) return;
-      creationStrike(c, frontEnemyInLane(l, c.rung));
-    });
+    alive().filter(function(e){ return Math.hypot(e.x-c.x, e.y-c.y)<=rungPitch()*1.4; })
+      .slice(0,3).forEach(function(e){ creationStrike(c, e); });
   } else if(c.kind==="sentry"){
-    creationBolt(c, frontEnemyInLane(c.lane, null));
+    var f2=nearestEnemyTo(c, null); if(f2) creationBolt(c, f2);   // ward-stone bolts at any range
   } else if(c.kind==="beacon"){
-    for(var l=0;l<CFG.lanes;l++) creationBolt(c, frontEnemyInLane(l, null));
+    alive().slice().sort(function(a,b){ return b.hp-a.hp; }).slice(0, CFG.lanes).forEach(function(e){ creationBolt(c, e); });
   }
 }
 /* ===================== SUMMONS (PURE RUNS, wave-scoped) =====================
@@ -1883,15 +2048,25 @@ function warriorAt(lane, rung){
   for(var i=0;i<S.warriors.length;i++){ var w=S.warriors[i]; if(!w.dead && w.lane===lane && w.rung===rung) return w; }
   return null;
 }
-/* Rung 1 of the most-threatened FREE lane. */
-function spawnWarrior(st, tier, colour, TL){
+/* OPEN FIELD: a summon auto-positions by its colour SOUL and then HOLDS — enemies come to it.
+   melee souls (R/O) take the front-center, G/Y a mid-field skirmish line, B/P anchor nearer the wall. */
+function summonHomeY(colour){
+  if(colour==="R"||colour==="O") return geo.fieldTop + rungPitch()*1.25;   // melee front
+  if(colour==="G"||colour==="Y") return (geo.fieldTop+geo.gateY)/2;        // mid-field skirmish
+  return geo.gateY - rungPitch()*1.45;                                     // B/P anchor near the wall
+}
+function spawnWarrior(st, tier, colour, TL, statMul){
   if(liveWarriors().length>=2) dissolveOldestWarrior(st);        // cap 2 (shared) — the oldest fades first
-  var occ=[]; liveWarriors().forEach(function(w){ occ.push(w.lane); });   // one per lane — retarget like golems
-  var lane=pickThreatLane(occ);
-  var stt=summonStats(tier, colour, TL);
-  var w={ warrior:true, tier:tier, colour:colour, lane:lane, rung:1,
-    hp:stt.hp, maxhp:stt.hp, attack:stt.attack, tl:TL,
-    x:laneX(lane), y:rungY(1), born:now(), hit:0, sq:0, act:0, dead:false, deadAt:0, melt:0 };
+  var hy=summonHomeY(colour);
+  var others=liveWarriors().length;                              // offset x if another troop shares the band
+  var hx=geo.cx + (others? (others%2?1:-1)*geo.laneW*0.85 : 0) + (Math.random()*2-1)*8;
+  hx=Math.max(geo.fieldL+26, Math.min(geo.fieldL+fieldW()-26, hx));
+  var stt=summonStats(tier, colour, TL), mul=statMul||1;
+  var hp=Math.max(1,Math.round(stt.hp*mul)), atk=Math.max(1,Math.round(stt.attack*mul));
+  var w={ warrior:true, tier:tier, colour:colour, hx:hx, hy:hy, lane:0, rung:0,
+    hp:hp, maxhp:hp, attack:atk, tl:TL,
+    x:hx, y:hy, born:now(), hit:0, sq:0, act:0, dead:false, deadAt:0, melt:0 };
+  w.lane=Math.max(0,Math.min(CFG.lanes-1,Math.round((hx-geo.fieldL)/geo.laneW-0.5)));
   st.warriors.push(w);
   var tint=HEX[colour];
   boom(w.x, w.y, tint, tier==="champion"?1.9:tier==="knight"?1.6:1.4); confetti(w.x, w.y, tint);
@@ -1964,14 +2139,15 @@ function warriorStrike(w, e){
   S.fx.push({ arc:true, from:{x:w.x,y:w.y-geo.ballR*0.4}, to:{x:e.x,y:e.y}, t:now(), tint:HEX[w.colour] });
   S.fx.push({ star:true, x:e.x, y:e.y, t:now()+60, tint:HEX[w.colour] });
 }
-/* the summon's turn — it strikes the frontmost foe in its lane; an Orange soul splashes r1. */
+/* the summon's turn — it holds position and strikes any foe that has come into reach; Orange splashes. */
 function warriorAct(w){
   if(w.dead) return;
-  var front=frontEnemyInLane(w.lane, null);
+  var reach = engageR()*1.5;
+  var front=nearestEnemyTo(w, reach);
   if(!front) return;
   var targets;
-  if(w.colour==="O"){                                                  // Orange: attack splashes r1 around the front foe
-    targets=alive().filter(function(en){ return Math.abs(en.lane-front.lane)<=1 && Math.abs(en.rung-front.rung)<=1; });
+  if(w.colour==="O"){                                                  // Orange: attack splashes around the front foe
+    targets=alive().filter(function(en){ return Math.hypot(en.x-front.x, en.y-front.y)<=rungPitch()*0.9; });
   } else targets=[front];
   targets.forEach(function(e){ warriorStrike(w, e); });
   w.act=now(); sHit(w.attack,false); beep(320,.05,"triangle",.04);
@@ -1982,6 +2158,8 @@ function summonWarrior(idxs, sum){
   var st=S;
   if(CFG.realtime){ if(S.cool>0){ coolReject(); return; } startCool(); }
   else if(S.actions<=0) return;
+  consumeFlick();                                                // summons don't aim
+  var pmul=consumePerfect();                                     // PERFECT summon: +25% stats
   st.busy=true; st.phase="cast";
   idxs.forEach(function(i,k){ st.dial[i].castT=now()+k*40; });   // slurp the run into the hub (no stale)
   vib([20,40,20,40,60]);
@@ -1990,9 +2168,11 @@ function summonWarrior(idxs, sum){
     sCast(sum.tl,true); warriorSummonFx(sum.colour);
   },150);
   setTimeout(function(){ if(S!==st||st.over) return;
-    spawnWarrior(st, sum.tier, sum.colour, sum.tl);
+    spawnWarrior(st, sum.tier, sum.colour, sum.tl, pmul);
     S.shake=Math.min(20, 6+sum.tl*0.8);
+    if(pmul>1) perfectCallout();
     toast(nm+"!", 1000, HEX[sum.colour], "mid", true);
+    coachHit("summon");
   },230);
   setTimeout(function(){ if(S!==st||st.over) return;
     idxs.forEach(function(i,k){ st.dial[i]=freshBall(); st.dial[i].born=now()+k*40; });
@@ -2144,6 +2324,7 @@ function tryMerge(a,b){
     var gs=geo.slots[b]; boom(gs.x,gs.y, HEX[res.c], .6);
     mergeShove(b, res.lvl);                                // MERGE-SHOVE: springy radial nudge to the neighbours
   }, GOO_TRAVEL);
+  coachHit("merge");                                          // FIRST-RUN COACH: first merge advances the coach
   if(CFG.realtime){ /* every merge is free and instant in flow — the between-casts activity */ }
   else if(gild){ toast("Gilded merge!", 800, "#b9791a", "low"); syncHud(); }   // free, and freeMerge stays unspent
   else if(free){ S.freeMerge=false; toast("Free merge!", 800, "#2c2733", "low"); syncHud(); }
@@ -2204,6 +2385,7 @@ function enemyPhase(){
   if(!CFG.realtime){ st.busy=true; toast("HORDE ADVANCES", 700, "#6b6472", "mid"); }   // flow: input stays live, no per-beat banner
   syncHud();
   var t=430, live=alive();
+  live.forEach(syncCell);                 // refresh derived cells from continuous (x,y) before the beat resolves
   function later(ms, fn){ setTimeout(function(){ if(S===st && !st.over) fn(); }, ms); }
   // Pyre Ground bites any foe that STARTS the phase standing on it (entering is handled in stepEnemy)
   live.forEach(function(e){
@@ -2219,7 +2401,7 @@ function enemyPhase(){
   live.forEach(function(e){
     if(e.leech){ later(t, function(){ leechDrain(e); }); t+=110; }
   });
-  live.slice().sort(function(a,b){ return a.rung-b.rung; }).forEach(function(e){
+  live.slice().sort(function(a,b){ return b.y-a.y; }).forEach(function(e){   // nearest the wall steps first
     later(t, function(){ stepEnemy(e); }); t+=120;
   });
   // the standing creations take their turn after the march (same beat, staggered like the horde)
@@ -2236,10 +2418,11 @@ function enemyPhase(){
 /* healer: tops up every OTHER living enemy; never itself */
 function healPulse(h){
   if(h.dead) return;
-  var amt = 3 + Math.floor(S.wave/3), any=false;
+  var amt = 3 + Math.floor(S.wave/3), any=false, rad=rungPitch()*2.4;   // heals nearby allies within a radius
   h.dotT = now();
   alive().forEach(function(e){
     if(e===h || e.hp>=e.maxhp) return;
+    if(Math.hypot(e.x-h.x, e.y-h.y) > rad) return;
     e.hp = Math.min(e.maxhp, e.hp+amt);
     spawnDmg(e.x, e.y-geo.ballR*0.9, amt, false, false, true);
     any=true;
@@ -2248,7 +2431,8 @@ function healPulse(h){
 }
 /* leech: close enough (rung <= 3) it siphons a dial ball into a dead husk and fattens up */
 function leechDrain(L){
-  if(L.dead || L.rung>3) return;
+  if(L.dead) return;
+  if(L.y < (geo.fieldTop+geo.gateY)/2) return;   // drains only once it has reached mid-field (nearer the wall)
   var opts=[], i;
   for(i=0;i<CFG.slots;i++){ var b=S.dial[i]; if(b && b.c!=="H") opts.push(i); }
   if(!opts.length) return;
@@ -2268,26 +2452,58 @@ function dotTick(e){
   if(e.poison>0 && !(e.freeze>0)){ applyDmg(e, Math.max(1,Math.round(e.poison)), "G"); e.poison--; }
   if(e.burn>0){ applyDmg(e, (S.reagents && S.reagents.cinder) ? (isII("cinder")?4:3) : 2, "O"); e.burn--; }   // Cinder Wick: hotter ticks (3, II 4, vs 2)
 }
+/* nearest living foe to a friendly entity, optionally within `range` px (null = unbounded, for bolts) */
+function nearestEnemyTo(w, range){
+  var best=null, bd=Infinity;
+  alive().forEach(function(e){ var d=Math.hypot(e.x-w.x, e.y-w.y); if(d<bd){ bd=d; best=e; } });
+  if(!best) return null;
+  if(range!=null && bd>range) return null;
+  return best;
+}
+/* glide the foe up to `step` px toward (tx,ty), clamped to the field, and bite any Pyre Ground it enters */
+function moveTowardStep(e, tx, ty, step){
+  var dx=tx-e.x, dy=ty-e.y, d=Math.hypot(dx,dy)||1;
+  var mv=Math.min(step, d);
+  var nx=e.x+dx/d*mv, ny=e.y+dy/d*mv;
+  nx=Math.max(geo.fieldL+14, Math.min(geo.fieldL+fieldW()-14, nx));
+  ny=Math.min(wallY(), Math.max(geo.fieldTop-6, ny));
+  moveGlide(e, nx, ny);
+  e.stepT=now(); e.wallT=0; sAdvance(); vib(6);
+  // derive the entered cell so Pyre Ground (a wave-scoped zone) can bite
+  e.rung=Math.max(0,Math.min(CFG.rungs-1,Math.round((geo.gateY-ny)/rungPitch())));
+  e.lane=Math.max(0,Math.min(CFG.lanes-1,Math.round((nx-geo.fieldL)/geo.laneW-0.5)));
+  applyPyre(e);
+}
+/* OPEN-FIELD enemy beat: settle → path to the nearest troop (melee-lock or trample) → else march to the wall */
 function stepEnemy(e){
   if(e.dead) return;
-  if(e.fled){ e.fled=false; return; }   // skittish healer just retreated — recover, don't also advance
-  if(!e.arrived){ e.arrived=true; return; }   // ARRIVAL GRACE: freshly-spawned foe settles in — skip its first advance (DoT/heals already applied this phase)
+  syncCell(e);
+  if(e.fled){ e.fled=false; e.engaged=null; return; }   // skittish healer just retreated — recover, don't advance
+  if(!e.arrived){ e.arrived=true; return; }             // ARRIVAL GRACE: freshly-spawned foe settles in
   if(e.frImm>0) e.frImm--;
   if(e.freeze>0){ e.freeze--;
     if(e.freeze<=0){ e.frImm=1;
-      if(e.psnPreserved && e.poison>0){ e.poison=Math.min(POISON_CAP, e.poison*2); e.dotT=now(); }   // PRESERVE: poison doubles on thaw (cap 12)
+      if(e.psnPreserved && e.poison>0){ e.poison=Math.min(POISON_CAP, e.poison*2); e.dotT=now(); }   // PRESERVE: doubles on thaw
       e.psnPreserved=false;
-    } return; }   // thaw grants 1-turn immunity
-  if(e.slow){ e.slowT=(e.slowT+1)%2; if(e.slowT===1) return; }
-  if(e.rung<=0){
-    // a ward-stone at the wall (rung 0) is a shield — foes strike it INSTEAD of the gate
-    var guard = creationAt(e.lane, 0);
-    if(guard && e.dmg>0){ enemyStrikeCreation(e, guard); return; }
+    } return; }                                          // thaw grants 1-turn immunity
+  var step = rungPitch()*(e.spd||1);                     // one rung's worth per beat (brute/elite half)
+  // ---- TARGETING: seek the nearest friendly troop ----
+  var nt = nearestTroop(e);
+  if(nt){
+    var w=nt.w, reach = engageR() + (w.warrior?geo.ballR*0.3:geo.ballR*0.6);
+    if(nt.d <= reach){
+      if(w.warrior && summonTramples(e, w)){ stompWarrior(e, w); e.engaged=null; }   // TRAMPLE: crush and roll on
+      else { e.engaged=w;                                                            // MELEE LOCK: exchange hits (troop hits back in its act)
+        if(w.warrior) enemyStrikeWarrior(e, w); else enemyStrikeCreation(e, w);
+        return; }
+    } else {
+      e.engaged=null; moveTowardStep(e, w.x, w.y, step); return;                     // path toward the troop
+    }
+  } else e.engaged=null;
+  // ---- no troop in reach: head for the wall ----
+  if(e.y >= wallY()-geo.ballR*1.1){
     if(e.dmg<=0) return;                  // the healer just sits at the wall, mending
-    /* at the wall: strike on ARRIVAL, then only every OTHER phase — e.wallT toggles the beat.
-       falsy (fresh/just-wound-up) → strike this phase, then arm a windup; truthy → wind up (skip),
-       then re-arm the strike. The off-phase draws a coil cue in the advance-triangle spot. */
-    if(e.wallT){ e.wallT=0; return; }     // winding up this phase — recover, will strike next
+    if(e.wallT){ e.wallT=0; return; }     // winding up this phase — recover, will strike next (cadence preserved)
     S.hp -= e.dmg; S.shake=Math.max(S.shake,10);
     sBreach(); vib([90,60,90]); flashGate();
     if(S.scorch.length<12) S.scorch.push({ x:e.x+((e.seed%9)-4) });
@@ -2296,18 +2512,7 @@ function stepEnemy(e){
     syncHud();
     if(S.hp<=0) gameOver();
   } else {
-    // BLOCKING: a creation in the destination cell is attacked instead of stepped past
-    var dest = creationAt(e.lane, e.rung-1);
-    if(dest){ enemyStrikeCreation(e, dest); return; }
-    // a SUMMON in the destination cell blocks — trample gate depends on its tier (Warrior<Knight<Champion)
-    var wdest = warriorAt(e.lane, e.rung-1);
-    if(wdest){
-      if(summonTramples(e, wdest)){ stompWarrior(e, wdest); }   // TRAMPLE — crush and keep coming this same step
-      else { enemyStrikeWarrior(e, wdest); return; }            // blocked — fight the summon, don't advance
-    }
-    e.rung--; e.stepT=now(); e.wallT=0;   // stepping resets the wall cadence for a clean arrival strike
-    sAdvance(); vib(8);
-    applyPyre(e);                          // Pyre Ground bites a foe ENTERING its cell
+    moveTowardStep(e, e.x, wallY(), step);   // straight down toward the wall
   }
 }
 function endEnemyPhase(){
@@ -2716,19 +2921,11 @@ function renderNextWave(spec){
   // ELITE ribbon across the top of the section
   if(spec.elite){ var rib=document.createElement("div"); rib.className="nw-ribbon"; rib.textContent="⚑ ELITE APPROACHES"; box.appendChild(rib); }
   var lbl=document.createElement("div"); lbl.className="nw-label"; lbl.textContent="Next wave"; box.appendChild(lbl);
-  // per-lane mini-columns, front foes (lowest rung) on top
-  var lanes=document.createElement("div"); lanes.className="nw-lanes";
-  for(var l=0;l<CFG.lanes;l++){
-    var col=document.createElement("div"); col.className="nw-lane";
-    var foes=es.filter(function(e){ return e.lane===l; }).sort(function(a,b){ return a.rung-b.rung; });
-    if(foes.length) col.classList.add("hot");
-    var ln=document.createElement("div"); ln.className="nw-ln"; ln.textContent=(l+1); col.appendChild(ln);
-    var chips=document.createElement("div"); chips.className="nw-chips";
-    if(!foes.length){ var em=document.createElement("div"); em.className="nw-empty"; chips.appendChild(em); }
-    foes.forEach(function(e){ chips.appendChild(makeFoeChip(e)); });
-    col.appendChild(chips); lanes.appendChild(col);
-  }
-  box.appendChild(lanes);
+  // OPEN FIELD: a single composition ROW — one chip per foe (elites, brutes, then the rest), wards as rings
+  var rank=function(e){ return e.elite?0 : e.brute?1 : (e.armored||e.healer||e.leech)?2 : 3; };
+  var comp=document.createElement("div"); comp.className="nw-comp";
+  es.slice().sort(function(a,b){ return rank(a)-rank(b); }).forEach(function(e){ comp.appendChild(makeFoeChip(e)); });
+  box.appendChild(comp);
   // terse summary line
   var sum=document.createElement("div"); sum.className="nw-sum"; sum.innerHTML=waveSummary(spec); box.appendChild(sum);
 }
@@ -2749,8 +2946,9 @@ function waveSummary(spec){
   es.forEach(function(e){ if(e.elite) return; if(e.brute) cnt.brute++; else if(e.armored) cnt.armored++; else if(e.healer) cnt.healer++; else if(e.leech) cnt.leech++; });
   ["brute","armored","healer","leech"].forEach(function(k){ if(cnt[k]) parts.push(cnt[k]+" "+k); });
   var warded=es.filter(function(e){ return e.ward && !e.elite; });
-  if(warded.length===1) parts.push("lane "+(warded[0].lane+1)+" warded "+WARDNAME[warded[0].ward]);
-  else if(warded.length>1) parts.push(warded.length+" warded ("+warded.map(function(e){ return "L"+(e.lane+1)+" "+WARDNAME[e.ward]; }).join(", ")+")");
+  if(warded.length===1) parts.push("1 warded "+WARDNAME[warded[0].ward]);
+  else if(warded.length>1){ var wc={}; warded.forEach(function(e){ wc[e.ward]=(wc[e.ward]||0)+1; });
+    parts.push(warded.length+" warded ("+Object.keys(wc).map(function(k){ return wc[k]+" "+WARDNAME[k]; }).join(", ")+")"); }
   return parts.join(" · ");
 }
 function showReward(){
@@ -2828,16 +3026,29 @@ function moodFor(sp){
 function castFx(sp,tgt,hitPts){
   var t0=now();
   moodFor(sp);
-  if(sp.kind==="all"){ S.fx.push({ wave:true, t:t0, tint:sp.tint==="#fff"?"#ffd15c":sp.tint }); }
-  else if(sp.kind==="lane" && tgt){ S.fx.push({ laneFlash:true, lane:tgt.lane, t:t0, tint:sp.tint }); }
-  else if(tgt){
-    S.fx.push({ beam:true, tgt:{x:tgt.x,y:tgt.y}, t:t0, tint:sp.tint==="#fff"?"#ffd15c":sp.tint });
-    hitPts.forEach(function(p){
-      if(p.x===tgt.x&&p.y===tgt.y) return;
-      S.fx.push({ arc:true, from:{x:tgt.x,y:tgt.y}, to:p, t:t0+90, tint:sp.tint });
-    });
+  var aim=_lastAim, gold=sp.tint==="#fff"?"#ffd15c":sp.tint;
+  if(aim && aim.flick && aim.ox!=null){                                  // flick ghost-arrow trace of the aim ray
+    S.fx.push({ ghost:true, ox:aim.ox, oy:aim.oy, dx:aim.dx, dy:aim.dy, t:t0, tint:sp.tint });
   }
-  if(tgt) S.fx.push({ star:true, x:tgt.x, y:tgt.y, t:t0+70, tint:sp.tint==="#fff"?"#ffd15c":sp.tint });
+  if(sp.kind==="all"){ S.fx.push({ wave:true, t:t0, tint:gold }); }
+  else if(aim && aim.kind==="line"){
+    S.fx.push({ corridor:true, ox:aim.ox, oy:aim.oy, dx:aim.dx, dy:aim.dy, half:corridorHalf(), t:t0, tint:sp.tint });
+    hitPts.forEach(function(p){ S.fx.push({ star:true, x:p.x, y:p.y, t:t0+80, tint:sp.tint }); });
+  }
+  else if(aim && aim.kind==="cone"){
+    S.fx.push({ cone:true, ox:aim.ox, oy:aim.oy, dx:aim.dx, dy:aim.dy, ha:aim.ha, len:aim.len, t:t0, tint:sp.tint });
+    hitPts.forEach(function(p){ S.fx.push({ star:true, x:p.x, y:p.y, t:t0+80, tint:sp.tint }); });
+  }
+  else if(aim && aim.kind==="burst"){
+    S.fx.push({ ring:true, x:aim.pt.x, y:aim.pt.y, col:sp.tint, t:t0, max:aim.r });
+    boom(aim.pt.x, aim.pt.y, gold, (aim.r/(geo.ballR||20))*0.9);
+    hitPts.forEach(function(p){ S.fx.push({ arc:true, from:{x:aim.pt.x,y:aim.pt.y}, to:p, t:t0+70, tint:sp.tint }); });
+  }
+  else if(tgt){
+    S.fx.push({ beam:true, tgt:{x:tgt.x,y:tgt.y}, t:t0, tint:gold });
+    hitPts.forEach(function(p){ if(p.x===tgt.x&&p.y===tgt.y) return; S.fx.push({ arc:true, from:{x:tgt.x,y:tgt.y}, to:p, t:t0+90, tint:sp.tint }); });
+  }
+  if(tgt) S.fx.push({ star:true, x:tgt.x, y:tgt.y, t:t0+70, tint:gold });
 }
 var gateFlash=0, lastBeat=0;
 function flashGate(){ gateFlash=now(); }
@@ -2967,10 +3178,12 @@ function draw(){
     drawWarriors(t);
     drawGate(t);
     drawDial(t);
+    drawPerfectRing(t);
     drawExoticStrip(t);
     drawFx(t);
     drawDmgs(t);
     drawToast(t);
+    if(!S.over) drawCoach(t);
     if(!S.over && S.hp/S.maxhp<0.4 && t-lastBeat>1900){ lastBeat=t; beep(70,.1,"sine",.045); }
   }
   ctx.restore();
@@ -2986,15 +3199,17 @@ function draw(){
 }
 
 function drawField(t){
-  // lane guides + rung ticks: the grid the horde marches down
-  ctx.strokeStyle="rgba(44,39,51,.14)"; ctx.lineWidth=2; ctx.setLineDash([1,7]);
-  for(var l=0;l<=CFG.lanes;l++){ var x=geo.fieldL+l*geo.laneW; ctx.beginPath(); ctx.moveTo(x,geo.fieldTop); ctx.lineTo(x,geo.gateY-12); ctx.stroke(); }
+  // THE OPEN FIELD — one continuous battlefield, no lanes, no rungs
+  var top=geo.fieldTop, bot=geo.gateY-8, L=geo.fieldL, Rt=geo.fieldL+fieldW();
+  // a faint dashed muster line along the top edge, where the horde gathers
+  ctx.strokeStyle="rgba(44,39,51,.10)"; ctx.lineWidth=2; ctx.setLineDash([2,9]);
+  ctx.beginPath(); ctx.moveTo(L, top); ctx.lineTo(Rt, top); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle="rgba(44,39,51,.12)";
-  for(var r=1;r<CFG.rungs;r++) for(var l2=0;l2<CFG.lanes;l2++){
-    ctx.beginPath(); ctx.arc(laneX(l2), rungY(r), 3, 0, 7); ctx.fill();
-  }
-  // breach scorch marks
+  // scattered ground specks for organic texture (deterministic, static — reads as trampled earth)
+  ctx.fillStyle="rgba(44,39,51,.05)";
+  for(var k=0;k<28;k++){ var gx=L+((k*97)%1000)/1000*fieldW(), gy=top+((k*53+17)%1000)/1000*(bot-top);
+    ctx.beginPath(); ctx.arc(gx,gy,2.2,0,7); ctx.fill(); }
+  // breach scorch marks smudged along the wall
   S.scorch.forEach(function(s){
     ctx.fillStyle="rgba(44,39,51,.25)";
     ctx.beginPath(); ctx.ellipse(s.x, geo.gateY-2, 11, 4, 0, 0, 7); ctx.fill();
@@ -3129,7 +3344,7 @@ function drawWarriors(t){
   for(var i=S.warriors.length-1;i>=0;i--){ var ww=S.warriors[i]; if(ww.dead && t-ww.deadAt>(ww.melt?600:460)) S.warriors.splice(i,1); }
   S.warriors.forEach(function(w){
     var tint=HEX[w.colour];
-    w.x += (laneX(w.lane)-w.x)*0.25; w.y += (rungY(w.rung)-w.y)*0.25;
+    w.x += ((w.hx!=null?w.hx:w.x)-w.x)*0.25; w.y += ((w.hy!=null?w.hy:w.y)-w.y)*0.25;   // glide to its soul-home, then hold
     var tierScale = w.tier==="champion"?1.08 : w.tier==="knight"?0.9 : 0.74;   // Champion largest, Warrior smallest
     var r=baseR*tierScale;
     var pop=Math.min(1,(t-w.born)/300); var pr=r*(0.4+0.6*(pop<1?(1.7*pop-0.7*pop*pop):1));
@@ -3313,13 +3528,29 @@ function statusChip(x,y,col,glyph,pulse){
   ctx.restore();
 }
 
+/* light local avoidance so drifting blobs don't fully overlap (O(n²), n≤12) */
+function nudgeFoe(e,dx,dy){
+  e.x=Math.max(geo.fieldL+14, Math.min(geo.fieldL+fieldW()-14, e.x+dx));
+  e.y=Math.max(geo.fieldTop-6, Math.min(wallY(), e.y+dy));
+  if(!e.moveT || (now()-e.moveT)>=FIELD_GLIDE){ e.tx=e.x; e.ty=e.y; e.mx0=e.x; e.my0=e.y; }   // pin resting foes
+}
+function separateEnemies(){
+  var list=alive(), R=sepR();
+  for(var i=0;i<list.length;i++) for(var j=i+1;j<list.length;j++){
+    var a=list[i], b=list[j], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+    if(d>0.01 && d<R){ var push=(R-d)*0.25, ux=dx/d, uy=dy/d; nudgeFoe(a,-ux*push,-uy*push); nudgeFoe(b,ux*push,uy*push); }
+    else if(d<=0.01){ nudgeFoe(a,-1.2,0); nudgeFoe(b,1.2,0); }
+  }
+}
 function drawEnemies(t){
   var pitch=rungPitch();
   var baseR=Math.min(geo.ballR*0.9, pitch*0.44);      // capped so stacked enemies don't overlap
+  separateEnemies();
   S.enemies.forEach(function(e){
     if(t<e.spawn) return;
     if(e.dead && t-e.deadAt>220) return;
-    e.x += ((laneX(e.lane)+e.jit)-e.x)*0.2; e.y += (rungY(e.rung)-e.y)*0.2;
+    if(e.moveT){ var gp=Math.min(1,(t-e.moveT)/FIELD_GLIDE), ge=gp*gp*(3-2*gp);   // smooth glide over the beat
+      e.x=e.mx0+(e.tx-e.mx0)*ge; e.y=e.my0+(e.ty-e.my0)*ge; }
     var r=baseR*(e.elite?1.45:(e.brute?1.3:1));
     var pop=Math.min(1,(t-e.spawn)/260); var pr=r*(0.5+0.5*pop);
     if(e.dead){ var dk=(t-e.deadAt)/220; pr*=Math.max(0,1-dk); }
@@ -3491,6 +3722,26 @@ function drawWindowArc(slots, tint, alpha){
   ctx.beginPath(); ctx.arc(g.cx,g.cy,g.dialR, a0-pad, a1+pad);
   ctx.lineWidth=g.ballR*1.35; ctx.strokeStyle=tint; ctx.globalAlpha=alpha;
   ctx.lineCap="round"; ctx.stroke(); ctx.globalAlpha=1;
+}
+/* PERFECT-RELEASE ring: a subtle 2px gold ring tightening around the last touched ball toward a sweet
+   band (~65-80% shrink). Releasing inside the band = PERFECT. Only while a valid 3+ sweep is HELD. */
+function drawPerfectRing(t){
+  if(!gesture || gesture.mode==="arrange") return;
+  if(!gesture.visited || gesture.visited.length<3) return;
+  var holdMs = t-(gesture.lastAddT+PERFECT_DELAY);
+  if(holdMs<=0) return;
+  var last=gesture.visited[gesture.visited.length-1], lp=geo.slots[last]; if(!lp) return;
+  var shrink=perfectShrink(holdMs);
+  var R0=geo.ballR*2.0, R=R0*(1-Math.min(1,shrink)*0.82);
+  var inBand=shrink>=PERFECT_LO && shrink<=PERFECT_HI;
+  // faint guide ring where the sweet band lands
+  var Rb=R0*(1-((PERFECT_LO+PERFECT_HI)/2)*0.82);
+  ctx.beginPath(); ctx.arc(lp.x,lp.y,Rb,0,7); ctx.lineWidth=1.4; ctx.strokeStyle="rgba(185,121,26,0.30)"; ctx.stroke();
+  // the tightening ring
+  ctx.beginPath(); ctx.arc(lp.x,lp.y,R,0,7); ctx.lineWidth=2;
+  ctx.strokeStyle=inBand?"#ffd15c":"rgba(224,160,32,0.7)";
+  if(inBand){ ctx.save(); ctx.shadowColor="#ffd15c"; ctx.shadowBlur=8; ctx.stroke(); ctx.restore(); }
+  else ctx.stroke();
 }
 /* DOUBLECAST HOLD-GLOW: a valid held 6-ball weave (release would doublecast) — is it live right now? */
 function holdDblActive(){
@@ -3893,6 +4144,21 @@ function drawHub(t){
   ctx.textBaseline="alphabetic";
 }
 
+/* FIRST-RUN COACH: a small paper pill along the muster line with the current one-line prompt */
+function drawCoach(t){
+  if(!S || S.coach==null) return;
+  var line=COACH_LINES[S.coach]; if(!line) return;
+  var appear=Math.min(1,(t-(S.coachT||0))/300), y=geo.fieldTop+16, bob=Math.sin(t/600)*1.5;
+  ctx.save();
+  ctx.font="700 12.5px Nunito, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  var w=ctx.measureText(line).width, pad=14, bw=w+pad*2, bh=28, bx=geo.cx-bw/2;
+  ctx.globalAlpha=appear; ctx.translate(0,bob);
+  ctx.fillStyle="rgba(44,39,51,.9)"; rr(bx, y-bh/2+2.5, bw, bh, 13); ctx.fill();
+  ctx.fillStyle="#fffdf6"; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2.5; rr(bx, y-bh/2, bw, bh, 13); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#2c2733"; ctx.fillText(line, geo.cx, y);
+  ctx.restore();
+  ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+}
 function drawFx(t){
   for(var i=S.fx.length-1;i>=0;i--){ var f=S.fx[i]; var age=t-f.t;
     if(age<0) continue;
@@ -3951,6 +4217,32 @@ function drawFx(t){
       rr(-ss/2,-ss/2,ss,ss,2); ctx.fill(); ctx.stroke();
       ctx.rotate(Math.PI/4); rr(-ss/2,-ss/2,ss,ss,2); ctx.fill(); ctx.stroke();
       ctx.globalAlpha=1; ctx.restore();
+    } else if(f.corridor){ var crk=age/320; if(crk>=1){ S.fx.splice(i,1); continue; }
+      // BOLT/PIERCE line: a translucent corridor from the wall/hub across the field
+      var CL=geo.gateY-geo.fieldTop+140, cex=f.ox+f.dx*CL, cey=f.oy+f.dy*CL;
+      ctx.globalAlpha=(1-crk)*0.42; ctx.strokeStyle=f.tint; ctx.lineWidth=f.half*2*(1-crk*0.35); ctx.lineCap="butt";
+      ctx.beginPath(); ctx.moveTo(f.ox,f.oy); ctx.lineTo(cex,cey); ctx.stroke();
+      ctx.globalAlpha=(1-crk)*0.9; ctx.strokeStyle="#2c2733"; ctx.lineWidth=3.5; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(f.ox,f.oy); ctx.lineTo(cex,cey); ctx.stroke();
+      ctx.globalAlpha=1;
+    } else if(f.cone){ var qk=age/320; if(qk>=1){ S.fx.splice(i,1); continue; }
+      // SPRAY cone from the hub
+      var qang=Math.atan2(f.dy,f.dx);
+      ctx.globalAlpha=(1-qk)*0.33; ctx.fillStyle=f.tint;
+      ctx.beginPath(); ctx.moveTo(f.ox,f.oy); ctx.arc(f.ox,f.oy,f.len*(0.6+0.4*qk),qang-f.ha,qang+f.ha); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=(1-qk)*0.7; ctx.strokeStyle="#2c2733"; ctx.lineWidth=2; ctx.stroke();
+      ctx.globalAlpha=1;
+    } else if(f.ghost){ var gk=age/450; if(gk>=1){ S.fx.splice(i,1); continue; }
+      // FLICK ghost-arrow: a brief dashed aim ray with a head
+      var GL=geo.dialR*1.5, gex=f.ox+f.dx*GL, gey=f.oy+f.dy*GL;
+      ctx.globalAlpha=(1-gk)*0.75; ctx.setLineDash([7,6]); ctx.lineDashOffset=-age/9;
+      ctx.strokeStyle=f.tint==="#fff"?"#2c2733":(f.tint||"#2c2733"); ctx.lineWidth=3; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(f.ox,f.oy); ctx.lineTo(gex,gey); ctx.stroke();
+      ctx.setLineDash([]);
+      var gaa=Math.atan2(f.dy,f.dx), ah=11;
+      ctx.beginPath(); ctx.moveTo(gex,gey); ctx.lineTo(gex-Math.cos(gaa-0.42)*ah, gey-Math.sin(gaa-0.42)*ah);
+      ctx.moveTo(gex,gey); ctx.lineTo(gex-Math.cos(gaa+0.42)*ah, gey-Math.sin(gaa+0.42)*ah); ctx.stroke();
+      ctx.globalAlpha=1;
     } else if(f.implode){ var ik=age/300; if(ik>=1){ S.fx.splice(i,1); continue; }
       // CONSUME: a void-dark ring drawing inward, collapsing to a point
       ctx.beginPath(); ctx.arc(f.x,f.y, f.max*(1-ik), 0,7);
@@ -4145,8 +4437,24 @@ function tryVisit(s){
   if(gesture.visited.indexOf(s)>=0) return false;
   if(gesture.visited.length>=6) return false;   // 3 = cast, 6 = doublecast weave
   gesture.visited.push(s);
+  gesture.lastAddT=now();                 // PERFECT RELEASE clock: the perfect ring begins 250ms after this
   beep(430+gesture.visited.length*60,.05,"sine",.03);
   return true;
+}
+/* at release: derive the flick vector (fast sweep-off aims directional spells) + the perfect timing */
+function computeFlickPerfect(g){
+  pendingFlick=null; pendingPerfect=false;
+  if(!g || !g.visited || g.visited.length<3) return;   // aiming/perfect apply to CASTS only, never merges
+  var holdMs = now() - (g.lastAddT + PERFECT_DELAY);
+  pendingPerfect = perfectWindow(holdMs).perfect;
+  var s=g.samples||[];
+  if(s.length>=2){
+    var nowp=performance.now(), newest=s[s.length-1], old=s[s.length-2];
+    for(var i=s.length-1;i>=0;i--){ if(nowp-s[i].t<=100) old=s[i]; else break; }
+    var dtm=newest.t-old.t;
+    if(dtm>0){ var vx=(newest.x-old.x)/dtm, vy=(newest.y-old.y)/dtm, sp=Math.hypot(vx,vy);
+      if(sp>=FLICK_V){ pendingFlick={ dx:vx/sp, dy:vy/sp, sp:sp }; } }
+  }
 }
 function cancelGesture(){
   if(!gesture) return;
@@ -4252,7 +4560,8 @@ function down(x,y){
   }
   var si=slotAt(x,y,true); if(si<0) return;
   markInput();
-  gesture={ visited:[si], x:x, y:y, downX:x, downY:y, mode:null, arming:true };
+  gesture={ visited:[si], x:x, y:y, downX:x, downY:y, mode:null, arming:true,
+    lastAddT:now(), samples:[{ x:x, y:y, t:performance.now() }] };
   // arm the long-press: a stationary finger for ARM_MS lifts the ball. A moving finger disarms (see move).
   clearArm();
   var gref=gesture;
@@ -4274,6 +4583,7 @@ function move(x,y){
     return;
   }
   gesture.x=x; gesture.y=y; markInput();
+  if(gesture.samples){ gesture.samples.push({ x:x, y:y, t:performance.now() }); if(gesture.samples.length>8) gesture.samples.shift(); }
   // a moving finger never arms the long-press: once it travels past the slot, disarm → this is a sweep/merge
   if(gesture.arming){
     if(Math.hypot(x-gesture.downX, y-gesture.downY) > geo.ballR*0.55){ gesture.arming=false; clearArm(); }
@@ -4297,6 +4607,7 @@ function up(){
   if(!gesture) return;
   clearArm();
   if(gesture.mode==="arrange"){ arrangeSettle(); return; }      // arrange settles on its own — never merges
+  computeFlickPerfect(gesture);                                 // set the flick vector + perfect flag AT release
   var v=gesture.visited; gesture=null;
   markInput(); S.oneAway=null;
   if(v.length===2){ if(!tryMerge(v[0],v[1])){ beep(180,.1,"sine",.04); } }
@@ -4386,6 +4697,9 @@ function startMode(rt){
 }
 document.getElementById("btnStart").addEventListener("click", function(){ startMode(false); });
 document.getElementById("btnFlow").addEventListener("click", function(){ startMode(true); });
+document.getElementById("btnBegin").addEventListener("click", function(){ startMode(true); });   // FLOW is canon
+document.getElementById("btnStartBook").addEventListener("click", function(){ ac(); openBook(); });
+if(DEV_TURNMODE){ document.getElementById("devModeRow").style.display="flex"; }   // dev flag restores the toggle
 document.getElementById("btnRetry").addEventListener("click", function(){ hide("vOver"); newGame(); });
 document.getElementById("btnContinue").addEventListener("click", function(){
   if(!S || !S.boonPicked) return;                 // a boon is required, as before — this is the explicit exit
@@ -4466,8 +4780,11 @@ window.__whx = {
     var e={ x:geo.cx, y:geo.fieldTop+40, lane:1, rung:3, hp:9999, maxhp:9999,
       burn:0, poison:0, freeze:0, frImm:0, chill:false, brittle:false, psnPreserved:false,
       dead:false, ward:null, armored:false, elite:false, brute:false,
-      healer:false, leech:false, seed:0, dotT:0 };
+      healer:false, leech:false, seed:0, dotT:0,
+      spd:1, tx:0, ty:0, mx0:0, my0:0, moveT:0, wallT:0, engaged:null, arrived:true, dmg:5, stepT:0, spawn:0, hit:0, deadAt:0 };
     if(over) for(var k in over) e[k]=over[k];
+    e.tx=e.x; e.ty=e.y; e.mx0=e.x; e.my0=e.y;
+    if(e.brute||e.elite){ if(over && over.spd==null) e.spd=0.5; }
     return e;
   },
   applyDmg: function(e, amt, el, opts){ return applyDmg(e, amt, el, opts); },
@@ -4489,7 +4806,7 @@ window.__whx = {
   cast: function(idxs){ return cast(idxs); },
   castWeave: function(idxs){ return castWeave(idxs); },
   geo: function(){ return geo; },
-  spawnWarrior: function(tier, colour, TL){ return spawnWarrior(S, tier, colour, TL); },
+  spawnWarrior: function(tier, colour, TL, mul){ return spawnWarrior(S, tier, colour, TL, mul); },
   summonTramples: function(e,w){ return summonTramples(e,w); },
   summonStats: function(tier,colour,TL){ return summonStats(tier,colour,TL); },
   warriorStrike: function(w,e){ return warriorStrike(w,e); },
@@ -4512,6 +4829,37 @@ window.__whx = {
     return { active: !!_freezeStart, span: _freezeStart?(_hitstopEnd-_freezeStart):0, remain: _freezeStart?Math.max(0,_hitstopEnd-raw):0 }; },
   clearHitstop: function(){ _freezeStart=0; _timeFreeze=0; _hitstopEnd=0; },
   mood: function(){ return screenMood?screenMood.type:null; },
+  /* ---- build-14 harness: open field, flick aim, perfect release, coach ---- */
+  perfectWindow: perfectWindow,
+  perfectConsts: function(){ return { delay:PERFECT_DELAY, dur:PERFECT_DUR, lo:PERFECT_LO, hi:PERFECT_HI }; },
+  perfectShrink: perfectShrink,
+  setFlick: function(dx,dy){ var d=Math.hypot(dx,dy)||1; pendingFlick={ dx:dx/d, dy:dy/d, sp:9 }; },
+  clearFlick: function(){ pendingFlick=null; },
+  setPerfect: function(v){ pendingPerfect=!!v; },
+  peekPerfect: function(){ return pendingPerfect; },
+  consumePerfect: function(){ return consumePerfect(); },
+  aim: function(sp){ var a=aimSpell(sp); return { hits:a.hits.slice(), tgt:a.tgt, aim:_lastAim }; },
+  placeFoes: function(list){ S.enemies=list.map(function(o){ return window.__whx.mkFoe(o); }); return S.enemies.length; },
+  clearFoes: function(){ S.enemies=[]; },
+  setFoeXY: function(i,x,y){ var e=S.enemies[i]; if(e){ e.x=x; e.y=y; e.tx=x; e.ty=y; e.mx0=x; e.my0=y; e.moveT=0; syncCell(e); } },
+  foesXY: function(){ return alive().map(function(e){ return { x:e.x, y:e.y, lane:e.lane, rung:e.rung, brute:e.brute, elite:e.elite }; }); },
+  nearestTroop: function(e){ var n=nearestTroop(e); return n?{ d:n.d, warrior:!!n.w.warrior, colour:n.w.colour, tier:n.w.tier, x:n.w.x, y:n.w.y }:null; },
+  troopCount: function(){ return troopList().length; },
+  summonHomeY: function(c){ return summonHomeY(c); },
+  moveGlide: function(e,tx,ty){ return moveGlide(e,tx,ty); },
+  wallY: function(){ return wallY(); }, engageR: function(){ return engageR(); },
+  rungPitch: function(){ return rungPitch(); }, corridorHalf: function(){ return corridorHalf(); },
+  fieldGeom: function(){ return { fieldTop:geo.fieldTop, gateY:geo.gateY, fieldL:geo.fieldL, fieldW:fieldW(), cx:geo.cx, cy:geo.cy, laneW:geo.laneW, ballR:geo.ballR }; },
+  coach: function(){ return { step:S?S.coach:null, line:(S&&S.coach!=null)?COACH_LINES[S.coach]:null }; },
+  coachHit: function(ev){ return coachHit(ev); },
+  coachReset: function(){ try{ localStorage.removeItem("wh_coach"); }catch(e){} if(S){ S.coach=0; S.coachT=now(); } },
+  devTurnmode: function(){ return DEV_TURNMODE; },
+  spawnWaveSpec: function(spec){ return spawnWave(spec); },
+  demoCastFx: function(cols, fdx, fdy){ var sp=resolveSpell(cols.map(function(c){return {c:c,lvl:2};}));
+    if(fdx!=null){ var d=Math.hypot(fdx,fdy)||1; pendingFlick={ dx:fdx/d, dy:fdy/d, sp:9 }; }
+    var a=aimSpell(sp); castFx(sp, a.tgt, a.hits.map(hitPt)); return a.hits.length; },
+  rollWave: function(w){ return rollWave(w); },
+  stepEnemyRaw: function(e){ return stepEnemy(e); },
   /* mirror of the drawDmgs magnitude→font lerp so the harness can assert the curve */
   fontFor: function(amt, react, crit){
     var mag=Math.abs(amt)||0, fs=16 + Math.max(0,Math.min(1,(mag-9)/31))*18;
