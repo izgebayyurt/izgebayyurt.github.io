@@ -174,7 +174,24 @@ const inb = (n, r, c) => r >= 0 && c >= 0 && r < n && c < n;
    so the covered region never gains a shortcut adjacency → the routing is forced
    (unique). `forbidAdj` cells may not be touched by new cells either. Returns the
    arms (arrays of cells, not including center). */
-function growArms(n, rng, center, k, visited, share, maxCells, looseness, jumper) {
+/* is (r,c) an interior straight-through cell of some arm OTHER than `ai`?
+   Returns its axis ('V'/'H') or null. */
+function ownerAxis(arms, center, ai, r, c) {
+  for (let aj = 0; aj < arms.length; aj++) {
+    if (aj === ai) continue;
+    const arm = arms[aj];
+    for (let i = 0; i < arm.length - 1; i++) {   // interior only: i < len-1, prev exists (center at i=0)
+      if (arm[i][0] !== r || arm[i][1] !== c) continue;
+      const prev = i === 0 ? center : arm[i - 1], next = arm[i + 1];
+      const v1 = [r - prev[0], c - prev[1]], v2 = [next[0] - r, next[1] - c];
+      if (v1[0] !== v2[0] || v1[1] !== v2[1]) return null;   // it turns here — can't bridge a corner
+      return v1[0] !== 0 ? "V" : "H";
+    }
+  }
+  return null;
+}
+
+function growArms(n, rng, center, k, visited, share, maxCells, looseness, jumper, bridger) {
   const forbid = share || new Set();
   const loose = looseness || 0;
   const starts = shuffle(NB4.map(([dr, dc]) => [center[0] + dr, center[1] + dc])
@@ -201,6 +218,31 @@ function growArms(n, rng, center, k, visited, share, maxCells, looseness, jumper
         const f = lands[(rng() * lands.length) | 0];
         arms[ai].push(f); visited.add(f[0] + "," + f[1]); added++;
         jumper.pairs.push([h[0], h[1], f[0], f[1]]); jumper.left--;
+        continue;
+      }
+    }
+    // BRIDGE crossing: an arm ploughs straight OVER another arm's straight cell
+    // and lands on the far side. The shared cell becomes a bridge.
+    if (bridger && bridger.left > 0 && added > k && rng() < 0.2) {
+      const tries = [];
+      arms.forEach((arm, ai) => {
+        const h = arm[arm.length - 1];
+        for (const [dr, dc] of NB4) {
+          const xr = h[0] + dr, xc = h[1] + dc, yr = xr + dr, yc = xc + dc;
+          if (!inb(n, yr, yc) || !visited.has(xr + "," + xc) || visited.has(yr + "," + yc)) continue;
+          if (forbid.has(yr + "," + yc) || adjToForbidCenter(n, yr, yc, center, forbid)) continue;
+          if (bridger.cells.some((b) => b[0] === xr && b[1] === xc)) continue;   // one crossing per cell
+          if (xr === center[0] && xc === center[1]) continue;
+          const ax = ownerAxis(arms, center, ai, xr, xc);
+          if (!ax || ax === (dr !== 0 ? "V" : "H")) continue;                    // must cross PERPENDICULAR
+          if (vnbr(n, yr, yc, xr, xc, visited) > 0) continue;                    // landing keeps the no-shortcut shape
+          tries.push([ai, [xr, xc], [yr, yc]]);
+        }
+      });
+      if (tries.length) {
+        const [ai, x, y] = tries[(rng() * tries.length) | 0];
+        arms[ai].push(x); arms[ai].push(y); visited.add(y[0] + "," + y[1]); added++;
+        bridger.cells.push([x[0], x[1]]); bridger.left--;
         continue;
       }
     }
@@ -250,10 +292,12 @@ export function buildJunctionLevel(n, rng, spec = {}) {
   const J = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
   const visited = new Set([J[0] + "," + J[1]]);
   const jumper = spec.jump ? { left: spec.jump, pairs: [] } : null;
-  const arms = growArms(n, rng, J, 3, visited, null, null, spec.looseness, jumper);
+  const bridger = spec.bridge ? { left: spec.bridge, cells: [] } : null;
+  const arms = growArms(n, rng, J, 3, visited, null, null, spec.looseness, jumper, bridger);
   if (!arms || arms.length < 3) return null;
   if (visited.size < (spec.minCells || 10)) return null;
   if (jumper && jumper.pairs.length < spec.jump) return null;   // the warp never happened
+  if (bridger && bridger.cells.length < spec.bridge) return null;   // no crossing happened
   const sec = SECS[(rng() * 3) | 0], [p1, p2] = COMP[sec];
   const o = shuffle([0, 1, 2], rng);
   const sq = [[p1, ...armEnd(arms[o[0]])], [p2, ...armEnd(arms[o[1]])]];
@@ -274,6 +318,7 @@ export function buildJunctionLevel(n, rng, spec = {}) {
   ];
   const out = { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J], edges, gest };
   if (jumper) out.portals = jumper.pairs;
+  if (bridger) out.bridges = bridger.cells;
   return out;
 }
 
@@ -366,6 +411,51 @@ export function buildChainLevel(n, rng, spec = {}) {
     [...armC.slice().reverse(), J2, ...armN],
   ];
   return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
+}
+
+/* Build a PRISM level: two primaries mix at J1, the blend feeds the PRISM, which
+   releases the SAME two primaries as rays that must reach their circles.
+   2 emitters, 1 prism, 2 primary circles. Ray order matches COMP[sec] (the engine
+   assigns the first ray drawn out of a fed prism to COMP[sec][0]). */
+export function buildPrismLevel(n, rng, spec = {}) {
+  const J1 = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
+  const visited = new Set([J1[0] + "," + J1[1]]);
+  const lo = spec.looseness || 0;
+  const blendMax = 3 + ((rng() * Math.max(2, n - 3)) | 0);
+  const arms = growArms(n, rng, J1, 3, visited, null, blendMax * 3, lo);
+  if (!arms || arms.length < 3) return null;
+  const o = shuffle([0, 1, 2], rng);
+  const armA = arms[o[0]], armB = arms[o[1]], armS = arms[o[2]];
+  if (armS.length < 2) return null;
+  const P = armEnd(armS);
+  if (Math.abs(P[0] - J1[0]) + Math.abs(P[1] - J1[1]) <= 1) return null;
+  const forbid = new Set([J1[0] + "," + J1[1]]);
+  const rays = growArms(n, rng, P, 2, visited, forbid, null, lo);   // the two released primaries
+  if (!rays || rays.length < 2 || rays.some((r) => r.length < 2)) return null;
+  if (visited.size < (spec.minCells || 12)) return null;
+  const sec = SECS[(rng() * 3) | 0], comp = COMP[sec];
+  const [pA, pB] = shuffle(comp.slice(), rng);
+  const sq = [[pA, ...armEnd(armA)], [pB, ...armEnd(armB)]];
+  const ci = [[comp[0], ...armEnd(rays[0])], [comp[1], ...armEnd(rays[1])]];   // ray k -> COMP[sec][k]'s circle
+  const prisms = [[sec, P[0], P[1]]];
+  const paint = new Map([[J1[0] + "," + J1[1], sec], [P[0] + "," + P[1], sec]]);
+  armA.forEach((c) => paint.set(c[0] + "," + c[1], pA));
+  armB.forEach((c) => paint.set(c[0] + "," + c[1], pB));
+  armS.forEach((c) => paint.set(c[0] + "," + c[1], sec));
+  rays[0].forEach((c) => paint.set(c[0] + "," + c[1], comp[0]));
+  rays[1].forEach((c) => paint.set(c[0] + "," + c[1], comp[1]));
+  const edges = [
+    ...armEdges(J1, armA, pA), ...armEdges(J1, armB, pB), ...armEdges(J1, armS, sec),
+    ...armEdges(P, rays[0], comp[0]), ...armEdges(P, rays[1], comp[1]),
+  ];
+  // gestures: feed the prism, then draw each ray out of it (first drawn = comp[0])
+  const gest = [
+    [...armA.slice().reverse(), J1],
+    [...armB.slice().reverse(), J1, ...armS],
+    [P, ...rays[0]],
+    [P, ...rays[1]],
+  ];
+  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1], prisms, edges, gest };
 }
 
 /* Generate a clean single-emitter level with COLOUR GATES for challenge.

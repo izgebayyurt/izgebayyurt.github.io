@@ -62,10 +62,14 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
 .dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
 .dot.ci{ border-radius:50%; }
+.dot.prism{ border-radius:24%; transform:rotate(45deg) scale(0.92); }
+.dot.prism .pcore{ position:absolute; left:50%; top:50%; width:42%; height:42%; border-radius:50%; border:2.5px solid var(--line); transform:translate(-50%,-50%); box-shadow:0 0 0 2px rgba(255,255,255,.35); }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
 @keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
 .dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
+@keyframes prismBounce{ 0%,100%{transform:rotate(45deg) scale(0.92)} 32%{transform:rotate(45deg) scale(1.14)} 66%{transform:rotate(45deg) scale(.85)} }
+.dot.prism.bounce{ animation:prismBounce .42s cubic-bezier(.34,1.7,.6,1); }
 @keyframes starSpin{ to{ transform:rotate(360deg) } }
 .dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
 @keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -221,6 +225,7 @@ var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6"
 /* primaries pair into secondaries; a secondary + its MISSING primary makes browN
    (O+B, G+R, P+Y) — that's how "mix all three" levels chain two junctions. */
 var MIXMAP={RY:"O",BR:"P",BY:"G",BO:"N",GR:"N",PY:"N"};
+var COMPS={O:["R","Y"],G:["B","Y"],P:["B","R"]};   // what a PRISM splits a secondary back into
 function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
 var CBGLYPH={R:"R",Y:"Y",B:"B",O:"O",G:"G",P:"P",N:"Br"};   // colour-blind letters
 
@@ -267,6 +272,7 @@ var li=Math.min(+(localStorage.getItem("hm_flow2_i")||0), LEVELS.length-1);
 var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
 var walls=[], wallSet={}, gates=[];
 var ices=[], iceSet={}, portals=[];      // pack mechanics: straight-through ice, paired warps
+var bridges=[], bridgeSet={};            // pack mechanic: a cell two lines may CROSS (perpendicular)
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
@@ -367,6 +373,16 @@ function applyLevel(L){
   ices=(L.ice||[]).map(function(x){ return [x[0],x[1]]; });
   iceSet={}; ices.forEach(function(x){ iceSet[x[0]+","+x[1]]=1; });
   portals=(L.portals||[]).map(function(p){ return [p[0],p[1],p[2],p[3]]; });
+  bridges=(L.bridges||[]).map(function(b){ return [b[0],b[1]]; });
+  bridgeSet={}; bridges.forEach(function(b){ bridgeSet[b[0]+","+b[1]]=1; });
+  // PRISMS: a tile that wants its secondary fed IN, then releases the two primaries
+  // back OUT. Modelled as a target (the feed) + two co-located LOCKED 1-ray emitters.
+  (L.prisms||[]).forEach(function(p){
+    var ti=tgts.length;
+    tgts.push({col:p[0], r:p[1], c:p[2], done:false, prism:true});
+    var comp=COMPS[p[0]]||[];
+    comp.forEach(function(pc){ ems.push({col:pc, r:p[1], c:p[2], legs:[], lock:ti, max:1}); });
+  });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
   buildGrid(); renderDots(); renderPaths(); updateUndoUI();
 }
@@ -448,6 +464,26 @@ function iceOK(){
   }
   return true;
 }
+function isBridge(r,c){ return !!bridgeSet[r+","+c]; }
+/* ALL pipes whose cells include (r,c) — a bridge cell can carry two */
+function pathsAt(r,c){
+  var out=[];
+  junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd}); });
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id}); }); });
+  return out;
+}
+/* every bridge cell must be crossed straight by every line on it (1 or 2, perpendicular) */
+function bridgesOK(){
+  for(var i=0;i<bridges.length;i++){
+    var ps=pathsAt(bridges[i][0],bridges[i][1]);
+    if(!ps.length) return false;
+    for(var k=0;k<ps.length;k++){ var cl=ps[k].cells, x=ps[k].idx;
+      if(x<=0 || x>=cl.length-1) return false;
+      if(cl[x+1][0]-cl[x][0]!==cl[x][0]-cl[x-1][0] || cl[x+1][1]-cl[x][1]!==cl[x][1]-cl[x-1][1]) return false;
+    }
+  }
+  return true;
+}
 function bounceDot(r,c){ var rd=[].slice.call(dotL.querySelectorAll(".dot")).filter(function(d){ return +d.dataset.dr===r && +d.dataset.dc===c; })[0]; if(rd){ rd.classList.remove("bounce"); void rd.offsetWidth; rd.classList.add("bounce"); } }
 
 function buildGrid(){
@@ -485,6 +521,19 @@ function dropChildOf(ji){ var J=junctions[ji];
   if(J && J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<ji) ji--; }
   return ji;
 }
+/* tapping a prism cell: >=0 -> start that ray emitter; -2 -> prism unfed (hint);
+   -3 -> prism fully drawn (do nothing); -1 -> not a prism cell */
+function prismStartAt(r,c){
+  var locked=false, anyPrism=false;
+  for(var e=0;e<ems.length;e++){ var E=ems[e];
+    if(E.lock==null || E.r!==r || E.c!==c) continue;
+    anyPrism=true;
+    if(!tgts[E.lock] || !tgts[E.lock].done){ locked=true; continue; }
+    if(!E.legs.length) return e;
+  }
+  if(locked) return -2;
+  return anyPrism ? -3 : -1;
+}
 /* the single source of consistency — run after ANY structural change (retreat, truncate, etc.).
    Deterministic: derives the valid set of legs/junctions from the raw cell paths. */
 function reconcile(){
@@ -516,6 +565,11 @@ function reconcile(){
     }
   }
   recomputeTargets();
+  // C) a prism that lost its feed retracts its rays
+  var pdrop=false;
+  ems.forEach(function(E){ if(E.lock==null) return; if(tgts[E.lock] && tgts[E.lock].done) return;
+    for(var k=E.legs.length-1;k>=0;k--){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); pdrop=true; } });
+  if(pdrop) recomputeTargets();
 }
 /* Derive each circle's done-state from the CURRENT pipe heads — the single truth.
    Fixes the stuck-terminal bug: delivering set done=true, but retreating a pipe off
@@ -564,7 +618,15 @@ board.addEventListener("pointerdown", function(e){
   if(!o) return;
   preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
   drawSteps=0; melodyReset();
-  if(o.t==="jun"){
+  var pri=prismStartAt(cell[0],cell[1]);
+  if(pri===-2){ toast("Feed the prism its colour first!"); drag=null; }
+  else if(pri===-3){ drag=null; }       // fully-drawn prism: retreat rays by their tips (or Undo)
+  else if(pri>=0){
+    var PE=ems[pri];
+    PE.legs.push({cells:[[PE.r,PE.c]], jun:-1});
+    drag={t:"em", e:pri, l:PE.legs.length-1};
+  }
+  else if(o.t==="jun"){
     var ji=dropChildOf(o.i);
     var J=junctions[ji]; J.leg=[J.cell.slice()];
     var tj=tgtFor(J.sec); if(tj) tj.done=false;
@@ -616,8 +678,8 @@ function step(cell){
   if(leg.length>1 && same(cell, leg[leg.length-2])){ leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return; }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
-  if(tgtAt(head[0],head[1])) return;    // a terminal is an endpoint — you can't drag a pipe THROUGH it
-  if(isIce(head[0],head[1]) && leg.length>1){   // no turning on ice — keep going straight
+  if(leg.length>1 && tgtAt(head[0],head[1])) return;   // a terminal is an endpoint — no dragging THROUGH it (a prism RAY's root sits on one, hence length>1)
+  if((isIce(head[0],head[1])||isBridge(head[0],head[1])) && leg.length>1){   // no turning on ice or mid-bridge
     var pv=leg[leg.length-2];
     if(cell[0]-head[0]!==head[0]-pv[0] || cell[1]-head[1]!==head[1]-pv[1]) return;
   }
@@ -627,6 +689,20 @@ function step(cell){
     var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
     if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){ leg.push([tw[0],tw[1]]); addBloom(tw[0],tw[1],"#7fd4ee",520); }
     renderPaths(); return;
+  }
+  // BRIDGE: a second line may cross an occupied bridge cell — perpendicular only
+  if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg") && indexIn(leg,cell[0],cell[1])<0){
+    var d0=[cell[0]-head[0], cell[1]-head[1]];
+    var ps0=pathsAt(cell[0],cell[1]);
+    var okX=ps0.length>0 && ps0.every(function(pp){
+      var cl=pp.cells, x=pp.idx, v=null;
+      if(x>0) v=[cl[x][0]-cl[x-1][0], cl[x][1]-cl[x-1][1]];
+      else if(x<cl.length-1) v=[cl[x+1][0]-cl[x][0], cl[x+1][1]-cl[x][1]];
+      if(!v) return false;
+      return (v[0]!==0)!==(d0[0]!==0);   // different axes
+    });
+    if(okX){ leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true); renderPaths(); }
+    return;   // parallel entry into an occupied bridge is blocked
   }
 
   if(drag.t==="jun" && (o.t==="em" || o.t==="emdot")){
@@ -718,9 +794,11 @@ function step(cell){
       bounceDot(TD.r,TD.c); sfxDone(); renderPaths(); checkWin(); return;
     }
   }
-  // BLEND delivery: a junction's blend reaches its matching secondary circle
-  if(drag.t==="jun" && o.t==="tgt"){
-    var T=tgts[o.i], J3=junctions[drag.i];
+  // BLEND delivery: a junction's blend reaches its matching secondary circle — or a
+  // PRISM's core (whose co-located ray emitters shadow the target in occAt, so look
+  // the target up by cell, not by occupant type)
+  if(drag.t==="jun" && (o.t==="tgt" || tgtAt(cell[0],cell[1]))){
+    var T=tgtAt(cell[0],cell[1]), J3=junctions[drag.i];
     if(T.col===J3.sec && !T.done){
       J3.leg.push(cell); T.done=true;
       addBloom(cell[0],cell[1], HEX[T.col], 760); addSweep(J3.leg.slice(), "#fff", 0, 480);
@@ -756,6 +834,7 @@ function checkWin(){
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
   if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
   if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
+  if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
   solved=true; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI();
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
@@ -788,8 +867,15 @@ function renderDots(){
     var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
     return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
-  ems.forEach(function(E){ h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round…
-  tgts.forEach(function(T){ h+=dot(T.col,T.r,T.c,"sq",true); });   // …objectives are square (gates are square too, so squares read as "goals")
+  ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
+  tgts.forEach(function(T){
+    if(T.prism){   // prism: a split diamond of the two primaries it releases, its core the colour it wants fed
+      var comp=COMPS[T.col]||["R","Y"], sz=s*0.84, off=(s-sz)/2;
+      h+='<div class="dot prism" data-dr="'+T.r+'" data-dc="'+T.c+'" style="left:'+(T.c*s+off)+'px;top:'+(T.r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:linear-gradient(135deg,'+HEX[comp[0]]+' 49%,'+HEX[comp[1]]+' 51%)"><span class="pcore" style="background:'+HEX[T.col]+'"></span></div>';
+      return;
+    }
+    h+=dot(T.col,T.r,T.c,"sq",true);   // …objectives are square (gates are square too, so squares read as "goals")
+  });
   dotL.innerHTML=h;
 }
 /* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
@@ -961,6 +1047,21 @@ function renderPaths(){
       ctx.globalAlpha=0.85; ctx.strokeStyle="#eef9ff"; ctx.lineWidth=s*0.035; ctx.lineCap="round";
       for(var ai=0;ai<3;ai++){ var an=ai*Math.PI/3, arm2=s*0.15;
         ctx.beginPath(); ctx.moveTo(cx0-Math.cos(an)*arm2, cy0-Math.sin(an)*arm2); ctx.lineTo(cx0+Math.cos(an)*arm2, cy0+Math.sin(an)*arm2); ctx.stroke(); }
+    });
+    ctx.restore();
+  }
+  // 6b''' — bridges: corner brackets marking a cell two lines may cross
+  if(bridges.length){
+    ctx.save(); ctx.lineCap="round";
+    bridges.forEach(function(bc){
+      var cx2=bc[1]*s+s/2, cy2=bc[0]*s+s/2, ins=s*0.335, ln=s*0.16;
+      [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(function(q){
+        var px=cx2+q[1]*ins, py=cy2+q[0]*ins;
+        [[s*0.085,INK],[s*0.045,"#aeb6cc"]].forEach(function(st){
+          ctx.lineWidth=st[0]; ctx.strokeStyle=st[1];
+          ctx.beginPath(); ctx.moveTo(px-q[1]*ln,py); ctx.lineTo(px,py); ctx.lineTo(px,py-q[0]*ln); ctx.stroke();
+        });
+      });
     });
     ctx.restore();
   }

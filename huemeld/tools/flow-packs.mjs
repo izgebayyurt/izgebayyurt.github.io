@@ -8,7 +8,7 @@
      arrows  — directional gates: the colour must cross the gate the arrow's way
      ice     — frozen cells a line may only pass straight through
      portals — a paired warp: a line entering one end exits the other */
-import { buildJunctionLevel, buildForkLevel, buildChainLevel, mulberry32 } from "./flow-gen2.mjs";
+import { buildJunctionLevel, buildForkLevel, buildChainLevel, buildPrismLevel, mulberry32 } from "./flow-gen2.mjs";
 
 const SECS = ["O", "G", "P"];
 const key = (r, c) => r + "," + c;
@@ -92,6 +92,20 @@ function makePortals(spec, rng) {
   return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [], portals: L.portals }, gest: L.gest };
 }
 
+function makeBridges(spec, rng) {
+  const L = buildJunctionLevel(spec.n, rng, { looseness: 1.0, bridge: spec.bridge });
+  if (!L || !L.bridges) return null;
+  if (spec.n * spec.n - L.walls.length < spec.minOpen) return null;
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [], bridges: L.bridges }, gest: L.gest };
+}
+
+function makePrisms(spec, rng) {
+  const L = buildPrismLevel(spec.n, rng, { looseness: spec.looseness == null ? 1.0 : spec.looseness, minCells: 12 });
+  if (!L) return null;
+  if (spec.n * spec.n - L.walls.length < spec.minOpen) return null;
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [], prisms: L.prisms }, gest: L.gest };
+}
+
 /* ---- assembly ---- */
 const RAMPS = {
   brown: { name: "Brown", icon: "🟤", desc: "Mix all three primaries", make: makeBrown, tiers: [
@@ -115,6 +129,16 @@ const RAMPS = {
     [4, { n: 5, minOpen: 23 }],
     [4, { n: 6, minOpen: 32 }],
     [2, { n: 7, minOpen: 43 }],
+  ] },
+  bridges: { name: "Bridges", icon: "⌗", desc: "Lines cross over each other", make: makeBridges, tiers: [
+    [4, { n: 5, minOpen: 23, bridge: 1 }],
+    [4, { n: 6, minOpen: 32, bridge: 1 }],
+    [2, { n: 7, minOpen: 43, bridge: 2 }],
+  ] },
+  prisms: { name: "Prisms", icon: "◈", desc: "Split a blend back apart", make: makePrisms, tiers: [
+    [4, { n: 5, minOpen: 22 }],
+    [4, { n: 6, minOpen: 31 }],
+    [2, { n: 7, minOpen: 42 }],
   ] },
 };
 
