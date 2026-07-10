@@ -96,13 +96,16 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 }
 .mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .pkgrid{ display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-top:10px; max-width:280px; }
-#ovPick .panel{ max-height:84%; overflow-y:auto; }
 .packtitle{ font-family:var(--font-d); font-weight:700; font-size:17px; margin:16px 0 2px; }
 .packhead{ font-family:var(--font-d); font-weight:600; font-size:14px; margin-top:10px; color:var(--ink); }
 .packhead .pksub{ font-size:12px; color:var(--ink-soft); font-weight:700; margin-left:6px; }
 #ovPick{ position:fixed; }
-#ovPick .panel{ max-height:86vh; display:flex; flex-direction:column; }
-#ovPick .pkgrid{ overflow-y:auto; overflow-x:hidden; padding:6px 4px; min-height:0; }
+/* the PANEL is the one scroller; the level grid and pack grids keep natural height
+   (a shrinkable grid collapsed to a sliver once the packs section moved in below it) */
+#ovPick .panel{ max-height:86vh; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; }
+#ovPick .pkgrid{ padding:6px 4px; flex:0 0 auto; }
+#packsArea{ flex:0 0 auto; width:100%; }
+#packsArea .pkgrid{ margin-left:auto; margin-right:auto; }
 .pkbtn{
   width:52px; height:52px; border:3px solid var(--line); border-radius:14px; background:var(--card);
   box-shadow:0 3px 0 var(--shadow); cursor:pointer; font-family:var(--font-d); font-weight:700; font-size:17px; color:var(--ink);
