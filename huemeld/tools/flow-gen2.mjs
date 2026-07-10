@@ -297,18 +297,23 @@ export function genGate(spec, rng) {
     if (!L) continue;
     const open = spec.n * spec.n - L.walls.length;
     if (spec.minOpen && open < spec.minOpen) continue;    // prefer near-full boards
-    // gate candidates: painted FIELD cells (not emitter / circle / junction)
+    // gate candidates: painted FIELD cells (not emitter / circle / junction), and
+    // not orthogonally next to a source or terminal — a gate touching an endpoint
+    // is trivially satisfied by nearly any line through it.
     const skip = new Set();
     L.sq.forEach(([, r, c]) => skip.add(r + "," + c));
     L.ci.forEach(([, r, c]) => skip.add(r + "," + c));
     (L.junctions || []).forEach(([r, c]) => skip.add(r + "," + c));
+    L.sq.concat(L.ci).forEach(([, r, c]) => { skip.add((r + 1) + "," + c); skip.add((r - 1) + "," + c); skip.add(r + "," + (c + 1)); skip.add(r + "," + (c - 1)); });
     const prim = [], sec = [];
     for (const [k, col] of L.paint) { if (skip.has(k)) continue; const [r, c] = k.split(",").map(Number);
       (SECS.includes(col) ? sec : prim).push([col, r, c]); }
     if (!sec.length && !prim.length) continue;
-    // FEW gates, SPREAD OUT (no two adjacent), secondary-first so mixing is the puzzle.
+    // FEW gates, SPREAD OUT (no two adjacent). Mostly secondary (mixing is the
+    // puzzle) but with a deliberate primary share (~1 in 3) once gates stack up.
     const want = spec.gates != null ? spec.gates : 3;
-    const cand = [...shuffle(sec, rng), ...shuffle(prim, rng)];
+    const sprim = shuffle(prim, rng), wantPrim = Math.min(sprim.length, Math.floor(want / 3));
+    const cand = [...sprim.slice(0, wantPrim), ...shuffle(sec, rng), ...sprim.slice(wantPrim)];
     const gates = [], gkey = new Set();
     for (const g of cand) {
       if (gates.length >= want) break;
