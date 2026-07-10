@@ -46,23 +46,35 @@ function buildSet(ramp, label) {
   return set;
 }
 
-// campaign — learn one mix, then the fork; gates scale up; walls stay sparse
+// campaign — 250 levels in five 50-level chapters; gates and boards scale up
 const CAMPAIGN = [
-  // Tier 1 — one mix on a full 5×5, ease in with a gate or two
-  [5, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
-  [5, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
-  // Tier 2 — bigger single-mix boards, gates start to bite
-  [5, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
-  [5, { n: 6, type: "junction", minOpen: 33, looseness: 0.9, gates: 3 }],
-  // Tier 3 — the fork: one square feeds two mixes (2 secondaries)
-  [5, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
-  [5, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 3 }],
-  // Tier 4 — bigger forks, gates ramp toward "make you think"
-  [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
-  [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 4 }],
-  [5, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 5 }],
-  // Tier 5 — the wall: dense gates on the largest clean boards
-  [5, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
+  // Chapter 1 — MIX (50): one junction, full boards, gates ease in
+  [10, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
+  [10, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
+  [10, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
+  [10, { n: 6, type: "junction", minOpen: 33, looseness: 0.9, gates: 3 }],
+  [10, { n: 6, type: "junction", minOpen: 33, looseness: 1.0, gates: 4 }],
+  // Chapter 2 — FORK (50): one square feeds two mixes
+  [10, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
+  [15, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 3 }],
+  [15, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
+  [10, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 4 }],
+  // Chapter 3 — PRESSURE (50): 7×7, gates stack up
+  [15, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 4 }],
+  [15, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 5 }],
+  [10, { n: 7, type: "junction", minOpen: 46, looseness: 1.0, gates: 5 }],
+  [10, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
+  // Chapter 4 — BIG BOARDS (50): 8×8 arrives
+  [10, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
+  [10, { n: 8, type: "junction", minOpen: 59, looseness: 1.0, gates: 4 }],
+  [10, { n: 8, type: "junction", minOpen: 58, looseness: 1.0, gates: 5 }],
+  [10, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 5 }],
+  [10, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 6 }],
+  // Chapter 5 — MASTERY (50): dense gates on the largest clean boards
+  [15, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 6 }],
+  [15, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 7 }],
+  [10, { n: 8, type: "fork", minOpen: 59, looseness: 1.0, gates: 8 }],
+  [10, { n: 8, type: "junction", minOpen: 59, looseness: 1.0, gates: 8 }],
 ];
 
 // daily pool — a spread of self-contained medium puzzles
