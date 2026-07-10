@@ -34,8 +34,7 @@ node huemeld/tools/flow-app.mjs --seed 20260709   # writes flow-data.js (campaig
   board is a full-coverage single-emitter solution by construction, then the counter
   confirms exactly one solution. One R/Y/B square each; secondary circles (O/G/P) as
   objectives.
-- `tools/flow-hints.mjs` — derives the per-circle delivery paths baked in as hints.
-- `tools/flow-app.mjs` — the campaign ramp + daily pool, with baked hints.
+- `tools/flow-app.mjs` — the campaign ramp + daily pool.
 - `tools/flow-gen.mjs` / `flow-build.mjs` — the earlier multi-emitter snake generator
   (kept for reference).
 
@@ -45,14 +44,12 @@ cycles through the `daily` pool, so grow that pool for a longer daily runway.
 
 ## 3. Monetization (native)
 
-The web build shows **no ads**; hints are earned by solving (+1 per solve). The
-native wrapper injects a bridge that turns the seams already in `flow2.html` into
-real ads/IAP:
+The web build shows **no ads**. The native wrapper injects a bridge that turns the
+seams already in `flow2.html` into real ads/IAP:
 
 ```js
 // provided by the Capacitor shell on app start:
 window.HuemeldNative = {
-  rewarded(cb)      { /* show rewarded video; cb(true) on complete → +2 hints */ },
   interstitial()    { /* show interstitial (called every 4th solve) */ },
   buyRemoveAds(cb)  { /* run IAP; cb(true) on success → ads removed forever */ },
 };
@@ -62,7 +59,6 @@ Where each hooks in (search `flow2.html` for these):
 
 | Seam | Trigger | Function |
 |------|---------|----------|
-| Rewarded video → +2 hints | tap **Hint** with 0 in the bank | `rewardedForHints()` |
 | Interstitial | every 4th level solved | `maybeInterstitial()` |
 | Remove-Ads IAP | **Remove Ads** button (shown only when the bridge exists) | `btnNoAds` handler |
 
@@ -90,6 +86,5 @@ AdMob account (+ a RevenueCat account if you use it). Store review expects a
 privacy policy and, for ads, an ATT prompt on iOS.
 
 ### Recommended model
-Free with a **rewarded video** for extra hints, a light **interstitial** every few
-solves, and a one-time **Remove Ads** IAP. This matches the genre and keeps the
-core game fully playable for free.
+Free with a light **interstitial** every few solves and a one-time **Remove Ads**
+IAP. This matches the genre and keeps the core game fully playable for free.
