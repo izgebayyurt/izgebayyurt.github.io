@@ -205,6 +205,10 @@ function growArms(n, rng, center, k, visited, share, maxCells, looseness, jumper
     // PORTAL jump: occasionally an arm warps to a fresh free cell; the head becomes
     // the portal's entry, the landing cell its exit. Growth carries on from there.
     if (jumper && jumper.left > 0 && added > k && rng() < 0.14) {
+      const jarm = (rng() * arms.length) | 0;
+      const jh = arms[jarm][arms[jarm].length - 1];
+      // never jump FROM a cell that's already a portal — chained warps strand the line
+      if (jumper.pairs.some((p) => (p[0] === jh[0] && p[1] === jh[1]) || (p[2] === jh[0] && p[3] === jh[1]))) continue;
       const lands = [];
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
         if (visited.has(r + "," + c)) continue;
@@ -213,11 +217,9 @@ function growArms(n, rng, center, k, visited, share, maxCells, looseness, jumper
         if (clear) lands.push([r, c]);
       }
       if (lands.length) {
-        const ai = (rng() * arms.length) | 0;
-        const h = arms[ai][arms[ai].length - 1];
         const f = lands[(rng() * lands.length) | 0];
-        arms[ai].push(f); visited.add(f[0] + "," + f[1]); added++;
-        jumper.pairs.push([h[0], h[1], f[0], f[1]]); jumper.left--;
+        arms[jarm].push(f); visited.add(f[0] + "," + f[1]); added++;
+        jumper.pairs.push([jh[0], jh[1], f[0], f[1]]); jumper.left--;
         continue;
       }
     }
@@ -503,7 +505,7 @@ export function genGate(spec, rng) {
     if (spec.measure) { const res = countSolutions(out, spec.solCap || 4, spec.gateBudget || 200000);
       solutions = res.aborted ? null : res.count; capped = res.capped;
       if (spec.maxSolutions && (res.aborted || res.count > spec.maxSolutions)) continue; }
-    return { L: out, open, solutions, capped, edges: L.edges };   // edges = the constructed solution
+    return { L: out, open, solutions, capped, edges: L.edges, gest: L.gest };   // edges/gest = the constructed solution
   }
   return null;
 }

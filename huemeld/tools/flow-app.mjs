@@ -22,7 +22,7 @@ function makeLevel(base) {
   const g = genGate({ tries: 6000, ...base }, rng);
   if (!g) return null;
   const L = g.L;
-  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls || [], gates: L.gates }, edges: g.edges };
+  return { lv: { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls || [], gates: L.gates }, edges: g.edges, gest: g.gest };
 }
 
 function buildSet(ramp, label) {
@@ -37,7 +37,7 @@ function buildSet(ramp, label) {
       const lv = r.lv;
       const sig = JSON.stringify([lv.n, lv.sq, lv.ci, lv.walls, lv.gates]);
       if (sigs.has(sig)) continue;
-      sigs.add(sig); set.push(lv); SOL[label].push({ lv, edges: r.edges }); made++;
+      sigs.add(sig); set.push(lv); SOL[label].push({ lv, edges: r.edges, gest: r.gest }); made++;
     }
     if (made < count) process.stderr.write(`  (${label} tier short ${made}/${count} n${base.n} ${base.type})\n`);
   }
@@ -46,23 +46,35 @@ function buildSet(ramp, label) {
   return set;
 }
 
-// campaign — learn one mix, then the fork; gates scale up; walls stay sparse
+// campaign — 250 levels in five 50-level chapters; gates and boards scale up
 const CAMPAIGN = [
-  // Tier 1 — one mix on a full 5×5, ease in with a gate or two
-  [5, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
-  [5, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
-  // Tier 2 — bigger single-mix boards, gates start to bite
-  [5, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
-  [5, { n: 6, type: "junction", minOpen: 33, looseness: 0.9, gates: 3 }],
-  // Tier 3 — the fork: one square feeds two mixes (2 secondaries)
-  [5, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
-  [5, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 3 }],
-  // Tier 4 — bigger forks, gates ramp toward "make you think"
-  [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
-  [5, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 4 }],
-  [5, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 5 }],
-  // Tier 5 — the wall: dense gates on the largest clean boards
-  [5, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
+  // Chapter 1 — MIX (50): one junction, full boards, gates ease in
+  [10, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
+  [10, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
+  [10, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
+  [10, { n: 6, type: "junction", minOpen: 33, looseness: 0.9, gates: 3 }],
+  [10, { n: 6, type: "junction", minOpen: 33, looseness: 1.0, gates: 4 }],
+  // Chapter 2 — FORK (50): one square feeds two mixes
+  [10, { n: 6, type: "fork", minOpen: 32, looseness: 1.0, gates: 2 }],
+  [15, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 3 }],
+  [15, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 3 }],
+  [10, { n: 6, type: "fork", minOpen: 31, looseness: 1.0, gates: 4 }],
+  // Chapter 3 — PRESSURE (50): 7×7, gates stack up
+  [15, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 4 }],
+  [15, { n: 7, type: "fork", minOpen: 45, looseness: 1.0, gates: 5 }],
+  [10, { n: 7, type: "junction", minOpen: 46, looseness: 1.0, gates: 5 }],
+  [10, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
+  // Chapter 4 — BIG BOARDS (50): 8×8 arrives
+  [10, { n: 7, type: "fork", minOpen: 46, looseness: 1.0, gates: 6 }],
+  [10, { n: 8, type: "junction", minOpen: 59, looseness: 1.0, gates: 4 }],
+  [10, { n: 8, type: "junction", minOpen: 58, looseness: 1.0, gates: 5 }],
+  [10, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 5 }],
+  [10, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 6 }],
+  // Chapter 5 — MASTERY (50): dense gates on the largest clean boards
+  [15, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 6 }],
+  [15, { n: 8, type: "fork", minOpen: 58, looseness: 1.0, gates: 7 }],
+  [10, { n: 8, type: "fork", minOpen: 59, looseness: 1.0, gates: 8 }],
+  [10, { n: 8, type: "junction", minOpen: 59, looseness: 1.0, gates: 8 }],
 ];
 
 // daily pool — a spread of self-contained medium puzzles
@@ -74,6 +86,14 @@ const DAILY = [
 
 const campaign = buildSet(CAMPAIGN, "campaign");
 const daily = buildSet(DAILY, "daily");
+// level 1 carries its solution gestures so the shell can play the ghost-hand demo
+if (campaign.length && SOL.campaign[0].gest) campaign[0].demo = SOL.campaign[0].gest;
+
+// chapter map for the shell: free players unlock each chapter by solving 2/3 of the previous
+const CHAPTERS = [
+  { name: "Mix", n: 50 }, { name: "Fork", n: 50 }, { name: "Pressure", n: 50 },
+  { name: "Big Boards", n: 50 }, { name: "Mastery", n: 50 },
+];
 // side packs use their own rng stream so campaign/daily stay byte-identical per seed
 const pk = genPacks(seed + 777);
 SOL.packs = pk.sols;
@@ -83,7 +103,7 @@ pk.packs.forEach((p) => process.stderr.write(`pack ${p.id}: ${p.levels.length} l
 // separately by replaying each through the real engine.
 void countSolutions; void findOneSolution;
 
-const payload = { version: 5, campaign, daily, packs: pk.packs };
+const payload = { version: 6, campaign, chapters: CHAPTERS, daily, packs: pk.packs };
 const js = "/* GENERATED by tools/flow-app.mjs — single-emitter colour-gate puzzles. */\n" +
   "window.HUEMELD_FLOW=" + JSON.stringify(payload) + ";\n";
 writeFileSync(join(__dir, "..", "flow-data.js"), js);

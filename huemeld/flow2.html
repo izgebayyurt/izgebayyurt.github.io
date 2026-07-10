@@ -99,6 +99,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .packtitle{ font-family:var(--font-d); font-weight:700; font-size:17px; margin:16px 0 2px; }
 .packhead{ font-family:var(--font-d); font-weight:600; font-size:14px; margin-top:10px; color:var(--ink); }
 .packhead .pksub{ font-size:12px; color:var(--ink-soft); font-weight:700; margin-left:6px; }
+.packdesc{ font-family:var(--font-d); font-size:12px; color:var(--ink-soft); font-weight:600; margin-top:1px; }
 #ovPick{ position:fixed; }
 /* the PANEL is the one scroller; the level grid and pack grids keep natural height
    (a shrinkable grid collapsed to a sliver once the packs section moved in below it) */
@@ -114,6 +115,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pkbtn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
 .pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
 .pkbtn.cur{ background:#ffd15c; color:#2c2733; }
+.pkbtn.lk{ opacity:.32; pointer-events:none; }
 .tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
@@ -181,6 +183,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div class="ov" id="ovPick">
       <div class="panel">
         <h2 id="pickTitle">Levels</h2>
+        <button class="mk" id="btnContinue" style="background:#ffd15c;margin-top:4px">▶ Continue</button>
         <button class="mk" id="btnDaily" style="background:#c9f0c0;margin-top:4px">★ Daily Puzzle</button>
         <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:8px">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
@@ -210,6 +213,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
           <p>A <b>gate</b> only lets its own colour pass.</p>
           <p>Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
         </div>
+        <button class="mk" id="btnDemo" style="background:#e6d9ff">▶ Show me</button>
         <button class="mk" id="btnHelpClose">Got it</button>
       </div>
     </div>
@@ -263,6 +267,26 @@ var FLOWDATA=(typeof window!=="undefined" && window.HUEMELD_FLOW) ? window.HUEME
 LEVELS = (FLOWDATA && FLOWDATA.campaign && FLOWDATA.campaign.length) ? FLOWDATA.campaign : FALLBACK_LEVELS;
 var DAILY = (FLOWDATA && FLOWDATA.daily) ? FLOWDATA.daily : [];
 var PACKS = (FLOWDATA && FLOWDATA.packs) ? FLOWDATA.packs : [];   // side packs: new mechanics, à-la-carte
+var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLOWDATA.chapters : [{name:"Levels", n:LEVELS.length}];
+
+/* ---------- chapters & entitlements ----------
+   FREE gets every chapter, gated by progress: solving 2/3 of a chapter opens the
+   next. The paid "full game" entitlement (wired to IAP in the app build) opens
+   everything at once. */
+function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
+function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
+function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
+function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
+function solvedInChapter(c){
+  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+  var s=chapterStart(c), n=0;
+  for(var i=s;i<s+CHAPTERS[c].n;i++) if(done[i]) n++;
+  return n;
+}
+function chapterUnlocked(c){
+  if(c<=0 || entFull()) return true;
+  return solvedInChapter(c-1) >= chapterNeed(c-1);
+}
 
 var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
     shadowCanvas=document.createElement("canvas"), sctx=shadowCanvas.getContext("2d"),
@@ -309,6 +333,15 @@ function applyTheme(){
   try{ renderPaths(); }catch(_e){}
 }
 function todayKey(){ var d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+/* consecutive solved days ending today (or yesterday, if today's not done yet) */
+function dailyStreak(){
+  var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
+  function k(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+  var d=new Date(), n=0;
+  if(!dd[k(d)]) d.setDate(d.getDate()-1);
+  while(dd[k(d)]){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
 function dailyIndex(){ if(!DAILY.length) return 0; var d=new Date(); var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return ((n%DAILY.length)+DAILY.length)%DAILY.length; }
 
 /* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
@@ -365,6 +398,7 @@ function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ s
 
 /* ---------- level state ---------- */
 function applyLevel(L){
+  if(demoing) stopDemo();   // navigating anywhere cancels a running ghost demo
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
   undoStack=[]; preGesture=null;
@@ -390,13 +424,31 @@ function applyLevel(L){
   buildGrid(); renderDots(); renderPaths(); updateUndoUI();
 }
 function loadLevel(i){
+  var want=Math.max(0, Math.min(LEVELS.length-1, i));
+  var ch=chapterOf(want);
+  if(!chapterUnlocked(ch)){
+    var prev=CHAPTERS[ch-1];
+    toast("🔒 "+CHAPTERS[ch].name+" — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
+    return;
+  }
   isTut=false; mode="campaign";
-  li=Math.max(0, Math.min(LEVELS.length-1, i));
+  li=want;
   localStorage.setItem("hm_flow2_i",""+li);
   lvNameEl.textContent="Level "+(li+1);
   document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = li<LEVELS.length-1 ? "" : "hidden";
   applyLevel(LEVELS[li]);
+  // first FORK level: teach the one move nobody discovers alone — a circle can
+  // feed TWO lines. Pulse the square that has to do it.
+  var L=LEVELS[li];
+  if(L.sq.length>=3 && !localStorage.getItem("hm_flow2_forktip")){
+    localStorage.setItem("hm_flow2_forktip","1");
+    var need={}; L.ci.forEach(function(t){ (COMPS[t[0]]||[]).forEach(function(p){ need[p]=(need[p]||0)+1; }); });
+    var forkCol=null; for(var pc in need) if(need[pc]>1) forkCol=pc;
+    var fe=null; ems.forEach(function(E){ if(E.col===forkCol) fe=E; });
+    toast("New: one circle can FORK — draw a second line from it!");
+    if(fe){ var k=0, iv=setInterval(function(){ if(li>=0) bounceDot(fe.r,fe.c); if(++k>=5) clearInterval(iv); }, 850); }
+  }
 }
 function loadDaily(){
   isTut=false; mode="daily";
@@ -415,11 +467,49 @@ function loadPackLevel(pi, k){
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
   applyLevel(pk.levels[k]);
+  if(k===0 && pk.desc) toast(pk.name+": "+pk.desc.toLowerCase());
 }
-/* flow2 teaches via the ? legend (no ghost demo yet). these keep old references harmless. */
-var demoing=false, demoFiring=false;
-function stopDemo(){}
-function loadTutorial(){ document.getElementById("ovHelp").classList.add("show"); }
+/* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
+   Synthetic pointer events run through the REAL input handlers (demoFiring lets them
+   through while demoing blocks the player's own touches). */
+var demoing=false, demoFiring=false, demoTimers=[];
+var ghostEl=document.getElementById("ghost"), demobanEl=document.getElementById("demoban"), demoskipEl=document.getElementById("demoskip");
+function demoAt(ms,fn){ demoTimers.push(setTimeout(fn,ms)); }
+function fireDemo(type,cell){
+  var rect=board.getBoundingClientRect(), s=cs();
+  var x=rect.left+cell[1]*s+s/2, y=rect.top+cell[0]*s+s/2;
+  demoFiring=true;
+  try{ board.dispatchEvent(new PointerEvent(type,{clientX:x,clientY:y,isPrimary:true,pointerId:99,bubbles:true})); }catch(_e){}
+  demoFiring=false;
+  ghostEl.style.left=(cell[1]*s+s/2)+"px"; ghostEl.style.top=(cell[0]*s+s/2)+"px";
+}
+function stopDemo(){   // clear timers + chrome; does NOT touch the board
+  demoTimers.forEach(clearTimeout); demoTimers=[];
+  demoing=false; demoFiring=false;
+  ghostEl.style.display="none"; demobanEl.classList.remove("show"); demoskipEl.classList.remove("show");
+}
+function endDemo(){ stopDemo(); loadLevel(0); toast("Your turn!"); }
+function playDemo(){
+  var demo=LEVELS[0] && LEVELS[0].demo;
+  if(!demo || demoing) return false;
+  loadLevel(0);
+  demoing=true;
+  ghostEl.style.display="block"; ghostEl.style.transition="left .14s linear, top .14s linear";
+  demoskipEl.classList.add("show");
+  var CAP=["Drag a line out of a circle…","…meet the other colour: they MIX! Ride it to the ✦","Cover the board. Light the ✦. That's the game."];
+  var t=500, STEP=150;
+  demo.forEach(function(cells,gi){
+    demoAt(t,function(){ demobanEl.textContent=CAP[Math.min(gi,CAP.length-1)]; demobanEl.classList.add("show"); });
+    demoAt(t,function(){ fireDemo("pointerdown",cells[0]); });
+    cells.forEach(function(c,i){ if(i===0) return; demoAt(t+i*STEP,function(){ fireDemo("pointermove",c); }); });
+    t+=cells.length*STEP+220;
+    demoAt(t,function(){ fireDemo("pointerup",cells[cells.length-1]); });
+    t+=650;
+  });
+  demoAt(t+900,endDemo);
+  return true;
+}
+function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
 function cs(){ return board.clientWidth/N; }
 function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
 function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
@@ -858,12 +948,14 @@ function checkWin(){
   if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
   solved=true; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI();
+  if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
   var wn=document.getElementById("btnWinNext");
   document.querySelector("#ovWin h2").textContent="Solved! ✦";
   if(mode==="daily"){
     var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[todayKey()]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
-    document.getElementById("winMsg").textContent="Daily puzzle solved — see you tomorrow!";
+    var stk2=dailyStreak();
+    document.getElementById("winMsg").textContent="Daily solved"+(stk2>1 ? " — 🔥 "+stk2+"-day streak!" : " — see you tomorrow!");
     wn.style.display=""; wn.textContent="Back to levels";
   } else if(mode==="pack"){
     var pk=PACKS[curPack];
@@ -873,11 +965,16 @@ function checkWin(){
     document.getElementById("winMsg").textContent = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length+(lastOne ? " — pack complete!" : "");
     wn.style.display=""; wn.textContent = lastOne ? "Back to levels" : "Next →";
   } else {
-    var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
-    document.getElementById("winMsg").textContent = "Whole board covered."+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
+    var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+    var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
+    var msg="Whole board covered.";
+    var myCh=chapterOf(li);
+    if(newly && myCh+1<CHAPTERS.length && solvedInChapter(myCh)===chapterNeed(myCh))
+      msg="🎉 Chapter unlocked: "+CHAPTERS[myCh+1].name+"!";
+    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
     wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
   }
-  setTimeout(function(){ ovWin.classList.add("show"); }, 1250);
+  setTimeout(function(){ if(solved) ovWin.classList.add("show"); }, 1250);   // a reset in the window cancels it
 }
 
 /* ---------- render: marker-style SVG pipes with blend gradients ---------- */
@@ -1150,18 +1247,33 @@ requestAnimationFrame(frame);
 /* ---------- level picker & controls ---------- */
 function renderPicker(){
   var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), h="", nd=0;
-  for(var i=0;i<LEVELS.length;i++){ if(done[i]) nd++;
-    h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>'; }
+  for(var i0=0;i0<LEVELS.length;i0++) if(done[i0]) nd++;
+  // the campaign is CHAPTERED: later chapters unlock by solving 2/3 of the one before
+  for(var c=0;c<CHAPTERS.length;c++){
+    var s=chapterStart(c), CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
+    h+='<div class="packhead">'+(unl?"":"🔒 ")+"Chapter "+(c+1)+" · "+CH.name+'<span class="pksub">'+sv+"/"+CH.n+"</span></div>";
+    if(!unl) h+='<div class="packdesc">Solve '+(chapterNeed(c-1)-solvedInChapter(c-1))+' more in '+CHAPTERS[c-1].name+' to unlock</div>';
+    h+='<div class="pkgrid">';
+    for(var i=s;i<s+CH.n && i<LEVELS.length;i++)
+      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+(unl?"":" lk")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+    h+='</div>';
+  }
   document.getElementById("pkgrid").innerHTML=h;
   document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
   var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
-  var db=document.getElementById("btnDaily");
-  db.textContent = dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle";
+  var db=document.getElementById("btnDaily"), stk=dailyStreak();
+  db.textContent = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? "  🔥"+stk : "");
+  // continue: the first unsolved level in an UNLOCKED chapter
+  var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
+  var cb=document.getElementById("btnContinue");
+  cb.style.display = cont<0 ? "none" : "";
+  if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
   // side packs: new mechanics, tried here (purchase gating comes with the app build)
   var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}"), ph="";
   PACKS.forEach(function(pk,pi){
     var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
     ph+='<div class="packhead">'+(pk.icon||"")+' '+pk.name+'<span class="pksub">'+ndp+"/"+pk.levels.length+"</span></div>";
+    if(pk.desc) ph+='<div class="packdesc">'+pk.desc+'</div>';
     ph+='<div class="pkgrid">';
     for(var k=0;k<pk.levels.length;k++)
       ph+='<button class="pkbtn'+(mode==="pack"&&curPack===pi&&packIdx===k?" cur":"")+'" data-p="'+pi+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d[k]?"✓":"")+'</span></button>';
@@ -1173,6 +1285,7 @@ document.getElementById("packsArea").addEventListener("click", function(e){
   var b=e.target.closest(".pkbtn"); if(!b || b.dataset.p==null) return;
   ensureAudio(); loadPackLevel(+b.dataset.p, +b.dataset.k);
 });
+document.getElementById("btnContinue").addEventListener("click", function(){ ensureAudio(); loadLevel(+this.dataset.i||0); });
 document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadDaily(); });
@@ -1231,8 +1344,16 @@ document.getElementById("btnHelp").addEventListener("click", function(){ ensureA
 document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
 
 applyTheme();
+if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) — restart safely
 loadLevel(li);
-if(!localStorage.getItem("hm_flow2_seen")){ localStorage.setItem("hm_flow2_seen","1"); document.getElementById("ovHelp").classList.add("show"); }
+demoskipEl.addEventListener("click", function(){ ensureAudio(); endDemo(); });
+document.getElementById("btnDemo").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.remove("show"); playDemo(); });
+if(!(LEVELS[0] && LEVELS[0].demo)) document.getElementById("btnDemo").style.display="none";
+if(!localStorage.getItem("hm_flow2_seen")){
+  localStorage.setItem("hm_flow2_seen","1");
+  if(LEVELS[0] && LEVELS[0].demo && li===0) setTimeout(playDemo, 650);   // first run: SHOW the game instead of telling it
+  else document.getElementById("ovHelp").classList.add("show");
+}
 
 /* PWA: installable + offline. Registered from a subpath so scope stays under /huemeld/. */
 if("serviceWorker" in navigator){ window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); }); }
@@ -1254,6 +1375,8 @@ window.__flow={
   daily:loadDaily,
   pack:loadPackLevel,
   packs:function(){ return PACKS; },
+  chapters:function(){ return CHAPTERS.map(function(C,c){ return {name:C.name, n:C.n, unlocked:chapterUnlocked(c), solved:solvedInChapter(c), need:chapterNeed(c)}; }); },
+  entFull:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_full", v?"1":"0"); return entFull(); },
   undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
   undoDepth:function(){ return undoStack.length; },
   data:function(){ return { campaign:LEVELS, daily:DAILY }; },
