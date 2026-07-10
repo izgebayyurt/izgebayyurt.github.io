@@ -115,6 +115,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pkbtn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
 .pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
 .pkbtn.cur{ background:#ffd15c; color:#2c2733; }
+.pkbtn.lk{ opacity:.32; pointer-events:none; }
 .tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
@@ -266,6 +267,26 @@ var FLOWDATA=(typeof window!=="undefined" && window.HUEMELD_FLOW) ? window.HUEME
 LEVELS = (FLOWDATA && FLOWDATA.campaign && FLOWDATA.campaign.length) ? FLOWDATA.campaign : FALLBACK_LEVELS;
 var DAILY = (FLOWDATA && FLOWDATA.daily) ? FLOWDATA.daily : [];
 var PACKS = (FLOWDATA && FLOWDATA.packs) ? FLOWDATA.packs : [];   // side packs: new mechanics, à-la-carte
+var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLOWDATA.chapters : [{name:"Levels", n:LEVELS.length}];
+
+/* ---------- chapters & entitlements ----------
+   FREE gets every chapter, gated by progress: solving 2/3 of a chapter opens the
+   next. The paid "full game" entitlement (wired to IAP in the app build) opens
+   everything at once. */
+function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
+function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
+function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
+function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
+function solvedInChapter(c){
+  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+  var s=chapterStart(c), n=0;
+  for(var i=s;i<s+CHAPTERS[c].n;i++) if(done[i]) n++;
+  return n;
+}
+function chapterUnlocked(c){
+  if(c<=0 || entFull()) return true;
+  return solvedInChapter(c-1) >= chapterNeed(c-1);
+}
 
 var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
     shadowCanvas=document.createElement("canvas"), sctx=shadowCanvas.getContext("2d"),
@@ -403,8 +424,15 @@ function applyLevel(L){
   buildGrid(); renderDots(); renderPaths(); updateUndoUI();
 }
 function loadLevel(i){
+  var want=Math.max(0, Math.min(LEVELS.length-1, i));
+  var ch=chapterOf(want);
+  if(!chapterUnlocked(ch)){
+    var prev=CHAPTERS[ch-1];
+    toast("🔒 "+CHAPTERS[ch].name+" — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
+    return;
+  }
   isTut=false; mode="campaign";
-  li=Math.max(0, Math.min(LEVELS.length-1, i));
+  li=want;
   localStorage.setItem("hm_flow2_i",""+li);
   lvNameEl.textContent="Level "+(li+1);
   document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
@@ -937,8 +965,13 @@ function checkWin(){
     document.getElementById("winMsg").textContent = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length+(lastOne ? " — pack complete!" : "");
     wn.style.display=""; wn.textContent = lastOne ? "Back to levels" : "Next →";
   } else {
-    var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"); done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
-    document.getElementById("winMsg").textContent = "Whole board covered."+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
+    var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+    var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
+    var msg="Whole board covered.";
+    var myCh=chapterOf(li);
+    if(newly && myCh+1<CHAPTERS.length && solvedInChapter(myCh)===chapterNeed(myCh))
+      msg="🎉 Chapter unlocked: "+CHAPTERS[myCh+1].name+"!";
+    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
     wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
   }
   setTimeout(function(){ if(solved) ovWin.classList.add("show"); }, 1250);   // a reset in the window cancels it
@@ -1214,15 +1247,24 @@ requestAnimationFrame(frame);
 /* ---------- level picker & controls ---------- */
 function renderPicker(){
   var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), h="", nd=0;
-  for(var i=0;i<LEVELS.length;i++){ if(done[i]) nd++;
-    h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>'; }
+  for(var i0=0;i0<LEVELS.length;i0++) if(done[i0]) nd++;
+  // the campaign is CHAPTERED: later chapters unlock by solving 2/3 of the one before
+  for(var c=0;c<CHAPTERS.length;c++){
+    var s=chapterStart(c), CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
+    h+='<div class="packhead">'+(unl?"":"🔒 ")+"Chapter "+(c+1)+" · "+CH.name+'<span class="pksub">'+sv+"/"+CH.n+"</span></div>";
+    if(!unl) h+='<div class="packdesc">Solve '+(chapterNeed(c-1)-solvedInChapter(c-1))+' more in '+CHAPTERS[c-1].name+' to unlock</div>';
+    h+='<div class="pkgrid">';
+    for(var i=s;i<s+CH.n && i<LEVELS.length;i++)
+      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+(unl?"":" lk")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+    h+='</div>';
+  }
   document.getElementById("pkgrid").innerHTML=h;
   document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
   var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
   var db=document.getElementById("btnDaily"), stk=dailyStreak();
   db.textContent = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? "  🔥"+stk : "");
-  // continue: jump straight to the first unsolved level
-  var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2]){ cont=c2; break; } }
+  // continue: the first unsolved level in an UNLOCKED chapter
+  var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
   var cb=document.getElementById("btnContinue");
   cb.style.display = cont<0 ? "none" : "";
   if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
@@ -1302,6 +1344,7 @@ document.getElementById("btnHelp").addEventListener("click", function(){ ensureA
 document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
 
 applyTheme();
+if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) — restart safely
 loadLevel(li);
 demoskipEl.addEventListener("click", function(){ ensureAudio(); endDemo(); });
 document.getElementById("btnDemo").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.remove("show"); playDemo(); });
@@ -1332,6 +1375,8 @@ window.__flow={
   daily:loadDaily,
   pack:loadPackLevel,
   packs:function(){ return PACKS; },
+  chapters:function(){ return CHAPTERS.map(function(C,c){ return {name:C.name, n:C.n, unlocked:chapterUnlocked(c), solved:solvedInChapter(c), need:chapterNeed(c)}; }); },
+  entFull:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_full", v?"1":"0"); return entFull(); },
   undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
   undoDepth:function(){ return undoStack.length; },
   data:function(){ return { campaign:LEVELS, daily:DAILY }; },
