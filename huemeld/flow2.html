@@ -109,6 +109,9 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
 .cdots i.on{ background:var(--ink); }
 .coachmix{ display:flex; gap:14px; justify-content:center; align-items:center; margin-bottom:10px; min-height:0; flex-wrap:wrap; }
+.rules{ text-align:left; margin:4px auto 12px; max-width:270px; }
+.rules p{ margin:7px 0; font-size:14px; }
+.rules b{ color:var(--ink); }
 .coachmix .mx{ display:flex; align-items:center; gap:3px; font-family:var(--font-d); font-weight:700; font-size:15px; color:var(--ink-soft); }
 .coachmix .sw{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:1px 1.5px 0 var(--shadow); }
 .coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
@@ -188,7 +191,13 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
       <div class="panel">
         <h2>How to play</h2>
         <div class="coachmix" id="helpMix"></div>
-        <p style="margin-top:2px">Drag a line out of each coloured <b>circle</b>. Where two different colours <b>meet at a junction they mix</b> into a blend, which carries on to its matching <b>✦</b> square. Feed <b>every ✦ square</b>, <b>cover the whole board</b>, and run each <b>gate</b> tile's colour through it (an orange gate needs orange to pass). Leave no loose ends.</p>
+        <div class="rules">
+          <p><b>Drag</b> from a circle to draw a line.</p>
+          <p>When two lines <b>meet</b>, their colours <b>mix</b>.</p>
+          <p>Bring each mix to its <b>✦ square</b>.</p>
+          <p>A <b>gate</b> only lets its own colour pass.</p>
+          <p><b>To win:</b> reach every ✦ and cover the whole board.</p>
+        </div>
         <button class="mk" id="btnHelpClose">Got it</button>
       </div>
     </div>
