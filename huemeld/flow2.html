@@ -64,7 +64,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .gcell{ position:absolute; }
 .gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--grid); }
 .gcell.wall::before{ display:none; }
-.gcell.wall::after{ content:""; position:absolute; left:9%; top:9%; width:82%; height:82%; border-radius:22% 26% 24% 28% / 26% 22% 28% 24%; background:#4a4353; border:2.5px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 5px, rgba(0,0,0,.06) 5px 10px); }
+.gcell.wall::after{ content:""; box-sizing:border-box; position:absolute; left:9%; top:9%; width:82%; height:82%; border-radius:22% 26% 24% 28% / 26% 22% 28% 24%; background:#4a4353; border:2.5px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 5px, rgba(0,0,0,.06) 5px 10px); }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
 .dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
 .dot.ci{ border-radius:50%; }

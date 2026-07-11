@@ -25,7 +25,9 @@ Levels are **generated and proven** — every level has exactly one solution, an
 each is machine-checked (solver + an end-to-end replay through the real engine).
 
 ```
-node huemeld/tools/flow-app.mjs --seed 20260709   # writes flow-data.js (campaign + daily)
+node huemeld/tools/flow-app.mjs   # writes flow-data.js (campaign + daily + packs)
+# NOTE: no --seed! The shipped data uses the tool's default seed (20260712);
+# passing a different seed regenerates EVERY level and invalidates verification.
 ```
 
 - `tools/flow-solve.mjs` — exact solution counter + one-solution extractor.

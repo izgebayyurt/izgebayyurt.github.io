@@ -121,17 +121,17 @@ Notes:
 ## 8. Store listing (paste-ready)
 
 **Name** (30 max): `Huemeld`
-**Subtitle** (30 max): `Melt colours. Fill the board.`
+**Subtitle** (30 max): `Melt colors. Fill the board.`
 
 **Promotional text** (170 max, editable without review):
-> A colour-mixing puzzle with 250 free levels, a daily puzzle, and seven mechanic packs — portals, prisms, bridges, counters and more.
+> A color-mixing puzzle with 250 free levels, a daily puzzle, and seven mechanic packs — portals, prisms, bridges, counters and more.
 
 **Description**:
 
 ```
-Draw pipes of light. Where they meet, colours melt.
+Draw pipes of light. Where they meet, colors melt.
 
-Huemeld is a colour-mixing puzzle: every board has glowing sources and
+Huemeld is a color-mixing puzzle: every board has glowing sources and
 empty squares that need exactly the right hue. Red and yellow melt into
 orange. Blue and yellow make green. All three primaries? That's brown —
 if you can route them together.
@@ -140,23 +140,23 @@ Fill the whole board. Leave nothing dark.
 
 EASY TO LEARN
 • Draw a line from each glowing circle
-• Lines that meet in a junction melt into a new colour
+• Lines that meet in a junction melt into a new color
 • Light every square and cover the board to win
 
 HARD TO PUT DOWN
 • 250 free levels across five chapters
 • A new daily puzzle every day — keep your streak alive
 • Undo, unlimited retries, no timers, no move limits
-• Colour-blind labels, sound toggle, light & dark themes
+• Color-blind labels, sound toggle, light & dark themes
 
 SEVEN PUZZLE PACKS (350 more levels)
 • Brown — chain all three primaries into deep blends
-• Arrows — gates only pass their colour, some one-way
+• Arrows — gates only pass their color, some one-way
 • Ice — frozen tiles keep your line running straight
 • Portals — pink spirals teleport your flow across the board
 • Bridges — cross your own lines on overpasses
 • Prisms — feed a secondary in, two primaries burst out
-• Tally — counter tiles demand exactly N cells of their colour
+• Numbers — counter tiles demand exactly N cells of their color
 
 …and the MEDLEY: 150 levels that stack mechanics together —
 portals with brown chains, prisms over bridges, and worse.
@@ -183,14 +183,14 @@ more ways than one — but never as many as you'd hope.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
 **Screenshots** — upload the eight from `store-assets/` in this order (6.7" slot; Apple auto-scales for smaller devices, or re-shoot at 1242×2688 if you want a tailored 5.5" set):
-1. `screen-01-hero.png` — Melt colours together
-2. `screen-02-mix.png` — Primaries make new hues
-3. `screen-04-medley.png` — Portals. Bridges. Combined.
-4. `screen-03-brown.png` — Chain the deep blends
-5. `screen-05-tally.png` — Counter logic
+1. `screen-01-hero.png` — Mix colors. Light it up.
+2. `screen-02-mix.png` — Easy to learn, hard to master
+3. `screen-04-medley.png` — Portals, bridges & prisms
+4. `screen-03-brown.png` — Discover new blends
+5. `screen-05-tally.png` — Crack the number clues
 6. `screen-06-prisms.png` — Split light with prisms
 7. `screen-07-daily.png` — A new puzzle every day
-8. `screen-08-packs.png` — 250 free levels & 7 packs
+8. `screen-08-packs.png` — 7 puzzle packs to unlock
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 

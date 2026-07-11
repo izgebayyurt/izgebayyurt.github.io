@@ -253,7 +253,7 @@ const RAMPS = {
     [6, { build: "prism", n: 7, minOpen: 41, gates: 2, arrows: 2 }],
     [6, { build: "prism", n: 8, minOpen: 53 }],
   ] },
-  tally: { name: "Tally", icon: "③", desc: "Exact colour counts around a tile", tiers: [
+  tally: { name: "Numbers", icon: "③", desc: "Exact colour counts around a tile", tiers: [
     [8, { n: 5, minOpen: 24, counts: 1 }],
     [8, { n: 6, minOpen: 32, counts: 2 }],
     [6, { n: 6, minOpen: 32, counts: 3, zeros: true }],
