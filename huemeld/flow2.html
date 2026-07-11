@@ -62,14 +62,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
 .dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
 .dot.ci{ border-radius:50%; }
-.dot.prism{ border-radius:24%; transform:rotate(45deg) scale(0.92); }
-.dot.prism .pcore{ position:absolute; left:50%; top:50%; width:42%; height:42%; border-radius:50%; border:2.5px solid var(--line); transform:translate(-50%,-50%); box-shadow:0 0 0 2px rgba(255,255,255,.35); }
+.dot.prism2{ border:none; background:transparent; box-shadow:none; }
+.dot.prism2.donept{ box-shadow:none; filter:drop-shadow(0 0 6px rgba(87,194,104,.9)) drop-shadow(0 0 2px #fff); border-radius:0; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
 @keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
 .dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
-@keyframes prismBounce{ 0%,100%{transform:rotate(45deg) scale(0.92)} 32%{transform:rotate(45deg) scale(1.14)} 66%{transform:rotate(45deg) scale(.85)} }
-.dot.prism.bounce{ animation:prismBounce .42s cubic-bezier(.34,1.7,.6,1); }
 @keyframes starSpin{ to{ transform:rotate(360deg) } }
 .dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
 @keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -561,8 +559,8 @@ function isBridge(r,c){ return !!bridgeSet[r+","+c]; }
 /* ALL pipes whose cells include (r,c) — a bridge cell can carry two */
 function pathsAt(r,c){
   var out=[];
-  junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd}); });
-  ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id}); }); });
+  junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd, col:J.sec}); });
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id, col:E.col}); }); });
   return out;
 }
 /* every bridge cell must be crossed straight by every line on it (1 or 2, perpendicular) */
@@ -987,9 +985,16 @@ function renderDots(){
   }
   ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
   tgts.forEach(function(T){
-    if(T.prism){   // prism: a split diamond of the two primaries it releases, its core the colour it wants fed
-      var comp=COMPS[T.col]||["R","Y"], sz=s*0.84, off=(s-sz)/2;
-      h+='<div class="dot prism" data-dr="'+T.r+'" data-dc="'+T.c+'" style="left:'+(T.c*s+off)+'px;top:'+(T.r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:linear-gradient(135deg,'+HEX[comp[0]]+' 49%,'+HEX[comp[1]]+' 51%)"><span class="pcore" style="background:'+HEX[T.col]+'"></span></div>';
+    if(T.prism){   // prism: a GLASS TRIANGLE filled with the secondary it wants fed;
+      // its border splits into the two primaries it releases (half and half)
+      var comp=COMPS[T.col]||["R","Y"], sz=s*0.92, off=(s-sz)/2;
+      h+='<div class="dot prism2" data-dr="'+T.r+'" data-dc="'+T.c+'" style="left:'+(T.c*s+off)+'px;top:'+(T.r*s+off)+'px;width:'+sz+'px;height:'+sz+'px">'
+        +'<svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow:visible">'
+        +'<path d="M50 8 L93 88 L7 88 Z" fill="'+HEX[T.col]+'" stroke="'+INK+'" stroke-width="11" stroke-linejoin="round"/>'
+        +'<path d="M50 8 L7 88 L50 88" fill="none" stroke="'+HEX[comp[0]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
+        +'<path d="M50 8 L93 88 L50 88" fill="none" stroke="'+HEX[comp[1]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
+        +'<path d="M50 22 L28 66 L50 66 Z" fill="rgba(255,255,255,0.30)"/>'
+        +'</svg></div>';
       return;
     }
     h+=dot(T.col,T.r,T.c,"sq",true);   // …objectives are square (gates are square too, so squares read as "goals")
@@ -1107,25 +1112,44 @@ function renderPaths(){
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
   });
-  // 4 — living paint: tiny bubbles drifting inside each pipe, tinted a LIGHTER
-  //     shade of that pipe's colour. Clipped to the pipes (source-atop) so they
-  //     only show inside the band.
+  // 3b — OVERPASS: at a bridge, the later-drawn line crosses OVER. Redraw its
+  //      straight segment with its own outline plus a shadow band, so the under
+  //      line visibly dips beneath (a gap on each side of the deck).
+  if(bridges.length){
+    ctx.save(); ctx.lineCap="butt";
+    bridges.forEach(function(bc){
+      var ps=pathsAt(bc[0],bc[1]); if(ps.length<2) return;   // nothing to layer until two lines share it
+      var top=ps[ps.length-1], cl=top.cells, i=top.idx;
+      if(i<=0 || i>=cl.length-1) return;
+      var dy=cl[i+1][0]-cl[i][0], dx=cl[i+1][1]-cl[i][1];    // over-line axis (screen: x=dx, y=dy)
+      var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
+      ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
+      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+      ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
+      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+      ctx.strokeStyle=HEX[top.col]||"#fff"; ctx.lineWidth=pipeW;
+      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  // 4 — living paint: FIZZ. A stream of near-pinpoint sparkles racing inside each
+  //     pipe like bubbles up a bottle of cola — dense, tiny, twinkling. Clipped to
+  //     the pipes (source-atop) so they only show inside the band.
   ctx.save(); ctx.globalCompositeOperation="source-atop";
   legs.forEach(function(L,idx){
     var pts=L.cells.map(P); if(pts.length<1) return; var m=polyCum(pts); if(m.total<=0) return;
-    var lite=lighten(L.color,0.5), t=animT/1000;
-    var count=Math.max(2, Math.round(m.total/(s*1.0)));     // ~1 bubble per cell
+    var lite=lighten(L.color,0.62), t=animT/1000;
+    var count=Math.max(4, Math.round(m.total/(s*0.30)));    // ~3 fizz specks per cell
     for(var k=0;k<count;k++){
-      var ph=frac(idx*0.3197+k*0.61803);                    // stable per-bubble phase
-      var sp=s*(0.85+0.5*frac(ph*7.13));                    // speed varies a little
-      var rad=pipeW*(0.13+0.11*frac(ph*3.71));              // size varies a little
+      var ph=frac(idx*0.3197+k*0.61803);                    // stable per-speck phase
+      var sp=s*(0.7+0.9*frac(ph*7.13));                     // wide speed spread — some race, some drift
+      var rad=pipeW*(0.035+0.04*frac(ph*3.71));             // near-pinpoint
       var pos=frac((t*sp)/m.total + ph)*m.total;
       var pt=ptAtLen(pts,m.cum,pos);
-      var a=0.30+0.30*(0.5+0.5*Math.sin(t*3.1+ph*6.283));   // gentle twinkle
+      var wob=pipeW*0.24, wx=Math.sin(ph*41.3+t*2.1)*wob, wy=Math.cos(ph*27.7+t*1.7)*wob;   // lateral jiggle inside the band
+      var a=0.22+0.38*(0.5+0.5*Math.sin(t*4.6+ph*6.283));   // quick twinkle
       ctx.globalAlpha=a; ctx.fillStyle=lite;
-      ctx.beginPath(); ctx.arc(pt[0],pt[1],rad,0,6.2832); ctx.fill();
-      ctx.globalAlpha=a*0.6; ctx.fillStyle="rgba(255,255,255,0.75)";
-      ctx.beginPath(); ctx.arc(pt[0]-rad*0.28,pt[1]-rad*0.28,rad*0.42,0,6.2832); ctx.fill();  // tiny gloss highlight
+      ctx.beginPath(); ctx.arc(pt[0]+wx,pt[1]+wy,rad,0,6.2832); ctx.fill();
     }
   });
   ctx.globalAlpha=1;
@@ -1166,43 +1190,76 @@ function renderPaths(){
       var cx0=icell[1]*s+s/2, cy0=icell[0]*s+s/2, gs2=s*0.78, x0=cx0-gs2/2, y0=cy0-gs2/2, rr2=s*0.17;
       ctx.globalAlpha=0.30; ctx.fillStyle="#cdeaff"; roundRect(ctx,x0,y0,gs2,gs2,rr2); ctx.fill();
       ctx.globalAlpha=0.9; ctx.lineWidth=s*0.05; ctx.strokeStyle="#8fd0f0"; roundRect(ctx,x0,y0,gs2,gs2,rr2); ctx.stroke();
-      ctx.globalAlpha=0.85; ctx.strokeStyle="#eef9ff"; ctx.lineWidth=s*0.035; ctx.lineCap="round";
-      for(var ai=0;ai<3;ai++){ var an=ai*Math.PI/3, arm2=s*0.15;
-        ctx.beginPath(); ctx.moveTo(cx0-Math.cos(an)*arm2, cy0-Math.sin(an)*arm2); ctx.lineTo(cx0+Math.cos(an)*arm2, cy0+Math.sin(an)*arm2); ctx.stroke(); }
-    });
-    ctx.restore();
-  }
-  // 6b''' — bridges: corner brackets marking a cell two lines may cross
-  if(bridges.length){
-    ctx.save(); ctx.lineCap="round";
-    bridges.forEach(function(bc){
-      var cx2=bc[1]*s+s/2, cy2=bc[0]*s+s/2, ins=s*0.335, ln=s*0.16;
-      [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(function(q){
-        var px=cx2+q[1]*ins, py=cy2+q[0]*ins;
-        [[s*0.085,INK],[s*0.045,"#aeb6cc"]].forEach(function(st){
-          ctx.lineWidth=st[0]; ctx.strokeStyle=st[1];
-          ctx.beginPath(); ctx.moveTo(px-q[1]*ln,py); ctx.lineTo(px,py); ctx.lineTo(px,py-q[0]*ln); ctx.stroke();
-        });
+      // a true six-armed snowflake with branch ticks
+      ctx.lineCap="round";
+      [[s*0.055,INK],[s*0.028,"#eef9ff"]].forEach(function(st){
+        ctx.globalAlpha=st[1]===INK?0.55:0.95; ctx.lineWidth=st[0]; ctx.strokeStyle=st[1];
+        for(var ai=0;ai<6;ai++){ var an=ai*Math.PI/3, ca=Math.cos(an), sa=Math.sin(an);
+          ctx.beginPath(); ctx.moveTo(cx0,cy0); ctx.lineTo(cx0+ca*s*0.235, cy0+sa*s*0.235); ctx.stroke();
+          [s*0.13, s*0.19].forEach(function(d){
+            var bx=cx0+ca*d, by=cy0+sa*d, bl=s*0.058;
+            [an+Math.PI/3, an-Math.PI/3].forEach(function(ba){
+              ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx+Math.cos(ba)*bl, by+Math.sin(ba)*bl); ctx.stroke();
+            });
+          });
+        }
       });
     });
     ctx.restore();
   }
-  // 6b'' — portals: paired swirl rings; a line entering one comes out of its twin
+  // 6b''' — bridges: OVERPASS deck rails along the over-line's axis (a neutral
+  //         crossing hash while the cell is still empty)
+  if(bridges.length){
+    ctx.save(); ctx.lineCap="round";
+    bridges.forEach(function(bc){
+      var cx2=bc[1]*s+s/2, cy2=bc[0]*s+s/2;
+      var ps=pathsAt(bc[0],bc[1]);
+      var axis=null;   // [dx,dy] of the over line
+      if(ps.length){ var tp=ps[ps.length-1], cl=tp.cells, i=tp.idx;
+        var v = i<cl.length-1 ? [cl[i+1][0]-cl[i][0], cl[i+1][1]-cl[i][1]] : [cl[i][0]-cl[i-1][0], cl[i][1]-cl[i-1][1]];
+        axis=[v[1],v[0]];
+      }
+      var po=pipeInk/2+s*0.045, ln=s*0.29;
+      function rails(dx,dy,alpha){   // two rails offset perpendicular to (dx,dy)
+        var pxo=-dy*po, pyo=dx*po;
+        [[s*0.075,INK],[s*0.036,"#e8e2f2"]].forEach(function(st){
+          ctx.lineWidth=st[0]; ctx.strokeStyle=st[1]; ctx.globalAlpha=alpha;
+          [[pxo,pyo],[-pxo,-pyo]].forEach(function(off){
+            ctx.beginPath(); ctx.moveTo(cx2+off[0]-dx*ln, cy2+off[1]-dy*ln); ctx.lineTo(cx2+off[0]+dx*ln, cy2+off[1]+dy*ln); ctx.stroke();
+          });
+        });
+      }
+      if(axis) rails(axis[0],axis[1],1);
+      else { rails(1,0,0.55); rails(0,1,0.55); }   // unused bridge: a soft ⌗
+      ctx.globalAlpha=1;
+    });
+    ctx.restore();
+  }
+  // 6b'' — portals: paired SPIRAL GALAXIES; a line entering one comes out of its
+  //         twin. The spiral winds out from the centre and lands ON the ring,
+  //         carrying on along it briefly so the join is seamless. Slowly spins.
   if(portals.length){
     var PCOLS=["#49c6e5","#ef9d3c","#b083e8","#6fcf7c"];
-    ctx.save();
+    ctx.save(); ctx.lineCap="round"; ctx.lineJoin="round";
     portals.forEach(function(p,pi){
       var pcol=PCOLS[pi%PCOLS.length];
-      [[p[0],p[1]],[p[2],p[3]]].forEach(function(pc){
+      [[p[0],p[1]],[p[2],p[3]]].forEach(function(pc,side){
         var cx1=pc[1]*s+s/2, cy1=pc[0]*s+s/2, R=s*0.33;
         ctx.globalAlpha=1; ctx.lineWidth=s*0.10; ctx.strokeStyle=INK;
         ctx.beginPath(); ctx.arc(cx1,cy1,R,0,6.2832); ctx.stroke();
-        ctx.lineWidth=s*0.055; ctx.strokeStyle=pcol;
+        ctx.lineWidth=s*0.05; ctx.strokeStyle=pcol;
         ctx.beginPath(); ctx.arc(cx1,cy1,R,0,6.2832); ctx.stroke();
-        var a0=animT/380 + pi*1.7;
-        ctx.lineWidth=s*0.045; ctx.globalAlpha=0.95;
-        ctx.beginPath(); ctx.arc(cx1,cy1,R*0.55,a0,a0+2.2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(cx1,cy1,R*0.55,a0+3.14,a0+5.34); ctx.stroke();
+        var rot=animT/900*(side?-1:1) + pi*1.7;   // twins counter-rotate
+        var TURNS=2.1, amax=TURNS*6.2832;
+        ctx.lineWidth=s*0.042;
+        ctx.beginPath();
+        for(var a=0;a<=amax;a+=0.14){
+          var rr2=R*(0.07+0.93*a/amax);
+          var px=cx1+Math.cos(a+rot)*rr2, py=cy1+Math.sin(a+rot)*rr2;
+          if(a===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+        }
+        ctx.arc(cx1,cy1,R,amax+rot,amax+rot+1.1);   // run the tail along the ring — a smooth merge
+        ctx.stroke();
       });
     });
     ctx.restore();
@@ -1223,11 +1280,16 @@ function renderPaths(){
       ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
       ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
       if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.06; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
-      if(G.dir){   // arrow gate: a chevron shows the demanded crossing direction
-        var v=DIRV[G.dir], ang=Math.atan2(v[0],v[1]), aa=s*0.17*pop;
-        ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
-        ctx.globalAlpha=1; ctx.fillStyle=col; ctx.strokeStyle=INK; ctx.lineWidth=s*0.03;
-        ctx.beginPath(); ctx.moveTo(aa*0.75,0); ctx.lineTo(-aa*0.45,-aa*0.62); ctx.lineTo(-aa*0.45,aa*0.62); ctx.closePath(); ctx.fill(); ctx.stroke();
+      if(G.dir){   // arrow gate: a double chevron » shows the demanded crossing direction
+        var v=DIRV[G.dir], ang=Math.atan2(v[0],v[1]);
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang); ctx.scale(pop,pop);
+        ctx.lineCap="round"; ctx.lineJoin="round"; ctx.globalAlpha=1;
+        [[s*0.072,INK],[s*0.037,col]].forEach(function(st){
+          ctx.lineWidth=st[0]; ctx.strokeStyle=st[1];
+          [-s*0.062, s*0.062].forEach(function(off){
+            ctx.beginPath(); ctx.moveTo(off-s*0.05,-s*0.095); ctx.lineTo(off+s*0.05,0); ctx.lineTo(off-s*0.05,s*0.095); ctx.stroke();
+          });
+        });
         ctx.restore();
       }
       if(cbOn){ var ty=G.dir? y-s*0.10 : cy;
