@@ -1,7 +1,7 @@
 /* Huemeld Flow service worker — offline + installable.
    NETWORK-FIRST for the app shell + level data (so updates always land, with the
    cache as the offline fallback); cache-first for static assets like icons. */
-var CACHE = "huemeld-flow-v2";
+var CACHE = "huemeld-v3";
 var CORE = ["flow2.html", "flow-data.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-180.png"];
 
 self.addEventListener("install", function (e) {

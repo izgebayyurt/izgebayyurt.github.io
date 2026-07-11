@@ -1,4 +1,4 @@
-# Huemeld Flow — publishing & monetization
+# Publishing Huemeld
 
 Flow is a single static web game (`flow2.html` + `flow-data.js` + `sw.js` +
 icons). It ships two ways from the same code:
@@ -69,7 +69,7 @@ mirror the flag.
 ### Wrapping with Capacitor (outline)
 
 ```sh
-npm i -D @capacitor/cli && npx cap init "Huemeld Flow" com.izge.huemeldflow
+npm i -D @capacitor/cli && npx cap init "Huemeld" com.izge.huemeld
 # point webDir at a folder containing flow2.html + flow-data.js + sw.js + icons
 npm i @capacitor/android @capacitor/ios
 npx cap add android && npx cap add ios

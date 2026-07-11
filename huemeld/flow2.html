@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#17131f" />
-<title>Huemeld Flow</title>
-<meta name="description" content="Huemeld Flow — a colour-mixing pipe puzzle: mix the primaries, fill the board, run each gate's colour through it." />
+<title>Huemeld</title>
+<meta name="description" content="Huemeld — the colour-mixing pipe puzzle. Draw lines, meld the primaries, light every ✦." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="Huemeld Flow" />
+<meta name="apple-mobile-web-app-title" content="Huemeld" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f3ead6'/%3E%3Crect x='4' y='4' width='11' height='11' rx='3' fill='%23ef4a5a' stroke='%232c2733' stroke-width='2'/%3E%3Crect x='17' y='6' width='10' height='10' rx='3' fill='%233d8bdf' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='16' cy='23' r='6' fill='%2357c268' stroke='%232c2733' stroke-width='2'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317131f'/%3E%3Cpath d='M4 20 L13 20 L13 29' fill='none' stroke='%23ef4a5a' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13 4 L13 12' fill='none' stroke='%23f6c445' stroke-width='5.5' stroke-linecap='round'/%3E%3Cpath d='M13 14 L22 14' fill='none' stroke='%23f2913d' stroke-width='5.5' stroke-linecap='round'/%3E%3Crect x='20' y='9' width='10' height='10' rx='3' fill='%23f2913d' stroke='%23141019' stroke-width='2'/%3E%3C/svg%3E" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,7 +38,8 @@ body{
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; overscroll-behavior:none;
 }
-.top{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 8px; }
+.top{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 0; margin-bottom:20px; }
+.helpfab{ position:fixed; right:calc(14px + env(safe-area-inset-right)); bottom:calc(14px + env(safe-area-inset-bottom)); width:44px; z-index:20; }
 .brand{ display:flex; align-items:baseline; gap:8px; }
 .brand a{ text-decoration:none; color:var(--ink); }
 h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
@@ -46,7 +47,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .topbtns{ display:flex; gap:7px; }
 .mkk{ height:38px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; font-family:var(--font-d); font-weight:600; padding:0 13px; color:var(--ink); }
 .mkk:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
-.lvbar{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.lvbar{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
 .lvname{ font-family:var(--font-d); font-weight:700; font-size:17px; }
 .covwrap{ display:flex; align-items:center; justify-content:center; gap:7px; margin-top:3px; }
 .covbar{ width:86px; height:9px; border:2px solid var(--line); border-radius:99px; background:var(--paper); overflow:hidden; }
@@ -138,7 +139,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .demoskip{ display:none; margin:10px auto 0; }
 .demoskip.show{ display:block; }
 /* action bar */
-.actionbar{ width:var(--bw); display:flex; gap:10px; justify-content:center; margin-top:12px; }
+.actionbar{ width:var(--bw); display:flex; gap:10px; justify-content:center; margin-top:18px; }
 .actionbar .mkk{ height:44px; }
 #btnUndo{ padding:0 18px; font-size:15px; }
 #btnUndo[disabled]{ opacity:.45; }
@@ -155,13 +156,10 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 </head>
 <body>
   <div class="top">
-    <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">FLOW</span></div>
-    <div class="topbtns">
-      <button class="mkk" id="btnHelp" title="How to play">?</button>
-      <button class="mkk" id="btnPick">☰ levels</button>
-      <button class="mkk" id="btnSet" title="Settings">⚙</button>
-    </div>
+    <button class="mkk" id="btnPick">☰ levels</button>
+    <button class="mkk" id="btnSet" title="Settings">⚙</button>
   </div>
+  <button class="mkk helpfab" id="btnHelp" title="How to play">?</button>
   <div class="lvbar">
     <button class="mkk" id="btnPrev">←</button>
     <div style="text-align:center">
