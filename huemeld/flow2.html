@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#17131f" />
-<title>Huemeld Flow</title>
-<meta name="description" content="Huemeld Flow — a colour-mixing pipe puzzle: mix the primaries, fill the board, run each gate's colour through it." />
+<title>Huemeld</title>
+<meta name="description" content="Huemeld — the colour-mixing pipe puzzle. Draw lines, meld the primaries, light every ✦." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="Huemeld Flow" />
+<meta name="apple-mobile-web-app-title" content="Huemeld" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f3ead6'/%3E%3Crect x='4' y='4' width='11' height='11' rx='3' fill='%23ef4a5a' stroke='%232c2733' stroke-width='2'/%3E%3Crect x='17' y='6' width='10' height='10' rx='3' fill='%233d8bdf' stroke='%232c2733' stroke-width='2'/%3E%3Ccircle cx='16' cy='23' r='6' fill='%2357c268' stroke='%232c2733' stroke-width='2'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23241e2e'/%3E%3Cpath d='M6 16 H16 M26 6 V16 H16 V26' fill='none' stroke='%230e0b14' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M6 16 H16' fill='none' stroke='%23ef4a5a' stroke-width='5.5' stroke-linecap='round'/%3E%3Cpath d='M26 6 V12' fill='none' stroke='%23f6c445' stroke-width='5.5' stroke-linecap='round'/%3E%3Cpath d='M26 12 V16 H16 V25' fill='none' stroke='%23f2913d' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='6' cy='16' r='4.4' fill='%23ef4a5a' stroke='%230e0b14' stroke-width='1.8'/%3E%3Ccircle cx='26' cy='6' r='4.4' fill='%23f6c445' stroke='%230e0b14' stroke-width='1.8'/%3E%3Crect x='11.4' y='21.4' width='9.2' height='9.2' rx='2.8' fill='%23f2913d' stroke='%23fff' stroke-width='1.6'/%3E%3Cpath d='M16 23.4 L18.3 26 L16 28.6 L13.7 26 Z' fill='%23fff'/%3E%3C/svg%3E" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,14 +29,17 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{
+  --bw:min(94vw, 60vh, 540px);   /* one knob: the play column's width (board is square) */
   background:var(--paper);
   background-image:radial-gradient(var(--bgdot) 1.2px, transparent 1.3px);
   background-size:22px 22px;
   font-family:var(--font-u); color:var(--ink);
-  display:flex; flex-direction:column; align-items:center;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; overscroll-behavior:none;
 }
-.top{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 8px; }
+.top{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 0; margin-bottom:20px; }
+.helpfab{ position:fixed; right:calc(14px + env(safe-area-inset-right)); bottom:calc(14px + env(safe-area-inset-bottom)); width:44px; z-index:20; }
 .brand{ display:flex; align-items:baseline; gap:8px; }
 .brand a{ text-decoration:none; color:var(--ink); }
 h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
@@ -44,10 +47,13 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .topbtns{ display:flex; gap:7px; }
 .mkk{ height:38px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; font-family:var(--font-d); font-weight:600; padding:0 13px; color:var(--ink); }
 .mkk:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
-.lvbar{ width:min(94vw,420px); display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.lvbar{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
 .lvname{ font-family:var(--font-d); font-weight:700; font-size:17px; }
+.covwrap{ display:flex; align-items:center; justify-content:center; gap:7px; margin-top:3px; }
+.covbar{ width:86px; height:9px; border:2px solid var(--line); border-radius:99px; background:var(--paper); overflow:hidden; }
+.covbar i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#57c268,#8fd39b); transition:width .18s; }
 .cov{ font-size:11.5px; font-weight:800; color:var(--ink-soft); letter-spacing:.5px; }
-.boardwrap{ position:relative; width:min(94vw,420px); }
+.boardwrap{ position:relative; width:var(--bw); }
 .board{
   position:relative; width:100%; aspect-ratio:1;
   background:var(--card); border:3px solid var(--line); border-radius:18px;
@@ -114,7 +120,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
 .pkbtn.cur{ background:#ffd15c; color:#2c2733; }
 .pkbtn.lk{ opacity:.32; pointer-events:none; }
-.tip{ width:min(94vw,420px); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
+.tip{ width:var(--bw); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
 .cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
@@ -128,12 +134,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
 /* demo "ghost hand" + caption banner + skip */
 .ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1); }
-.demoban{ width:min(94vw,420px); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
+.demoban{ width:var(--bw); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
 .demoban.show{ display:flex; }
 .demoskip{ display:none; margin:10px auto 0; }
 .demoskip.show{ display:block; }
 /* action bar */
-.actionbar{ width:min(94vw,420px); display:flex; gap:10px; justify-content:center; margin-top:12px; }
+.actionbar{ width:var(--bw); display:flex; gap:10px; justify-content:center; margin-top:18px; }
 .actionbar .mkk{ height:44px; }
 #btnUndo{ padding:0 18px; font-size:15px; }
 #btnUndo[disabled]{ opacity:.45; }
@@ -150,17 +156,16 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 </head>
 <body>
   <div class="top">
-    <div class="brand"><a href="./" title="back to Huemeld"><h1>Huemeld</h1></a><span class="arc">FLOW</span></div>
-    <div class="topbtns">
-      <button class="mkk" id="btnHelp" title="How to play">?</button>
-      <button class="mkk" id="btnPick">☰ levels</button>
-      <button class="mkk" id="btnSet" title="Settings">⚙</button>
-      <button class="mkk" id="btnReset" title="Reset level">↻</button>
-    </div>
+    <button class="mkk" id="btnPick">☰ levels</button>
+    <button class="mkk" id="btnSet" title="Settings">⚙</button>
   </div>
+  <button class="mkk helpfab" id="btnHelp" title="How to play">?</button>
   <div class="lvbar">
     <button class="mkk" id="btnPrev">←</button>
-    <div style="text-align:center"><div class="lvname" id="lvName">Level 1</div><div class="cov" id="cov">0/25 painted</div></div>
+    <div style="text-align:center">
+      <div class="lvname" id="lvName">Level 1</div>
+      <div class="covwrap"><div class="covbar"><i id="covfill"></i></div><div class="cov" id="cov">0/25</div></div>
+    </div>
     <button class="mkk" id="btnNext">→</button>
   </div>
   <div class="demoban" id="demoban"></div>
@@ -219,6 +224,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
   </div>
   <div class="actionbar">
     <button class="mkk" id="btnUndo" title="Undo last move">↶ Undo</button>
+    <button class="mkk" id="btnReset" title="Reset level">↻ Reset</button>
   </div>
   <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
 
@@ -434,7 +440,7 @@ function loadLevel(i){
   isTut=false; mode="campaign";
   li=want;
   localStorage.setItem("hm_flow2_i",""+li);
-  lvNameEl.textContent="Level "+(li+1);
+  lvNameEl.textContent="Level "+(li+1)+(CHAPTERS.length>1 ? " · "+CHAPTERS[ch].name : "");
   document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = li<LEVELS.length-1 ? "" : "hidden";
   applyLevel(LEVELS[li]);
@@ -1352,7 +1358,10 @@ function renderPaths(){
   confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
   if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
     ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle=INK; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
-  covEl.textContent=coverage()+"/"+paintTarget()+" painted";
+  var covN=coverage(), covT=paintTarget();
+  covEl.textContent=covN+"/"+covT;
+  var cf=document.getElementById("covfill"), pct=covT?Math.round(covN/covT*100):0;
+  if(cf && cf._p!==pct){ cf._p=pct; cf.style.width=pct+"%"; }
   var dots=dotL.querySelectorAll(".dot");
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
 }
