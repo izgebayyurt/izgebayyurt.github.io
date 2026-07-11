@@ -168,16 +168,23 @@ const RAMPS = {
     [6, { build: "prism", n: 8, minOpen: 53 }],
   ] },
   mix: { name: "Medley", icon: "✚", desc: "Every mechanic, mixed together", tiers: [
-    [15, { n: 5, minOpen: 22, jump: 1, gates: 1 }],
-    [15, { n: 5, minOpen: 22, bridge: 1, gates: 1 }],
-    [15, { n: 6, minOpen: 31, jump: 1, ice: 2 }],
-    [15, { n: 6, minOpen: 31, bridge: 1, gates: 2, arrows: 1 }],
-    [15, { build: "fork", n: 6, minOpen: 31, gates: 2, ice: 2 }],
-    [15, { build: "chain", n: 6, minOpen: 30, gates: 2 }],
-    [15, { build: "prism", n: 6, minOpen: 30, gates: 2 }],
-    [15, { n: 7, minOpen: 42, jump: 1, bridge: 1, gates: 2 }],
-    [15, { build: "fork", n: 7, minOpen: 43, gates: 4, arrows: 2, ice: 2 }],
-    [15, { build: "chain", n: 7, minOpen: 42, gates: 2, ice: 2 }],
+    // warm-up: one mechanic + a decoration
+    [10, { n: 5, minOpen: 22, jump: 1, gates: 1 }],
+    [10, { n: 5, minOpen: 22, bridge: 1, gates: 1 }],
+    [10, { n: 6, minOpen: 31, jump: 1, ice: 2 }],
+    [10, { n: 6, minOpen: 31, bridge: 1, gates: 2, arrows: 1 }],
+    [10, { build: "fork", n: 6, minOpen: 31, gates: 2, ice: 2 }],
+    [10, { build: "chain", n: 6, minOpen: 30, gates: 2 }],
+    [10, { build: "prism", n: 6, minOpen: 30, gates: 2 }],
+    // COMBOS: two or more mechanics on one board
+    [10, { build: "chain", n: 6, minOpen: 30, jump: 1 }],
+    [10, { build: "prism", n: 6, minOpen: 30, bridge: 1 }],
+    [10, { n: 7, minOpen: 42, jump: 1, bridge: 1, gates: 2 }],
+    [10, { build: "fork", n: 7, minOpen: 42, bridge: 1, gates: 2 }],
+    [10, { build: "chain", n: 7, minOpen: 41, bridge: 1, ice: 2 }],
+    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, gates: 2 }],
+    [10, { n: 7, minOpen: 41, jump: 2, bridge: 1, ice: 2 }],
+    [10, { build: "chain", n: 7, minOpen: 41, jump: 1, bridge: 1 }],
   ] },
 };
 
