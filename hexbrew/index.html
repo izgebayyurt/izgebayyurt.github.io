@@ -458,6 +458,16 @@ function detonateBombs(){
   }
   vibrate([18,26,18]);
 }
+function wetInkRepair(){
+  let matches=findMatches(), guard=0;
+  while(guard++<8 && matches.some(m=>m.cells.some(ci=>cells[ci].fresh))){
+    for(const m of matches) for(const ci of m.cells){ if(cells[ci].fresh){
+      const p=pickRefillColour(ci); if(!p.biased) cells[ci].fresh=false;
+      for(let k=0;k<3;k++) puffs.push(mkPuff(cells[ci].x,cells[ci].y+cells[ci].oy,colOf(cells[ci].c)));
+    } }
+    matches=findMatches();
+  }
+}
 function stepResolver(dt){
   if(!resolver) return;
   resolver.t-=dt; if(resolver.t>0) return;
@@ -465,17 +475,14 @@ function stepResolver(dt){
     const maxDrop=compactColumns();
     let rows=0; // refill immediately each round — wet-ink bias keeps new balls from matching on arrival
     if(cells.some(c=>c.c==null)){ rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; }
+    wetInkRepair(); // repair colours now, while balls are mid-churn — never after they've settled
     resolver.phase='fall'; resolver.t=0.10+Math.sqrt(Math.max(maxDrop,rows))*0.2;
   } else if(resolver.phase==='fall'){
     for(const c of cells){ c.oy=0; c.vy=0; }
     resolver.phase='beat'; resolver.t=BEAT_DUR;
   } else {
+    wetInkRepair(); // safety — normally a no-op, repair already ran at compaction time
     let matches=findMatches();
-    let guard=0;
-    while(guard++<8 && matches.some(m=>m.cells.some(ci=>cells[ci].fresh))){
-      for(const m of matches) for(const ci of m.cells){ if(cells[ci].fresh){ const p=pickRefillColour(ci); if(!p.biased) cells[ci].fresh=false; } }
-      matches=findMatches();
-    }
     if(matches.length){ resolver.depth++; clearRound(matches,resolver.depth); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
     else if(cells.some(c=>c.c==null)){ const rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=0.10+Math.sqrt(rows)*0.2; }
     else if(cells.some(c=>c.c==='K')){ detonateBombs(); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
