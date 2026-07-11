@@ -305,15 +305,17 @@ const RAMPS = {
     [10, { n: 6, minOpen: 31, jump: 1, ice: 2 }],
     [10, { n: 6, minOpen: 31, bridge: 1, gates: 2, arrows: 1 }],
     [10, { build: "fork", n: 6, minOpen: 31, gates: 2, ice: 2 }],
-    [10, { build: "chain", n: 6, minOpen: 30, gates: 2 }],
+    [10, { build: "chain", n: 6, minOpen: 30, counts: 2, zeros: true }],
     [10, { build: "prism", n: 6, minOpen: 30, gates: 2 }],
     // COMBOS: two or more mechanics on one board
+    // (counters never share a board with bridges: a bridge cell wears two
+    //  colours, which would make a neighbouring clue ambiguous)
     [10, { build: "chain", n: 6, minOpen: 30, jump: 1 }],
     [10, { build: "prism", n: 6, minOpen: 30, bridge: 1 }],
     [10, { n: 7, minOpen: 42, jump: 1, bridge: 1, gates: 2 }],
-    [10, { build: "fork", n: 7, minOpen: 42, bridge: 1, gates: 2 }],
+    [10, { build: "fork", n: 7, minOpen: 42, gates: 2, counts: 3, zeros: true }],
     [10, { build: "chain", n: 7, minOpen: 41, bridge: 1, ice: 2 }],
-    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, gates: 2 }],
+    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, counts: 3, zeros: true }],
     [10, { n: 7, minOpen: 41, jump: 2, bridge: 1, ice: 2 }],
     [10, { build: "chain", n: 7, minOpen: 41, jump: 1, bridge: 1 }],
   ] },

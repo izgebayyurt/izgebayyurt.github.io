@@ -589,6 +589,9 @@ function pathsAt(r,c){
 function cellColorFull(r,c){
   var T=tgtAt(r,c); if(T) return T.col;
   for(var e=0;e<ems.length;e++) if(ems[e].r===r && ems[e].c===c) return ems[e].col;
+  /* a junction's mixing cell wears its OUTPUT colour (a chain cell counts as
+     brown, not as the secondary flowing in) — keeps counters consistent */
+  for(var j=0;j<junctions.length;j++){ var J=junctions[j]; if(J.cell && J.cell[0]===r && J.cell[1]===c) return J.sec; }
   return colorAt(r,c);
 }
 /* counters: how many tiles of the 3×3 block INCLUDING the counter's own cell wear
