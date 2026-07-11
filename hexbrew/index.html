@@ -203,29 +203,31 @@ const CELL_LINES=(()=>{ const m=Array.from({length:N},()=>[]);
 const ringQR = rad => CELLS_QR.filter(([q,r])=>Math.max(Math.abs(q),Math.abs(r),Math.abs(-q-r))===rad);
 const RING1=ringQR(1), RING2=ringQR(2);   // 6 and 12 cells
 // Completability notes (construction/bot-verified, see suite):
-//  L4/L11 seeded bombs detonate after ANY matching swap's cascade settles → boom goals reachable by construction.
-//  L5/L15 palettes have exactly one brewable secondary (R+Y→O, Y+B→G); 2-colour boards make double-matches and
-//   cascade re-forges frequent, so the forge supply is high; collecting requires lining forged secondaries.
+//  No level requires bombs — seeded bombs (L4, L11) are free tools that detonate after any
+//   matching swap's cascade settles, clearing/scrubbing their radius.
+//  L5 O4: two deliberate R+Y doubles forge 4 orange; collecting 4 needs one O-line (3) + one more,
+//   so ~3 doubles or a 4-line — the teaching beat is "engineer the double, then line the brew".
 //  L7 seeded O/G near centre diversify cascade steps: a cascade round popping 3 distinct colours forges the white.
-//  L13 bombs come from 7+ connected clear-groups; adjacent same-round matches merge groups, common in cascades.
+//  L13 Triple Distilled: one deliberate double of each pair (R+Y, Y+B, R+B) forges 2 of each secondary.
 //  L14 chain ≥3 occurs naturally every handful of cascading swaps.
+//  (boom goal type retained in code for future levels; palette path likewise, currently unused.)
 const LEVELS = [
   { name:'Warm-up',        goals:[{t:'col',c:'R',need:15}], moves:18 },
   { name:'Two of a Kind',  goals:[{t:'col',c:'R',need:12},{t:'col',c:'B',need:12}], moves:22 },
   { name:'Triple Order',   goals:[{t:'col',c:'R',need:10},{t:'col',c:'Y',need:10},{t:'col',c:'B',need:10}], moves:24 },
-  { name:'The Gift',       goals:[{t:'col',c:'R',need:14},{t:'boom',need:1}], moves:22, seed:[{q:3,r:0,c:'K'}] },
-  { name:'First Brew',     goals:[{t:'col',c:'O',need:4}], moves:16, palette:['R','Y'] },
+  { name:'The Gift',       goals:[{t:'col',c:'R',need:14}], moves:20, seed:[{q:3,r:0,c:'K'}] },
+  { name:'First Brew',     goals:[{t:'col',c:'O',need:4}], moves:22 },
   { name:'Green Thumb',    goals:[{t:'col',c:'G',need:5},{t:'col',c:'P',need:5}], moves:30 },
   { name:'White Lightning',goals:[{t:'white',need:1}], moves:24,
     seed:[{q:0,r:-1,c:'O'},{q:1,r:1,c:'O'},{q:-1,r:0,c:'O'},{q:1,r:-1,c:'G'},{q:-1,r:1,c:'G'},{q:0,r:2,c:'G'},{q:2,r:-1,c:'O'},{q:-2,r:1,c:'G'}] },
   { name:'Production Line',goals:[{t:'brew',need:6},{t:'col',c:'Y',need:10}], moves:26 },
   { name:'Ink Spill',      goals:[{t:'ink',need:7}], moves:20, ink:[[0,0],...RING1] },
   { name:'Deep Clean',     goals:[{t:'ink',need:10},{t:'col',c:'O',need:4}], moves:30, ink:[...RING1,[2,-1],[-2,1],[0,-2],[0,2]] },
-  { name:'Powder Keg',     goals:[{t:'ink',need:12},{t:'boom',need:1}], moves:26, ink:[...RING2], seed:[{q:1,r:-1,c:'K'}] },
+  { name:'Powder Keg',     goals:[{t:'ink',need:12}], moves:26, ink:[...RING2], seed:[{q:1,r:-1,c:'K'}] },
   { name:'Spotless',       goals:[{t:'ink',need:14},{t:'white',need:1}], moves:32, ink:[...RING2,[0,0],[0,-1]] },
-  { name:'Demolition',     goals:[{t:'boom',need:2},{t:'col',c:'R',need:12}], moves:12 },
+  { name:'Triple Distilled',goals:[{t:'brew',c:'O',need:2},{t:'brew',c:'G',need:2},{t:'brew',c:'P',need:2}], moves:8 },
   { name:'Chain Reaction', goals:[{t:'chain',need:3},{t:'col',c:'P',need:6}], moves:28 },
-  { name:'Cold Brew',      goals:[{t:'col',c:'G',need:24}], moves:6, palette:['Y','B'] },   // 6-move cascade sprint
+  { name:'Night Cap',      goals:[{t:'col',c:'G',need:8},{t:'ink',need:6}], moves:26, ink:[...RING1] },
   { name:'The Full Brew',  goals:[{t:'col',c:'O',need:5},{t:'col',c:'G',need:5},{t:'col',c:'P',need:5},{t:'white',need:1},{t:'ink',need:6}], moves:36, ink:[...RING1] },
 ];
 function starThresholds(moves){ return { s3:Math.max(2,Math.round(moves*0.35)), s2:Math.max(1,Math.round(moves*0.15)) }; }
@@ -632,13 +634,27 @@ function detonateBombs(){
   vibrate([18,26,18]);
 }
 function wetInkRepair(){
-  let matches=findMatches(), guard=0;
-  while(guard++<8 && matches.some(m=>m.cells.some(ci=>cells[ci].fresh))){
-    for(const m of matches) for(const ci of m.cells){ if(cells[ci].fresh){
-      const p=pickRefillColour(ci); if(!p.biased) cells[ci].fresh=false;
-      for(let k=0;k<3;k++) puffs.push(mkPuff(cells[ci].x,cells[ci].y+cells[ci].oy,colOf(cells[ci].c)));
-    } }
-    matches=findMatches();
+  // A settled ball may only ever STAY or POP — never change colour. Recolours happen
+  // exclusively mid-air (oy<0, still falling). If a match's fresh balls are all
+  // settled, drop their fresh flags and let the match stand: it pops as a normal
+  // chain round. (Design note: this relaxes "no refill-fed chains" to "no
+  // same-arrival chains" — a refill ball may join a LATER round's chain.)
+  let guard=0;
+  while(guard++<8){
+    let rerolled=false;
+    for(const m of findMatches()){
+      const freshCells=m.cells.filter(ci=>cells[ci].fresh);
+      if(!freshCells.length) continue;
+      const midair=freshCells.filter(ci=>cells[ci].oy<0);
+      if(midair.length){
+        for(const ci of midair){ const p=pickRefillColour(ci); if(!p.biased) cells[ci].fresh=false;
+          for(let k=0;k<3;k++) puffs.push(mkPuff(cells[ci].x,cells[ci].y+cells[ci].oy,colOf(cells[ci].c))); }
+        rerolled=true;
+      } else {
+        for(const ci of freshCells) cells[ci].fresh=false;   // settled: the match stands
+      }
+    }
+    if(!rerolled) break;
   }
 }
 function stepResolver(dt){
@@ -648,13 +664,13 @@ function stepResolver(dt){
     const maxDrop=compactColumns();
     let rows=0; // refill immediately each round — wet-ink bias keeps new balls from matching on arrival
     if(cells.some(c=>c.c==null)){ rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; }
-    wetInkRepair(); // repair colours now, while balls are mid-churn — never after they've settled
+    wetInkRepair(); // recolour mid-air refills only; settled balls stay or pop, never flip
     resolver.phase='fall'; resolver.t=0.10+Math.sqrt(Math.max(maxDrop,rows))*0.2;
   } else if(resolver.phase==='fall'){
     for(const c of cells){ c.oy=0; c.vy=0; }
     resolver.phase='beat'; resolver.t=BEAT_DUR;
   } else {
-    wetInkRepair(); // safety — normally a no-op, repair already ran at compaction time
+    wetInkRepair(); // everything settled here: fresh-fed matches are legitimised and pop as chains
     let matches=findMatches();
     if(matches.length){ resolver.depth++; clearRound(matches,resolver.depth); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
     else if(cells.some(c=>c.c==null)){ const rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=0.10+Math.sqrt(rows)*0.2; }
@@ -1140,6 +1156,8 @@ window.HB = {
   get inkRemaining(){ return ink.reduce((a,b)=>a+b,0); },
   get palette(){ return PALETTE.slice(); },
   setInk(i,v){ if(i>=0&&i<N) ink[i]=v?1:0; },
+  setFresh(i,v){ if(cells[i]) cells[i].fresh=!!v; },
+  fresh(){ return cells.map(c=>!!c.fresh); },
   setMaxChain(n){ stats.maxChain=Math.max(stats.maxChain,n|0); },
   get collect(){ return Object.assign({},collect); },
   get stats(){ return Object.assign({},stats); },
