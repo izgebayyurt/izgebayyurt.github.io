@@ -64,8 +64,50 @@ function placeGates(L, spec, rng, extra) {
   });
 }
 
+const NB8 = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+/* counter tiles: EXACTLY n of the 8 neighbours wear colour col, stamped from the
+   constructed solution so they're satisfiable by construction. spec.zeros allows
+   the occasional "0 of this colour touches me" clue. */
+function placeCounters(L, spec, rng, mech) {
+  const skip = keepOut(L, false);
+  if (mech) mech.forEach((k2) => skip.add(k2));
+  (L.prisms || []).forEach(([, r, c]) => skip.add(key(r, c)));
+  const wallSet = new Set(L.walls.map(([r, c]) => key(r, c)));
+  const bridgeSet = new Set((L.bridges || []).map(([r, c]) => key(r, c)));
+  const cand = [];
+  for (const [k2] of L.paint) { if (!skip.has(k2)) cand.push(k2.split(",").map(Number)); }
+  const picked = [];
+  for (const [r, c] of shuffle(cand, rng)) {
+    if (picked.length >= spec.counts) break;
+    if (picked.some((p) => Math.abs(p[2] - r) <= 1 && Math.abs(p[3] - c) <= 1)) continue;   // spread out
+    // a bridge neighbour wears two colours at once — don't count near one
+    let nearBridge = false;
+    const hood = {};
+    for (const [dr, dc] of NB8) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || cc < 0 || rr >= L.n || cc >= L.n || wallSet.has(key(rr, cc))) continue;
+      if (bridgeSet.has(key(rr, cc))) { nearBridge = true; break; }
+      const pc = L.paint.get(key(rr, cc));
+      if (pc) hood[pc] = (hood[pc] || 0) + 1;
+    }
+    if (nearBridge) continue;
+    let col = null, nv = 0;
+    if (spec.zeros && rng() < 0.25) {
+      const absent = ["R", "Y", "B", "O", "G", "P"].filter((x) => !hood[x]);
+      if (absent.length) { col = absent[(rng() * absent.length) | 0]; nv = 0; }
+    }
+    if (col == null) {
+      const cols = Object.keys(hood);
+      if (!cols.length) continue;
+      col = cols[(rng() * cols.length) | 0]; nv = hood[col];
+    }
+    picked.push([col, nv, r, c]);
+  }
+  return picked.length >= spec.counts ? picked : null;
+}
+
 /* ONE composable maker: any builder (junction/fork/chain/prism), any growth twist
-   (portals/bridges), any decoration (gates/arrows/ice) — driven purely by spec. */
+   (portals/bridges), any decoration (gates/arrows/ice/counters) — driven purely by spec. */
 const BUILDS = { junction: buildJunctionLevel, fork: buildForkLevel, chain: buildChainLevel, prism: buildPrismLevel };
 function makeMix(spec, rng) {
   const build = BUILDS[spec.build || "junction"];
@@ -95,8 +137,17 @@ function makeMix(spec, rng) {
     if (!picked) return null;
     ice = picked.map((x) => [x.r, x.c]);
   }
+  let counts = null;
+  if (spec.counts) {
+    const used = new Set(mech);
+    gates.forEach((g) => used.add(key(g[1], g[2])));
+    (ice || []).forEach((ic) => used.add(key(ic[0], ic[1])));
+    counts = placeCounters(L, spec, rng, used);
+    if (!counts) return null;
+  }
   const lv = { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates };
   if (ice) lv.ice = ice;
+  if (counts) lv.counts = counts;
   if (L.portals) lv.portals = L.portals;
   if (L.bridges) lv.bridges = L.bridges;
   if (L.prisms) lv.prisms = L.prisms;
@@ -166,6 +217,16 @@ const RAMPS = {
     [6, { build: "prism", n: 7, minOpen: 41, ice: 2 }],
     [6, { build: "prism", n: 7, minOpen: 41, gates: 2, arrows: 2 }],
     [6, { build: "prism", n: 8, minOpen: 53 }],
+  ] },
+  tally: { name: "Tally", icon: "③", desc: "Exact colour counts around a tile", tiers: [
+    [8, { n: 5, minOpen: 24, counts: 1 }],
+    [8, { n: 6, minOpen: 32, counts: 2 }],
+    [6, { n: 6, minOpen: 32, counts: 3, zeros: true }],
+    [6, { build: "fork", n: 6, minOpen: 31, counts: 3 }],
+    [6, { n: 7, minOpen: 43, counts: 4, zeros: true }],
+    [6, { build: "fork", n: 7, minOpen: 43, counts: 4, zeros: true }],
+    [6, { n: 7, minOpen: 43, counts: 5, zeros: true, gates: 2 }],
+    [4, { n: 8, minOpen: 56, counts: 6, zeros: true }],
   ] },
   mix: { name: "Medley", icon: "✚", desc: "Every mechanic, mixed together", tiers: [
     // warm-up: one mechanic + a decoration

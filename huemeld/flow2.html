@@ -298,6 +298,7 @@ var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
 var walls=[], wallSet={}, gates=[];
 var ices=[], iceSet={}, portals=[];      // pack mechanics: straight-through ice, paired warps
 var bridges=[], bridgeSet={};            // pack mechanic: a cell two lines may CROSS (perpendicular)
+var counters=[];                         // pack mechanic: EXACTLY n of my 8 neighbours wear this colour
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
@@ -410,6 +411,7 @@ function applyLevel(L){
   portals=(L.portals||[]).map(function(p){ return [p[0],p[1],p[2],p[3]]; });
   bridges=(L.bridges||[]).map(function(b){ return [b[0],b[1]]; });
   bridgeSet={}; bridges.forEach(function(b){ bridgeSet[b[0]+","+b[1]]=1; });
+  counters=(L.counts||[]).map(function(k){ return {col:k[0], n:k[1], r:k[2], c:k[3]}; });
   // PRISMS: a tile that wants its secondary fed IN, then releases the two primaries
   // back OUT. Modelled as a target (the feed) + two co-located LOCKED 1-ray emitters.
   (L.prisms||[]).forEach(function(p){
@@ -563,6 +565,25 @@ function pathsAt(r,c){
   ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id, col:E.col}); }); });
   return out;
 }
+/* the colour a tile visibly WEARS: circles/prisms and emitter dots count as their
+   own colour even before a pipe arrives; otherwise it's the pipe through the cell */
+function cellColorFull(r,c){
+  var T=tgtAt(r,c); if(T) return T.col;
+  for(var e=0;e<ems.length;e++) if(ems[e].r===r && ems[e].c===c) return ems[e].col;
+  return colorAt(r,c);
+}
+/* counters: how many of the 8 surrounding tiles currently wear K's colour */
+function countAround(K){
+  var n=0;
+  for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
+    if(!dr && !dc) continue;
+    var rr=K.r+dr, cc=K.c+dc;
+    if(!inb(rr,cc) || isWall(rr,cc)) continue;
+    if(cellColorFull(rr,cc)===K.col) n++;
+  }
+  return n;
+}
+function countersOK(){ for(var i=0;i<counters.length;i++){ if(countAround(counters[i])!==counters[i].n) return false; } return true; }
 /* every bridge cell must be crossed straight by every line on it (1 or 2, perpendicular) */
 function bridgesOK(){
   for(var i=0;i<bridges.length;i++){
@@ -794,7 +815,7 @@ function step(cell){
     var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
     if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){
       leg.push([tw[0],tw[1]]);
-      addBloom(cell[0],cell[1],"#7fd4ee",420); addBloom(tw[0],tw[1],"#7fd4ee",560);
+      addBloom(cell[0],cell[1],"#f45fa8",420); addBloom(tw[0],tw[1],"#f45fa8",560);
       try{ voice(520,0.16,{type:"sine",to:1240,gl:0.12,lp:2800,g:0.045,atk:0.004}); }catch(_e){}
     }
     renderPaths(); return;
@@ -944,6 +965,7 @@ function checkWin(){
   if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
   if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
   if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
+  if(!countersOK()){ toast("A number tile needs its EXACT count!"); return; }
   solved=true; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI();
   if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
@@ -993,7 +1015,6 @@ function renderDots(){
         +'<path d="M50 8 L93 88 L7 88 Z" fill="'+HEX[T.col]+'" stroke="'+INK+'" stroke-width="11" stroke-linejoin="round"/>'
         +'<path d="M50 8 L7 88 L50 88" fill="none" stroke="'+HEX[comp[0]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
         +'<path d="M50 8 L93 88 L50 88" fill="none" stroke="'+HEX[comp[1]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
-        +'<path d="M50 22 L28 66 L50 66 Z" fill="rgba(255,255,255,0.30)"/>'
         +'</svg></div>';
       return;
     }
@@ -1239,7 +1260,9 @@ function renderPaths(){
   //         twin. The spiral winds out from the centre and lands ON the ring,
   //         carrying on along it briefly so the join is seamless. Slowly spins.
   if(portals.length){
-    var PCOLS=["#49c6e5","#ef9d3c","#b083e8","#6fcf7c"];
+    // PINK — the one hue no pipe uses, so portals never read as a paint colour.
+    // Multi-pair boards get distinct pink shades so twins stay matchable.
+    var PCOLS=["#f45fa8","#ff9ed2","#c9377f","#ffc7e3"];
     ctx.save(); ctx.lineCap="round"; ctx.lineJoin="round";
     portals.forEach(function(p,pi){
       var pcol=PCOLS[pi%PCOLS.length];
@@ -1294,6 +1317,34 @@ function renderPaths(){
       }
       if(cbOn){ var ty=G.dir? y-s*0.10 : cy;
         ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(CBGLYPH[G.col]||G.col,cx,ty); ctx.fillText(CBGLYPH[G.col]||G.col,cx,ty); }
+      ctx.restore();
+    });
+  }
+  // 6d — counters: EXACTLY n of the 8 surrounding tiles must wear this colour.
+  //      Live: dim while under, pops when exact, red ring the moment it's over.
+  if(counters.length){
+    var KPOP=380;
+    counters.forEach(function(K){
+      var cur=countAround(K), exact=cur===K.n, over=cur>K.n;
+      if(exact && !K.sat){ K.sat=true; K.satAt=nowMs(); if(soundOn) voice(990,0.12,{type:"sine",g:0.028,lp:3400,atk:0.003}); }
+      else if(!exact) K.sat=false;
+      var pop=1, age=(nowMs()-(K.satAt||-9999))/KPOP;
+      if(K.sat && age<1) pop = 1 + Math.sin(age*Math.PI)*0.45;
+      var cxk=K.c*s+s/2, cyk=K.r*s+s/2, cw=s*0.54*pop, rk=s*0.13*pop;
+      ctx.save(); ctx.lineJoin="round";
+      ctx.globalAlpha=0.94; ctx.fillStyle=INK;
+      roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=s*0.045;
+      ctx.strokeStyle = over ? "#e23b45" : HEX[K.col];
+      roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke();
+      if(over){ ctx.globalAlpha=0.35+0.35*(0.5+0.5*Math.sin(animT/140)); roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke(); ctx.globalAlpha=1; }
+      if(K.sat){ ctx.globalAlpha=0.35+0.35*(0.5+0.5*Math.sin(animT/300)); ctx.lineWidth=s*0.045; roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke(); ctx.globalAlpha=1; }
+      ctx.fillStyle=HEX[K.col]; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 "+(s*0.30*pop)+"px 'Fredoka',sans-serif";
+      ctx.globalAlpha = exact||over ? 1 : 0.8;
+      ctx.fillText(""+K.n, cxk, cyk+s*0.012);
+      if(cbOn){ ctx.font="700 "+(s*0.115)+"px 'Fredoka',sans-serif"; ctx.fillStyle="#fff";
+        ctx.fillText(CBGLYPH[K.col]||K.col, cxk, cyk+cw/2+s*0.075); }
       ctx.restore();
     });
   }
@@ -1442,6 +1493,7 @@ window.__flow={
   pack:loadPackLevel,
   packs:function(){ return PACKS; },
   chapters:function(){ return CHAPTERS.map(function(C,c){ return {name:C.name, n:C.n, unlocked:chapterUnlocked(c), solved:solvedInChapter(c), need:chapterNeed(c)}; }); },
+  cellColorFull:cellColorFull,
   entFull:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_full", v?"1":"0"); return entFull(); },
   undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
   undoDepth:function(){ return undoStack.length; },
