@@ -1107,25 +1107,24 @@ function renderPaths(){
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
   });
-  // 4 — living paint: tiny bubbles drifting inside each pipe, tinted a LIGHTER
-  //     shade of that pipe's colour. Clipped to the pipes (source-atop) so they
-  //     only show inside the band.
+  // 4 — living paint: FIZZ. A stream of near-pinpoint sparkles racing inside each
+  //     pipe like bubbles up a bottle of cola — dense, tiny, twinkling. Clipped to
+  //     the pipes (source-atop) so they only show inside the band.
   ctx.save(); ctx.globalCompositeOperation="source-atop";
   legs.forEach(function(L,idx){
     var pts=L.cells.map(P); if(pts.length<1) return; var m=polyCum(pts); if(m.total<=0) return;
-    var lite=lighten(L.color,0.5), t=animT/1000;
-    var count=Math.max(2, Math.round(m.total/(s*1.0)));     // ~1 bubble per cell
+    var lite=lighten(L.color,0.62), t=animT/1000;
+    var count=Math.max(4, Math.round(m.total/(s*0.30)));    // ~3 fizz specks per cell
     for(var k=0;k<count;k++){
-      var ph=frac(idx*0.3197+k*0.61803);                    // stable per-bubble phase
-      var sp=s*(0.85+0.5*frac(ph*7.13));                    // speed varies a little
-      var rad=pipeW*(0.13+0.11*frac(ph*3.71));              // size varies a little
+      var ph=frac(idx*0.3197+k*0.61803);                    // stable per-speck phase
+      var sp=s*(0.7+0.9*frac(ph*7.13));                     // wide speed spread — some race, some drift
+      var rad=pipeW*(0.035+0.04*frac(ph*3.71));             // near-pinpoint
       var pos=frac((t*sp)/m.total + ph)*m.total;
       var pt=ptAtLen(pts,m.cum,pos);
-      var a=0.30+0.30*(0.5+0.5*Math.sin(t*3.1+ph*6.283));   // gentle twinkle
+      var wob=pipeW*0.24, wx=Math.sin(ph*41.3+t*2.1)*wob, wy=Math.cos(ph*27.7+t*1.7)*wob;   // lateral jiggle inside the band
+      var a=0.22+0.38*(0.5+0.5*Math.sin(t*4.6+ph*6.283));   // quick twinkle
       ctx.globalAlpha=a; ctx.fillStyle=lite;
-      ctx.beginPath(); ctx.arc(pt[0],pt[1],rad,0,6.2832); ctx.fill();
-      ctx.globalAlpha=a*0.6; ctx.fillStyle="rgba(255,255,255,0.75)";
-      ctx.beginPath(); ctx.arc(pt[0]-rad*0.28,pt[1]-rad*0.28,rad*0.42,0,6.2832); ctx.fill();  // tiny gloss highlight
+      ctx.beginPath(); ctx.arc(pt[0]+wx,pt[1]+wy,rad,0,6.2832); ctx.fill();
     }
   });
   ctx.globalAlpha=1;
