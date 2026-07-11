@@ -287,6 +287,14 @@ function armEdges(center, arm, col) {
   return e;
 }
 function levelWalls(n, visited) { const w = []; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (!visited.has(r + "," + c)) w.push([r, c]); return w; }
+/* portals may only sit MID-ARM — never on an endpoint, junction, or prism cell
+   (the engine can't merge/deliver/start on a warp) */
+function portalsClearOf(jumper, cells) {
+  if (!jumper) return true;
+  const stop = new Set(cells.map((c) => c[0] + "," + c[1]));
+  for (const [r1, c1, r2, c2] of jumper.pairs) if (stop.has(r1 + "," + c1) || stop.has(r2 + "," + c2)) return false;
+  return true;
+}
 
 /* Build a single-junction level (2 emitters + 1 secondary circle).
    spec.jump=1 threads ONE portal pair through an arm (the arm warps mid-route). */
@@ -330,17 +338,21 @@ export function buildForkLevel(n, rng, spec = {}) {
   const E = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
   const visited = new Set([E[0] + "," + E[1]]);
   const lo = spec.looseness || 0;
+  const jumper = spec.jump ? { left: spec.jump, pairs: [] } : null;
+  const bridger = spec.bridge ? { left: spec.bridge, cells: [] } : null;
   const legMax = 2 + ((rng() * Math.max(2, (n - 3))) | 0);   // keep E's legs short so the junctions have room
-  const legs = growArms(n, rng, E, 2, visited, null, legMax, lo);
+  const legs = growArms(n, rng, E, 2, visited, null, legMax, lo, jumper, bridger);
   if (!legs || legs.length < 2 || legs.some((l) => l.length < 2)) return null;
   const J1 = armEnd(legs[0]), J2 = armEnd(legs[1]);
   if (Math.abs(J1[0] - J2[0]) + Math.abs(J1[1] - J2[1]) <= 1) return null;   // junctions must not touch
   const forbid = new Set([E[0] + "," + E[1]]);           // protect the emitter cell from stray adjacency
-  const a1 = growArms(n, rng, J1, 2, visited, forbid, null, lo);   // J1: q1 feeder + blend
+  const a1 = growArms(n, rng, J1, 2, visited, forbid, null, lo, jumper, bridger);   // J1: q1 feeder + blend
   if (!a1 || a1.length < 2) return null;
-  const a2 = growArms(n, rng, J2, 2, visited, forbid, null, lo);   // J2: q2 feeder + blend
+  const a2 = growArms(n, rng, J2, 2, visited, forbid, null, lo, jumper, bridger);   // J2: q2 feeder + blend
   if (!a2 || a2.length < 2) return null;
   if (visited.size < (spec.minCells || 12)) return null;
+  if (jumper && jumper.pairs.length < spec.jump) return null;
+  if (bridger && bridger.cells.length < spec.bridge) return null;
   const p = PRIMS[(rng() * 3) | 0];
   const others = shuffle(PRIMS.filter((x) => x !== p), rng);
   const q1 = others[0], q2 = others[1];
@@ -368,7 +380,11 @@ export function buildForkLevel(n, rng, spec = {}) {
     [...f1.slice().reverse(), J1, ...b1],
     [...f2.slice().reverse(), J2, ...b2],
   ];
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
+  if (!portalsClearOf(jumper, [E, J1, J2, ...sq.map(([, r, c]) => [r, c]), ...ci.map(([, r, c]) => [r, c])])) return null;
+  const out = { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
+  if (jumper) out.portals = jumper.pairs;
+  if (bridger) out.bridges = bridger.cells;
+  return out;
 }
 
 /* Build a CHAIN level — the browN pack: two primaries meet at J1 making a secondary,
@@ -378,9 +394,11 @@ export function buildChainLevel(n, rng, spec = {}) {
   const J1 = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
   const visited = new Set([J1[0] + "," + J1[1]]);
   const lo = spec.looseness || 0;
+  const jumper = spec.jump ? { left: spec.jump, pairs: [] } : null;
+  const bridger = spec.bridge ? { left: spec.bridge, cells: [] } : null;
   // 3 arms out of J1: feeder A, feeder B, and the blend path (capped so J2 has room)
   const blendMax = 3 + ((rng() * Math.max(2, n - 3)) | 0);
-  const arms = growArms(n, rng, J1, 3, visited, null, blendMax * 3, lo);
+  const arms = growArms(n, rng, J1, 3, visited, null, blendMax * 3, lo, jumper, bridger);
   if (!arms || arms.length < 3) return null;
   const o = shuffle([0, 1, 2], rng);
   const armA = arms[o[0]], armB = arms[o[1]], armS = arms[o[2]];
@@ -388,9 +406,11 @@ export function buildChainLevel(n, rng, spec = {}) {
   const J2 = armEnd(armS);
   if (Math.abs(J2[0] - J1[0]) + Math.abs(J2[1] - J1[1]) <= 1) return null;
   const forbid = new Set([J1[0] + "," + J1[1]]);
-  const a2 = growArms(n, rng, J2, 2, visited, forbid, null, lo);   // feeder C + the brown run
+  const a2 = growArms(n, rng, J2, 2, visited, forbid, null, lo, jumper, bridger);   // feeder C + the brown run
   if (!a2 || a2.length < 2) return null;
   if (visited.size < (spec.minCells || 12)) return null;
+  if (jumper && jumper.pairs.length < spec.jump) return null;
+  if (bridger && bridger.cells.length < spec.bridge) return null;
   const [armC, armN] = shuffle(a2.slice(), rng);
   const sec = SECS[(rng() * 3) | 0], [pA, pB] = shuffle(COMP[sec].slice(), rng);
   const pC = PRIMS.find((x) => !COMP[sec].includes(x));   // the missing primary completes brown
@@ -412,7 +432,11 @@ export function buildChainLevel(n, rng, spec = {}) {
     [...armB.slice().reverse(), J1, ...armS],
     [...armC.slice().reverse(), J2, ...armN],
   ];
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
+  if (!portalsClearOf(jumper, [J1, J2, ...sq.map(([, r, c]) => [r, c]), ...ci.map(([, r, c]) => [r, c])])) return null;
+  const out = { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1, J2], edges, gest };
+  if (jumper) out.portals = jumper.pairs;
+  if (bridger) out.bridges = bridger.cells;
+  return out;
 }
 
 /* Build a PRISM level: two primaries mix at J1, the blend feeds the PRISM, which
@@ -423,8 +447,10 @@ export function buildPrismLevel(n, rng, spec = {}) {
   const J1 = [1 + ((rng() * (n - 2)) | 0), 1 + ((rng() * (n - 2)) | 0)];
   const visited = new Set([J1[0] + "," + J1[1]]);
   const lo = spec.looseness || 0;
+  const jumper = spec.jump ? { left: spec.jump, pairs: [] } : null;
+  const bridger = spec.bridge ? { left: spec.bridge, cells: [] } : null;
   const blendMax = 3 + ((rng() * Math.max(2, n - 3)) | 0);
-  const arms = growArms(n, rng, J1, 3, visited, null, blendMax * 3, lo);
+  const arms = growArms(n, rng, J1, 3, visited, null, blendMax * 3, lo, jumper, bridger);
   if (!arms || arms.length < 3) return null;
   const o = shuffle([0, 1, 2], rng);
   const armA = arms[o[0]], armB = arms[o[1]], armS = arms[o[2]];
@@ -432,9 +458,11 @@ export function buildPrismLevel(n, rng, spec = {}) {
   const P = armEnd(armS);
   if (Math.abs(P[0] - J1[0]) + Math.abs(P[1] - J1[1]) <= 1) return null;
   const forbid = new Set([J1[0] + "," + J1[1]]);
-  const rays = growArms(n, rng, P, 2, visited, forbid, null, lo);   // the two released primaries
+  const rays = growArms(n, rng, P, 2, visited, forbid, null, lo, jumper, bridger);   // the two released primaries
   if (!rays || rays.length < 2 || rays.some((r) => r.length < 2)) return null;
   if (visited.size < (spec.minCells || 12)) return null;
+  if (jumper && jumper.pairs.length < spec.jump) return null;
+  if (bridger && bridger.cells.length < spec.bridge) return null;
   const sec = SECS[(rng() * 3) | 0], comp = COMP[sec];
   const [pA, pB] = shuffle(comp.slice(), rng);
   const sq = [[pA, ...armEnd(armA)], [pB, ...armEnd(armB)]];
@@ -457,7 +485,11 @@ export function buildPrismLevel(n, rng, spec = {}) {
     [P, ...rays[0]],
     [P, ...rays[1]],
   ];
-  return { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1], prisms, edges, gest };
+  if (!portalsClearOf(jumper, [J1, P, ...sq.map(([, r, c]) => [r, c]), ...ci.map(([, r, c]) => [r, c])])) return null;
+  const out = { n, sq, ci, walls: levelWalls(n, visited), paint, junctions: [J1], prisms, edges, gest };
+  if (jumper) out.portals = jumper.pairs;
+  if (bridger) out.bridges = bridger.cells;
+  return out;
 }
 
 /* Generate a clean single-emitter level with COLOUR GATES for challenge.
