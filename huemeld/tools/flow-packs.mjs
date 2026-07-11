@@ -74,10 +74,18 @@ function placeCounters(L, spec, rng, mech) {
   (L.prisms || []).forEach(([, r, c]) => skip.add(key(r, c)));
   const wallSet = new Set(L.walls.map(([r, c]) => key(r, c)));
   const bridgeSet = new Set((L.bridges || []).map(([r, c]) => key(r, c)));
-  const cand = [];
-  for (const [k2] of L.paint) { if (!skip.has(k2)) cand.push(k2.split(",").map(Number)); }
+  const open = [];
+  for (const [k2] of L.paint) { if (!skip.has(k2)) open.push(k2.split(",").map(Number)); }
+  // WALL clues: a number carved into the rock — the clue costs no playable cell.
+  // Preferred whenever a wall has enough painted neighbours to say something.
+  const wallCand = [];
+  for (const [r, c] of L.walls) {
+    let touch = 0;
+    for (const [dr, dc] of NB8) if (L.paint.has(key(r + dr, c + dc))) touch++;
+    if (touch >= 2) wallCand.push([r, c]);
+  }
   const picked = [];
-  for (const [r, c] of shuffle(cand, rng)) {
+  for (const [r, c] of [...shuffle(wallCand, rng), ...shuffle(open, rng)]) {
     if (picked.length >= spec.counts) break;
     if (picked.some((p) => Math.abs(p[2] - r) <= 1 && Math.abs(p[3] - c) <= 1)) continue;   // spread out
     // a bridge neighbour wears two colours at once — don't count near one
