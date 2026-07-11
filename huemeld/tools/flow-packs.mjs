@@ -9,6 +9,7 @@
      ice     — frozen cells a line may only pass straight through
      portals — a paired warp: a line entering one end exits the other */
 import { buildJunctionLevel, buildForkLevel, buildChainLevel, buildPrismLevel, mulberry32 } from "./flow-gen2.mjs";
+import { countSolutions } from "./flow-solve.mjs";
 
 const SECS = ["O", "G", "P"];
 const key = (r, c) => r + "," + c;
@@ -64,46 +65,80 @@ function placeGates(L, spec, rng, extra) {
   });
 }
 
-const NB8 = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
-/* counter tiles: EXACTLY n of the 8 neighbours wear colour col, stamped from the
-   constructed solution so they're satisfiable by construction. spec.zeros allows
-   the occasional "0 of this colour touches me" clue. */
-function placeCounters(L, spec, rng, mech) {
+/* counter tiles: EXACTLY nv cells of the 3×3 block around (and including) the
+   counter wear colour col — stamped from the constructed solution so they're
+   satisfiable by construction. spec.zeros allows "none of this colour near me"
+   clues. TACTICAL: each clue is chosen from a sample to MINIMIZE the solver's
+   solution count, steering the level toward near-uniqueness; spec.maxSol
+   rejects boards that stay too loose. */
+function placeCounters(L, spec, rng, mech, gatesPlaced) {
   const skip = keepOut(L, false);
   if (mech) mech.forEach((k2) => skip.add(k2));
   (L.prisms || []).forEach(([, r, c]) => skip.add(key(r, c)));
   const wallSet = new Set(L.walls.map(([r, c]) => key(r, c)));
   const bridgeSet = new Set((L.bridges || []).map(([r, c]) => key(r, c)));
-  const cand = [];
-  for (const [k2] of L.paint) { if (!skip.has(k2)) cand.push(k2.split(",").map(Number)); }
-  const picked = [];
-  for (const [r, c] of shuffle(cand, rng)) {
-    if (picked.length >= spec.counts) break;
-    if (picked.some((p) => Math.abs(p[2] - r) <= 1 && Math.abs(p[3] - c) <= 1)) continue;   // spread out
-    // a bridge neighbour wears two colours at once — don't count near one
-    let nearBridge = false;
+  // candidate = [r, c, isWall] — clue value derived per candidate below
+  const open = [], wallCand = [];
+  for (const [k2] of L.paint) { if (!skip.has(k2)) open.push([...k2.split(",").map(Number), 0]); }
+  for (const [r, c] of L.walls) {
+    let touch = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (L.paint.has(key(r + dr, c + dc))) touch++;
+    if (touch >= 2) wallCand.push([r, c, 1]);
+  }
+  function clueAt(r, c) {   // -> [col, nv] from the constructed solution (3×3 incl. self)
     const hood = {};
-    for (const [dr, dc] of NB8) {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
       const rr = r + dr, cc = c + dc;
       if (rr < 0 || cc < 0 || rr >= L.n || cc >= L.n || wallSet.has(key(rr, cc))) continue;
-      if (bridgeSet.has(key(rr, cc))) { nearBridge = true; break; }
+      if (bridgeSet.has(key(rr, cc))) return null;   // a bridge wears two colours — don't count near one
       const pc = L.paint.get(key(rr, cc));
       if (pc) hood[pc] = (hood[pc] || 0) + 1;
     }
-    if (nearBridge) continue;
-    let col = null, nv = 0;
     if (spec.zeros && rng() < 0.25) {
       const absent = ["R", "Y", "B", "O", "G", "P"].filter((x) => !hood[x]);
-      if (absent.length) { col = absent[(rng() * absent.length) | 0]; nv = 0; }
+      if (absent.length) return [absent[(rng() * absent.length) | 0], 0];
     }
-    if (col == null) {
-      const cols = Object.keys(hood);
-      if (!cols.length) continue;
-      col = cols[(rng() * cols.length) | 0]; nv = hood[col];
-    }
-    picked.push([col, nv, r, c]);
+    const cols = Object.keys(hood);
+    if (!cols.length) return null;
+    const col = cols[(rng() * cols.length) | 0];
+    return [col, hood[col]];
   }
-  return picked.length >= spec.counts ? picked : null;
+  // exact solution-counting is only affordable on tiny boards (a full 5x5 already
+  // costs seconds), so tactical scoring is opt-in via spec.tactical; the default
+  // stamps clues straight from the constructed solution.
+  const canScore = spec.tactical && !L.portals && !L.bridges && !L.prisms && L.ci.every(([col]) => col !== "N");
+  const gates0 = gatesPlaced || [];
+  const solCap = spec.solCap || 12, solBudget = spec.solBudget || 250000;
+  const lvlWith = (counts) => ({ n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: gates0, counts });
+  const picked = [];
+  while (picked.length < spec.counts) {
+    const poolAll = [...shuffle(wallCand, rng), ...shuffle(open, rng)].filter(([r, c]) =>
+      picked.every((p) => Math.abs(p[2] - r) > 1 || Math.abs(p[3] - c) > 1));
+    if (!poolAll.length) break;
+    if (!canScore) {   // unsupported mechanics on board: fall back to plain placement
+      let done = false;
+      for (const [r, c] of poolAll) { const cl = clueAt(r, c); if (cl) { picked.push([cl[0], cl[1], r, c]); done = true; break; } }
+      if (!done) break;
+      continue;
+    }
+    // TACTICAL: score a sample of candidates by how few solutions remain
+    let best = null, bestS = Infinity;
+    for (const [r, c] of poolAll.slice(0, spec.sample || 8)) {
+      const cl = clueAt(r, c);
+      if (!cl) continue;
+      const res = countSolutions(lvlWith([...picked, [cl[0], cl[1], r, c]]), solCap, solBudget);
+      const sc = res.aborted ? 1e9 : res.count;
+      if (sc < bestS) { bestS = sc; best = [cl[0], cl[1], r, c]; }
+    }
+    if (!best) break;
+    picked.push(best);
+  }
+  if (picked.length < spec.counts) return null;
+  if (canScore && spec.maxSol) {
+    const fin = countSolutions(lvlWith(picked), spec.maxSol + 1, solBudget * 2);
+    if (!fin.aborted && fin.count > spec.maxSol) return null;   // still too loose — try a new board
+  }
+  return picked;
 }
 
 /* ONE composable maker: any builder (junction/fork/chain/prism), any growth twist
@@ -142,7 +177,7 @@ function makeMix(spec, rng) {
     const used = new Set(mech);
     gates.forEach((g) => used.add(key(g[1], g[2])));
     (ice || []).forEach((ic) => used.add(key(ic[0], ic[1])));
-    counts = placeCounters(L, spec, rng, used);
+    counts = placeCounters(L, spec, rng, used, gates);
     if (!counts) return null;
   }
   const lv = { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates };

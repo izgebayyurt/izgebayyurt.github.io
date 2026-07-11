@@ -172,6 +172,31 @@ export function countSolutions(L, cap = 2, budget = 4_000_000) {
     return true;
   }
 
+  // COUNTERS (tally tiles): exactly nv cells of the 3×3 block around (and
+  // including) the counter wear colour col. Matches the engine's rule: a cell
+  // "wears" its emitter/circle colour, a junction wears its blend, a pipe its
+  // paint. Checked on complete assignments.
+  const counters = L.counts || [];
+  function wornColour(r, c) {
+    if (!passable(r, c)) return null;
+    const t = type[r][c];
+    if (t.kind === "S" || t.kind === "C") return t.col;
+    const cols = incident(r, c);
+    if (cols.length === 2) return cols[0];
+    if (cols.length === 3) return cols.find((x) => SECS.includes(x)) || null;   // a junction wears its blend
+    return null;
+  }
+  function countersOK() {
+    for (const [col, nv, r, c] of counters) {
+      let k = 0;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (wornColour(r + dr, c + dc) === col) k++;
+      }
+      if (k !== nv) return false;
+    }
+    return true;
+  }
+
   // Order of decisions: for each cell row-major, decide its right edge then its
   // down edge, then (its up/left already decided) validate the cell.
   const cells = [];
@@ -229,7 +254,7 @@ export function countSolutions(L, cap = 2, budget = 4_000_000) {
     if (count >= cap) return;
     if (++nodes > budget) { aborted = true; return; }
     if (ci === cells.length) {
-      if (globalOK()) count++;
+      if (countersOK() && globalOK()) count++;
       return;
     }
     const [r, c] = cells[ci];

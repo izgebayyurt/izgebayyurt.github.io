@@ -572,11 +572,11 @@ function cellColorFull(r,c){
   for(var e=0;e<ems.length;e++) if(ems[e].r===r && ems[e].c===c) return ems[e].col;
   return colorAt(r,c);
 }
-/* counters: how many of the 8 surrounding tiles currently wear K's colour */
+/* counters: how many tiles of the 3×3 block INCLUDING the counter's own cell wear
+   K's colour (max 9 on a pipe cell; a wall clue's own cell is rock, so max 8) */
 function countAround(K){
   var n=0;
   for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
-    if(!dr && !dc) continue;
     var rr=K.r+dr, cc=K.c+dc;
     if(!inb(rr,cc) || isWall(rr,cc)) continue;
     if(cellColorFull(rr,cc)===K.col) n++;

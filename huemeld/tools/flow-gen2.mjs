@@ -525,14 +525,40 @@ export function genGate(spec, rng) {
     const want = spec.gates != null ? spec.gates : 3;
     const sprim = shuffle(prim, rng), wantPrim = Math.min(sprim.length, Math.floor(want / 3));
     const cand = [...sprim.slice(0, wantPrim), ...shuffle(sec, rng), ...sprim.slice(wantPrim)];
-    const gates = [], gkey = new Set();
-    for (const g of cand) {
-      if (gates.length >= want) break;
-      let adj = false; for (const h of gates) if (Math.abs(h[1] - g[1]) + Math.abs(h[2] - g[2]) === 1) { adj = true; break; }
-      if (adj) continue;
-      gates.push(g); gkey.add(g[1] + "," + g[2]);
+    let gates;
+    if (spec.tactical) {
+      // TACTICAL: place each gate where it kills the most alternative solutions,
+      // steering the board toward (near-)uniqueness.
+      gates = [];
+      const solCap = spec.solCap || 12, solBudget = spec.solBudget || 250000;
+      while (gates.length < want) {
+        const pool = shuffle(cand.filter((g) =>
+          !gates.includes(g) && gates.every((h) => Math.abs(h[1] - g[1]) + Math.abs(h[2] - g[2]) !== 1)), rng)
+          .slice(0, spec.sample || 8);
+        if (!pool.length) break;
+        let bestG = null, bestS = Infinity;
+        for (const g of pool) {
+          const res = countSolutions({ n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates: [...gates, g] }, solCap, solBudget);
+          const sc = res.aborted ? 1e9 : res.count;
+          if (sc < bestS) { bestS = sc; bestG = g; }
+        }
+        gates.push(bestG);
+      }
+      if (gates.length < want) continue;
+      if (spec.maxSolutions) {
+        const fin = countSolutions({ n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates }, spec.maxSolutions + 1, solBudget * 2);
+        if (!fin.aborted && fin.count > spec.maxSolutions) continue;   // still too loose — new board
+      }
+    } else {
+      gates = [];
+      for (const g of cand) {
+        if (gates.length >= want) break;
+        let adj = false; for (const h of gates) if (Math.abs(h[1] - g[1]) + Math.abs(h[2] - g[2]) === 1) { adj = true; break; }
+        if (adj) continue;
+        gates.push(g);
+      }
+      if (gates.length < want) continue;                // couldn't place enough spread-out gates
     }
-    if (gates.length < want) continue;                  // couldn't place enough spread-out gates
     const out = { n: L.n, sq: L.sq, ci: L.ci, walls: L.walls, gates };
     // uniqueness isn't required, so counting is OFF by default (it's the slow part on
     // open boards). Only measure when asked, and only reject if a cap is set.
