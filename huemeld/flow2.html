@@ -794,7 +794,7 @@ function step(cell){
     var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
     if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){
       leg.push([tw[0],tw[1]]);
-      addBloom(cell[0],cell[1],"#7fd4ee",420); addBloom(tw[0],tw[1],"#7fd4ee",560);
+      addBloom(cell[0],cell[1],"#f45fa8",420); addBloom(tw[0],tw[1],"#f45fa8",560);
       try{ voice(520,0.16,{type:"sine",to:1240,gl:0.12,lp:2800,g:0.045,atk:0.004}); }catch(_e){}
     }
     renderPaths(); return;
@@ -993,7 +993,6 @@ function renderDots(){
         +'<path d="M50 8 L93 88 L7 88 Z" fill="'+HEX[T.col]+'" stroke="'+INK+'" stroke-width="11" stroke-linejoin="round"/>'
         +'<path d="M50 8 L7 88 L50 88" fill="none" stroke="'+HEX[comp[0]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
         +'<path d="M50 8 L93 88 L50 88" fill="none" stroke="'+HEX[comp[1]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
-        +'<path d="M50 22 L28 66 L50 66 Z" fill="rgba(255,255,255,0.30)"/>'
         +'</svg></div>';
       return;
     }
@@ -1239,7 +1238,9 @@ function renderPaths(){
   //         twin. The spiral winds out from the centre and lands ON the ring,
   //         carrying on along it briefly so the join is seamless. Slowly spins.
   if(portals.length){
-    var PCOLS=["#49c6e5","#ef9d3c","#b083e8","#6fcf7c"];
+    // PINK — the one hue no pipe uses, so portals never read as a paint colour.
+    // Multi-pair boards get distinct pink shades so twins stay matchable.
+    var PCOLS=["#f45fa8","#ff9ed2","#c9377f","#ffc7e3"];
     ctx.save(); ctx.lineCap="round"; ctx.lineJoin="round";
     portals.forEach(function(p,pi){
       var pcol=PCOLS[pi%PCOLS.length];
