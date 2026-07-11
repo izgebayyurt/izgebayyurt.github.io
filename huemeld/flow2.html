@@ -203,7 +203,9 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Everything · $4.99</button>
+        <button class="mk" id="btnRestore" style="display:none;background:var(--card);margin-top:6px;font-size:13px">Restore Purchases</button>
         <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
+        <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
         <button class="mk" id="btnSetClose">Done</button>
       </div>
     </div>
@@ -1481,13 +1483,24 @@ function maybeInterstitial(){
 
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
-(function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds"), fl=document.getElementById("btnFull");
+(function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds"), fl=document.getElementById("btnFull"), rs=document.getElementById("btnRestore");
+  function applyEnt(e){   // the bridge reports entitlements -> flip flags + refresh UI
+    if(e && e.noads) localStorage.setItem("hm_flow2_ent_noads","1");
+    if(e && e.full) localStorage.setItem("hm_flow2_ent_full","1");
+    rm.style.display = (n && n.buyRemoveAds && !entNoAds()) ? "" : "none";
+    fl.style.display = (n && n.buyFull && !entFull()) ? "" : "none";
+    try{ renderPicker(); }catch(_e){}
+  }
+  window.__applyEnt=applyEnt;   // native bootstrap calls this on launch + after purchases
   if(n && n.buyRemoveAds && !entNoAds()) rm.style.display="";       // only meaningful in the app
   if(n && n.buyFull && !entFull()) fl.style.display="";
+  if(n && n.restore) rs.style.display="";
   rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
-    nb.buyRemoveAds(function(ok){ if(ok){ localStorage.setItem("hm_flow2_ent_noads","1"); rm.style.display="none"; toast("Ads removed — thank you!"); } }); });
+    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } }); });
   fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
-    nb.buyFull(function(ok){ if(ok){ localStorage.setItem("hm_flow2_ent_full","1"); fl.style.display="none"; rm.style.display="none"; toast("✦ Everything unlocked — thank you!"); renderPicker(); } }); });
+    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Everything unlocked — thank you!"); } }); });
+  rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast("Available in the app"); return; }
+    nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
   document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");

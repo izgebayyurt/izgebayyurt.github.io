@@ -1,0 +1,228 @@
+# Huemeld — iOS ship checklist
+
+Everything you need to go from this repo to "Waiting for Review".
+Work top to bottom; each step tells you exactly what to paste where.
+
+**What's already in the repo**
+
+| Thing | Where |
+|---|---|
+| Capacitor wrapper (AdMob + RevenueCat wired) | `huemeld-app/` |
+| Native bridge with placeholders to fill | `huemeld-app/native.js` |
+| 8 App Store screenshots, 6.7" (1290×2796) | `huemeld-app/store-assets/screen-*.png` |
+| IAP promo images (1024×1024) | `huemeld-app/store-assets/iap-*.png` |
+| App icon 1024 source (upscale the 512 or re-run the generator) | `huemeld/icon-512.png` |
+| Privacy policy (live once pushed) | https://izgebayyurt.github.io/huemeld/privacy.html |
+
+---
+
+## 1. Accounts (one-time)
+
+- [ ] Enroll in the **Apple Developer Program** ($99/yr) at developer.apple.com with your Apple ID.
+- [ ] Create a **Google AdMob** account at admob.google.com (uses your Google account; hook up payment info later — required before real payouts, not before launch).
+- [ ] Create a free **RevenueCat** account at app.revenuecat.com.
+
+## 2. AdMob (5 minutes)
+
+- [ ] AdMob → Apps → **Add app** → iOS → "Huemeld" (say "not yet listed" — you can link the store listing after launch).
+- [ ] Copy the **App ID** — looks like `ca-app-pub-1234567890123456~0987654321` (note the `~`). You'll paste it into Info.plist in step 6.
+- [ ] Inside the app → **Ad units → Add ad unit → Interstitial**, name it "solve-break". Copy the **unit ID** (`ca-app-pub-…/…` with a `/`).
+- [ ] In `huemeld-app/native.js`: set `IOS_INTERSTITIAL_ID` to that unit ID. Leave `USE_TEST_ADS = true` until step 9.
+
+## 3. RevenueCat (10 minutes)
+
+- [ ] New project "Huemeld" → **Add app** → App Store → bundle ID `com.izge.huemeld`.
+- [ ] Copy the **public Apple API key** (starts `appl_`) → paste into `RC_IOS_API_KEY` in `huemeld-app/native.js`.
+- [ ] Products → add both (identifiers must match ASC exactly, step 5):
+  - `com.izge.huemeld.noads`
+  - `com.izge.huemeld.everything`
+- [ ] Entitlements → create **`noads`** and attach `com.izge.huemeld.noads`.
+- [ ] Entitlements → create **`everything`** and attach `com.izge.huemeld.everything`.
+  (The bridge treats `everything` as implying no-ads, so you don't need to double-attach.)
+- [ ] Later (step 5 makes this possible): paste the **App-Specific Shared Secret** from ASC into RevenueCat's App Store app settings so receipts validate.
+
+## 4. App Store Connect — app record
+
+- [ ] developer.apple.com → Certificates, IDs & Profiles → **Identifiers → +** → App ID `com.izge.huemeld` (capabilities: none needed; In-App Purchase is on by default).
+- [ ] appstoreconnect.apple.com → My Apps → **+ New App**:
+  - Platform iOS · Name **Huemeld** · Primary language English · Bundle ID `com.izge.huemeld` · SKU `huemeld-001`.
+
+## 5. App Store Connect — the two IAPs
+
+Monetization → In-App Purchases → **+** (both are **Non-Consumable**):
+
+| Field | No Ads | Everything |
+|---|---|---|
+| Reference name | Remove Ads | Everything |
+| Product ID | `com.izge.huemeld.noads` | `com.izge.huemeld.everything` |
+| Price | $2.99 (Tier 3) | $4.99 (Tier 5) |
+| Display name | Remove Ads | Everything |
+| Description | No more ad breaks — ever. | All 7 packs, the 150-level Medley, daily archive, and every chapter unlocked. No ads. |
+
+- [ ] Each IAP needs a **review screenshot**: use `store-assets/screen-08-packs.png` (shows the locked/unlocked catalogue) — any real in-app image ≥640px is accepted.
+- [ ] Optional but nice: upload `iap-noads-1024.png` / `iap-everything-1024.png` as the **promotional images** (App Store Promotion section) so the IAPs can be featured on your product page.
+- [ ] Monetization → App-Specific Shared Secret → generate → paste into RevenueCat (step 3 last box).
+- [ ] Both IAPs must be attached to the version in step 8 ("In-App Purchases" section on the version page) the first time they ship.
+
+## 6. Build the Xcode project
+
+On your Mac, in the repo:
+
+```bash
+cd huemeld-app
+npm install
+node sync.mjs            # builds www/ from ../huemeld with the native bridge injected
+npx cap add ios          # first time only — creates ios/
+npx cap sync ios
+npx cap open ios         # opens Xcode
+```
+
+In Xcode:
+
+- [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
+- [ ] Target → General → App Icon: drop in a 1024×1024 PNG. Generate it from the repo icon:
+      `sips -z 1024 1024 ../huemeld/icon-512.png --out AppIcon-1024.png` (or re-run the icon script at S=1024).
+- [ ] Open `ios/App/App/Info.plist` and add, inside the top-level `<dict>`:
+
+```xml
+<key>NSUserTrackingUsageDescription</key>
+<string>Allowing tracking lets us show fewer, better-matched ads. Your puzzles and progress are never shared.</string>
+<key>GADApplicationIdentifier</key>
+<string>ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY</string> <!-- your AdMob APP id from step 2, the one with ~ -->
+<key>SKAdNetworkItems</key>
+<array>
+  <dict>
+    <key>SKAdNetworkIdentifier</key>
+    <string>cstr6suwn9.skadnetwork</string> <!-- Google -->
+  </dict>
+  <!-- Paste the rest of Google's current list here:
+       https://developers.google.com/admob/ios/quick-start#update_your_infoplist
+       (~50 entries; copy the whole <array> they publish and replace this one) -->
+</array>
+```
+
+Notes:
+- The ATT prompt fires **in-app, lazily** — `native.js` requests tracking authorization right before the *first* interstitial (after the 15-solve honeymoon), so reviewers see it in a sensible context. Nothing else to wire.
+- If iOS 18+ Xcode warns about a missing `PrivacyInfo.xcprivacy`, the AdMob & RevenueCat pods ship their own; the app itself only uses localStorage (User Defaults-equivalent, exempt reason `CA92.1`) — add the manifest only if App Store Connect flags it at upload.
+
+## 7. TestFlight pass (sandbox everything)
+
+- [ ] Product → Archive → Distribute → App Store Connect → upload.
+- [ ] ASC → TestFlight → add yourself as internal tester, install via TestFlight app.
+- [ ] Verify, in order:
+  - [ ] Game boots, plays, dark theme, no service-worker weirdness (the wrapper strips it).
+  - [ ] Solve 15 levels → next 4th solve shows the **ATT prompt** then a **test interstitial** (test ads are on).
+  - [ ] Settings shows **Remove Ads · $2.99**, **✦ Everything · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
+  - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
+  - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
+  - [ ] Sandbox-buy Everything → all packs, Medley, daily archive, and locked chapters open instantly.
+- [ ] Flip `USE_TEST_ADS = false` in `native.js`, re-run `node sync.mjs && npx cap sync ios`, re-archive, re-upload. **This is the build you submit.**
+
+## 8. Store listing (paste-ready)
+
+**Name** (30 max): `Huemeld`
+**Subtitle** (30 max): `Melt colours. Fill the board.`
+
+**Promotional text** (170 max, editable without review):
+> A colour-mixing puzzle with 250 free levels, a daily puzzle, and seven mechanic packs — portals, prisms, bridges, counters and more.
+
+**Description**:
+
+```
+Draw pipes of light. Where they meet, colours melt.
+
+Huemeld is a colour-mixing puzzle: every board has glowing sources and
+empty squares that need exactly the right hue. Red and yellow melt into
+orange. Blue and yellow make green. All three primaries? That's brown —
+if you can route them together.
+
+Fill the whole board. Leave nothing dark.
+
+EASY TO LEARN
+• Draw a line from each glowing circle
+• Lines that meet in a junction melt into a new colour
+• Light every square and cover the board to win
+
+HARD TO PUT DOWN
+• 250 free levels across five chapters
+• A new daily puzzle every day — keep your streak alive
+• Undo, unlimited retries, no timers, no move limits
+• Colour-blind labels, sound toggle, light & dark themes
+
+SEVEN PUZZLE PACKS (350 more levels)
+• Brown — chain all three primaries into deep blends
+• Arrows — gates only pass their colour, some one-way
+• Ice — frozen tiles keep your line running straight
+• Portals — pink spirals teleport your flow across the board
+• Bridges — cross your own lines on overpasses
+• Prisms — feed a secondary in, two primaries burst out
+• Tally — counter tiles demand exactly N cells of their colour
+
+…and the MEDLEY: 150 levels that stack mechanics together —
+portals with brown chains, prisms over bridges, and worse.
+
+FAIR PRICING
+The 250-level campaign and the daily puzzle are free, with occasional
+ads after your first levels. One purchase removes ads forever. One more
+unlocks everything — every pack, the Medley, the daily archive, and
+instant chapter unlocks. No subscriptions, no energy, no coins.
+
+Every one of the 840 levels is verified solvable. Usually in
+more ways than one — but never as many as you'd hope.
+```
+
+**Keywords** (100 max, no spaces after commas):
+`color,colour,mix,pipe,flow,connect,logic,puzzle,zen,brain,daily,relax,line,paint,blend`
+(93 characters — room to tweak.)
+
+**Category**: Primary **Games › Puzzle**, secondary **Games › Board** (or Entertainment).
+**Age rating** questionnaire: everything "No" → **4+**. (Set "Unrestricted Web Access: No".)
+**Copyright**: `© 2026 Izge Bayyurt`
+**Support URL**: `https://izgebayyurt.github.io/huemeld/`
+**Marketing URL** (optional): same.
+**Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
+
+**Screenshots** — upload the eight from `store-assets/` in this order (6.7" slot; Apple auto-scales for smaller devices, or re-shoot at 1242×2688 if you want a tailored 5.5" set):
+1. `screen-01-hero.png` — Melt colours together
+2. `screen-02-mix.png` — Primaries make new hues
+3. `screen-04-medley.png` — Portals. Bridges. Combined.
+4. `screen-03-brown.png` — Chain the deep blends
+5. `screen-05-tally.png` — Counter logic
+6. `screen-06-prisms.png` — Split light with prisms
+7. `screen-07-daily.png` — A new puzzle every day
+8. `screen-08-packs.png` — 250 free levels & 7 packs
+
+## 9. App Privacy questionnaire (ASC → App Privacy)
+
+Because AdMob serves ads (and may use the IDFA when the user allows tracking):
+
+- [ ] "Do you collect data?" → **Yes**.
+- [ ] **Identifiers → Device ID**: used for **Third-Party Advertising**; **linked to identity: No**; **used for tracking: Yes**.
+- [ ] **Usage Data → Advertising Data** (ad interactions): Third-Party Advertising; not linked; tracking: Yes.
+- [ ] **Diagnostics → Crash/Performance**: only if you later add a crash SDK — currently **not collected**.
+- [ ] Purchases (RevenueCat receipts) count as **Purchase History**: App Functionality; **not linked** (anonymous ID); tracking: No.
+- [ ] Everything else: not collected.
+
+(If you'd rather answer "tracking: No", you must serve only non-personalized ads and skip ATT — the current build asks, so answer Yes.)
+
+## 10. Submit
+
+- [ ] Version page → attach the release build from step 7's second upload.
+- [ ] Attach both IAPs to the version.
+- [ ] **App Review notes**, paste:
+  > Free puzzle game with two one-time purchases. To reach ads quickly: ads only start after 15 solved levels (then every 4th solve; the ATT prompt appears right before the first ad). Purchases: Settings (gear icon) → "Remove Ads" / "Everything" / "Restore Purchases". No account or login required.
+- [ ] Release option: "Automatically release after approval" (or manual if you want to coordinate).
+- [ ] Submit for review. First reviews typically take 1–3 days.
+
+## Common rejection traps (already handled, don't undo them)
+
+- **Restore button missing** → present in Settings (Apple requires it for non-consumables).
+- **Privacy policy URL dead** → push this branch so `privacy.html` is live *before* submitting.
+- **ATT prompt wording** → the Info.plist string explains benefit + reassurance; don't shorten it to "for ads".
+- **Test ads in production** → step 7 flips `USE_TEST_ADS` before the submitted build.
+- **IAP not attached to version** → step 10.
+- **Placeholder metadata** — double-check you replaced every `XXXX` in `native.js` and Info.plist.
+
+## Android (later)
+
+The same wrapper works: `npx cap add android`, AdMob Android app ID in `AndroidManifest.xml`, a `goog_` RevenueCat key (add a platform switch in `native.js`), Play Console listing. The screenshots regenerate at any size by editing `storeshots.mjs` viewport. Park it until iOS is live.
