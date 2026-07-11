@@ -368,6 +368,8 @@ export function buildForkLevel(n, rng, spec = {}) {
   b1.forEach((c) => paint.set(c[0] + "," + c[1], sec1));
   f2.forEach((c) => paint.set(c[0] + "," + c[1], q2));
   b2.forEach((c) => paint.set(c[0] + "," + c[1], sec2));
+  // the E-legs INCLUDE their junction endpoints — re-assert the blend colours
+  paint.set(J1[0] + "," + J1[1], sec1); paint.set(J2[0] + "," + J2[1], sec2);
   const edges = [
     ...armEdges(E, legs[0], p), ...armEdges(E, legs[1], p),
     ...armEdges(J1, f1, q1), ...armEdges(J1, b1, sec1),
@@ -422,6 +424,7 @@ export function buildChainLevel(n, rng, spec = {}) {
   armS.forEach((c) => paint.set(c[0] + "," + c[1], sec));
   armC.forEach((c) => paint.set(c[0] + "," + c[1], pC));
   armN.forEach((c) => paint.set(c[0] + "," + c[1], "N"));
+  paint.set(J2[0] + "," + J2[1], "N");   // armS includes J2 — re-assert the brown junction
   const edges = [
     ...armEdges(J1, armA, pA), ...armEdges(J1, armB, pB), ...armEdges(J1, armS, sec),
     ...armEdges(J2, armC, pC), ...armEdges(J2, armN, "N"),
