@@ -85,14 +85,14 @@ app's start page to `flow2.html`.
 AdMob account (+ a RevenueCat account if you use it). Store review expects a
 privacy policy and, for ads, an ATT prompt on iOS.
 
-### Recommended model
-- **Free**: all 5 campaign chapters, gated by progress (solve 2/3 of a chapter to
-  open the next — already live in the shell), today's daily, 5-level pack teasers,
-  light interstitials after a 15-level honeymoon.
-- **$2.99 — No Ads.**
-- **$4.99 — Full Game**: no ads + every chapter unlocked instantly + the daily
-  archive + 3 mechanic packs of the player's choosing (~400 levels).
-- **$7.99 — Complete**: everything, including all 6 packs (50 levels each), the
-  150-level Medley, and future packs.
-The shell's `hm_flow2_ent_full` flag (see `entFull()`) is the seam the store
-purchases flip; pack/archive flags follow the same pattern.
+### The model (final — fully wired in the shell)
+- **Free**: the whole 250-level campaign (chapters gate by progress: solve 2/3 to
+  open the next), today's daily, and the first 5 levels of every pack — with
+  interstitials after a 15-solve honeymoon. The deep free tier IS the funnel:
+  anyone who plays 250 levels is ready to pay for silence and hungry for packs.
+- **$2.99 — No Ads** → flips `hm_flow2_ent_noads` (bridge: `buyRemoveAds(cb)`).
+- **$4.99 — Everything** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
+  no ads + all 7 packs + the 150-level Medley (500 levels) + the daily archive
+  (last 3 weeks replayable, streak-repairing) + instant chapter unlock.
+Both purchase buttons live in Settings and appear only when the native bridge
+exists. Test any state on web via `__flow.entNoAds(true)` / `__flow.entFull(true)`.

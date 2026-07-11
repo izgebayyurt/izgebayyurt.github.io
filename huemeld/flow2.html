@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Huemeld" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23241e2e'/%3E%3Cpath d='M6 16 H16 M26 6 V16 H16 V26' fill='none' stroke='%230e0b14' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M6 16 H16' fill='none' stroke='%23ef4a5a' stroke-width='5.5' stroke-linecap='round'/%3E%3Cpath d='M26 6 V12' fill='none' stroke='%23f6c445' stroke-width='5.5' stroke-linecap='round'/%3E%3Cpath d='M26 12 V16 H16 V25' fill='none' stroke='%23f2913d' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='6' cy='16' r='4.4' fill='%23ef4a5a' stroke='%230e0b14' stroke-width='1.8'/%3E%3Ccircle cx='26' cy='6' r='4.4' fill='%23f6c445' stroke='%230e0b14' stroke-width='1.8'/%3E%3Crect x='11.4' y='21.4' width='9.2' height='9.2' rx='2.8' fill='%23f2913d' stroke='%23fff' stroke-width='1.6'/%3E%3Cpath d='M16 23.4 L18.3 26 L16 28.6 L13.7 26 Z' fill='%23fff'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='m' x1='6' y1='0' x2='26' y2='0' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0.15' stop-color='%23ef4a5a'/%3E%3Cstop offset='0.5' stop-color='%23f2913d'/%3E%3Cstop offset='0.85' stop-color='%23f6c445'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='%23241e2e'/%3E%3Cpath d='M6 26 V13 H26 V6 M16 13 V24' fill='none' stroke='%230e0b14' stroke-width='8.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M6 26 V13' fill='none' stroke='%23ef4a5a' stroke-width='5.6' stroke-linecap='round'/%3E%3Cpath d='M26 13 V6' fill='none' stroke='%23f6c445' stroke-width='5.6' stroke-linecap='round'/%3E%3Cpath d='M6 13 H26' fill='none' stroke='url(%23m)' stroke-width='5.6' stroke-linecap='round'/%3E%3Cpath d='M16 13 V24' fill='none' stroke='%23f2913d' stroke-width='5.6' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='26' r='4.6' fill='%23ef4a5a' stroke='%230e0b14' stroke-width='1.8'/%3E%3Ccircle cx='26' cy='6' r='4.6' fill='%23f6c445' stroke='%230e0b14' stroke-width='1.8'/%3E%3Crect x='11.2' y='20.2' width='9.6' height='9.6' rx='2.9' fill='%23f2913d' stroke='%230e0b14' stroke-width='1.8'/%3E%3Cpath d='M16 22.3 L18.4 25 L16 27.7 L13.6 25 Z' fill='%23fff'/%3E%3C/svg%3E" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -188,6 +188,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
         <h2 id="pickTitle">Levels</h2>
         <button class="mk" id="btnContinue" style="background:#ffd15c;margin-top:4px">▶ Continue</button>
         <button class="mk" id="btnDaily" style="background:#c9f0c0;margin-top:4px">★ Daily Puzzle</button>
+        <div id="archArea"></div>
         <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:8px">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
         <div id="packsArea"></div>
@@ -200,7 +201,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
         <div class="setrow"><span>Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
-        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads</button>
+        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
+        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Everything · $4.99</button>
         <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
         <button class="mk" id="btnSetClose">Done</button>
       </div>
@@ -274,10 +276,15 @@ var PACKS = (FLOWDATA && FLOWDATA.packs) ? FLOWDATA.packs : [];   // side packs:
 var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLOWDATA.chapters : [{name:"Levels", n:LEVELS.length}];
 
 /* ---------- chapters & entitlements ----------
-   FREE gets every chapter, gated by progress: solving 2/3 of a chapter opens the
-   next. The paid "full game" entitlement (wired to IAP in the app build) opens
-   everything at once. */
+   THE MENU: free gets the whole 250-level campaign (gated by progress: solve 2/3
+   of a chapter to open the next), today's daily, and the first PACK_FREE levels
+   of every pack — with interstitials after a honeymoon. $2.99 (noads) silences
+   ads. $4.99 (full) = no ads + every pack + the Medley + the daily archive, and
+   as a bonus opens all chapters instantly. Store purchases flip these flags. */
 function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
+function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
+var PACK_FREE=5;   // free teaser levels per pack
+function packLevelUnlocked(k){ return entFull() || k<PACK_FREE; }
 function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
 function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
 function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
@@ -337,17 +344,18 @@ function applyTheme(){
   var mc=document.querySelector('meta[name=theme-color]'); if(mc) mc.setAttribute("content", theme==="light" ? "#f3ead6" : "#17131f");
   try{ renderPaths(); }catch(_e){}
 }
-function todayKey(){ var d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function keyOf(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function dateAgo(n){ var d=new Date(); d.setDate(d.getDate()-n); return d; }
+function todayKey(){ return keyOf(new Date()); }
 /* consecutive solved days ending today (or yesterday, if today's not done yet) */
 function dailyStreak(){
   var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
-  function k(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
   var d=new Date(), n=0;
-  if(!dd[k(d)]) d.setDate(d.getDate()-1);
-  while(dd[k(d)]){ n++; d.setDate(d.getDate()-1); }
+  if(!dd[keyOf(d)]) d.setDate(d.getDate()-1);
+  while(dd[keyOf(d)]){ n++; d.setDate(d.getDate()-1); }
   return n;
 }
-function dailyIndex(){ if(!DAILY.length) return 0; var d=new Date(); var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return ((n%DAILY.length)+DAILY.length)%DAILY.length; }
+function dailyIndexFor(d){ if(!DAILY.length) return 0; var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return ((n%DAILY.length)+DAILY.length)%DAILY.length; }
 
 /* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
 var actx=null, master=null;
@@ -456,10 +464,12 @@ function loadLevel(i){
     if(fe){ var k=0, iv=setInterval(function(){ if(li>=0) bounceDot(fe.r,fe.c); if(++k>=5) clearInterval(iv); }, 850); }
   }
 }
-function loadDaily(){
-  isTut=false; mode="daily";
-  var L = DAILY.length ? DAILY[dailyIndex()] : LEVELS[li];
-  var d=new Date(), mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+var dailyOff=0;   // 0 = today; >0 = archive, N days ago (full-game perk)
+function loadDaily(off){
+  isTut=false; mode="daily"; dailyOff=off||0;
+  var d=dateAgo(dailyOff);
+  var L = DAILY.length ? DAILY[dailyIndexFor(d)] : LEVELS[li];
+  var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
   lvNameEl.textContent = DAILY.length ? ("Daily · "+mo+" "+d.getDate()) : ("Level "+(li+1));
   document.getElementById("btnPrev").style.visibility="hidden";
   document.getElementById("btnNext").style.visibility="hidden";
@@ -468,6 +478,7 @@ function loadDaily(){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
+  if(!packLevelUnlocked(k)){ toast("🔒 The "+pk.name+" teaser ends here — get every pack with the full game!"); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
   lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
@@ -979,17 +990,21 @@ function checkWin(){
   var wn=document.getElementById("btnWinNext");
   document.querySelector("#ovWin h2").textContent="Solved! ✦";
   if(mode==="daily"){
-    var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[todayKey()]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
+    var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     var stk2=dailyStreak();
-    document.getElementById("winMsg").textContent="Daily solved"+(stk2>1 ? " — 🔥 "+stk2+"-day streak!" : " — see you tomorrow!");
+    document.getElementById("winMsg").textContent=(dailyOff?"Archive daily solved!":"Daily solved")+(stk2>1 ? " — 🔥 "+stk2+"-day streak!" : (dailyOff?"":" — see you tomorrow!"));
     wn.style.display=""; wn.textContent="Back to levels";
   } else if(mode==="pack"){
     var pk=PACKS[curPack];
     var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
     (pd[pk.id]=pd[pk.id]||{})[packIdx]=1; localStorage.setItem("hm_flow2_packdone", JSON.stringify(pd));
     var lastOne = packIdx+1>=pk.levels.length;
-    document.getElementById("winMsg").textContent = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length+(lastOne ? " — pack complete!" : "");
-    wn.style.display=""; wn.textContent = lastOne ? "Back to levels" : "Next →";
+    var teaserEnd = !lastOne && !packLevelUnlocked(packIdx+1);
+    var wm = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length;
+    if(lastOne) wm = pk.name+" — pack complete!";
+    else if(teaserEnd) wm = pk.name+" teaser done — "+(pk.levels.length-PACK_FREE)+" more levels in the full game!";
+    document.getElementById("winMsg").textContent = wm;
+    wn.style.display=""; wn.textContent = (lastOne||teaserEnd) ? "Back to levels" : "Next →";
   } else {
     var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
     var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
@@ -1394,15 +1409,28 @@ function renderPicker(){
   var cb=document.getElementById("btnContinue");
   cb.style.display = cont<0 ? "none" : "";
   if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
-  // side packs: new mechanics, tried here (purchase gating comes with the app build)
+  // daily ARCHIVE: full-game owners can replay the last 3 weeks
+  var ah="";
+  if(DAILY.length){
+    if(entFull()){
+      ah+='<div class="packhead">📅 Archive<span class="pksub">past dailies</span></div><div class="pkgrid">';
+      for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
+        ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
+      ah+='</div>';
+    } else ah='<div class="packdesc">🔒 Daily archive — included with the full game</div>';
+  }
+  document.getElementById("archArea").innerHTML=ah;
+  // side packs: 5 free teaser levels each; the rest come with the full game
   var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}"), ph="";
   PACKS.forEach(function(pk,pi){
     var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
     ph+='<div class="packhead">'+(pk.icon||"")+' '+pk.name+'<span class="pksub">'+ndp+"/"+pk.levels.length+"</span></div>";
-    if(pk.desc) ph+='<div class="packdesc">'+pk.desc+'</div>';
+    if(pk.desc) ph+='<div class="packdesc">'+pk.desc+(entFull()?"":" · first "+PACK_FREE+" free")+'</div>';
     ph+='<div class="pkgrid">';
-    for(var k=0;k<pk.levels.length;k++)
-      ph+='<button class="pkbtn'+(mode==="pack"&&curPack===pi&&packIdx===k?" cur":"")+'" data-p="'+pi+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d[k]?"✓":"")+'</span></button>';
+    for(var k=0;k<pk.levels.length;k++){
+      var open=packLevelUnlocked(k);
+      ph+='<button class="pkbtn'+(mode==="pack"&&curPack===pi&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d[k]?"✓":(open?"":"🔒"))+'</span></button>';
+    }
     ph+='</div>';
   });
   document.getElementById("packsArea").innerHTML = ph ? '<div class="packtitle">Puzzle Packs</div>'+ph : "";
@@ -1414,40 +1442,52 @@ document.getElementById("packsArea").addEventListener("click", function(e){
 document.getElementById("btnContinue").addEventListener("click", function(){ ensureAudio(); loadLevel(+this.dataset.i||0); });
 document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
-document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadDaily(); });
+document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadDaily(0); });
+document.getElementById("archArea").addEventListener("click", function(e){
+  var b=e.target.closest(".pkbtn"); if(!b || b.dataset.ago==null) return;
+  ensureAudio(); ovPick.classList.remove("show"); loadDaily(+b.dataset.ago);
+});
 document.getElementById("pkgrid").addEventListener("click", function(e){
   var b=e.target.closest(".pkbtn"); if(!b) return;
   ensureAudio(); loadLevel(+b.dataset.i);
 });
 document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li-1); else if(mode==="pack") loadPackLevel(curPack, packIdx-1); });
 document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li+1); else if(mode==="pack") loadPackLevel(curPack, packIdx+1); });
-document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadDaily(); else if(mode==="pack") loadPackLevel(curPack, packIdx); else loadLevel(li); });
+document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadDaily(dailyOff); else if(mode==="pack") loadPackLevel(curPack, packIdx); else loadLevel(li); });
 document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio();
   if(mode==="daily") loadLevel(li);
-  else if(mode==="pack"){ if(packIdx+1<PACKS[curPack].levels.length) loadPackLevel(curPack, packIdx+1); else loadLevel(li); }
+  else if(mode==="pack"){
+    if(packIdx+1<PACKS[curPack].levels.length && packLevelUnlocked(packIdx+1)) loadPackLevel(curPack, packIdx+1);
+    else loadLevel(li);
+  }
   else loadLevel(li+1); });
 
 document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(undoStack.length) restoreState(undoStack.pop()); });
 
 /* ---------- monetization seams ----------
    Real ads/IAP live in the native (Capacitor) wrapper, which injects
-   window.HuemeldNative = { interstitial(), buyRemoveAds(cb) }.
+   window.HuemeldNative = { interstitial(), buyRemoveAds(cb), buyFull(cb) }.
    On the plain web build there is no bridge, so everything degrades gracefully
    (no ads shown). See PUBLISHING.md. */
 function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNative) ? window.HuemeldNative : null; }
-function adsRemoved(){ return localStorage.getItem("hm_flow2_noads")==="1"; }
 var solveCount=+(localStorage.getItem("hm_flow2_solves")||0);
+var AD_HONEYMOON=15;   // the first session is sacred: no interstitials before this many solves
 function maybeInterstitial(){
   var n=nativeBridge();
-  if(n && n.interstitial && !adsRemoved() && solveCount%4===0){ try{ n.interstitial(); }catch(_e){} }
+  if(!n || !n.interstitial || entNoAds()) return;
+  if(solveCount<AD_HONEYMOON) return;
+  if(solveCount%4===0){ try{ n.interstitial(); }catch(_e){} }
 }
 
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
-(function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds");
-  if(n && n.buyRemoveAds && !adsRemoved()) rm.style.display="";     // only meaningful in the app
+(function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds"), fl=document.getElementById("btnFull");
+  if(n && n.buyRemoveAds && !entNoAds()) rm.style.display="";       // only meaningful in the app
+  if(n && n.buyFull && !entFull()) fl.style.display="";
   rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
-    nb.buyRemoveAds(function(ok){ if(ok){ localStorage.setItem("hm_flow2_noads","1"); rm.style.display="none"; toast("Ads removed — thank you!"); } }); });
+    nb.buyRemoveAds(function(ok){ if(ok){ localStorage.setItem("hm_flow2_ent_noads","1"); rm.style.display="none"; toast("Ads removed — thank you!"); } }); });
+  fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
+    nb.buyFull(function(ok){ if(ok){ localStorage.setItem("hm_flow2_ent_full","1"); fl.style.display="none"; rm.style.display="none"; toast("✦ Everything unlocked — thank you!"); renderPicker(); } }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
   document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
@@ -1504,6 +1544,8 @@ window.__flow={
   chapters:function(){ return CHAPTERS.map(function(C,c){ return {name:C.name, n:C.n, unlocked:chapterUnlocked(c), solved:solvedInChapter(c), need:chapterNeed(c)}; }); },
   cellColorFull:cellColorFull,
   entFull:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_full", v?"1":"0"); return entFull(); },
+  entNoAds:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_noads", v?"1":"0"); return entNoAds(); },
+  packFree:PACK_FREE,
   undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
   undoDepth:function(){ return undoStack.length; },
   data:function(){ return { campaign:LEVELS, daily:DAILY }; },
