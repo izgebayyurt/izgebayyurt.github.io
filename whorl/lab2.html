@@ -193,11 +193,14 @@ function sizeOff(){ off.width=Math.round(W*0.55); off.height=Math.round(H*0.55);
 
 // ================= state =================
 // cell: {q,r,x,y,c, oy, shake, born, forgeFx, _new}
-const cells = CELLS_QR.map(([q,r])=>({q,r,x:0,y:0,c:'R',oy:0,shake:0,born:0,forgeFx:0,_new:false}));
+const cells = CELLS_QR.map(([q,r])=>({q,r,x:0,y:0,c:'R',oy:0,shake:0,born:0,forgeFx:0,fresh:false}));
 let meters={O:0,G:0,P:0}, whorlReady=false;
 let enemies=[], spells=[], pools=[], puffs=[], dmgPops=[], shocks=[], castGoo=[], sparks=[];
 let remixFx=null, chainLabel=null;
-let cooldown=0, spawnT=0, auto=true, SAFE_REFILL=false;
+let cooldown=0, spawnT=0, auto=true;
+let resolver=null;          // paced resolution state machine (null = board settled)
+let lastResolve=null;       // {depth,forged,surged} of the most recent finished resolution
+let refillViolations=0;     // debug: matches that contained a freshly-refilled ball (must stay 0)
 let selIdx=-1;                       // tap-select
 let stats={ matches:0, doubles:0, forged:0, secPopped:0, whorls:0, maxChain:0, casts:0, kills:0, leaks:0, swaps:0, remixes:0 };
 
@@ -237,13 +240,13 @@ function hasMatchingMove(){
 
 // ================= board generation =================
 function genNoMatch(){
-  for(const cell of cells){ cell.c=randPrim(); cell.oy=0; cell.shake=0; cell.forgeFx=0; }
+  for(const cell of cells){ cell.c=randPrim(); cell.oy=0; cell.shake=0; cell.forgeFx=0; cell.fresh=false; }
   let guard=0;
   while(guard++<400 && hasInstantMatch()){
     for(const m of findMatches()) for(const ci of m.cells) cells[ci].c=randPrim();
   }
 }
-function rerollBoard(){ genNoMatch(); ensurePlayable(true); }
+function rerollBoard(){ resolver=null; lastResolve=null; genNoMatch(); ensurePlayable(true); }
 
 // ================= remix (deadlock rescue) =================
 // rearrange the SAME multiset into a no-match arrangement that has a matching move
@@ -292,15 +295,15 @@ function swapCore(a,b){
   const ca=cells[a].c, cb=cells[b].c;
   if(ca==null||cb==null) return {type:'blocked', reason:'empty'};
   if(ca===cb) return {type:'blocked', reason:'same-colour'};   // no-op, costs nothing
+  if(resolver){ refuse(a,b); return {type:'blocked', reason:'resolving'}; }  // board is busy cascading
   cells[a].c=cb; cells[b].c=ca;
   const trig=findMatches().filter(m=>m.cells.includes(a)||m.cells.includes(b));
   if(trig.length>0){
     animSwap(a,b);
-    const res=resolveBoard({a,b});
+    const info=startResolve({a,b});
     stats.swaps++;
     vibrate(24);
-    ensurePlayable();
-    return {type:'match', matches:res.firstMatches, forged:res.forged, surged:res.surged, chain:res.depth};
+    return {type:'match', matches:info.firstMatches, forged:info.forgedPlanned, surged:info.surged};
   }
   // no match
   if(cooldown>0){ cells[a].c=ca; cells[b].c=cb; refuse(a,b); vibrate([10,24,10]); return {type:'blocked', reason:'cooldown'}; }
@@ -314,65 +317,124 @@ function animSwap(a,b){ cells[a].shake=Math.max(cells[a].shake,0.35); cells[b].s
   cells[a].born=performance.now(); cells[b].born=performance.now(); }
 function refuse(a,b){ cells[a].shake=0.5; cells[b].shake=0.5; }
 
-// ================= resolution & casting =================
-function resolveBoard(swapInfo){
-  let depth=0, forgedTotal=0, surged=false, firstMatches=null;
-  let guard=0;
-  while(guard++<40){
-    const matches=findMatches();
-    if(!matches.length) break;
-    depth++;
-    if(depth===1) firstMatches=matches;
-    const mult=Math.pow(1.15, depth-1);
-    const clearSet=new Set();
-    for(const m of matches){
-      castProjectile(m, ladder(m.colour,m.len)*mult, mult);
-      stats.matches++; stats.casts++;
-      for(const ci of m.cells) clearSet.add(ci);
-    }
-    // forge / surge — only the swap round
-    let forgeThis=null;
-    if(depth===1 && swapInfo){
-      const trig=matches.filter(m=>m.cells.includes(swapInfo.a)||m.cells.includes(swapInfo.b));
-      const tcol=[...new Set(trig.map(m=>m.colour))];
-      if(tcol.length>=2){
-        stats.doubles++;
-        const prim=new Set(); for(const c of tcol) for(const p of DECOMP[c]) prim.add(p);
-        if(prim.has('R')&&prim.has('Y')&&prim.has('B')){ surgeMeters(); surged=true; }
-        else { const ps=tcol.filter(c=>PRIMS.includes(c)); if(ps.length>=2) forgeThis={colour:MIX[ps[0]+ps[1]], count:FORGE_COUNT}; }
-      }
-    }
-    // pop meters + clear
-    for(const ci of clearSet){ const c=cells[ci].c; if(c==null) continue;
-      if(isSec(c)){ addMeter(c); stats.secPopped++; } spawnClearPuffs(cells[ci].x,cells[ci].y,c); cells[ci].c=null; }
-    applyGravity(forgeThis, swapInfo);
-    if(forgeThis){ forgedTotal+=forgeThis.count; stats.forged+=forgeThis.count; }
-    if(depth>1) chainLabel={n:depth,life:1.1};
+// ================= resolution & casting (PACED, step-driven) =================
+// Timeline per chain step: squish/cast (0.25s) -> gravity fall (0.2-0.3s by distance)
+// -> settle beat (0.15s) -> evaluate next matches. Chain steps are sequential and
+// legible; everything advances through update(dt) so LAB.step() drives it fully.
+const SQUISH_DUR=0.25, FALL_MIN=0.20, FALL_MAX=0.30, BEAT_DUR=0.15;
+
+// lines through each cell, for refill instant-match checks
+const CELL_LINES=(()=>{ const m=Array.from({length:N},()=>[]);
+  for(const l of ALL_LINES) for(const ci of l) m[ci].push(l); return m; })();
+function runThrough(line,ci){ const pos=line.indexOf(ci); if(pos<0) return 0;
+  const c=cells[ci].c; if(c==null) return 0; let n=1;
+  for(let k=pos-1;k>=0&&cells[line[k]].c===c;k--)n++;
+  for(let k=pos+1;k<line.length&&cells[line[k]].c===c;k++)n++;
+  return n; }
+function createsMatchAt(ci){ for(const line of CELL_LINES[ci]){ if(runThrough(line,ci)>=3) return true; } return false; }
+// REFILL BIAS: pick uniformly among primaries that do NOT complete a 3+ line at the
+// landing position (evaluated against the settled board). If every colour would match
+// (rare), allow a random one. Cascades therefore only come from EXISTING balls falling
+// into new alignments, never from fresh spawns.
+function pickRefillColour(ci){
+  const ok=[];
+  for(const c of PRIMS){ cells[ci].c=c; if(!createsMatchAt(ci)) ok.push(c); }
+  if(ok.length){ cells[ci].c=ok[(Math.random()*ok.length)|0]; return {c:cells[ci].c, biased:true}; }
+  cells[ci].c=randPrim(); return {c:cells[ci].c, biased:false};
+}
+
+// clear one round of matches: cast, pop meters, decide forge/surge (swap round only)
+function clearRound(matches, depth, swapInfo){
+  const mult=Math.pow(1.15, depth-1);
+  const clearSet=new Set();
+  for(const m of matches){
+    castProjectile(m, ladder(m.colour,m.len)*mult, mult);
+    stats.matches++; stats.casts++;
+    for(const ci of m.cells) clearSet.add(ci);
   }
+  let forgeThis=null, surged=false;
+  if(depth===1 && swapInfo){
+    const trig=matches.filter(m=>m.cells.includes(swapInfo.a)||m.cells.includes(swapInfo.b));
+    const tcol=[...new Set(trig.map(m=>m.colour))];
+    if(tcol.length>=2){
+      stats.doubles++;
+      const prim=new Set(); for(const c of tcol) for(const p of DECOMP[c]) prim.add(p);
+      if(prim.has('R')&&prim.has('Y')&&prim.has('B')){ surgeMeters(); surged=true; }
+      else { const ps=tcol.filter(c=>PRIMS.includes(c)); if(ps.length>=2) forgeThis={colour:MIX[ps[0]+ps[1]], count:FORGE_COUNT}; }
+    }
+  }
+  for(const ci of clearSet){ const c=cells[ci].c; if(c==null) continue;
+    if(isSec(c)){ addMeter(c); stats.secPopped++; } spawnClearPuffs(cells[ci].x,cells[ci].y,c); cells[ci].c=null; }
+  if(depth>1) chainLabel={n:depth,life:1.1};
   stats.maxChain=Math.max(stats.maxChain, depth);
-  return {depth, forged:forgedTotal, surged, firstMatches:firstMatches||[]};
+  return {forgeThis, surged};
+}
+// begin a paced resolution: round 1 (the swap's own matches) clears immediately so
+// swap feedback is instant; gravity/refill/cascades follow the paced timeline.
+function startResolve(swapInfo){
+  const matches=findMatches();
+  lastResolve=null;
+  const r=clearRound(matches,1,swapInfo);
+  resolver={ phase:'squish', t:SQUISH_DUR, depth:1, swapInfo,
+             pendingForge:r.forgeThis, surged:r.surged, forgedTotal:0 };
+  return { firstMatches:matches.map(m=>({cells:m.cells.slice(),colour:m.colour,len:m.len})),
+           forgedPlanned:r.forgeThis?r.forgeThis.count:0, surged:r.surged };
+}
+function stepResolver(dt){
+  if(!resolver) return;
+  resolver.t-=dt;
+  if(resolver.t>0) return;
+  if(resolver.phase==='squish'){
+    const g=applyGravity(resolver.pendingForge, resolver.depth===1?resolver.swapInfo:null);
+    resolver.forgedTotal+=g.forgedPlaced;
+    resolver.pendingForge=null;
+    resolver.phase='fall';
+    resolver.t=Math.min(FALL_MAX, FALL_MIN + 0.025*g.maxDrop);
+  } else if(resolver.phase==='fall'){
+    for(const c of cells) c.oy=0;                    // snap settled
+    resolver.phase='beat'; resolver.t=BEAT_DUR;
+  } else { // beat over -> evaluate the next chain step
+    const matches=findMatches();
+    // instrumentation: with the refill bias, no match may contain a just-refilled ball
+    for(const m of matches){ if(m.cells.some(ci=>cells[ci].fresh)) refillViolations++; }
+    for(const c of cells) c.fresh=false;             // refills survive one evaluation -> "existing"
+    if(matches.length){
+      resolver.depth++;
+      clearRound(matches, resolver.depth, null);
+      resolver.phase='squish'; resolver.t=SQUISH_DUR;
+    } else {
+      lastResolve={depth:resolver.depth, forged:resolver.forgedTotal, surged:resolver.surged};
+      resolver=null;
+      ensurePlayable();
+    }
+  }
 }
 function applyGravity(forge, swapInfo){
-  const newSlots=[];
+  const newSlots=[]; let maxDrop=1;
   for(const col of COLUMNS){
     const survivors=[];
-    for(let k=0;k<col.length;k++){ const ci=col[k]; if(cells[ci].c!=null) survivors.push({c:cells[ci].c,fromK:k}); }
+    for(let k=0;k<col.length;k++){ const ci=col[k]; if(cells[ci].c!=null) survivors.push({c:cells[ci].c, fresh:cells[ci].fresh, fromK:k}); }
     const nEmpty=col.length-survivors.length;
     for(let k=0;k<col.length;k++){ const ci=col[k];
-      if(k<nEmpty){ cells[ci].c=null; cells[ci]._new=true; cells[ci].oy=-((nEmpty-k)*ROW_DY+ROW_DY+18); newSlots.push(ci); }
-      else { const s=survivors[k-nEmpty]; cells[ci].c=s.c; cells[ci].oy=(s.fromK-k)*ROW_DY; }
+      if(k<nEmpty){ cells[ci].c=null; cells[ci].fresh=false; cells[ci].oy=-((nEmpty-k)*ROW_DY+ROW_DY+18); newSlots.push(ci); maxDrop=Math.max(maxDrop,nEmpty); }
+      else { const s=survivors[k-nEmpty]; cells[ci].c=s.c; cells[ci].fresh=s.fresh; cells[ci].oy=(s.fromK-k)*ROW_DY; maxDrop=Math.max(maxDrop,k-s.fromK); }
     }
   }
+  let forgedPlaced=0;
   if(forge && forge.count>0 && swapInfo){
+    // forged secondaries drop as-is near the swap site (exempt from the refill bias)
     const sx=(cells[swapInfo.a].x+cells[swapInfo.b].x)/2, sy=(cells[swapInfo.a].y+cells[swapInfo.b].y)/2;
     newSlots.sort((i,j)=>((cells[i].x-sx)**2+(cells[i].y-sy)**2)-((cells[j].x-sx)**2+(cells[j].y-sy)**2));
-    for(let k=0;k<forge.count && k<newSlots.length;k++){ cells[newSlots[k]].c=forge.colour; cells[newSlots[k]].forgeFx=performance.now(); }
+    for(let k=0;k<forge.count && k<newSlots.length;k++){
+      cells[newSlots[k]].c=forge.colour; cells[newSlots[k]].fresh=false;
+      cells[newSlots[k]].forgeFx=performance.now(); forgedPlaced++; }
+    stats.forged+=forgedPlaced;
   }
-  for(const ci of newSlots){ if(cells[ci].c==null) cells[ci].c=randPrim(); cells[ci]._new=false; cells[ci].born=performance.now(); }
-  // debug: guarantee no cascade from the refill (reroll only NEW cells until stable)
-  if(SAFE_REFILL){ const nset=new Set(newSlots); let g=0;
-    while(g++<300){ const bad=findMatches().flatMap(m=>m.cells).filter(ci=>nset.has(ci));
-      if(!bad.length) break; for(const ci of bad) cells[ci].c=randPrim(); } }
+  for(const ci of newSlots){
+    if(cells[ci].c==null){ const pick=pickRefillColour(ci); cells[ci].fresh=pick.biased; }
+    cells[ci].born=performance.now();
+  }
+  return {maxDrop, forgedPlaced};
 }
 function centroidCells(arr){ let sx=0,sy=0; for(const i of arr){ sx+=cells[i].x; sy+=cells[i].y; }
   const n=Math.max(1,arr.length); return {x:sx/n,y:sy/n}; }
@@ -432,6 +494,7 @@ function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now; if(au
 function update(dt){
   const now=performance.now();
   cooldown=Math.max(0,cooldown-dt);
+  stepResolver(dt);                                  // paced cascade resolution
   // cells settle
   for(const cell of cells){ cell.oy+=(0-cell.oy)*Math.min(1,dt*13); if(Math.abs(cell.oy)<0.3) cell.oy=0;
     cell.shake=Math.max(0,cell.shake-dt*2.4); }
@@ -734,9 +797,12 @@ window.LAB = {
   get cooldown(){ return cooldown; },
   get cooldownDur(){ return CD_DUR; },
   get counts(){ return {enemies:enemies.length, spells:spells.length, pools:pools.length, castGoo:castGoo.length}; },
+  get resolving(){ return !!resolver; },
+  get lastResolve(){ return lastResolve?Object.assign({},lastResolve):null; },
+  get refillViolations(){ return refillViolations; },
   neighbors(i){ return NEIGH[i]?NEIGH[i].slice():[]; },
   colours(){ return cells.map(c=>c.c); },
-  setBall(idx,colour){ if(cells[idx]){ cells[idx].c=colour; cells[idx].oy=0; cells[idx]._new=false; } },
+  setBall(idx,colour){ if(cells[idx]){ cells[idx].c=colour; cells[idx].oy=0; cells[idx].fresh=false; } },
   swap(a,b){ return swapCore(a,b); },
   findMatches(){ return findMatches().map(m=>({cells:m.cells.slice(), colour:m.colour, len:m.len})); },
   hasMatchingMove(){ return hasMatchingMove(); },
@@ -753,8 +819,9 @@ window.LAB = {
   setForge(n){ FORGE_COUNT=Math.max(1,Math.min(3,n|0)); uiForge.s.value=FORGE_COUNT; uiForge.v.textContent=String(FORGE_COUNT); lsSet('whlab2_forge',FORGE_COUNT); },
   setPops(n){ POPS=Math.max(3,Math.min(8,n|0)); uiPops.s.value=POPS; uiPops.v.textContent=String(POPS); lsSet('whlab2_pops',POPS); },
   pause(){ auto=false; }, resume(){ auto=true; }, get auto(){ return auto; },
-  setSafeRefill(v){ SAFE_REFILL=!!v; },
+  setSafeRefill(){ /* compat no-op: refill bias now always prevents instant matches */ },
   step(ms){ let t=ms||16; while(t>0){ update(Math.min(16,t)/1000); t-=16; } },
+  settle(maxMs){ let t=maxMs||10000; while(resolver && t>0){ update(0.016); t-=16; } return !resolver; },
   sigil(){ return {x:sigilX,y:sigilY,r:sigilR}; }
 };
 
