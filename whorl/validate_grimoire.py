@@ -11,6 +11,7 @@ form is caught, not silently encoded.
 Run:  python3 validate_grimoire.py            # prints validation report
       python3 validate_grimoire.py --emit     # prints the markdown spell table
 """
+import re
 import sys
 from collections import Counter
 
@@ -58,18 +59,18 @@ def render_code(school, form, tier, arr):
 # =============================================================================
 SPELLS = [
   # ---------------- FIRE (pure R) : Burning dot -----------------------------
-  ("Firebolt","Fire","Bolt",2,None,"Common","Light fire dart; applies Burning.",["dot","burst"]),
+  ("Firebolt","Fire","Bolt",2,None,"Common","Medium fire dart; quick plain damage.",["burst","economy"]),
   ("Flame Wall","Fire","Wall",2,None,"Common","Short burning barrier; passers catch Burning.",["control","dot"]),
   ("Ember Pool","Fire","Pool",2,None,"Common","Small fire patch; Burning while stood in it.",["surface","dot"]),
   ("Fire Mine","Fire","Mine",2,None,"Common","Coal that bursts Fire when an enemy nears.",["control","burst"]),
-  ("Scorch Bolt","Fire","Bolt",3,None,"Common","Medium bolt; heavier Burning.",["dot","burst"]),
+  ("Scorch Bolt","Fire","Bolt",3,None,"Common","Heavy fire bolt; plain damage, fast recovery.",["burst","economy"]),
   ("Blaze Wall","Fire","Wall",3,None,"Uncommon","Tall wall of flame; long Burning on contact.",["control","dot"]),
   ("Coal Field","Fire","Pool",3,None,"Uncommon","Wide fire surface; stacking Burning.",["surface","dot"]),
   ("Ember Trap","Fire","Mine",3,None,"Common","Bigger mine; knockback fire burst.",["control","burst"]),
   ("Flame Jet","Fire","Beam",3,None,"Uncommon","Channelled cone of fire; Burns all in front.",["dot","burst"]),
   ("Ember Brand","Fire","Glyph",3,None,"Uncommon","Enchant: your next cast becomes Fire-typed + Burning.",["enchant","dot"]),
   ("Ember Sprites","Fire","Swarm",3,None,"Uncommon","Summons drifting embers that seek enemies and Burn.",["summon","dot"]),
-  ("Pyre Bolt","Fire","Bolt",4,None,"Uncommon","Heavy fire bolt; big Burning; small splash.",["dot","burst"]),
+  ("Pyre Bolt","Fire","Bolt",4,None,"Uncommon","Massive fire bolt; small splash.",["burst","economy"]),
   ("Wall of Flame","Fire","Wall",4,None,"Rare","Long high wall; strong Burning; hard block.",["control","dot"]),
   ("Lava Pool","Fire","Pool",4,None,"Rare","Molten surface; heavy Burning and slow (molten).",["surface","dot","control"]),
   ("Pyre Mine","Fire","Mine",4,None,"Uncommon","Large blast mine; area Burning on trigger.",["burst","control"]),
@@ -79,18 +80,18 @@ SPELLS = [
   ("Meteor","Fire","Bolt",5,None,"Legendary","Falling star: Massive impact burst + crater fire-pool; Shatters Frozen enemies.",["burst","dot","surface"]),
 
   # ---------------- SPARK (pure Y) : Shocked (stagger + amplify) -------------
-  ("Jolt","Spark","Bolt",2,None,"Common","Light shock dart; brief stagger.",["control","burst"]),
+  ("Jolt","Spark","Bolt",2,None,"Common","Medium spark dart; quick plain damage.",["burst","economy"]),
   ("Arc Fence","Spark","Wall",2,None,"Common","Crackling fence; staggers passers.",["control","surface"]),
   ("Static Field","Spark","Pool",2,None,"Common","Charged floor; periodic small shocks.",["surface","control"]),
   ("Shock Trap","Spark","Mine",2,None,"Common","Trap that Shocks its triggerer.",["control","burst"]),
-  ("Thunderbolt","Spark","Bolt",3,None,"Uncommon","Medium bolt; Shock amplifies your next hit.",["control","burst"]),
+  ("Thunderbolt","Spark","Bolt",3,None,"Uncommon","Heavy spark bolt; Conducts on Chilled (arcs between them).",["chain","burst"]),
   ("Arc Wall","Spark","Wall",3,None,"Uncommon","Longer arc fence; heavier stagger.",["control","surface"]),
   ("Storm Pool","Spark","Pool",3,None,"Uncommon","Wide static field; repeated shocks.",["surface","control"]),
   ("Tesla Trap","Spark","Mine",3,None,"Common","Shock trap; arc chains to 2 nearby.",["control","chain"]),
   ("Lightning","Spark","Beam",3,None,"Uncommon","Beam of lightning; Conducts (arcs) between Chilled.",["chain","control"]),
   ("Charge Brand","Spark","Glyph",3,None,"Uncommon","Enchant: next cast becomes Spark-typed + chains once.",["enchant","chain"]),
   ("Spark Motes","Spark","Swarm",3,None,"Uncommon","Buzzing motes that zap enemies and chain.",["summon","chain"]),
-  ("Levinbolt","Spark","Bolt",4,None,"Uncommon","Heavy shock; long stagger.",["control","burst"]),
+  ("Levinbolt","Spark","Bolt",4,None,"Uncommon","Massive spark bolt; forks to a second target.",["burst","chain"]),
   ("Storm Wall","Spark","Wall",4,None,"Rare","Big arc wall; chains to nearby enemies.",["control","chain"]),
   ("Tempest Pool","Spark","Pool",4,None,"Rare","Wide storm field; repeated chaining shocks.",["surface","chain","control"]),
   ("Chain Mine","Spark","Mine",4,None,"Uncommon","Trap whose shock chains through the whole cluster.",["chain","burst"]),
@@ -100,17 +101,17 @@ SPELLS = [
   ("Chain Lightning","Spark","Beam",5,None,"Legendary","A bolt that arcs between EVERY enemy; doubles on Chilled/Frozen.",["chain","burst","control"]),
 
   # ---------------- FROST (pure B) : Chilled -> Frozen ----------------------
-  ("Frostbolt","Frost","Bolt",2,None,"Common","Light frost dart; applies Chilled.",["control","burst"]),
+  ("Frostbolt","Frost","Bolt",2,None,"Common","Medium frost dart; Deepens an existing Chill (Chilled to Frozen).",["control","burst"]),
   ("Frost Wall","Frost","Wall",2,None,"Common","Short ice wall; blocks and Chills passers.",["control","surface"]),
   ("Ice Patch","Frost","Pool",2,None,"Common","Slick chilled floor; slows.",["surface","control"]),
   ("Rime Trap","Frost","Mine",2,None,"Common","Trap that Freezes its triggerer.",["control","burst"]),
-  ("Rime Bolt","Frost","Bolt",3,None,"Uncommon","Medium bolt; heavy Chill nearing Freeze.",["control","burst"]),
+  ("Rime Bolt","Frost","Bolt",3,None,"Uncommon","Heavy frost bolt; Deepens Chill; bonus vs Frozen.",["control","burst"]),
   ("Ice Wall","Frost","Wall",3,None,"Uncommon","Taller ice wall; high-HP block.",["control","surface"]),
   ("Glacier Pool","Frost","Pool",3,None,"Uncommon","Ice sheet; Frost-typed hits freeze it slick.",["surface","control"]),
   ("Freeze Trap","Frost","Mine",3,None,"Common","Freezes a small cluster on trigger.",["control","burst"]),
   ("Cold Ray","Frost","Beam",3,None,"Uncommon","Cone of cold; Chills all in front.",["control","burst"]),
   ("Rime Brand","Frost","Glyph",3,None,"Uncommon","Enchant: next cast becomes Frost-typed + Chill.",["enchant","control"]),
-  ("Icicle","Frost","Bolt",4,None,"Uncommon","Heavy shard; big Chill; bonus vs Frozen.",["control","burst"]),
+  ("Icicle","Frost","Bolt",4,None,"Uncommon","Massive frost shard; heavy bonus vs Frozen.",["burst","control"]),
   ("Ice Rampart","Frost","Wall",4,None,"Rare","Massive wall; very long block.",["control","surface"]),
   ("Deep Freeze","Frost","Pool",4,None,"Rare","Wide freezing field; standing turns enemies Frozen.",["surface","control"]),
   ("Blizzard Trap","Frost","Mine",4,None,"Uncommon","Freezes a large cluster on trigger.",["control","burst"]),
@@ -121,41 +122,41 @@ SPELLS = [
   ("Absolute Zero","Frost","Pool",5,None,"Legendary","The whole field freezes solid; all enemies Frozen; primes a mass Shatter.",["surface","control","burst"]),
 
   # ---------------- BLAST (R+Y) : Fire-typed + stagger ----------------------
-  ("Flash Bolt","Blast","Bolt",2,"RY","Common","Fire-lead blast dart: fire hit + stagger.",["burst","control"]),
-  ("Spark Blast","Blast","Bolt",2,"YR","Common","Spark-lead blast dart: stagger then fire.",["control","burst"]),
-  ("Flash Wall","Blast","Wall",2,"RY","Common","Burning-shock fence; staggers + Burns passers.",["control","dot"]),
-  ("Plasma Pool","Blast","Pool",2,"RY","Uncommon","Fizzing fire-shock floor; Burning + stagger.",["surface","control"]),
-  ("Flashbang Mine","Blast","Mine",2,"RY","Common","Pops for fire burst + wide stagger (blinds).",["burst","control"]),
-  ("Plasma Bolt","Blast","Bolt",3,"RRY","Uncommon","Fire-primary blast; Burning + stagger.",["burst","dot"]),
-  ("Flashbolt","Blast","Bolt",3,"YYR","Uncommon","Spark-primary blast; strong stagger + fire.",["control","burst"]),
-  ("Plasma Wall","Blast","Wall",3,"RRY","Uncommon","Burning-shock wall; passers Burn + stagger.",["control","dot"]),
-  ("Plasma Field","Blast","Pool",3,"RRY","Rare","Large fire-shock surface; Burning + repeated stagger.",["surface","dot","control"]),
-  ("Concussion Mine","Blast","Mine",3,"RYY","Uncommon","Fire burst + wide cluster stagger.",["burst","control"]),
-  ("Plasma Beam","Blast","Beam",3,"RYR","Rare","Searing shock beam; Burning + stagger; ignites pools.",["dot","control"]),
-  ("Blast Brand","Blast","Glyph",3,"YRY","Uncommon","Enchant: next cast fire-typed and staggers.",["enchant","control"]),
-  ("Detonation Bolt","Blast","Bolt",4,"RRRY","Rare","Heavy fire blast + stagger; small splash.",["burst","dot"]),
-  ("Plasma Barrier","Blast","Wall",4,"RRRY","Rare","Long burning-shock wall.",["control","dot"]),
-  ("Firestorm Field","Blast","Pool",4,"RRRY","Rare","Molten shock sea; heavy Burning + stagger.",["surface","dot","control"]),
-  ("Cluster Bomb","Blast","Mine",4,"RYYY","Rare","Multi-stagger fire cluster burst.",["burst","control"]),
-  ("Plasma Ward","Blast","Ward",4,"RYYR","Rare","Self: attackers Burned + staggered.",["ward","control","dot"]),
-  ("Plasma Ray","Blast","Beam",4,"RYRY","Rare","Sustained plasma beam; Burning + stagger.",["dot","control"]),
-  ("Supernova","Blast","Bolt",5,"RRRRY","Legendary","A detonation flashing the whole field: Massive fire burst; all staggered; Ignites all poison.",["burst","dot","control"]),
-  ("Sunlance","Blast","Beam",5,"RYRYR","Legendary","A continuous plasma beam carving the lane; Ignites and staggers everything.",["dot","control","burst"]),
+  ("Flash Bolt","Blast","Bolt",2,"RY","Common","Medium blast dart; shoves the target back.",["burst","control"]),
+  ("Spark Blast","Blast","Bolt",2,"YR","Common","Medium blast dart; lighter hit, longer shove.",["control","burst"]),
+  ("Flash Wall","Blast","Wall",2,"RY","Common","Burning fence; passers Burned + shoved back.",["control","dot"]),
+  ("Plasma Pool","Blast","Pool",2,"RY","Uncommon","Fizzing plasma floor; Burning + pushes enemies back.",["surface","control"]),
+  ("Flashbang Mine","Blast","Mine",2,"RY","Common","Pops for fire burst + wide knockback (blinds).",["burst","control"]),
+  ("Plasma Bolt","Blast","Bolt",3,"RRY","Uncommon","Heavy blast bolt; hard knockback.",["burst","control"]),
+  ("Flashbolt","Blast","Bolt",3,"YYR","Uncommon","Heavy blast bolt; extra-far knockback.",["control","burst"]),
+  ("Plasma Wall","Blast","Wall",3,"RRY","Uncommon","Plasma wall; passers Burned + shoved back.",["control","dot"]),
+  ("Plasma Field","Blast","Pool",3,"RRY","Rare","Large plasma surface; Burning + repeated pushback.",["surface","dot","control"]),
+  ("Concussion Mine","Blast","Mine",3,"RYY","Uncommon","Fire burst + wide cluster knockback.",["burst","control"]),
+  ("Plasma Beam","Blast","Beam",3,"RYR","Rare","Searing plasma beam; Burning + steady pushback; ignites pools.",["dot","control"]),
+  ("Blast Brand","Blast","Glyph",3,"YRY","Uncommon","Enchant: next cast fire-typed and shoves.",["enchant","control"]),
+  ("Detonation Bolt","Blast","Bolt",4,"RRRY","Rare","Massive blast bolt; splash + area knockback.",["burst","control"]),
+  ("Plasma Barrier","Blast","Wall",4,"RRRY","Rare","Long burning plasma wall; shoves passers back.",["control","dot"]),
+  ("Firestorm Field","Blast","Pool",4,"RRRY","Rare","Molten plasma sea; heavy Burning + pushback.",["surface","dot","control"]),
+  ("Cluster Bomb","Blast","Mine",4,"RYYY","Rare","Fire cluster burst; scatters the cluster (knockback).",["burst","control"]),
+  ("Plasma Ward","Blast","Ward",4,"RYYR","Rare","Self: attackers Burned + knocked away.",["ward","control","dot"]),
+  ("Plasma Ray","Blast","Beam",4,"RYRY","Rare","Sustained plasma beam; Burning + pushback.",["dot","control"]),
+  ("Supernova","Blast","Bolt",5,"RRRRY","Legendary","A detonation flashing the whole field: Massive fire burst; shoves everything back; Ignites all poison.",["burst","dot","control"]),
+  ("Sunlance","Blast","Beam",5,"RYRYR","Legendary","A continuous plasma beam carving the lane; Ignites and shoves everything back.",["dot","control","burst"]),
 
   # ---------------- VENOM (Y+B) : Poisoned (green stacking dot) + slow -------
-  ("Venom Dart","Venom","Bolt",2,"YB","Common","Light poison dart; applies Poisoned.",["dot","burst"]),
-  ("Toxin Dart","Venom","Bolt",2,"BY","Common","Frost-lead dart: Poisoned + slow.",["dot","control"]),
+  ("Venom Dart","Venom","Bolt",2,"YB","Common","Medium dart; corrodes: bonus damage to armoured.",["burst","economy"]),
+  ("Toxin Dart","Venom","Bolt",2,"BY","Common","Medium frost-lead dart; corrodes; bonus vs Chilled.",["burst","control"]),
   ("Venom Wall","Venom","Wall",2,"YB","Common","Dripping wall; poisons passers.",["control","dot"]),
   ("Poison Pool","Venom","Pool",2,"YB","Common","Toxic puddle; stacking Poisoned.",["surface","dot"]),
   ("Spore Mine","Venom","Mine",2,"YB","Common","Bursts a poison cloud on trigger.",["control","dot"]),
-  ("Blight Bolt","Venom","Bolt",3,"YYB","Uncommon","Medium poison; heavy stacks.",["dot","burst"]),
-  ("Corrosion Bolt","Venom","Bolt",3,"BBY","Uncommon","Frost-lead poison; slow + armour melt.",["dot","control"]),
+  ("Blight Bolt","Venom","Bolt",3,"YYB","Uncommon","Heavy venom bolt; hard corrode.",["burst","economy"]),
+  ("Corrosion Bolt","Venom","Bolt",3,"BBY","Uncommon","Heavy frost-lead bolt; strips armour outright (deep corrode).",["burst","control"]),
   ("Miasma Wall","Venom","Wall",3,"YYB","Uncommon","Long toxic wall; poisons passers.",["control","dot"]),
   ("Miasma Pool","Venom","Pool",3,"YBB","Uncommon","Big poison field + slow.",["surface","dot","control"]),
   ("Spore Trap","Venom","Mine",3,"YBB","Common","Poison cloud over a cluster on trigger.",["control","dot"]),
   ("Venom Spray","Venom","Beam",3,"YBY","Uncommon","Cone of toxin; poisons all in front.",["dot","control"]),
   ("Venom Brand","Venom","Glyph",3,"BYB","Uncommon","Enchant: next cast also applies Poisoned.",["enchant","dot"]),
-  ("Plague Bolt","Venom","Bolt",4,"YYYB","Rare","Heavy poison; spreads to a neighbour on kill.",["dot","chain"]),
+  ("Plague Bolt","Venom","Bolt",4,"YYYB","Rare","Massive venom bolt; on kill, leaps to a neighbour.",["chain","burst"]),
   ("Plague Wall","Venom","Wall",4,"YYYB","Rare","Long dripping wall; deep Poisoned.",["control","dot"]),
   ("Quagmire","Venom","Pool",4,"YYBB","Rare","Deep toxic mire; heavy stacks + strong slow.",["surface","dot","control"]),
   ("Contagion Mine","Venom","Mine",4,"YBBB","Rare","Poison cloud that spreads enemy-to-enemy.",["chain","dot"]),
@@ -165,18 +166,18 @@ SPELLS = [
   ("Plague Swarm","Venom","Swarm",5,"YYBBB","Legendary","Summons a cloud of toxic wasps that chase and Poison.",["summon","dot","chain"]),
 
   # ---------------- LANCE (R+B) : arcane pierce, no reactions ----------------
-  ("Force Lance","Lance","Bolt",2,"RB","Common","Piercing dart; hits everything in a line.",["pierce","burst"]),
-  ("Piercing Bolt","Lance","Bolt",2,"BR","Common","Arcane dart; pierces two enemies.",["pierce","burst"]),
+  ("Force Lance","Lance","Bolt",2,"RB","Common","Medium piercing dart; hits everything in a line.",["pierce","burst"]),
+  ("Piercing Bolt","Lance","Bolt",2,"BR","Common","Medium arcane dart; pierces two enemies.",["pierce","burst"]),
   ("Force Wall","Lance","Wall",2,"RB","Common","Barrier of force; your shots pass through gaining pierce.",["control","pierce"]),
   ("Gravity Well","Lance","Pool",2,"RB","Uncommon","Zone that drags and holds enemies (no element).",["surface","control"]),
   ("Force Mine","Lance","Mine",2,"RB","Common","Arcane trap; knockback pierce burst.",["control","pierce"]),
-  ("Arcane Lance","Lance","Bolt",3,"RBR","Uncommon","Medium pierce; skewers a full line.",["pierce","burst"]),
+  ("Arcane Lance","Lance","Bolt",3,"RBR","Uncommon","Heavy pierce; skewers a full line.",["pierce","burst"]),
   ("Force Barrier","Lance","Wall",3,"RRB","Uncommon","Strong force wall; long block.",["control","pierce"]),
   ("Singularity","Lance","Pool",3,"RBB","Rare","Gravity zone; clumps enemies to set up AoE.",["surface","control"]),
   ("Force Trap","Lance","Mine",3,"RBB","Common","Pierce burst that skewers a cluster.",["pierce","burst"]),
   ("Arcane Beam","Lance","Beam",3,"RBR","Uncommon","Lance-beam that pierces everything in the lane.",["pierce","burst"]),
   ("Force Brand","Lance","Glyph",3,"BRB","Uncommon","Enchant: next cast pierces and ignores walls.",["enchant","pierce"]),
-  ("Greater Lance","Lance","Bolt",4,"RRRB","Rare","Heavy pierce; full-lane skewer.",["pierce","burst"]),
+  ("Greater Lance","Lance","Bolt",4,"RRRB","Rare","Massive pierce; full-lane skewer.",["pierce","burst"]),
   ("Force Rampart","Lance","Wall",4,"RRRB","Rare","Huge force wall; reflects enemy projectiles.",["control","pierce"]),
   ("Event Horizon","Lance","Pool",4,"RRBB","Rare","Strong gravity well; immobilises a cluster.",["surface","control"]),
   ("Impaler Mine","Lance","Mine",4,"RBBB","Rare","Erupting spikes skewer a cluster.",["pierce","burst"]),
@@ -220,6 +221,12 @@ def validate(rows):
             errs.append(f"{r['name']}: tags {r['tags']} outside vocabulary")
         if not (2 <= len(r["tags"]) <= 3):
             errs.append(f"{r['name']}: tag count {len(r['tags'])} not in 2..3")
+        # 7. TAPS STRIKE, HOLDS INFUSE: Bolt effects never apply a status;
+        #    Blast stagger wording is gone (knockback school property instead).
+        if r["form"] == "Bolt" and re.search(r"\bappl\w*", r["effect"], re.I):
+            errs.append(f"LAW7 {r['name']}: Bolt effect text applies a status")
+        if r["school"] == "Blast" and "stagger" in r["effect"].lower():
+            errs.append(f"LAW7 {r['name']}: Blast effect says stagger (should be knockback)")
     # 5. count
     if len(rows) < 110:
         errs.append(f"COUNT {len(rows)} < 110")
@@ -235,6 +242,7 @@ def report(rows):
     print("[4] length matches tier ..... %s" % ("PASS" if not any("!= tier" in e for e in errs) else "FAIL"))
     print("[5] count >= 110 ............ %s (%d)" % ("PASS" if len(rows) >= 110 else "FAIL", len(rows)))
     print("[6] tags within vocab ....... %s" % ("PASS" if not any("vocabulary" in e or "tag count" in e for e in errs) else "FAIL"))
+    print("[7] taps strike, holds infuse %s" % ("PASS" if not any(e.startswith("LAW7") for e in errs) else "FAIL"))
     print()
     print("Per-school:", dict(sorted(Counter(r["school"] for r in rows).items())))
     print("Per-form:  ", dict(sorted(Counter(r["form"] for r in rows).items())))
