@@ -41,7 +41,11 @@ body{
   font-weight:600; font-size:16px; transition:transform .12s var(--pop); }
 .chip.pulse{ transform:scale(1.18); }
 .chip.done{ opacity:.55; }
-.chip .dot{ width:16px; height:16px; border-radius:50%; border:2px solid var(--ink); flex:none; }
+.dot{ display:inline-block; width:16px; height:16px; border-radius:50%; border:2px solid var(--ink); flex:none; }
+.gicon{ display:inline-flex; align-items:center; gap:3px; }
+.chip .gicon{ display:flex; font-size:14px; line-height:1; }
+.dot.ink{ border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:#2c2733; }
+.dot.mini{ width:10px; height:10px; border-width:1.5px; margin-left:-1px; }
 .chip.done .num::after{ content:"✓"; }
 .chip.done .num{ font-size:13px; }
 /* moves: bare ink numeral, top-right, no container */
@@ -77,15 +81,22 @@ body{
 .gpill{ display:flex; align-items:center; gap:5px; background:var(--paper2); border:2.5px solid var(--ink);
   border-radius:999px; padding:4px 11px 4px 7px; font-family:var(--font-d); font-weight:600; font-size:15px; box-shadow:0 2px 0 var(--shadow); }
 .gpill .dot{ width:15px; height:15px; border-radius:50%; border:2px solid var(--ink); }
-/* level select */
-.lvgrid{ display:grid; grid-template-columns:repeat(4,58px); gap:12px; }
-.lv{ width:58px; height:58px; border-radius:16px; background:var(--card); border:3px solid var(--ink);
-  box-shadow:0 4px 0 var(--shadow); font-family:var(--font-d); font-weight:700; font-size:22px; cursor:pointer;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; touch-action:manipulation;
+.gpill .gicon{ display:flex; align-items:center; gap:3px; font-size:13px; }
+/* level select: named cards with goal icons */
+.lvwrap{ max-height:72vh; overflow-y:auto; padding:4px 2px; }
+.lvgrid{ display:grid; grid-template-columns:repeat(2,160px); gap:10px; }
+.lv{ width:160px; min-height:58px; border-radius:14px; background:var(--card); border:3px solid var(--ink);
+  box-shadow:0 4px 0 var(--shadow); font-family:var(--font-d); cursor:pointer; padding:7px 10px 8px;
+  display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; touch-action:manipulation;
   transition:transform .08s var(--calm), box-shadow .08s var(--calm); }
+.lv .nm{ font-size:13px; font-weight:700; line-height:1.15; display:flex; gap:5px; align-items:baseline; }
+.lv .nm b{ color:var(--ink-soft); font-weight:600; font-size:11px; }
+.lv .ic{ display:flex; gap:5px; align-items:center; font-size:12px; height:15px; }
+.lv .ic .dot{ width:11px; height:11px; border-width:1.5px; }
+.lv .ic .dot.mini{ width:8px; height:8px; }
 .lv:active{ transform:translateY(4px); box-shadow:0 0 0 var(--shadow); }
 .lv.locked{ opacity:.4; cursor:default; background:var(--paper2); }
-.lv .ss{ font-size:9px; letter-spacing:1px; color:var(--accent); text-shadow:0 1px 0 var(--ink); height:10px; }
+.lv .ss{ font-size:10px; letter-spacing:1px; color:var(--accent); text-shadow:0 1px 0 var(--ink); margin-left:auto; }
 .lv.locked .ss{ color:var(--ink-soft); text-shadow:none; }
 .backbtn{ position:fixed; top:calc(env(safe-area-inset-top) + 10px); left:12px; z-index:6;
   width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
@@ -120,7 +131,7 @@ body{
 <!-- level select -->
 <div class="screen" id="scrSelect">
   <div class="lvtitle">Levels</div>
-  <div class="lvgrid" id="lvGrid"></div>
+  <div class="lvwrap"><div class="lvgrid" id="lvGrid"></div></div>
 </div>
 
 <!-- win -->
@@ -158,7 +169,7 @@ const DECOMP = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'
 const MIX = { RY:'O', YR:'O', RB:'P', BR:'P', YB:'G', BY:'G' };
 const NAME = { R:'red', Y:'yellow', B:'blue', O:'orange', G:'green', P:'purple', W:'white' };
 function isSec(c){ return c==='O'||c==='G'||c==='P'; }
-function colOf(c){ return c==='W'?WHITEC:(c==='K'?BOMBC:HEX[c]); }
+function colOf(c){ return c==='W'?WHITEC:(c==='K'||c==='I'?BOMBC:HEX[c]); }   // 'I' = ink (flyer icon colour)
 const FORGE_COUNT=2;      // secondaries per double step
 const BOMB_MIN=7;         // connected pop-group size that spawns a bomb
 const MIN_MATCH=3;
@@ -185,32 +196,48 @@ const CELL_LINES=(()=>{ const m=Array.from({length:N},()=>[]);
   for(const l of ALL_LINES) for(const ci of l) m[ci].push(l); return m; })();
 
 // ================= levels =================
-// goals: [{c, need}], moves: limit. Star thresholds derived from moves.
+// goal types: {t:'col',c,need} collect · {t:'ink',need} scrub all ink · {t:'brew',need,c?} forge secondaries
+//             {t:'white',need} forge whites · {t:'boom',need} detonate bombs · {t:'chain',need} cascade depth ≥ N
+// Level fields: name, goals, moves; optional palette (restrict spawned primaries),
+//               ink [[q,r],..] (single-layer cell stains), seed [{q,r,c},..] (pre-placed balls/bombs).
+const ringQR = rad => CELLS_QR.filter(([q,r])=>Math.max(Math.abs(q),Math.abs(r),Math.abs(-q-r))===rad);
+const RING1=ringQR(1), RING2=ringQR(2);   // 6 and 12 cells
+// Completability notes (construction/bot-verified, see suite):
+//  L4/L11 seeded bombs detonate after ANY matching swap's cascade settles → boom goals reachable by construction.
+//  L5/L15 palettes have exactly one brewable secondary (R+Y→O, Y+B→G); 2-colour boards make double-matches and
+//   cascade re-forges frequent, so the forge supply is high; collecting requires lining forged secondaries.
+//  L7 seeded O/G near centre diversify cascade steps: a cascade round popping 3 distinct colours forges the white.
+//  L13 bombs come from 7+ connected clear-groups; adjacent same-round matches merge groups, common in cascades.
+//  L14 chain ≥3 occurs naturally every handful of cascading swaps.
 const LEVELS = [
-  { goals:[{c:'R',need:15}], moves:20 },
-  { goals:[{c:'B',need:15}], moves:20 },
-  { goals:[{c:'R',need:12},{c:'Y',need:12}], moves:22 },
-  { goals:[{c:'R',need:12},{c:'Y',need:12},{c:'B',need:12}], moves:26 },
-  { goals:[{c:'O',need:6}], moves:22 },
-  { goals:[{c:'G',need:6}], moves:22 },
-  { goals:[{c:'P',need:6}], moves:22 },
-  { goals:[{c:'O',need:5},{c:'G',need:5}], moves:26 },
-  { goals:[{c:'R',need:20},{c:'O',need:6}], moves:26 },
-  { goals:[{c:'O',need:6},{c:'G',need:6},{c:'P',need:6}], moves:30 },
-  { goals:[{c:'W',need:1}], moves:22 },
-  { goals:[{c:'O',need:8},{c:'W',need:1}], moves:28 },
-  { goals:[{c:'O',need:5},{c:'G',need:5},{c:'P',need:5}], moves:28 },
-  { goals:[{c:'G',need:6},{c:'W',need:2}], moves:30 },
-  { goals:[{c:'O',need:8},{c:'G',need:8},{c:'P',need:8}], moves:32 },
-  { goals:[{c:'O',need:6},{c:'G',need:6},{c:'P',need:6},{c:'W',need:2}], moves:34 },
+  { name:'Warm-up',        goals:[{t:'col',c:'R',need:15}], moves:18 },
+  { name:'Two of a Kind',  goals:[{t:'col',c:'R',need:12},{t:'col',c:'B',need:12}], moves:22 },
+  { name:'Triple Order',   goals:[{t:'col',c:'R',need:10},{t:'col',c:'Y',need:10},{t:'col',c:'B',need:10}], moves:24 },
+  { name:'The Gift',       goals:[{t:'col',c:'R',need:14},{t:'boom',need:1}], moves:22, seed:[{q:3,r:0,c:'K'}] },
+  { name:'First Brew',     goals:[{t:'col',c:'O',need:4}], moves:16, palette:['R','Y'] },
+  { name:'Green Thumb',    goals:[{t:'col',c:'G',need:5},{t:'col',c:'P',need:5}], moves:30 },
+  { name:'White Lightning',goals:[{t:'white',need:1}], moves:24,
+    seed:[{q:0,r:-1,c:'O'},{q:1,r:1,c:'O'},{q:-1,r:0,c:'O'},{q:1,r:-1,c:'G'},{q:-1,r:1,c:'G'},{q:0,r:2,c:'G'},{q:2,r:-1,c:'O'},{q:-2,r:1,c:'G'}] },
+  { name:'Production Line',goals:[{t:'brew',need:6},{t:'col',c:'Y',need:10}], moves:26 },
+  { name:'Ink Spill',      goals:[{t:'ink',need:7}], moves:20, ink:[[0,0],...RING1] },
+  { name:'Deep Clean',     goals:[{t:'ink',need:10},{t:'col',c:'O',need:4}], moves:30, ink:[...RING1,[2,-1],[-2,1],[0,-2],[0,2]] },
+  { name:'Powder Keg',     goals:[{t:'ink',need:12},{t:'boom',need:1}], moves:26, ink:[...RING2], seed:[{q:1,r:-1,c:'K'}] },
+  { name:'Spotless',       goals:[{t:'ink',need:14},{t:'white',need:1}], moves:32, ink:[...RING2,[0,0],[0,-1]] },
+  { name:'Demolition',     goals:[{t:'boom',need:2},{t:'col',c:'R',need:12}], moves:12 },
+  { name:'Chain Reaction', goals:[{t:'chain',need:3},{t:'col',c:'P',need:6}], moves:28 },
+  { name:'Cold Brew',      goals:[{t:'col',c:'G',need:24}], moves:6, palette:['Y','B'] },   // 6-move cascade sprint
+  { name:'The Full Brew',  goals:[{t:'col',c:'O',need:5},{t:'col',c:'G',need:5},{t:'col',c:'P',need:5},{t:'white',need:1},{t:'ink',need:6}], moves:36, ink:[...RING1] },
 ];
 function starThresholds(moves){ return { s3:Math.max(2,Math.round(moves*0.35)), s2:Math.max(1,Math.round(moves*0.15)) }; }
 
 // ================= persistence =================
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-function loadProgress(){ try{ const p=JSON.parse(lsGet('hb_progress','')); if(p&&p.unlocked) return p; }catch(e){}
-  return { unlocked:1, stars:{} }; }
+function loadProgress(){ try{ const p=JSON.parse(lsGet('hb_progress',''));
+    if(p&&p.v===2&&p.unlocked) return p;
+    if(p&&p.unlocked) return { v:2, unlocked:Math.min(p.unlocked,16), stars:p.stars||{} };  // migrate v1 gracefully
+  }catch(e){}
+  return { v:2, unlocked:1, stars:{} }; }
 function saveProgress(){ lsSet('hb_progress', JSON.stringify(progress)); }
 let progress = loadProgress();
 
@@ -252,7 +279,7 @@ const SFX=(()=>{
   // major pentatonic climb from A4; cap 2 octaves
   const PENTA=[0,2,4,7,9];
   function pfreq(n){ n=Math.max(0,Math.min(10,n|0)); return 440*Math.pow(2,(((n/5)|0)*12+PENTA[n%5])/12); }
-  const TICKF={R:660,Y:784,B:587,O:698,G:622,P:554,W:880};
+  const TICKF={R:660,Y:784,B:587,O:698,G:622,P:554,W:880,I:523,K:392};
   return {
     init, get ready(){ return ready; }, get muted(){ return muted; },
     setMuted(m){ muted=!!m; lsSet('hb_mute',muted?'1':'0'); },
@@ -268,7 +295,8 @@ const SFX=(()=>{
     goalDone(){ tone(784,{d:0.12,peak:0.14}); tone(1175,{d:0.24,peak:0.13,delay:0.08}); },
     win(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:'triangle',d:0.3,peak:0.16,delay:i*0.13})); },
     lose(){ tone(392,{type:'triangle',d:0.3,peak:0.15}); tone(311,{type:'triangle',d:0.45,peak:0.14,delay:0.18}); },
-    warn(){ tone(330,{type:'sine',d:0.09,peak:0.1}); }                                 // low-moves tick
+    warn(){ tone(330,{type:'sine',d:0.09,peak:0.1}); },                                // low-moves tick
+    scrub(){ tone(880,{type:'sine',slide:1500,d:0.08,peak:0.12}); tone(1250,{type:'sine',slide:720,d:0.09,peak:0.1,delay:0.085}); } // squeaky-clean
   };
 })();
 for(const evn of ['pointerdown','touchstart','mousedown','keydown'])
@@ -322,8 +350,12 @@ let pops=[];   // ripple-pop queue: mechanics applied instantly, FX/audio fire p
 let remixFx=null, chainLabel=null, brewLabel=null, flashFx=null;
 let stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, swaps:0, cascades:0, remixes:0 };
 let winInfo=null;
+let PALETTE=PRIMS.slice();            // per-level spawn palette (refill + initial fill)
+let ink=new Array(N).fill(0);         // single-layer ink stains, keyed by CELL (survive gravity/remix)
+let inkFx=[];                         // scrub wipe animations {x,y,born,seed}
 
-function randPrim(){ return PRIMS[(Math.random()*3)|0]; }
+function randPrim(){ return PALETTE[(Math.random()*PALETTE.length)|0]; }
+function inkGoal(){ return goals.find(g=>g.t==='ink'); }
 
 // ================= match finding (white = wildcard) =================
 function matchesColour(c,col){ return c===col || c==='W'; }
@@ -362,37 +394,66 @@ function hasMatchingMove(){
 }
 
 // ================= board generation =================
-function genNoMatch(){
-  for(const cell of cells){ cell.c=randPrim(); cell.oy=0; cell.shake=0; cell.forgeFx=0; cell.bombBorn=0; cell.fresh=false; }
+// fill non-protected cells with palette primaries, no instant match. The parity
+// pattern (q+2r mod |palette|) is run-free on all three axes, so even 2-colour
+// palettes always have a deterministic match-free fallback.
+function fillNoMatch(prot){
+  prot=prot||new Set();
+  for(let i=0;i<N;i++){ if(prot.has(i)) continue; const cell=cells[i];
+    cell.c=randPrim(); cell.oy=0; cell.shake=0; cell.forgeFx=0; cell.bombBorn=0; cell.fresh=false; }
   let guard=0;
   while(guard++<400 && hasInstantMatch()){
-    for(const m of findMatches()) for(const ci of m.cells) cells[ci].c=randPrim();
+    let fixed=false;
+    for(const m of findMatches()) for(const ci of m.cells){ if(!prot.has(ci)){ cells[ci].c=randPrim(); fixed=true; } }
+    if(!fixed) break;   // every match lies inside protected cells — level-design invariant broken
   }
+  if(hasInstantMatch()){
+    for(let i=0;i<N;i++){ if(prot.has(i)) continue; const [q,r]=CELLS_QR[i];
+      cells[i].c=PALETTE[(((q+2*r)%PALETTE.length)+PALETTE.length)%PALETTE.length]; }
+    let g=0; while(g++<200 && hasInstantMatch()){ let f=false;
+      for(const m of findMatches()) for(const ci of m.cells){ if(!prot.has(ci)){ cells[ci].c=randPrim(); f=true; } }
+      if(!f) break; }
+  }
+}
+function genNoMatch(){ fillNoMatch(null); }
+function applySeeds(seedList){
+  if(!seedList) return;
+  const prot=new Set();
+  for(const s of seedList){ const i=IDX[KEY(s.q,s.r)]; if(i===undefined) continue;
+    cells[i].c=s.c; cells[i].fresh=false; cells[i].bombBorn=(s.c==='K')?performance.now():0; prot.add(i); }
+  let g=0;   // repair any instant matches the seeds created, never touching the seeds
+  while(g++<400 && hasInstantMatch()){ let f=false;
+    for(const m of findMatches()) for(const ci of m.cells){ if(!prot.has(ci)){ cells[ci].c=randPrim(); f=true; } }
+    if(!f) break; }
 }
 
 // ================= remix (deadlock rescue) — free =================
+// bombs stay FIXED in place (and ink lives on cells, so it never moves either)
 function remixArrange(){
-  const bag=cells.map(c=>c.c);
+  const idxs=[]; for(let i=0;i<N;i++) if(cells[i].c!=null && cells[i].c!=='K') idxs.push(i);
+  const bag=idxs.map(i=>cells[i].c);
   for(let attempt=0; attempt<60; attempt++){
     for(let i=bag.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=bag[i]; bag[i]=bag[j]; bag[j]=t; }
-    for(let i=0;i<N;i++) cells[i].c=bag[i];
+    idxs.forEach((ci,k)=>cells[ci].c=bag[k]);
     let g=0;
     while(g++<400 && hasInstantMatch()){
       const m=findMatches()[0]; const ci=m.cells[(Math.random()*m.cells.length)|0];
-      let dj=-1; for(let t=0;t<60;t++){ const j=(Math.random()*N)|0; if(cells[j].c!==cells[ci].c && cells[j].c!=='K'){ dj=j; break; } }
+      if(cells[ci].c==='K') break;
+      let dj=-1; for(let t=0;t<60;t++){ const j=idxs[(Math.random()*idxs.length)|0]; if(cells[j].c!==cells[ci].c){ dj=j; break; } }
       if(dj<0) break; const tmp=cells[ci].c; cells[ci].c=cells[dj].c; cells[dj].c=tmp;
     }
     if(!hasInstantMatch() && hasMatchingMove()) return true;
-    for(let i=0;i<N;i++) bag[i]=cells[i].c;
+    idxs.forEach((ci,k)=>bag[k]=cells[ci].c);
   }
   return false;
 }
 function remix(force){
   if(!force && hasMatchingMove()) return false;
-  if(cells.some(c=>c.c==='K'||c.c==null)) return false; // don't remix mid-cascade artefacts
+  if(cells.some(c=>c.c==null)) return false; // don't remix mid-cascade
   const before=cells.map(c=>c.c);
   const ok=remixArrange();
-  if(!ok){ let g=0; do{ genNoMatch(); }while(!hasMatchingMove() && ++g<400); }
+  if(!ok){ const prot=new Set(); for(let i=0;i<N;i++) if(cells[i].c==='K') prot.add(i);
+    let g=0; do{ fillNoMatch(prot); }while(!hasMatchingMove() && ++g<400); }
   remixFx={ t0:performance.now(), dur:700, from:before.map((c,i)=>({x:cells[i].x,y:cells[i].y,c})) };
   chainLabel={ n:-1, life:1.1, text:'remixed!' };
   for(let i=0;i<N;i++){ cells[i].born=performance.now(); cells[i].oy=0; }
@@ -401,11 +462,24 @@ function remix(force){
 }
 function ensurePlayable(){ if(hasMatchingMove()) return false; remix(true); return true; }
 
-// ================= collection =================
-function goalFor(c){ return goals.find(g=>g.c===c); }
-function remainingOf(g){ return Math.max(0, g.need-collect[g.c]); }
+// ================= goals & collection =================
+function goalFor(c){ return goals.find(g=>g.t==='col'&&g.c===c); }
+function goalProgress(g){
+  switch(g.t){
+    case 'col':   return collect[g.c]||0;
+    case 'ink':   return stats.inkScrubbed;
+    case 'brew':  return g.c ? (stats.brewedBy[g.c]||0) : stats.forges;
+    case 'white': return stats.whites;
+    case 'boom':  return stats.boomsDet;
+    case 'chain': return stats.maxChain>=g.need ? g.need : 0;
+  } return 0;
+}
+function remainingOf(g){ return Math.max(0, g.need-goalProgress(g)); }
+// collected whites boost whichever COLOUR goal is furthest from done
 function whiteTargetGoal(){ let best=null, bd=-1;
-  for(const g of goals){ const rem=remainingOf(g); if(rem>bd && rem>0){ bd=rem; best=g; } } return best; }
+  for(const g of goals){ if(g.t!=='col') continue; const rem=remainingOf(g); if(rem>bd && rem>0){ bd=rem; best=g; } } return best; }
+// ink scrub mechanics (FX ride along with the pop/detonation)
+function scrubInkAt(ci){ if(!ink[ci]) return false; ink[ci]=0; stats.inkScrubbed++; return true; }
 function collectWhite(x,y){
   const best=whiteTargetGoal();
   if(!best){ // no unmet goal — no effect, just sparkle
@@ -432,7 +506,7 @@ function createsMatchAt(ci){ for(const line of CELL_LINES[ci]){
     if(n>=MIN_MATCH) return true; } return false; }
 function pickRefillColour(ci){
   const ok=[];
-  for(const c of PRIMS){ cells[ci].c=c; if(!createsMatchAt(ci)) ok.push(c); }
+  for(const c of PALETTE){ cells[ci].c=c; if(!createsMatchAt(ci)) ok.push(c); }
   if(ok.length){ cells[ci].c=ok[(Math.random()*ok.length)|0]; return {c:cells[ci].c, biased:true}; }
   cells[ci].c=randPrim(); return {c:cells[ci].c, biased:false};
 }
@@ -478,8 +552,10 @@ function clearRound(matches, depth){
     let goalT=null;
     if(c==='W'){ goalT=whiteTargetGoal(); if(goalT) collect[goalT.c]=Math.min(goalT.need, collect[goalT.c]+1); }
     else { if(collect[c]!==undefined) collect[c]++; goalT=goalFor(c); }
+    const scrub=scrubInkAt(ci);                     // popping ON an inked cell scrubs it
     const gt=gooTarget[ci]||{x:cells[ci].x,y:cells[ci].y};
     pops.push({ x:cells[ci].x, y:cells[ci].y+cells[ci].oy, tx:gt.x, ty:gt.y, c, goal:goalT,
+                scrub, inkG:scrub?inkGoal():null,
                 delay:k*POP_STAGGER, step:resolver?resolver.popStep++:k, fired:false });
     k++;
     cells[ci].c=null; cells[ci].fresh=false; }
@@ -521,7 +597,7 @@ function refillEmpties(orders){
       const ci=byTop[idx++]; used.add(ci);
       cells[ci].c=(o.type==='white')?'W':o.colour; cells[ci].fresh=false; cells[ci].forgeFx=performance.now();
       if(o.type==='white'){ stats.whites++; for(let s=0;s<10;s++) sparks.push(mkSpark(cells[ci].x,cells[ci].y,WHITEC)); }
-      else stats.forges++;
+      else { stats.forges++; if(stats.brewedBy[o.colour]!==undefined) stats.brewedBy[o.colour]++; }
     } }
   for(const ci of newSlots){ if(used.has(ci)) continue; const pick=pickRefillColour(ci); cells[ci].fresh=pick.biased; }
   for(const ci of newSlots) cells[ci].born=performance.now();
@@ -535,14 +611,22 @@ function detonateBombs(){
   const start=[]; for(let i=0;i<N;i++) if(cells[i].c==='K') start.push(i);
   if(start.length) SFX.boom();
   const queue=start.slice(), done=new Set();
+  let scrubbedAny=false;
   while(queue.length){ const bi=queue.shift(); if(done.has(bi)) continue; done.add(bi);
+    stats.boomsDet++;
     shocks.push({x:cells[bi].x,y:cells[bi].y,r:0,maxr:ROW_DY*3.4,t0:performance.now(),dur:520});
     for(let k=0;k<14;k++){ const p=mkPuff(cells[bi].x,cells[bi].y,ACCENT); p.life+=0.2; puffs.push(p); }
     cells[bi].c=null; cells[bi].bombBorn=0;
-    for(let ci=0;ci<N;ci++){ if(ci===bi) continue; if(hexDist(ci,bi)<=1){ const c=cells[ci].c; if(c==null) continue;
+    for(let ci=0;ci<N;ci++){ if(hexDist(ci,bi)<=1){
+      // detonation scrubs EVERY cell in its radius, occupied or not
+      if(scrubInkAt(ci)){ scrubbedAny=true; inkFx.push({x:cells[ci].x,y:cells[ci].y,born:performance.now(),seed:ci});
+        const gi=inkGoal(); if(gi) spawnFlyer(cells[ci].x,cells[ci].y,'I',gi); }
+      if(ci===bi) continue;
+      const c=cells[ci].c; if(c==null) continue;
       if(c==='K'){ if(!done.has(ci)) queue.push(ci); }
       else { collectBall(ci,c); cells[ci].c=null; cells[ci].fresh=false; } } }
   }
+  if(scrubbedAny) SFX.scrub();
   vibrate([18,26,18]);
 }
 function wetInkRepair(){
@@ -604,7 +688,7 @@ function refuse(a,b){ if(cells[a])cells[a].shake=0.5; if(cells[b])cells[b].shake
 function onSettle(){
   if(state!=='play') return;
   ensurePlayable();
-  if(goals.length && goals.every(g=>collect[g.c]>=g.need)){ winLevel(); }
+  if(goals.length && goals.every(g=>remainingOf(g)<=0)){ winLevel(); }
   else if(movesLeft<=0){ loseLevel(); }
 }
 
@@ -612,16 +696,22 @@ function onSettle(){
 function loadLevel(n){
   n=Math.max(1,Math.min(LEVELS.length,n)); level=n;
   const L=LEVELS[n-1];
-  goals=L.goals.map(g=>({c:g.c, need:g.need, disp:g.need, chipEl:null}));
+  goals=L.goals.map(g=>({t:g.t||'col', c:g.c, need:g.need, chipEl:null, prev:undefined}));
   collect={R:0,Y:0,B:0,O:0,G:0,P:0,W:0};
   movesLeft=L.moves;
+  PALETTE=(L.palette&&L.palette.length)?L.palette.slice():PRIMS.slice();
+  ink=new Array(N).fill(0); inkFx=[];
+  if(L.ink) for(const [q,r] of L.ink){ const i=IDX[KEY(q,r)]; if(i!==undefined) ink[i]=1; }
   resolver=null; lastResolve=null; selIdx=-1; winInfo=null;
   puffs=[]; sparks=[]; flyers=[]; shocks=[]; popGoo=[]; pops=[]; remixFx=null; chainLabel=null; brewLabel=null; flashFx=null;
   dragStart=-1; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0};
   for(const c of cells){ c.oy=0; c.vy=0; c.land=0; c.fx=0; c.fy=0; c.fvx=0; c.fvy=0; }
-  stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, swaps:0, cascades:0, remixes:0 };
+  stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, boomsDet:0, inkScrubbed:0,
+          brewedBy:{O:0,G:0,P:0}, swaps:0, cascades:0, remixes:0 };
   layout();
-  genNoMatch(); ensurePlayable();
+  genNoMatch();
+  applySeeds(L.seed);
+  ensurePlayable();
   buildChips();
   setState('play');
   updateHUD();
@@ -673,6 +763,8 @@ function update(dt,now){
       spawnClearPuffs(p.x,p.y,p.c);
       if(p.c==='W') for(let s=0;s<8;s++) sparks.push(mkSpark(p.x,p.y,WHITEC));
       if(p.goal) spawnFlyer(p.x,p.y,p.c,p.goal);
+      if(p.scrub){ inkFx.push({x:p.x,y:p.y,born:performance.now(),seed:(p.x*7+p.y)|0});
+        SFX.scrub(); if(p.inkG) spawnFlyer(p.x,p.y,'I',p.inkG); }
       SFX.pop(p.step);
     } }
   pops=pops.filter(p=>!p.fired);
@@ -701,6 +793,7 @@ function render(now){
   ctx.clearRect(0,0,W,H);
   if(state==='start'||state==='select'){ return; }  // overlays cover the board
   drawBoardBack();
+  drawInk(now);
   drawPops(now);
   drawBalls(now);
   drawPopGoo();
@@ -718,6 +811,28 @@ function drawBoardBack(){
   for(let i=0;i<N;i++){ ctx.beginPath(); ctx.arc(cells[i].x,cells[i].y,ballRad*0.92,0,6.2832);
     ctx.fillStyle='rgba(44,39,51,.05)'; ctx.fill(); }
   ctx.restore();
+}
+// ink-wash stains: dark splotches with papery (blobby) edges, drawn on the CELL under the ball
+function drawSplot(x,y,a,seed){
+  ctx.save(); ctx.fillStyle=INK;
+  ctx.globalAlpha=0.55*a;                            // lobes peek out past the ball rim
+  for(let k=0;k<7;k++){ const ang=(seed*2.399+k*0.983)%6.2832;
+    const rr=ballRad*(0.34+(((seed*7+k*13)%10)/20));
+    const ox=Math.cos(ang)*ballRad*0.80, oyy=Math.sin(ang)*ballRad*0.74;
+    ctx.beginPath(); ctx.arc(x+ox,y+oyy,rr,0,6.2832); ctx.fill(); }
+  ctx.globalAlpha=0.72*a;
+  ctx.beginPath(); ctx.arc(x,y,ballRad*0.70,0,6.2832); ctx.fill();
+  ctx.restore();
+}
+function drawInk(now){
+  for(let i=0;i<N;i++){ if(ink[i]) drawSplot(cells[i].x,cells[i].y,1,i); }
+  inkFx=inkFx.filter(f=>now-f.born<380);
+  for(const f of inkFx){ const t=(now-f.born)/380;
+    drawSplot(f.x,f.y,(1-t)*(1-t),f.seed);                       // stain fades out
+    ctx.save(); ctx.globalAlpha=(1-t)*0.9; ctx.strokeStyle='#fffdf6'; ctx.lineCap='round';
+    ctx.lineWidth=7*(1-t)+2;                                     // wipe swipe
+    ctx.beginPath(); ctx.arc(f.x,f.y,ballRad*(0.35+t*0.75), -0.8+t*4.2, 0.9+t*4.2); ctx.stroke();
+    ctx.restore(); }
 }
 function stickerCircle(x,y,r,fill,rim,lw){ ctx.save();
   ctx.shadowColor='rgba(44,39,51,.28)'; ctx.shadowBlur=0; ctx.shadowOffsetY=3;
@@ -832,13 +947,28 @@ function ease(t){ t=Math.max(0,Math.min(1,t)); return t<0.5?2*t*t:1-Math.pow(-2*
 
 // ================= HUD (DOM) =================
 const chipsEl=document.getElementById('chips'), movesNum=document.getElementById('movesNum'), movesBox=document.getElementById('movesBox');
+const CONIC='conic-gradient('+HEX.R+','+HEX.Y+','+HEX.G+','+HEX.B+','+HEX.P+','+HEX.R+')';
+// legible icon per goal type, shared by chips, lose pills and level-select cards
+function goalIconEl(g){
+  const wrap=document.createElement('span'); wrap.className='gicon';
+  function dot(bg,cls){ const d=document.createElement('span'); d.className='dot'+(cls?' '+cls:'');
+    if(bg) d.style.background=bg; wrap.appendChild(d); return d; }
+  switch(g.t){
+    case 'col':   dot(g.c==='W'?CONIC:colOf(g.c)); break;
+    case 'ink':   dot(null,'ink'); break;
+    case 'brew':  wrap.appendChild(document.createTextNode('🧪')); if(g.c) dot(HEX[g.c],'mini'); break;
+    case 'white': dot(CONIC); wrap.appendChild(document.createTextNode('✦')); break;
+    case 'boom':  wrap.appendChild(document.createTextNode('💣')); break;
+    case 'chain': wrap.appendChild(document.createTextNode('⚡')); break;
+  }
+  return wrap;
+}
 function buildChips(){
   chipsEl.innerHTML='';
   for(const g of goals){ const el=document.createElement('div'); el.className='chip';
-    const dot=document.createElement('span'); dot.className='dot'; dot.style.background=colOf(g.c);
-    if(g.c==='W') dot.style.background='conic-gradient('+HEX.R+','+HEX.Y+','+HEX.G+','+HEX.B+','+HEX.P+','+HEX.R+')';
+    el.appendChild(goalIconEl(g));
     const num=document.createElement('span'); num.className='num';
-    el.appendChild(dot); el.appendChild(num); chipsEl.appendChild(el); g.chipEl=el; g.numEl=num; }
+    el.appendChild(num); chipsEl.appendChild(el); g.chipEl=el; g.numEl=num; }
 }
 function chipCenter(g){ if(!g||!g.chipEl) return {x:W/2,y:40}; const r=g.chipEl.getBoundingClientRect();
   return { x:r.left+r.width/2, y:r.top+r.height/2 }; }
@@ -847,15 +977,20 @@ function pulseChip(g){ if(!g||!g.chipEl) return; g.chipEl.classList.remove('puls
 // chip DISPLAY lags mechanics: contributions still queued (unfired pops) or in flight
 // (flyers) don't count yet, so the number ticks down as each ball lands on the chip.
 function inFlightTo(g){ let n=0;
-  for(const p of pops) if(!p.fired && p.goal===g) n++;
+  for(const p of pops) if(!p.fired && (p.goal===g || p.inkG===g)) n++;
   for(const f of flyers) if(!f.landed && f.g===g) n++;
   return n; }
-function dispRemaining(g){ const shown=Math.max(0,(collect[g.c]||0)-inFlightTo(g));
+function dispRemaining(g){ const shown=Math.max(0, goalProgress(g)-inFlightTo(g));
   return Math.max(0, g.need-shown); }
 function updateHUD(){
   for(const g of goals){ if(!g.numEl) continue; const rem=dispRemaining(g);
     if(rem<=0){ g.chipEl.classList.add('done'); g.numEl.textContent=''; }
-    else { g.chipEl.classList.remove('done'); g.numEl.textContent=rem; } }
+    else { g.chipEl.classList.remove('done'); g.numEl.textContent=(g.t==='chain')?('×'+g.need):rem; }
+    // brew/white/boom/chain tick at the forge/detonation/chain moment (no flyers for these)
+    if(g.prev!==undefined && rem<g.prev && (g.t==='brew'||g.t==='white'||g.t==='boom'||g.t==='chain')){
+      pulseChip(g); SFX.tick(g.t==='boom'?'K':'W');
+      if(rem<=0) SFX.goalDone(); }
+    g.prev=rem; }
   movesNum.textContent=movesLeft;
   movesBox.classList.toggle('low', movesLeft<=5 && state==='play');
 }
@@ -873,29 +1008,36 @@ function setState(s){ state=s;
 }
 function goSelect(){ buildLvGrid(); setState('select'); }
 function buildLvGrid(){ const grid=document.getElementById('lvGrid'); grid.innerHTML='';
-  for(let i=1;i<=LEVELS.length;i++){ const el=document.createElement('div'); el.className='lv';
+  for(let i=1;i<=LEVELS.length;i++){ const L=LEVELS[i-1]; const el=document.createElement('div'); el.className='lv';
     const unlocked=i<=progress.unlocked;
     if(!unlocked) el.classList.add('locked');
-    const num=document.createElement('div'); num.textContent=unlocked?i:'🔒'; if(!unlocked) num.style.fontSize='20px';
-    const ss=document.createElement('div'); ss.className='ss';
+    const nm=document.createElement('div'); nm.className='nm';
+    const b=document.createElement('b'); b.textContent=unlocked?String(i):'🔒';
+    const t=document.createElement('span'); t.textContent=L.name;
+    nm.appendChild(b); nm.appendChild(t);
+    const ic=document.createElement('div'); ic.className='ic';
+    for(const g of L.goals) ic.appendChild(goalIconEl(g));
+    const ss=document.createElement('span'); ss.className='ss';
     const st=progress.stars[i]||0; ss.textContent=st?'★'.repeat(st):'';
-    el.appendChild(num); el.appendChild(ss);
+    ic.appendChild(ss);
+    el.appendChild(nm); el.appendChild(ic);
     if(unlocked) el.addEventListener('click', ()=>loadLevel(i));
     grid.appendChild(el); } }
 function showWinScreen(){
   const stars=document.getElementById('winStars').children;
   for(let k=0;k<3;k++) stars[k].classList.toggle('on', k<winInfo.stars);
+  const nm=LEVELS[level-1].name;
   document.getElementById('winSub').textContent = (level<LEVELS.length)
-    ? `${winInfo.moves} move${winInfo.moves===1?'':'s'} to spare · ${winInfo.stars}★`
-    : `you finished Hexbrew! ${winInfo.stars}★`;
+    ? `“${nm}” cleared · ${winInfo.moves} move${winInfo.moves===1?'':'s'} to spare · ${winInfo.stars}★`
+    : `“${nm}” cleared — you finished Hexbrew! ${winInfo.stars}★`;
   const nb=document.getElementById('btnNext'); nb.style.display=(level<LEVELS.length)?'':'none';
 }
 function showLoseScreen(){ const g=document.getElementById('loseGoals'); g.innerHTML='';
   for(const goal of goals){ const el=document.createElement('div'); el.className='gpill';
-    const dot=document.createElement('span'); dot.className='dot'; dot.style.background=colOf(goal.c);
-    if(goal.c==='W') dot.style.background='conic-gradient('+HEX.R+','+HEX.Y+','+HEX.B+','+HEX.R+')';
-    const t=document.createElement('span'); t.textContent=Math.min(collect[goal.c],goal.need)+'/'+goal.need;
-    el.appendChild(dot); el.appendChild(t); g.appendChild(el); } }
+    el.appendChild(goalIconEl(goal));
+    const t=document.createElement('span');
+    t.textContent=Math.min(goalProgress(goal),goal.need)+'/'+goal.need;
+    el.appendChild(t); g.appendChild(el); } }
 
 document.getElementById('btnPlay').addEventListener('click', goSelect);
 document.getElementById('btnNext').addEventListener('click', ()=>loadLevel(level+1));
@@ -916,8 +1058,9 @@ function getPos(ev){ const rect=canvas.getBoundingClientRect(); let cx,cy;
   return {x:cx-rect.left, y:cy-rect.top}; }
 function ballAt(x,y){ let best=-1,bd=ballRad*1.3; for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null||b.c==='K') continue;
   const d=Math.hypot(x-b.x,y-b.y); if(d<bd){bd=d;best=i;} } return best; }
-// drag feedback: A follows the pointer (clamped), B leans reciprocally, release
-// past ~45% of spacing commits, short release springs back with a wobble.
+// drag feedback: A follows the pointer (clamped), B leans reciprocally. Dragging
+// past ~45% of spacing commits the swap immediately (finger still down — release
+// is just letting go); a short release springs back with a wobble.
 const DRAG_CAP=0.55, DRAG_COMMIT=0.45, DRAG_PICK=0.15, LEAN=0.25;
 let dragStart=-1, downPos={x:0,y:0}, movedFar=false;
 let dragOff={x:0,y:0}, dragTgt=-1, dragLean={x:0,y:0};
@@ -946,25 +1089,27 @@ function onMove(ev){ if(dragStart<0) return; const p=getPos(ev); ev.preventDefau
     const f=Math.min(1, Math.hypot(dragOff.x,dragOff.y)/cap);
     dragLean={x:(A.x-B.x)*LEAN*f, y:(A.y-B.y)*LEAN*f}; }
   else dragLean={x:0,y:0};
+  // drag far enough and the swap just happens — no need to let go
+  if(dragTgt>=0){ const B=cells[dragTgt];
+    if(A.c!==B.c){
+      const dx=B.x-A.x, dy=B.y-A.y, dl=Math.hypot(dx,dy)||1;
+      const proj=(dragOff.x*dx+dragOff.y*dy)/dl;
+      if(proj>=DRAG_COMMIT*ROW_DY){
+        const start=dragStart, tgt=dragTgt, off={x:dragOff.x,y:dragOff.y}, lean={x:dragLean.x,y:dragLean.y};
+        clearDrag();
+        const res=swapCore(start,tgt);
+        if(res.type==='match'||res.type==='positional'){
+          springTo(tgt, (A.x+off.x)-B.x, (A.y+off.y)-B.y);
+          springTo(start, (B.x+lean.x)-A.x, (B.y+lean.y)-A.y);
+        } else { springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
+        selIdx=-1;
+      } } }
 }
 function onUp(ev){ if(dragStart<0) return; ev.preventDefault(); const p=getPos(ev);
   const start=dragStart, tgt=dragTgt, off={x:dragOff.x,y:dragOff.y}, lean={x:dragLean.x,y:dragLean.y};
   clearDrag();
   if(movedFar){
-    if(tgt>=0){ const A=cells[start], B=cells[tgt];
-      const dx=B.x-A.x, dy=B.y-A.y, dl=Math.hypot(dx,dy)||1;
-      const proj=(off.x*dx+off.y*dy)/dl;
-      if(proj>=DRAG_COMMIT*ROW_DY){
-        const res=swapCore(start,tgt);
-        if(res.type==='match'||res.type==='positional'){
-          // colours swapped: hand the current dragged positions to the springs (no snap-back-then-swap)
-          springTo(tgt, (A.x+off.x)-B.x, (A.y+off.y)-B.y);
-          springTo(start, (B.x+lean.x)-A.x, (B.y+lean.y)-A.y);
-        } else { // blocked (same colour / resolving / no moves): spring back + refusal shake (in swapCore)
-          springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
-        selIdx=-1; return;
-      } }
-    // short release: both spring back with an eased wobble
+    // commit happens mid-drag now — any release that gets here springs back
     springTo(start, off.x, off.y); if(tgt>=0) springTo(tgt, lean.x, lean.y);
     SFX.spring(); selIdx=-1; return;
   }
@@ -988,7 +1133,12 @@ window.HB = {
   get state(){ return state; },
   get level(){ return level; },
   get movesLeft(){ return movesLeft; },
-  get goals(){ return goals.map(g=>({c:g.c,need:g.need,remaining:remainingOf(g)})); },
+  get goals(){ return goals.map(g=>({t:g.t,c:g.c,need:g.need,progress:goalProgress(g),remaining:remainingOf(g)})); },
+  get ink(){ return ink.slice(); },
+  get inkRemaining(){ return ink.reduce((a,b)=>a+b,0); },
+  get palette(){ return PALETTE.slice(); },
+  setInk(i,v){ if(i>=0&&i<N) ink[i]=v?1:0; },
+  setMaxChain(n){ stats.maxChain=Math.max(stats.maxChain,n|0); },
   get collect(){ return Object.assign({},collect); },
   get stats(){ return Object.assign({},stats); },
   get resolving(){ return !!resolver; },
@@ -1020,8 +1170,9 @@ window.HB = {
   goSelect(){ goSelect(); },
   step(ms){ let t=ms||16; while(t>0){ const d=Math.min(16,t)/1000; update(d,performance.now()); t-=16; } },
   settle(maxMs){ let t=maxMs||20000; while(resolver && t>0){ update(0.016,performance.now()); t-=16; } return !resolver; },
-  levels(){ return LEVELS.map(l=>({goals:l.goals.map(g=>Object.assign({},g)),moves:l.moves})); },
-  resetProgress(){ progress={unlocked:1,stars:{}}; saveProgress(); }
+  levels(){ return LEVELS.map(l=>({name:l.name,goals:l.goals.map(g=>Object.assign({},g)),moves:l.moves,
+    palette:l.palette?l.palette.slice():null, ink:l.ink?l.ink.length:0, seed:l.seed?l.seed.map(s=>Object.assign({},s)):null})); },
+  resetProgress(){ progress={v:2,unlocked:1,stars:{}}; saveProgress(); }
 };
 
 // ================= boot =================
