@@ -94,6 +94,11 @@ body{
   opacity:0; pointer-events:none; transition:opacity .2s, transform .08s var(--calm), box-shadow .08s var(--calm); touch-action:manipulation; }
 .backbtn:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .backbtn.show{ opacity:1; pointer-events:auto; }
+.mutebtn{ position:fixed; left:12px; bottom:calc(env(safe-area-inset-bottom) + 12px); z-index:10;
+  width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:17px; cursor:pointer; background:var(--card); border:2.5px solid var(--ink); box-shadow:0 3px 0 var(--shadow);
+  transition:transform .08s var(--calm), box-shadow .08s var(--calm); touch-action:manipulation; }
+.mutebtn:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .lvtitle{ font-family:var(--font-d); font-weight:700; font-size:30px; text-shadow:0 3px 0 var(--shadow); }
 </style>
 </head>
@@ -101,6 +106,7 @@ body{
 <canvas id="c"></canvas>
 
 <div class="backbtn" id="backBtn">‹</div>
+<div class="mutebtn" id="muteBtn">🔊</div>
 <div class="chips" id="chips"></div>
 <div class="moves" id="movesBox"><b id="movesNum">0</b><small>moves</small></div>
 
@@ -208,6 +214,66 @@ function loadProgress(){ try{ const p=JSON.parse(lsGet('hb_progress','')); if(p&
 function saveProgress(){ lsSet('hb_progress', JSON.stringify(progress)); }
 let progress = loadProgress();
 
+// ================= audio (fully synthesized, lazy init on first gesture) =================
+const SFX=(()=>{
+  let ac=null, master=null, ready=false, nbuf=null;
+  let muted = lsGet('hb_mute','0')==='1';
+  function init(){ if(ready) return; try{
+      const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+      ac=new AC(); master=ac.createGain(); master.gain.value=0.5; master.connect(ac.destination); ready=true;
+    }catch(e){ ac=null; ready=false; } }
+  function on(){ if(!ready||muted||!ac) return false;
+    try{ if(ac.state==='suspended') ac.resume(); }catch(e){} return true; }
+  function tone(freq,opts){ if(!on()) return; try{
+      const {type='sine',a=0.004,d=0.16,peak=0.22,delay=0,slide=0}=opts||{};
+      const t0=ac.currentTime+delay;
+      const o=ac.createOscillator(); o.type=type;
+      o.frequency.setValueAtTime(Math.max(30,freq),t0);
+      if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,slide),t0+a+d);
+      const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t0);
+      g.gain.linearRampToValueAtTime(peak,t0+a);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+a+d);
+      o.connect(g); g.connect(master); o.start(t0); o.stop(t0+a+d+0.06);
+    }catch(e){} }
+  function noise(opts){ if(!on()) return; try{
+      const {dur=0.25,peak=0.18,delay=0,f0=1200,f1=0,ftype='bandpass'}=opts||{};
+      if(!nbuf){ nbuf=ac.createBuffer(1,(ac.sampleRate*0.5)|0,ac.sampleRate);
+        const d=nbuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; }
+      const t0=ac.currentTime+delay;
+      const src=ac.createBufferSource(); src.buffer=nbuf; src.loop=true;
+      const fl=ac.createBiquadFilter(); fl.type=ftype; fl.frequency.setValueAtTime(f0,t0);
+      if(f1) fl.frequency.exponentialRampToValueAtTime(Math.max(40,f1),t0+dur);
+      const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t0);
+      g.gain.linearRampToValueAtTime(peak,t0+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+      src.connect(fl); fl.connect(g); g.connect(master);
+      src.start(t0); src.stop(t0+dur+0.05);
+    }catch(e){} }
+  // major pentatonic climb from A4; cap 2 octaves
+  const PENTA=[0,2,4,7,9];
+  function pfreq(n){ n=Math.max(0,Math.min(10,n|0)); return 440*Math.pow(2,(((n/5)|0)*12+PENTA[n%5])/12); }
+  const TICKF={R:660,Y:784,B:587,O:698,G:622,P:554,W:880};
+  return {
+    init, get ready(){ return ready; }, get muted(){ return muted; },
+    setMuted(m){ muted=!!m; lsSet('hb_mute',muted?'1':'0'); },
+    pop(step){ tone(pfreq(step),{type:'triangle',d:0.13,peak:0.2}); },                 // pew — pitch climbs per ball
+    swap(){ tone(120,{type:'sine',d:0.06,peak:0.24}); },                               // low soft thunk
+    refuse(){ tone(90,{type:'square',d:0.05,peak:0.07}); tone(82,{type:'square',d:0.05,peak:0.07,delay:0.075}); },
+    spring(){ tone(300,{type:'sine',d:0.1,peak:0.1,slide:170}); },                     // tiny boing
+    brew(){ tone(659,{type:'triangle',d:0.22,peak:0.16}); tone(988,{type:'triangle',d:0.3,peak:0.14,delay:0.09}); },
+    white(){ tone(659,{d:0.25,peak:0.14}); tone(831,{d:0.28,peak:0.13,delay:0.11}); tone(1047,{d:0.4,peak:0.13,delay:0.22}); },
+    fuse(){ noise({dur:0.3,peak:0.08,f0:2800,ftype:'highpass'}); },                    // fuse hiss
+    boom(){ tone(150,{type:'sine',a:0.008,d:0.5,peak:0.4,slide:50}); noise({dur:0.32,peak:0.22,f0:900,f1:120,ftype:'lowpass'}); },
+    tick(c){ tone(TICKF[c]||700,{type:'triangle',d:0.05,peak:0.12}); },                // flyer reaches chip
+    goalDone(){ tone(784,{d:0.12,peak:0.14}); tone(1175,{d:0.24,peak:0.13,delay:0.08}); },
+    win(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:'triangle',d:0.3,peak:0.16,delay:i*0.13})); },
+    lose(){ tone(392,{type:'triangle',d:0.3,peak:0.15}); tone(311,{type:'triangle',d:0.45,peak:0.14,delay:0.18}); },
+    warn(){ tone(330,{type:'sine',d:0.09,peak:0.1}); }                                 // low-moves tick
+  };
+})();
+for(const evn of ['pointerdown','touchstart','mousedown','keydown'])
+  window.addEventListener(evn, ()=>{ try{ SFX.init(); }catch(e){} }, {passive:true, capture:true});
+
 // ================= canvas / layout =================
 const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
 let W=390,H=800,DPR=1;
@@ -241,7 +307,8 @@ function sizeOff(){ off.width=Math.round(W*0.55); off.height=Math.round(H*0.55);
 
 // ================= state =================
 // cell: {q,r,x,y,c, oy, shake, born, forgeFx, bombBorn, fresh}
-const cells = CELLS_QR.map(([q,r])=>({q,r,x:0,y:0,c:'R',oy:0,shake:0,born:0,forgeFx:0,bombBorn:0,fresh:false}));
+const cells = CELLS_QR.map(([q,r])=>({q,r,x:0,y:0,c:'R',oy:0,vy:0,land:0,shake:0,born:0,forgeFx:0,bombBorn:0,fresh:false,
+  fx:0,fy:0,fvx:0,fvy:0}));   // fx/fy: spring-back offset (drag release / post-commit hand-off)
 let state='start';            // start|select|play|win|lose
 let level=1;                  // 1-based
 let goals=[];                 // [{c,need,disp,chipEl}]
@@ -251,6 +318,7 @@ let resolver=null;
 let lastResolve=null;
 let selIdx=-1;
 let puffs=[], sparks=[], flyers=[], shocks=[], popGoo=[];
+let pops=[];   // ripple-pop queue: mechanics applied instantly, FX/audio fire per-ball with a spatial stagger
 let remixFx=null, chainLabel=null, brewLabel=null, flashFx=null;
 let stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, swaps:0, cascades:0, remixes:0 };
 let winInfo=null;
@@ -336,9 +404,10 @@ function ensurePlayable(){ if(hasMatchingMove()) return false; remix(true); retu
 // ================= collection =================
 function goalFor(c){ return goals.find(g=>g.c===c); }
 function remainingOf(g){ return Math.max(0, g.need-collect[g.c]); }
+function whiteTargetGoal(){ let best=null, bd=-1;
+  for(const g of goals){ const rem=remainingOf(g); if(rem>bd && rem>0){ bd=rem; best=g; } } return best; }
 function collectWhite(x,y){
-  let best=null, bd=-1;
-  for(const g of goals){ const rem=remainingOf(g); if(rem>bd && rem>0){ bd=rem; best=g; } }
+  const best=whiteTargetGoal();
   if(!best){ // no unmet goal — no effect, just sparkle
     for(let k=0;k<8;k++) sparks.push(mkSpark(x,y,WHITEC)); return; }
   collect[best.c]=Math.min(best.need, collect[best.c]+1);
@@ -378,14 +447,16 @@ function findBombCentroids(clearSet){
       bombs.push(best); } }
   return bombs;
 }
-function spawnPopGoo(match){ const col=colOf(match.colour); const o=centroidCells(match.cells);
-  for(const ci of match.cells) popGoo.push({x:cells[ci].x,y:cells[ci].y,tx:o.x,ty:o.y,r:ballRad*0.85,col,t:0,dur:0.26}); }
-
-// one resolution step: find distinct colours, decide forge, spawn bombs, clear+collect
+// one resolution step: find distinct colours, decide forge, spawn bombs, clear+collect.
+// MECHANICS happen at once (one step: simultaneity forging, bomb groups, collection);
+// the VISUALS+AUDIO ripple outward per-ball ("pew pew pew") via the pops queue.
+const POP_STAGGER=0.05;
 function clearRound(matches, depth){
   stats.cascades++;
-  const clearSet=new Set();
-  for(const m of matches){ stats.matches++; spawnPopGoo(m); for(const ci of m.cells) clearSet.add(ci); }
+  const clearSet=new Set(), gooTarget={};
+  for(const m of matches){ stats.matches++;
+    const o=centroidCells(m.cells);
+    for(const ci of m.cells){ clearSet.add(ci); if(gooTarget[ci]===undefined) gooTarget[ci]=o; } }
   // forge decision (per step)
   const distinct=[...new Set(matches.map(m=>m.colour))];
   let order=null;
@@ -393,24 +464,39 @@ function clearRound(matches, depth){
   else if(distinct.length===2 && distinct.every(c=>PRIMS.includes(c))){
     const mix=MIX[distinct[0]+distinct[1]]; if(mix) order={type:'sec',colour:mix,count:FORGE_COUNT}; }
   if(order && resolver){ resolver.pendingForge.push(order);
-    if(order.type==='white') brewFlash('white!', WHITEC); else brewFlash('brewed!', HEX[order.colour]); }
+    if(order.type==='white'){ brewFlash('white!', WHITEC); SFX.white(); }
+    else { brewFlash('brewed!', HEX[order.colour]); SFX.brew(); } }
   // bombs from big connected groups
   const bombCells=findBombCentroids(clearSet);
-  const bombSet=new Set(bombCells);
-  // clear + collect
-  for(const ci of clearSet){ const c=cells[ci].c; if(c==null||c==='K') continue;
-    collectBall(ci,c); cells[ci].c=null; cells[ci].fresh=false; }
+  // ripple order: distance from the swap site (round 1) or the round centroid (cascades)
+  const ref=(depth===1 && resolver && resolver.origin) ? resolver.origin : centroidCells([...clearSet]);
+  const orderCells=[...clearSet].sort((a,b)=>
+    ((cells[a].x-ref.x)**2+(cells[a].y-ref.y)**2)-((cells[b].x-ref.x)**2+(cells[b].y-ref.y)**2));
+  // clear + collect NOW (one mechanical step); queue per-ball FX with delays
+  let k=0;
+  for(const ci of orderCells){ const c=cells[ci].c; if(c==null||c==='K') continue;
+    let goalT=null;
+    if(c==='W'){ goalT=whiteTargetGoal(); if(goalT) collect[goalT.c]=Math.min(goalT.need, collect[goalT.c]+1); }
+    else { if(collect[c]!==undefined) collect[c]++; goalT=goalFor(c); }
+    const gt=gooTarget[ci]||{x:cells[ci].x,y:cells[ci].y};
+    pops.push({ x:cells[ci].x, y:cells[ci].y+cells[ci].oy, tx:gt.x, ty:gt.y, c, goal:goalT,
+                delay:k*POP_STAGGER, step:resolver?resolver.popStep++:k, fired:false });
+    k++;
+    cells[ci].c=null; cells[ci].fresh=false; }
+  // extend the squish so compaction/refill start after the last pew
+  if(resolver) resolver.t=SQUISH_DUR + k*POP_STAGGER;
   // place bombs
   for(const bc of bombCells){ cells[bc].c='K'; cells[bc].bombBorn=performance.now(); cells[bc].oy=0; stats.bombs++;
-    for(let k=0;k<8;k++) sparks.push(mkSpark(cells[bc].x,cells[bc].y,ACCENT)); }
+    SFX.fuse();
+    for(let s=0;s<8;s++) sparks.push(mkSpark(cells[bc].x,cells[bc].y,ACCENT)); }
   if(depth>1) chainLabel={n:depth,life:1.0};
   stats.maxChain=Math.max(stats.maxChain, depth);
 }
-function startResolve(){
+function startResolve(origin){
   const matches=findMatches();
   if(!matches.length) return false;
   lastResolve=null;
-  resolver={ phase:'squish', t:SQUISH_DUR, depth:1, pendingForge:[] };
+  resolver={ phase:'squish', t:SQUISH_DUR, depth:1, pendingForge:[], origin:origin||null, popStep:0 };
   clearRound(matches,1);
   return true;
 }
@@ -447,6 +533,7 @@ function refillEmpties(orders){
 }
 function detonateBombs(){
   const start=[]; for(let i=0;i<N;i++) if(cells[i].c==='K') start.push(i);
+  if(start.length) SFX.boom();
   const queue=start.slice(), done=new Set();
   while(queue.length){ const bi=queue.shift(); if(done.has(bi)) continue; done.add(bi);
     shocks.push({x:cells[bi].x,y:cells[bi].y,r:0,maxr:ROW_DY*3.4,t0:performance.now(),dur:520});
@@ -458,22 +545,31 @@ function detonateBombs(){
   }
   vibrate([18,26,18]);
 }
+function wetInkRepair(){
+  let matches=findMatches(), guard=0;
+  while(guard++<8 && matches.some(m=>m.cells.some(ci=>cells[ci].fresh))){
+    for(const m of matches) for(const ci of m.cells){ if(cells[ci].fresh){
+      const p=pickRefillColour(ci); if(!p.biased) cells[ci].fresh=false;
+      for(let k=0;k<3;k++) puffs.push(mkPuff(cells[ci].x,cells[ci].y+cells[ci].oy,colOf(cells[ci].c)));
+    } }
+    matches=findMatches();
+  }
+}
 function stepResolver(dt){
   if(!resolver) return;
   resolver.t-=dt; if(resolver.t>0) return;
   if(resolver.phase==='squish'){
     const maxDrop=compactColumns();
-    resolver.phase='fall'; resolver.t=0.10+Math.sqrt(maxDrop)*0.2;
+    let rows=0; // refill immediately each round — wet-ink bias keeps new balls from matching on arrival
+    if(cells.some(c=>c.c==null)){ rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; }
+    wetInkRepair(); // repair colours now, while balls are mid-churn — never after they've settled
+    resolver.phase='fall'; resolver.t=0.10+Math.sqrt(Math.max(maxDrop,rows))*0.2;
   } else if(resolver.phase==='fall'){
     for(const c of cells){ c.oy=0; c.vy=0; }
     resolver.phase='beat'; resolver.t=BEAT_DUR;
   } else {
+    wetInkRepair(); // safety — normally a no-op, repair already ran at compaction time
     let matches=findMatches();
-    let guard=0;
-    while(guard++<8 && matches.some(m=>m.cells.some(ci=>cells[ci].fresh))){
-      for(const m of matches) for(const ci of m.cells){ if(cells[ci].fresh){ const p=pickRefillColour(ci); if(!p.biased) cells[ci].fresh=false; } }
-      matches=findMatches();
-    }
     if(matches.length){ resolver.depth++; clearRound(matches,resolver.depth); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
     else if(cells.some(c=>c.c==null)){ const rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=0.10+Math.sqrt(rows)*0.2; }
     else if(cells.some(c=>c.c==='K')){ detonateBombs(); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
@@ -494,15 +590,16 @@ function swapCore(a,b){
   if(ca===cb){ refuse(a,b); return {type:'blocked',reason:'same'}; }
   cells[a].c=cb; cells[b].c=ca; animSwap(a,b);
   const trig=findMatches().filter(m=>m.cells.includes(a)||m.cells.includes(b));
-  movesLeft--; stats.swaps++; vibrate(20);
-  if(trig.length>0){ startResolve(); return {type:'match'}; }
+  movesLeft--; stats.swaps++; vibrate(20); SFX.swap();
+  if(movesLeft>0 && movesLeft<=3) SFX.warn();
+  if(trig.length>0){ startResolve({x:(cells[a].x+cells[b].x)/2, y:(cells[a].y+cells[b].y)/2}); return {type:'match'}; }
   // positional swap — legal, no bounce-back, costs the move
   ensurePlayable(); onSettle();
   return {type:'positional'};
 }
 function animSwap(a,b){ cells[a].shake=Math.max(cells[a].shake,0.3); cells[b].shake=Math.max(cells[b].shake,0.3);
   cells[a].born=performance.now(); cells[b].born=performance.now(); }
-function refuse(a,b){ if(cells[a])cells[a].shake=0.5; if(cells[b])cells[b].shake=0.5; }
+function refuse(a,b){ if(cells[a])cells[a].shake=0.5; if(cells[b])cells[b].shake=0.5; SFX.refuse(); }
 
 function onSettle(){
   if(state!=='play') return;
@@ -519,7 +616,9 @@ function loadLevel(n){
   collect={R:0,Y:0,B:0,O:0,G:0,P:0,W:0};
   movesLeft=L.moves;
   resolver=null; lastResolve=null; selIdx=-1; winInfo=null;
-  puffs=[]; sparks=[]; flyers=[]; shocks=[]; popGoo=[]; remixFx=null; chainLabel=null; brewLabel=null; flashFx=null;
+  puffs=[]; sparks=[]; flyers=[]; shocks=[]; popGoo=[]; pops=[]; remixFx=null; chainLabel=null; brewLabel=null; flashFx=null;
+  dragStart=-1; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0};
+  for(const c of cells){ c.oy=0; c.vy=0; c.land=0; c.fx=0; c.fy=0; c.fvx=0; c.fvy=0; }
   stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, swaps:0, cascades:0, remixes:0 };
   layout();
   genNoMatch(); ensurePlayable();
@@ -536,8 +635,9 @@ function winLevel(){
   saveProgress();
   setState('win');
   showWinScreen();
+  SFX.win();
 }
-function loseLevel(){ setState('lose'); showLoseScreen(); }
+function loseLevel(){ setState('lose'); showLoseScreen(); SFX.lose(); }
 
 // ================= particles =================
 function mkPuff(x,y,col){ const a=Math.random()*6.28, sp=40+Math.random()*90;
@@ -559,7 +659,23 @@ function update(dt,now){
     if(cell.oy<0){ cell.vy=(cell.vy||0)+FG*dt; cell.oy+=cell.vy*dt;
       if(cell.oy>=0){ cell.oy=0; cell.vy=0; cell.land=performance.now(); } }
     else if(cell.oy!==0){ cell.oy=0; cell.vy=0; }
-    cell.shake=Math.max(0,cell.shake-dt*2.4); }
+    cell.shake=Math.max(0,cell.shake-dt*2.4);
+    // spring-back offsets (drag release / swap hand-off) — underdamped for a small wobble
+    if(cell.fx||cell.fy||cell.fvx||cell.fvy){
+      cell.fvx+=(-900*cell.fx-16*cell.fvx)*dt; cell.fvy+=(-900*cell.fy-16*cell.fvy)*dt;
+      cell.fx+=cell.fvx*dt; cell.fy+=cell.fvy*dt;
+      if(Math.hypot(cell.fx,cell.fy)<0.4 && Math.hypot(cell.fvx,cell.fvy)<3){ cell.fx=cell.fy=0; cell.fvx=cell.fvy=0; } }
+  }
+  // ripple pops: fire each queued pop when its stagger delay elapses (pew pew pew)
+  for(const p of pops){ if(p.fired) continue; p.delay-=dt;
+    if(p.delay<=0){ p.fired=true;
+      popGoo.push({x:p.x,y:p.y,tx:p.tx,ty:p.ty,r:ballRad*0.85,col:colOf(p.c),t:0,dur:0.26});
+      spawnClearPuffs(p.x,p.y,p.c);
+      if(p.c==='W') for(let s=0;s<8;s++) sparks.push(mkSpark(p.x,p.y,WHITEC));
+      if(p.goal) spawnFlyer(p.x,p.y,p.c,p.goal);
+      SFX.pop(p.step);
+    } }
+  pops=pops.filter(p=>!p.fired);
   for(const g of popGoo){ g.t+=dt; g.x+=(g.tx-g.x)*Math.min(1,dt*13); g.y+=(g.ty-g.y)*Math.min(1,dt*13);
     g.r+=(ballRad*0.35-g.r)*Math.min(1,dt*8); }
   popGoo=popGoo.filter(g=>g.t<g.dur);
@@ -571,7 +687,8 @@ function update(dt,now){
   for(const f of flyers){ f.t+=dt; const tgt=chipCenter(f.g);
     const k=Math.min(1,f.t/f.dur); const e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
     f.cx=f.x+(tgt.x-f.x)*e; f.cy=f.y+(tgt.y-f.y)*e - Math.sin(k*Math.PI)*24;
-    if(f.t>=f.dur && !f.landed){ f.landed=true; pulseChip(f.g); } }
+    if(f.t>=f.dur && !f.landed){ f.landed=true; pulseChip(f.g); SFX.tick(f.c);
+      if(f.g && dispRemaining(f.g)<=0) SFX.goalDone(); } }
   flyers=flyers.filter(f=>f.t<f.dur+0.02);
   shocks=shocks.filter(s=>now-s.t0<s.dur);
   if(remixFx && now-remixFx.t0>=remixFx.dur) remixFx=null;
@@ -584,6 +701,7 @@ function render(now){
   ctx.clearRect(0,0,W,H);
   if(state==='start'||state==='select'){ return; }  // overlays cover the board
   drawBoardBack();
+  drawPops(now);
   drawBalls(now);
   drawPopGoo();
   drawShocks(now);
@@ -605,17 +723,31 @@ function stickerCircle(x,y,r,fill,rim,lw){ ctx.save();
   ctx.shadowColor='rgba(44,39,51,.28)'; ctx.shadowBlur=0; ctx.shadowOffsetY=3;
   ctx.beginPath(); ctx.arc(x,y,r,0,6.2832); ctx.fillStyle=fill; ctx.fill();
   ctx.shadowColor='transparent'; ctx.lineWidth=lw||2.5; ctx.strokeStyle=rim||INK; ctx.stroke(); ctx.restore(); }
+function drawPops(now){
+  // unfired ripple pops: the ball visually persists (ghost) until its pew moment
+  for(const p of pops){ if(p.fired) continue;
+    stickerCircle(p.x,p.y,ballRad,colOf(p.c),INK,3);
+    ctx.beginPath(); ctx.arc(p.x-ballRad*0.3,p.y-ballRad*0.34,ballRad*0.24,0,6.28);
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill(); }
+}
 function drawBalls(now){
   const remixing = remixFx && (now-remixFx.t0)<remixFx.dur;
-  for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null) continue;
-    let x=b.x, y=b.y+b.oy;
+  const dragging = dragStart>=0;
+  for(let i=0;i<N;i++){ if(dragging && i===dragStart) continue; drawOneBall(i,now,remixing); }
+  if(dragging) drawOneBall(dragStart,now,remixing);   // dragged ball on top
+}
+function drawOneBall(i,now,remixing){
+    const b=cells[i]; if(b.c==null) return;
+    let x=b.x+b.fx, y=b.y+b.oy+b.fy, scale=1;
+    if(i===dragStart){ x+=dragOff.x; y+=dragOff.y; scale=1.08; }
+    else if(dragStart>=0 && i===dragTgt){ x+=dragLean.x; y+=dragLean.y; }
     if(b.shake>0) x+=Math.sin(now/26+i)*b.shake*5;
     if(remixing){ const f=ease((now-remixFx.t0)/remixFx.dur);
       const ang=(i*0.53)+(1-f)*5.0; const rr=(1-f)*(90+((i*13)%60));
       x=latCX+Math.cos(ang)*rr + (b.x-latCX)*f; y=latCY+Math.sin(ang)*rr*0.7 + (b.y-latCY)*f; }
-    let r=ballRad + Math.sin(now/170+i)*0.6;
+    let r=(ballRad + Math.sin(now/170+i)*0.6)*scale;
     const age=now-b.born; if(age<260){ const f=age/260; r*=0.62+0.38*f; }
-    if(b.c==='K'){ drawBomb(x,y,r,now,i); continue; }
+    if(b.c==='K'){ drawBomb(x,y,r,now,i); return; }
     let sq=0; if(b.land){ const la=now-b.land; if(la<140) sq=1-la/140; else b.land=0; }
     if(sq>0){ ctx.save(); ctx.translate(x,y); ctx.scale(1+0.16*sq,1-0.22*sq); ctx.translate(-x,-y); }
     const sel=(i===selIdx);
@@ -636,7 +768,6 @@ function drawBalls(now){
     if(sel){ ctx.beginPath(); ctx.arc(x,y,r+4,0,6.28); ctx.strokeStyle=ACCENT; ctx.lineWidth=2.6; ctx.stroke();
       for(const ni of NEIGH[i]){ const nb=cells[ni]; if(nb.c==null) continue; ctx.beginPath(); ctx.arc(nb.x,nb.y+nb.oy,ballRad+2,0,6.28);
         ctx.strokeStyle='rgba(255,209,92,.4)'; ctx.lineWidth=2; ctx.stroke(); } }
-  }
 }
 function drawBomb(x,y,r,now,i){
   stickerCircle(x,y,r,BOMBC,INK,3);
@@ -713,8 +844,16 @@ function chipCenter(g){ if(!g||!g.chipEl) return {x:W/2,y:40}; const r=g.chipEl.
   return { x:r.left+r.width/2, y:r.top+r.height/2 }; }
 function pulseChip(g){ if(!g||!g.chipEl) return; g.chipEl.classList.remove('pulse'); void g.chipEl.offsetWidth; g.chipEl.classList.add('pulse');
   setTimeout(()=>g.chipEl&&g.chipEl.classList.remove('pulse'),160); }
+// chip DISPLAY lags mechanics: contributions still queued (unfired pops) or in flight
+// (flyers) don't count yet, so the number ticks down as each ball lands on the chip.
+function inFlightTo(g){ let n=0;
+  for(const p of pops) if(!p.fired && p.goal===g) n++;
+  for(const f of flyers) if(!f.landed && f.g===g) n++;
+  return n; }
+function dispRemaining(g){ const shown=Math.max(0,(collect[g.c]||0)-inFlightTo(g));
+  return Math.max(0, g.need-shown); }
 function updateHUD(){
-  for(const g of goals){ if(!g.numEl) continue; const rem=remainingOf(g);
+  for(const g of goals){ if(!g.numEl) continue; const rem=dispRemaining(g);
     if(rem<=0){ g.chipEl.classList.add('done'); g.numEl.textContent=''; }
     else { g.chipEl.classList.remove('done'); g.numEl.textContent=rem; } }
   movesNum.textContent=movesLeft;
@@ -764,6 +903,10 @@ document.getElementById('btnRetry').addEventListener('click', ()=>loadLevel(leve
 document.getElementById('btnWinSelect').addEventListener('click', goSelect);
 document.getElementById('btnLoseSelect').addEventListener('click', goSelect);
 backBtn.addEventListener('click', goSelect);
+const muteBtn=document.getElementById('muteBtn');
+function muteIcon(){ muteBtn.textContent=SFX.muted?'🔇':'🔊'; }
+muteBtn.addEventListener('click', ()=>{ try{ SFX.init(); }catch(e){} SFX.setMuted(!SFX.muted); muteIcon(); });
+muteIcon();
 
 // ================= input =================
 function getPos(ev){ const rect=canvas.getBoundingClientRect(); let cx,cy;
@@ -773,16 +916,59 @@ function getPos(ev){ const rect=canvas.getBoundingClientRect(); let cx,cy;
   return {x:cx-rect.left, y:cy-rect.top}; }
 function ballAt(x,y){ let best=-1,bd=ballRad*1.3; for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null||b.c==='K') continue;
   const d=Math.hypot(x-b.x,y-b.y); if(d<bd){bd=d;best=i;} } return best; }
+// drag feedback: A follows the pointer (clamped), B leans reciprocally, release
+// past ~45% of spacing commits, short release springs back with a wobble.
+const DRAG_CAP=0.55, DRAG_COMMIT=0.45, DRAG_PICK=0.15, LEAN=0.25;
 let dragStart=-1, downPos={x:0,y:0}, movedFar=false;
+let dragOff={x:0,y:0}, dragTgt=-1, dragLean={x:0,y:0};
+function springTo(i,ox,oy){ const c=cells[i]; if(!c) return; c.fx=ox; c.fy=oy; c.fvx=0; c.fvy=0; }
+function clearDrag(){ dragStart=-1; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0}; }
 function onDown(ev){ if(state!=='play') return; const p=getPos(ev);
   const i=ballAt(p.x,p.y); if(i<0){ return; }
-  ev.preventDefault(); dragStart=i; downPos=p; movedFar=false; }
+  ev.preventDefault(); dragStart=i; downPos=p; movedFar=false;
+  dragOff={x:0,y:0}; dragTgt=-1; dragLean={x:0,y:0}; }
 function onMove(ev){ if(dragStart<0) return; const p=getPos(ev); ev.preventDefault();
-  if(!movedFar && Math.hypot(p.x-downPos.x,p.y-downPos.y)>ballRad*0.5) movedFar=true; }
+  if(!movedFar && Math.hypot(p.x-downPos.x,p.y-downPos.y)>ballRad*0.5) movedFar=true;
+  const A=cells[dragStart];
+  let vx=p.x-A.x, vy=p.y-A.y; const mag=Math.hypot(vx,vy);
+  const cap=DRAG_CAP*ROW_DY;                       // clamp: never further than 55% of the way over
+  if(mag>cap){ vx*=cap/mag; vy*=cap/mag; }
+  dragOff={x:vx,y:vy};
+  dragTgt=-1;
+  if(mag>DRAG_PICK*ROW_DY){                        // direction clearly selects a neighbour
+    let best=-1,bd=0.35;
+    for(const ni of NEIGH[dragStart]){ const n=cells[ni]; if(n.c==null||n.c==='K') continue;
+      const dx=n.x-A.x, dy=n.y-A.y, dl=Math.hypot(dx,dy)||1;
+      const cos=(vx*dx+vy*dy)/((Math.hypot(vx,vy)||1)*dl);
+      if(cos>bd){ bd=cos; best=ni; } }
+    dragTgt=best; }
+  if(dragTgt>=0){ const B=cells[dragTgt];
+    const f=Math.min(1, Math.hypot(dragOff.x,dragOff.y)/cap);
+    dragLean={x:(A.x-B.x)*LEAN*f, y:(A.y-B.y)*LEAN*f}; }
+  else dragLean={x:0,y:0};
+}
 function onUp(ev){ if(dragStart<0) return; ev.preventDefault(); const p=getPos(ev);
-  const start=dragStart; dragStart=-1;
-  if(movedFar){ let best=-1,bd=1e9; for(const ni of NEIGH[start]){ const n=cells[ni]; const d=(n.x-p.x)**2+(n.y-p.y)**2; if(d<bd){bd=d;best=ni;} }
-    if(best>=0){ swapCore(start,best); selIdx=-1; return; } }
+  const start=dragStart, tgt=dragTgt, off={x:dragOff.x,y:dragOff.y}, lean={x:dragLean.x,y:dragLean.y};
+  clearDrag();
+  if(movedFar){
+    if(tgt>=0){ const A=cells[start], B=cells[tgt];
+      const dx=B.x-A.x, dy=B.y-A.y, dl=Math.hypot(dx,dy)||1;
+      const proj=(off.x*dx+off.y*dy)/dl;
+      if(proj>=DRAG_COMMIT*ROW_DY){
+        const res=swapCore(start,tgt);
+        if(res.type==='match'||res.type==='positional'){
+          // colours swapped: hand the current dragged positions to the springs (no snap-back-then-swap)
+          springTo(tgt, (A.x+off.x)-B.x, (A.y+off.y)-B.y);
+          springTo(start, (B.x+lean.x)-A.x, (B.y+lean.y)-A.y);
+        } else { // blocked (same colour / resolving / no moves): spring back + refusal shake (in swapCore)
+          springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
+        selIdx=-1; return;
+      } }
+    // short release: both spring back with an eased wobble
+    springTo(start, off.x, off.y); if(tgt>=0) springTo(tgt, lean.x, lean.y);
+    SFX.spring(); selIdx=-1; return;
+  }
+  // tap-tap path unchanged
   if(selIdx<0){ selIdx=start; }
   else if(selIdx===start){ selIdx=-1; }
   else if(adjacent(selIdx,start)){ swapCore(selIdx,start); selIdx=-1; }
@@ -806,7 +992,11 @@ window.HB = {
   get collect(){ return Object.assign({},collect); },
   get stats(){ return Object.assign({},stats); },
   get resolving(){ return !!resolver; },
+  get resolverState(){ return resolver?{phase:resolver.phase,t:resolver.t,depth:resolver.depth}:null; },
   get pendingForge(){ return resolver?resolver.pendingForge.map(o=>Object.assign({},o)):[]; },
+  get pendingPops(){ return pops.filter(p=>!p.fired).length; },
+  get audio(){ return { ready:SFX.ready, muted:SFX.muted }; },
+  setMuted(m){ SFX.setMuted(m); },
   get winState(){ return (state==='win')?'win':(state==='lose'?'lose':null); },
   get winInfo(){ return winInfo?Object.assign({},winInfo):null; },
   get progress(){ return JSON.parse(JSON.stringify(progress)); },
