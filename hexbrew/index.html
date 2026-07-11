@@ -463,7 +463,9 @@ function stepResolver(dt){
   resolver.t-=dt; if(resolver.t>0) return;
   if(resolver.phase==='squish'){
     const maxDrop=compactColumns();
-    resolver.phase='fall'; resolver.t=0.10+Math.sqrt(maxDrop)*0.2;
+    let rows=0; // refill immediately each round — wet-ink bias keeps new balls from matching on arrival
+    if(cells.some(c=>c.c==null)){ rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; }
+    resolver.phase='fall'; resolver.t=0.10+Math.sqrt(Math.max(maxDrop,rows))*0.2;
   } else if(resolver.phase==='fall'){
     for(const c of cells){ c.oy=0; c.vy=0; }
     resolver.phase='beat'; resolver.t=BEAT_DUR;
