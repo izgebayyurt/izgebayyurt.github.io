@@ -421,9 +421,9 @@ function compactColumns(){
     for(let k=0;k<col.length;k++){ const ci=col[k]; if(cells[ci].c!=null) surv.push({c:cells[ci].c,fresh:cells[ci].fresh,bombBorn:cells[ci].bombBorn||0,fromK:k}); }
     const nEmpty=col.length-surv.length;
     for(let k=0;k<col.length;k++){ const ci=col[k];
-      if(k<nEmpty){ cells[ci].c=null; cells[ci].fresh=false; cells[ci].bombBorn=0; cells[ci].oy=0; }
+      if(k<nEmpty){ cells[ci].c=null; cells[ci].fresh=false; cells[ci].bombBorn=0; cells[ci].oy=0; cells[ci].vy=0; }
       else { const s=surv[k-nEmpty]; cells[ci].c=s.c; cells[ci].fresh=s.fresh; cells[ci].bombBorn=s.bombBorn;
-        cells[ci].oy=(s.fromK-k)*ROW_DY; maxDrop=Math.max(maxDrop,k-s.fromK); } }
+        cells[ci].oy=(s.fromK-k)*ROW_DY; cells[ci].vy=0; maxDrop=Math.max(maxDrop,k-s.fromK); } }
   }
   return maxDrop;
 }
@@ -439,8 +439,11 @@ function refillEmpties(orders){
     } }
   for(const ci of newSlots){ if(used.has(ci)) continue; const pick=pickRefillColour(ci); cells[ci].fresh=pick.biased; }
   for(const ci of newSlots) cells[ci].born=performance.now();
+  let maxRows=1;
   for(const col of COLUMNS){ const empt=col.filter(ci=>newSlots.includes(ci));
-    empt.forEach((ci,k)=>{ cells[ci].oy=-((empt.length-k)*ROW_DY+ROW_DY+18); }); }
+    empt.forEach((ci,k)=>{ cells[ci].oy=-((empt.length-k)*ROW_DY+ROW_DY+18); cells[ci].vy=0;
+      maxRows=Math.max(maxRows, empt.length-k+1.4); }); }
+  return maxRows;
 }
 function detonateBombs(){
   const start=[]; for(let i=0;i<N;i++) if(cells[i].c==='K') start.push(i);
@@ -460,9 +463,9 @@ function stepResolver(dt){
   resolver.t-=dt; if(resolver.t>0) return;
   if(resolver.phase==='squish'){
     const maxDrop=compactColumns();
-    resolver.phase='fall'; resolver.t=Math.min(FALL_MAX, FALL_MIN+0.025*maxDrop);
+    resolver.phase='fall'; resolver.t=0.10+Math.sqrt(maxDrop)*0.2;
   } else if(resolver.phase==='fall'){
-    for(const c of cells) c.oy=0;
+    for(const c of cells){ c.oy=0; c.vy=0; }
     resolver.phase='beat'; resolver.t=BEAT_DUR;
   } else {
     let matches=findMatches();
@@ -472,7 +475,7 @@ function stepResolver(dt){
       matches=findMatches();
     }
     if(matches.length){ resolver.depth++; clearRound(matches,resolver.depth); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
-    else if(cells.some(c=>c.c==null)){ refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=REFILL_DROP; }
+    else if(cells.some(c=>c.c==null)){ const rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=0.10+Math.sqrt(rows)*0.2; }
     else if(cells.some(c=>c.c==='K')){ detonateBombs(); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
     else { for(const c of cells) c.fresh=false; lastResolve={depth:resolver.depth}; resolver=null; onSettle(); }
   }
@@ -551,7 +554,11 @@ let last=performance.now();
 function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now; update(dt,now); render(now); requestAnimationFrame(tick); }
 function update(dt,now){
   stepResolver(dt);
-  for(const cell of cells){ cell.oy+=(0-cell.oy)*Math.min(1,dt*13); if(Math.abs(cell.oy)<0.3) cell.oy=0;
+  const FG=ROW_DY*55; // gravity: balls accelerate into holes instead of easing (a 1-row drop ≈ 190ms, visible)
+  for(const cell of cells){
+    if(cell.oy<0){ cell.vy=(cell.vy||0)+FG*dt; cell.oy+=cell.vy*dt;
+      if(cell.oy>=0){ cell.oy=0; cell.vy=0; cell.land=performance.now(); } }
+    else if(cell.oy!==0){ cell.oy=0; cell.vy=0; }
     cell.shake=Math.max(0,cell.shake-dt*2.4); }
   for(const g of popGoo){ g.t+=dt; g.x+=(g.tx-g.x)*Math.min(1,dt*13); g.y+=(g.ty-g.y)*Math.min(1,dt*13);
     g.r+=(ballRad*0.35-g.r)*Math.min(1,dt*8); }
@@ -609,6 +616,8 @@ function drawBalls(now){
     let r=ballRad + Math.sin(now/170+i)*0.6;
     const age=now-b.born; if(age<260){ const f=age/260; r*=0.62+0.38*f; }
     if(b.c==='K'){ drawBomb(x,y,r,now,i); continue; }
+    let sq=0; if(b.land){ const la=now-b.land; if(la<140) sq=1-la/140; else b.land=0; }
+    if(sq>0){ ctx.save(); ctx.translate(x,y); ctx.scale(1+0.16*sq,1-0.22*sq); ctx.translate(-x,-y); }
     const sel=(i===selIdx);
     stickerCircle(x,y,r,colOf(b.c),INK,sel?4:3);
     if(isSec(b.c)){ ctx.save(); ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=1.6;
@@ -619,6 +628,7 @@ function drawBalls(now){
         ctx.fillStyle=[HEX.R,HEX.B,HEX.G][k]; ctx.globalAlpha=0.7; ctx.fill(); }
       ctx.restore(); }
     ctx.beginPath(); ctx.arc(x-r*0.3,y-r*0.34,r*0.24,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
+    if(sq>0) ctx.restore();
     if(b.forgeFx && now-b.forgeFx<600){ const f=(now-b.forgeFx)/600; ctx.save(); ctx.globalAlpha=1-f;
       for(let k=0;k<4;k++){ const a=k*1.57+f*4; const rr=r+3+f*10;
         ctx.beginPath(); ctx.arc(x+Math.cos(a)*rr,y+Math.sin(a)*rr,2.2*(1-f)+1,0,6.28); ctx.fillStyle=ACCENT; ctx.fill(); }
