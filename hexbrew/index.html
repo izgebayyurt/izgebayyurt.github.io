@@ -815,13 +815,13 @@ function drawBoardBack(){
 // ink-wash stains: dark splotches with papery (blobby) edges, drawn on the CELL under the ball
 function drawSplot(x,y,a,seed){
   ctx.save(); ctx.fillStyle=INK;
-  ctx.globalAlpha=0.30*a;                            // lobes peek out past the ball rim
+  ctx.globalAlpha=0.55*a;                            // lobes peek out past the ball rim
   for(let k=0;k<7;k++){ const ang=(seed*2.399+k*0.983)%6.2832;
-    const rr=ballRad*(0.30+(((seed*7+k*13)%10)/20));
-    const ox=Math.cos(ang)*ballRad*0.72, oyy=Math.sin(ang)*ballRad*0.66;
+    const rr=ballRad*(0.34+(((seed*7+k*13)%10)/20));
+    const ox=Math.cos(ang)*ballRad*0.80, oyy=Math.sin(ang)*ballRad*0.74;
     ctx.beginPath(); ctx.arc(x+ox,y+oyy,rr,0,6.2832); ctx.fill(); }
-  ctx.globalAlpha=0.45*a;
-  ctx.beginPath(); ctx.arc(x,y,ballRad*0.62,0,6.2832); ctx.fill();
+  ctx.globalAlpha=0.72*a;
+  ctx.beginPath(); ctx.arc(x,y,ballRad*0.70,0,6.2832); ctx.fill();
   ctx.restore();
 }
 function drawInk(now){
