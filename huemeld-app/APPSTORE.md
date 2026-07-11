@@ -151,7 +151,7 @@ HARD TO PUT DOWN
 
 SEVEN PUZZLE PACKS (350 more levels)
 • Brown — chain all three primaries into deep blends
-• Arrows — gates only pass their color, some one-way
+• Arrows — ride them straight through, the way they point
 • Ice — frozen tiles keep your line running straight
 • Portals — pink spirals teleport your flow across the board
 • Bridges — cross your own lines on overpasses
@@ -190,7 +190,7 @@ more ways than one — but never as many as you'd hope.
 5. `screen-05-bridges.png` — Cross over bridges
 6. `screen-06-prisms.png` — Split light with prisms
 7. `screen-07-numbers.png` — Crack the number clues
-8. `screen-08-daily.png` — A new puzzle every day
+8. `screen-08-daily.png` — A new puzzle every day!
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 

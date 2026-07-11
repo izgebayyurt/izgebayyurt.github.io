@@ -556,17 +556,17 @@ function pathAt(r,c){
   return null;
 }
 var DIRV={U:[-1,0],D:[1,0],L:[0,-1],R:[0,1]};
-/* a directional gate also demands the pipe crosses it MOVING the arrow's way */
+/* an arrow gate is ice with a heading: the pipe must run STRAIGHT through,
+   entering AND leaving the arrow's way (no turning inside the cell) */
 function dirOK(G){
   if(!G.dir) return true;
   var p=pathAt(G.r,G.c); if(!p) return false;
   var v=DIRV[G.dir], cl=p.cells, i=p.idx;
-  if(i>0 && cl[i][0]-cl[i-1][0]===v[0] && cl[i][1]-cl[i-1][1]===v[1]) return true;
-  if(i<cl.length-1 && cl[i+1][0]-cl[i][0]===v[0] && cl[i+1][1]-cl[i][1]===v[1]) return true;
-  return false;
+  return i>0 && i<cl.length-1 &&
+    cl[i][0]-cl[i-1][0]===v[0] && cl[i][1]-cl[i-1][1]===v[1] &&
+    cl[i+1][0]-cl[i][0]===v[0] && cl[i+1][1]-cl[i][1]===v[1];
 }
 function gateOK(G){ return colorAt(G.r,G.c)===G.col && dirOK(G); }
-function gatesSatisfied(){ for(var i=0;i<gates.length;i++){ if(!gateOK(gates[i])) return false; } return true; }
 /* every ice cell must be crossed in a straight line — enter one side, leave the opposite */
 function iceOK(){
   for(var i=0;i<ices.length;i++){ var p=pathAt(ices[i][0],ices[i][1]); if(!p) return false;
@@ -981,7 +981,10 @@ function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
   if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
   if(!noDangling()){ toast("A pipe has a loose end!"); return; }
-  if(!gatesSatisfied()){ toast("A gate needs the right colour!"); return; }
+  for(var gi=0;gi<gates.length;gi++){ var GG=gates[gi];
+    if(colorAt(GG.r,GG.c)!==GG.col){ toast("A gate needs the right colour!"); return; }
+    if(!dirOK(GG)){ toast("Ride arrows straight through, the way they point!"); return; }
+  }
   if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
   if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
   if(!countersOK()){ toast("A number tile needs its EXACT count!"); return; }

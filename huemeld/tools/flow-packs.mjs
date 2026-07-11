@@ -50,19 +50,54 @@ function spreadPick(cands, want, rng) {
 /* ---- per-pack level makers (return {lv, gest} or null) ---- */
 
 /* place `spec.gates` colour gates on the solution (first `spec.arrows` of them
-   directional), keeping clear of endpoints, junctions, prisms + any `extra` cells */
+   directional), keeping clear of endpoints, junctions, prisms + any `extra` cells.
+
+   Arrows are ice-with-a-heading: the line must run STRAIGHT through, entering
+   and leaving the arrow's way. So arrow cells must be straight cells of the
+   solution — and to make each arrow actually constrain (would the solve be
+   more straightforward without it?), it must have at least one open off-axis
+   neighbour: a cell where a reroute could have turned, which the arrow forbids.
+   Corridor cells (walls/edges on both sides force straightness anyway) never
+   get an arrow. Cells with BOTH side neighbours open constrain most, so they
+   are preferred. */
 function placeGates(L, spec, rng, extra) {
   const skip = keepOut(L, true);
   (L.prisms || []).forEach(([, r, c]) => { skip.add(key(r, c));
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => skip.add(key(r + dr, c + dc))); });
   if (extra) extra.forEach((k2) => skip.add(k2));
   const cands = pathInteriors(L.gest).filter((x) => !skip.has(key(x.r, x.c)));
-  const picked = spreadPick(cands, spec.gates, rng);
-  if (!picked) return null;
-  return picked.map((x, i) => {
-    const col = L.paint.get(key(x.r, x.c));
-    return (spec.arrows && i < spec.arrows) ? [col, x.r, x.c, DIRL(x.din)] : [col, x.r, x.c];
-  });
+  if (!spec.arrows) {              // gate-only path: byte-stable with old data
+    const picked = spreadPick(cands, spec.gates, rng);
+    if (!picked) return null;
+    return picked.map((x) => [L.paint.get(key(x.r, x.c)), x.r, x.c]);
+  }
+  const wallSet = new Set((L.walls || []).map(([r, c]) => key(r, c)));
+  const open = (r, c) => r >= 0 && c >= 0 && r < L.n && c < L.n && !wallSet.has(key(r, c));
+  const adj = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
+  const scored = cands
+    .filter((x) => x.din[0] === x.dout[0] && x.din[1] === x.dout[1])
+    .map((x) => ({ ...x, off: (open(x.r + x.din[1], x.c + x.din[0]) ? 1 : 0) + (open(x.r - x.din[1], x.c - x.din[0]) ? 1 : 0) }))
+    .filter((x) => x.off > 0);
+  const pool = [...shuffle(scored.filter((x) => x.off === 2), rng), ...shuffle(scored.filter((x) => x.off === 1), rng)];
+  const arrows = [];
+  for (const x of pool) {
+    if (arrows.length >= spec.arrows) break;
+    if (arrows.some((h) => adj(h, x))) continue;
+    arrows.push(x);
+  }
+  if (arrows.length < spec.arrows) return null;
+  const taken = new Set(arrows.map((x) => key(x.r, x.c)));
+  const plain = [];
+  for (const g of shuffle(cands.filter((x) => !taken.has(key(x.r, x.c))), rng)) {
+    if (plain.length >= spec.gates - spec.arrows) break;
+    if (plain.some((h) => adj(h, g)) || arrows.some((h) => adj(h, g))) continue;
+    plain.push(g);
+  }
+  if (plain.length < spec.gates - spec.arrows) return null;
+  return [
+    ...arrows.map((x) => [L.paint.get(key(x.r, x.c)), x.r, x.c, DIRL(x.din)]),
+    ...plain.map((x) => [L.paint.get(key(x.r, x.c)), x.r, x.c]),
+  ];
 }
 
 /* counter tiles: EXACTLY nv cells of the 3×3 block around (and including) the
@@ -201,7 +236,7 @@ const RAMPS = {
     [6, { build: "chain", n: 7, minOpen: 43, gates: 3 }],
     [6, { build: "chain", n: 8, minOpen: 54 }],
   ] },
-  arrows: { name: "Arrows", icon: "➤", desc: "Gates with a direction", tiers: [
+  arrows: { name: "Arrows", icon: "➤", desc: "Ride them straight through, the way they point", tiers: [
     [6, { n: 5, minOpen: 24, gates: 2, arrows: 1, looseness: 0.95 }],
     [6, { n: 6, minOpen: 33, gates: 3, arrows: 2, looseness: 0.95 }],
     [4, { build: "fork", n: 6, minOpen: 31, gates: 3, arrows: 2, looseness: 0.95 }],
