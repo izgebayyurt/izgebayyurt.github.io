@@ -1,12 +1,12 @@
 <!doctype html>
-<!-- whorl · crucible lab (lab2) — hex-19 lattice, line casting, alchemy traces -->
+<!-- whorl · match lab (lab2) — hex-37 match-3, double-match forging, tri-bar Whorl -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#f0e6cf" />
-<title>Whorl · Crucible Lab</title>
-<meta name="description" content="The Crucible — a hex-19 colour lattice. Draw straight lines across it to cast; casting merges the balls it crosses." />
+<title>Whorl · Match Lab</title>
+<meta name="description" content="Hex-37 match-3 casting lab — swap primaries into lines, forge secondaries, charge the Whorl." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -63,753 +63,626 @@ body{
   color:var(--ink); background:var(--paper2); border:2.5px solid var(--ink); border-radius:12px;
   box-shadow:0 3px 0 var(--shadow); transition:transform .08s var(--calm), box-shadow .08s var(--calm); touch-action:manipulation; }
 .tbtn:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
-.stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:10px; }
-.stat{ background:var(--paper2); border:2.5px solid var(--ink); border-radius:11px; padding:7px 3px; text-align:center;
+.stats{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px; }
+.stat{ background:var(--paper2); border:2.5px solid var(--ink); border-radius:11px; padding:6px 2px; text-align:center;
   box-shadow:0 2px 0 var(--shadow); }
-.stat b{ font-family:var(--font-d); font-weight:700; font-size:16px; display:block; line-height:1.1; }
-.stat small{ font-family:var(--font-u); font-weight:800; font-size:8px; letter-spacing:.06em; color:var(--ink-soft); text-transform:uppercase; }
+.stat b{ font-family:var(--font-d); font-weight:700; font-size:15px; display:block; line-height:1.1; }
+.stat small{ font-family:var(--font-u); font-weight:800; font-size:7.5px; letter-spacing:.04em; color:var(--ink-soft); text-transform:uppercase; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 
 <div class="hud">
-  <div class="title">Whorl <span>· Crucible Lab</span></div>
+  <div class="title">Whorl <span>· Match Lab</span></div>
   <div class="spacer"></div>
 </div>
 
 <div class="gear" id="gear">⚙</div>
 <div class="drawer" id="drawer">
   <h3>Tuning <span class="x" id="drawerClose">×</span></h3>
-  <div class="row"><label>Cooldown (s)</label><input type="range" id="sCd" min="0.5" max="4.0" step="0.1"><span class="val" id="vCd">1.6</span></div>
+  <div class="row"><label>Swap CD (s)</label><input type="range" id="sCd" min="0.5" max="4.0" step="0.1"><span class="val" id="vCd">1.6</span></div>
+  <div class="row"><label>Forge count</label><input type="range" id="sForge" min="1" max="3" step="1"><span class="val" id="vForge">2</span></div>
+  <div class="row"><label>Pops / bar</label><input type="range" id="sPops" min="3" max="8" step="1"><span class="val" id="vPops">5</span></div>
   <div class="row"><label>Spawn (s)</label><input type="range" id="sSpawn" min="1.0" max="8.0" step="0.1"><span class="val" id="vSpawn">3.0</span></div>
   <div class="row"><label>Enemy px/s</label><input type="range" id="sSpeed" min="4" max="40" step="1"><span class="val" id="vSpeed">14</span></div>
   <div class="btnrow">
     <button class="tbtn" id="bReroll">Reroll board</button>
     <button class="tbtn" id="bClear">Clear enemies</button>
+    <button class="tbtn" id="bFill">Fill bars</button>
   </div>
   <div class="stats">
+    <div class="stat"><b id="stMatches">0</b><small>matches</small></div>
+    <div class="stat"><b id="stDoubles">0</b><small>doubles</small></div>
+    <div class="stat"><b id="stForged">0</b><small>forged</small></div>
+    <div class="stat"><b id="stSec">0</b><small>sec pop</small></div>
+    <div class="stat"><b id="stWhorls">0</b><small>whorls</small></div>
+    <div class="stat"><b id="stChain">0</b><small>max chain</small></div>
     <div class="stat"><b id="stCasts">0</b><small>casts</small></div>
-    <div class="stat"><b id="stFizzles">0</b><small>fizzles</small></div>
     <div class="stat"><b id="stKills">0</b><small>kills</small></div>
     <div class="stat"><b id="stLeaks">0</b><small>leaks</small></div>
-    <div class="stat"><b id="stAvg">0.0</b><small>avg len</small></div>
-    <div class="stat"><b id="stWhorls">0</b><small>whorls</small></div>
-    <div class="stat"><b id="stWhites">0</b><small>whites</small></div>
-    <div class="stat"><b id="stWords">0</b><small>words</small></div>
-    <div class="stat"><b id="stSwaps">0</b><small>swaps</small></div>
-    <div class="stat"><b id="stBurned">0</b><small>burned</small></div>
+    <div class="stat"><b id="stRemix">0</b><small>remixes</small></div>
   </div>
 </div>
 
 <script>
 "use strict";
 (function(){
-// ---------------- constants ----------------
+// ================= constants =================
 const PRIMS = ['R','Y','B'];
-const HEX = {
-  R:'#ef4a5a', Y:'#f6c445', B:'#3d8bdf', O:'#f2913d', G:'#57c268', P:'#9b62d6', W:'#faf6ec'
-};
-const HEX_DARK = { // darker rim tone per colour
-  R:'#c02c3c', Y:'#c99518', B:'#2564a8', O:'#c26a20', G:'#3a9247', P:'#6f3fae', W:'#cbbf9a'
-};
+const SECS  = ['O','G','P'];
+const HEX = { R:'#ef4a5a', Y:'#f6c445', B:'#3d8bdf', O:'#f2913d', G:'#57c268', P:'#9b62d6' };
 const INK = '#2c2733', PAPER='#f0e6cf', PAPER2='#fbf5e6', ACCENT='#ffd15c';
-const NAMES_WING  = { R:'Fire', Y:'Splash', B:'Lance', O:'Fan', G:'Bog', P:'Orb', W:'Prism' };
-const NAMES_HEART = { R:'bolt', Y:'ray', B:'shard', O:'burst', G:'mire', P:'hex', W:'prism' };
-const DMG_BY_LEN = {3:10,4:22,5:40};
+const DECOMP = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'] };
+const MIX = { RY:'O', YR:'O', RB:'P', BR:'P', YB:'G', BY:'G' };
+function isSec(c){ return c==='O'||c==='G'||c==='P'; }
+// spell forms per colour
+const SPELLS = {
+  R:{ speed:520, r:12, applies:'burn' },
+  Y:{ speed:660, r:11, dmgMul:1.2 },
+  B:{ speed:430, r:14, applies:'chill' },
+  O:{ speed:340, r:16, aoe:70 },
+  P:{ speed:300, r:13, pierce:true },
+  G:{ speed:300, r:14, pool:true }
+};
+const LAD_PRIM = {3:8,4:18,5:32}, LAD_SEC = {3:22,4:44,5:80};
+function ladder(colour,len){ const t=Math.min(5,len); return (isSec(colour)?LAD_SEC:LAD_PRIM)[t]; }
 
-// colour decomposition -> primaries, and recombination
-const DECOMP = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'], W:['R','Y','B'] };
-function mergeColours(word){
-  const set = new Set();
-  for(const c of word){ for(const p of (DECOMP[c]||[])) set.add(p); }
-  const key = (set.has('R')?'R':'')+(set.has('Y')?'Y':'')+(set.has('B')?'B':'');
-  const map = {R:'R',Y:'Y',B:'B',RY:'O',YB:'G',RB:'P',RYB:'W'};
-  return map[key] || word[Math.floor(word.length/2)];
-}
+// ---------- hexagon radius 3 (flat-top cells → vertical columns for gravity) ----------
+const RAD=3;
+const CELLS_QR=[]; { for(let q=-RAD;q<=RAD;q++){ const r1=Math.max(-RAD,-q-RAD), r2=Math.min(RAD,-q+RAD);
+  for(let r=r1;r<=r2;r++) CELLS_QR.push([q,r]); } }               // 37 cells
+const N = CELLS_QR.length;
+const KEY = (q,r)=>q+','+r;
+const IDX = {}; CELLS_QR.forEach(([q,r],i)=>IDX[KEY(q,r)]=i);
+const NDELTA=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const NEIGH = CELLS_QR.map(([q,r])=> NDELTA.map(([dq,dr])=>IDX[KEY(q+dq,r+dr)]).filter(v=>v!==undefined));
+// columns (const q) top→bottom = r ascending (y grows with r); gravity pulls to larger r
+const COLUMNS = (()=>{ const m={}; CELLS_QR.forEach(([q,r],i)=>(m[q]=m[q]||[]).push(i));
+  return Object.keys(m).map(q=>+q).sort((a,b)=>a-b).map(q=>m[q].sort((i,j)=>CELLS_QR[i][1]-CELLS_QR[j][1])); })();
+// match lines for the 3 axes (A=const q vertical, B=const r, C=const q+r)
+const LINES = (()=>{ function build(keyf,ordf){ const m={};
+    for(let i=0;i<N;i++){ const [q,r]=CELLS_QR[i]; const k=keyf(q,r); (m[k]=m[k]||[]).push([ordf(q,r),i]); }
+    return Object.values(m).map(a=>a.sort((x,y)=>x[0]-y[0]).map(x=>x[1])).filter(l=>l.length>=3); }
+  return { A:build((q)=>q,(q,r)=>r), B:build((q,r)=>r,(q)=>q), C:build((q,r)=>q+r,(q)=>q) }; })();
+const ALL_LINES = [...LINES.A,...LINES.B,...LINES.C];
 
-// hex-19 lattice, axial (q,r), hexagon radius 2. Ordered row-by-row (r asc, q asc).
-const BALLS_QR = [
-  [0,-2],[1,-2],[2,-2],
-  [-1,-1],[0,-1],[1,-1],[2,-1],
-  [-2,0],[-1,0],[0,0],[1,0],[2,0],
-  [-2,1],[-1,1],[0,1],[1,1],
-  [-2,2],[-1,2],[0,2]
-];
-const CENTER_IDX = 9;
-
-// ---------------- feel / tuning ----------------
-const TAP_TOL = 8;      // px before a press becomes a drag
-const COMMIT_TOL = 16;  // px before drag commits to an axis
-const AIM_TOL = 46;     // perpendicular px off the line (with >=3 selected) => pull-to-aim
-const LOCK_DUR = 0.8;   // fizzle input lockout (s)
-
-// ---------------- persisted settings ----------------
+// ================= persisted settings =================
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+let CD_DUR = parseFloat(lsGet('whlab2_cd','1.6')); if(!(CD_DUR>=0.5&&CD_DUR<=4)) CD_DUR=1.6;
+let FORGE_COUNT = parseInt(lsGet('whlab2_forge','2'),10); if(!(FORGE_COUNT>=1&&FORGE_COUNT<=3)) FORGE_COUNT=2;
+let POPS = parseInt(lsGet('whlab2_pops','5'),10); if(!(POPS>=3&&POPS<=8)) POPS=5;
+let SPAWN = 3.0, ESPEED = 14;
 
-let CD_DUR = parseFloat(lsGet('whlab2_cd','1.6'));
-if(!(CD_DUR>=0.5 && CD_DUR<=4.0)) CD_DUR=1.6;
-let SPAWN = 3.0;
-let ESPEED = 14;
-
-// ---------------- canvas ----------------
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-let W=390, H=800, DPR=1;
-// lattice geometry (set by layout)
-let latCX=195, latCY=545, spacing=64, rowH=55, ballRad=24, leakY=394;
+// ================= canvas / layout =================
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let W=390,H=800,DPR=1;
+let size=26, ballRad=20, COL_DX=39, ROW_DY=45, latCX=195, latCY=584, leakY=360, topY=430;
+let sigilX=195, sigilY=372, sigilR=26;
+let barX=[10,26,42], barW=12, barTop=512, barH=144;
 function layout(){
-  DPR = Math.min(window.devicePixelRatio||1, 2.5);
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = Math.round(W*DPR); canvas.height = Math.round(H*DPR);
+  DPR=Math.min(window.devicePixelRatio||1,2.5);
+  W=window.innerWidth; H=window.innerHeight;
+  canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR);
   canvas.style.width=W+'px'; canvas.style.height=H+'px';
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  const margin = 18;
-  spacing = Math.min(64, (W-2*margin)/4.8);   // guarantees the middle row of 5 fits
-  ballRad = Math.max(20, Math.min(24, spacing*0.375));
-  const size = spacing/Math.sqrt(3);
-  rowH = size*1.5;
-  latCX = W/2;
-  latCY = H - 118 - ballRad - 2*rowH;          // bottom ball edge ~118px off the floor
-  leakY = latCY - 2*rowH - ballRad - 16;        // enemies leak just above the top row
-  for(let i=0;i<balls.length;i++){
-    const [q,r]=BALLS_QR[i];
-    balls[i].x = latCX + spacing*(q + r/2);
-    balls[i].y = latCY + rowH*r;
-    balls[i].rad = ballRad;
-  }
+  const margin=16;
+  size=Math.max(20,Math.min(26,(W-2*margin-14)/10.58));
+  ballRad=Math.max(18,Math.min(21,size*0.78));
+  COL_DX=1.5*size; ROW_DY=Math.sqrt(3)*size;
+  latCX=W/2;
+  const halfH=3*ROW_DY;
+  latCY=H-58-ballRad-halfH;
+  topY=latCY-halfH-ballRad;
+  leakY=topY-70;
+  sigilR=Math.min(27,ballRad+6);
+  sigilX=W/2; sigilY=Math.max(leakY, (leakY+topY)/2 - 2);
+  barW=10;
+  const gap=4, bmargin=8;
+  barX=[bmargin, bmargin+barW+gap, bmargin+2*(barW+gap)];
+  barTop=latCY-72; barH=150;
+  for(let i=0;i<N;i++){ const [q,r]=CELLS_QR[i];
+    cells[i].x=latCX+COL_DX*q; cells[i].y=latCY+ROW_DY*(r+q/2); }
 }
 window.addEventListener('resize', layout);
 
-// offscreen for metaball field
-const off = document.createElement('canvas');
-const octx = off.getContext('2d');
-function sizeOff(){ off.width=Math.round(W*0.6); off.height=Math.round(H*0.6); }
+// offscreen metaball
+const off=document.createElement('canvas'), octx=off.getContext('2d');
+function sizeOff(){ off.width=Math.round(W*0.55); off.height=Math.round(H*0.55); }
 
-// ---------------- lattice state ----------------
-// ball: {q,r,x,y,rad,c,wob, consumed(bool), refillT(s countdown), born}
-const REFILL_DUR = 0.6;
+// ================= state =================
+// cell: {q,r,x,y,c, oy, shake, born, forgeFx, _new}
+const cells = CELLS_QR.map(([q,r])=>({q,r,x:0,y:0,c:'R',oy:0,shake:0,born:0,forgeFx:0,_new:false}));
+let meters={O:0,G:0,P:0}, whorlReady=false;
+let enemies=[], spells=[], pools=[], puffs=[], dmgPops=[], shocks=[], castGoo=[], sparks=[];
+let remixFx=null, chainLabel=null;
+let cooldown=0, spawnT=0, auto=true, SAFE_REFILL=false;
+let selIdx=-1;                       // tap-select
+let stats={ matches:0, doubles:0, forged:0, secPopped:0, whorls:0, maxChain:0, casts:0, kills:0, leaks:0, swaps:0, remixes:0 };
+
 function randPrim(){ return PRIMS[(Math.random()*3)|0]; }
-let balls = BALLS_QR.map(([q,r])=>({q,r,x:0,y:0,rad:24,c:randPrim(),wob:0,consumed:false,refillT:0,born:performance.now()}));
 
-// ---------------- game state ----------------
-let enemies = [];  // {x,y,r,hp,maxhp,col,wob,dead,death}
-let spells = [];   // travelling spells
-let warriors = [];
-let puffs = [];
-let dmgPops = [];
-let alchFx = [];   // {x,y,t0,dur,from:[prims],to,col}
-let swapFx = [];   // swap smears {ax,ay,bx,by,ca,cb,t0,dur,popped}
-let burnFx = [];   // reagent burns {x,y,col,t0,dur}
-let shocks = [];   // whorl rings {x,y,r,maxr,t0,dur}
-let spawnT = 0;
-let cooldown = 0;  // remaining cast cooldown (s)
-let lockout = 0;   // remaining fizzle lockout (s)
-let stats = { casts:0, fizzles:0, kills:0, leaks:0, words:0, totalLen:0, whorls:0, whites:0, swaps:0, burned:0 };
-
-// ---------------- input / selection ----------------
-let dragging=false, moved=false;
-let startIdx=-1;                 // ball the press started on
-let startPos={x:0,y:0};
-let pointer={x:0,y:0};
-let committed=-1;                // axis 0/1/2 once committed
-let selection=[];                // ordered ball indices (start -> far)
-let aiming=false;
-let aimVec={x:0,y:-1};
-let blobs=[];                    // metaball goo {bi,x,y,tx,ty,r,col,seed}
-
-// pixel direction of each axis (pointy-top): A horizontal, B down-right, C up-right
-const AXPIX = [ {x:1,y:0}, {x:0.5,y:0.8660254}, {x:0.5,y:-0.8660254} ];
-
-function ballAt(x,y){
-  for(let i=0;i<balls.length;i++){ const b=balls[i]; if(b.consumed) continue;
-    if(Math.hypot(x-b.x,y-b.y)<=b.rad) return i; }
-  return -1;
-}
-// balls collinear with startIdx along an axis, sorted by position along it
-function lineOf(sIdx, axis){
-  const s=balls[sIdx];
-  const key = axis===0 ? s.r : axis===1 ? s.q : (s.q+s.r);
-  const line = [];
-  for(let i=0;i<balls.length;i++){ const b=balls[i]; if(b.consumed && i!==sIdx) continue;
-    const k = axis===0 ? b.r : axis===1 ? b.q : (b.q+b.r);
-    if(k===key) line.push(i);
-  }
-  line.sort((i,j)=> posAlong(i,axis)-posAlong(j,axis));
-  return line;
-}
-function posAlong(i,axis){ const b=balls[i]; return axis===1 ? b.r : b.q; }
-
-function commitAxis(){
-  const dx=pointer.x-startPos.x, dy=pointer.y-startPos.y;
-  let best=-1, bestd=0;
-  for(let a=0;a<3;a++){ const d=Math.abs(dx*AXPIX[a].x + dy*AXPIX[a].y); if(d>bestd){bestd=d;best=a;} }
-  committed=best;
-}
-function updateSelection(){
-  const axis=committed;
-  const s=balls[startIdx];
-  const dir=AXPIX[axis];
-  const line=lineOf(startIdx, axis);
-  const tf=(pointer.x-s.x)*dir.x + (pointer.y-s.y)*dir.y;   // finger projection rel. start
-  let target=startIdx, bd=1e9;
-  for(const i of line){ const b=balls[i]; const t=(b.x-s.x)*dir.x+(b.y-s.y)*dir.y;
-    const d=Math.abs(t-tf); if(d<bd){bd=d;target=i;} }
-  const si=line.indexOf(startIdx), ti=line.indexOf(target);
-  const lo=Math.min(si,ti), hi=Math.max(si,ti);
-  let seg=line.slice(lo,hi+1);
-  if(si>ti) seg.reverse();
-  if(seg.length>5) seg=seg.slice(0,5);
-  selection=seg;
-  // aim: pull far perpendicular to the line with >=3 selected
-  const drag={x:pointer.x-s.x,y:pointer.y-s.y};
-  const along=drag.x*dir.x+drag.y*dir.y;
-  const perp=Math.hypot(drag.x-dir.x*along, drag.y-dir.y*along);
-  aiming = selection.length>=3 && perp>AIM_TOL;
-  if(aiming){ const o=centroid(selection); aimVec={x:pointer.x-o.x, y:pointer.y-o.y}; }
-  syncBlobs();
-}
-function centroid(sel){ let sx=0,sy=0; for(const i of sel){ sx+=balls[i].x; sy+=balls[i].y; }
-  const n=Math.max(1,sel.length); return {x:sx/n, y:sy/n}; }
-
-function syncBlobs(){
-  blobs = blobs.filter(bl=>selection.includes(bl.bi));
-  for(const bi of selection){
-    let bl=blobs.find(x=>x.bi===bi);
-    if(!bl){ const b=balls[bi]; bl={bi,x:b.x,y:b.y,tx:b.x,ty:b.y,r:0,col:b.c,seed:Math.random()*6.28}; blobs.push(bl); }
-    bl.col=balls[bi].c;
-  }
-}
-function clearSelection(){ selection=[]; blobs=[]; aiming=false; committed=-1; dragging=false; moved=false; startIdx=-1; }
-
-// ---------------- grammar ----------------
-function isPalindrome(a){ for(let i=0,j=a.length-1;i<j;i++,j--) if(a[i]!==a[j]) return false; return true; }
-function allSame(a){ return a.every(c=>c===a[0]); }
-function classify(word){
-  const n=word.length;
-  if(n<3||n>5) return {type:'fizzle', reason:n>5?'too long':'too short'};
-  if(allSame(word)) return {type:'pure', col:word[0], len:n};
-  if(isPalindrome(word)) return {type:'mixed', wing:word[0], heart:word[Math.floor(n/2)], len:n};
-  return {type:'fizzle', reason:'not mirror'};
-}
-function heartIndices(n){ return n%2 ? [Math.floor(n/2)] : [n/2-1, n/2]; }
-function nameFor(cls){
-  if(cls.type==='pure') return 'Warrior '+cls.col;
-  if(cls.type==='mixed') return NAMES_WING[cls.wing]+NAMES_HEART[cls.heart];
-  return '';
-}
-
-// ---------------- casting ----------------
-function castFromSelection(vec){
-  if(cooldown>0){ clearSelection(); return {result:'cooldown'}; }
-  const sel = selection.slice();
-  const word = sel.map(i=>balls[i].c);
-  const cls = classify(word);
-  stats.words++; stats.totalLen += word.length;
-
-  if(cls.type==='fizzle'){
-    doFizzle(sel);
-    stats.fizzles++; lockout=LOCK_DUR;
-    clearSelection();
-    return {result:'fizzle', word:word.join('')};
-  }
-
-  const o = centroid(sel);
-  const v = normVec(vec || nearestEnemyVec(o));
-
-  if(cls.type==='pure'){
-    // consume the whole segment; warrior emerges; spots refill after ~0.6s
-    for(const i of sel){ const b=balls[i]; b.consumed=true; b.refillT=REFILL_DUR;
-      for(let k=0;k<5;k++) puffs.push(mkPuff(b.x,b.y,HEX[b.c])); }
-    summonWarrior(cls.col, cls.len, o);
-  } else {
-    // MIXED MIRROR — trace rule: transform heart ball(s) into the merge
-    const merged = mergeColours(word);
-    const contribs = [...new Set(word.flatMap(c=>DECOMP[c]))];
-    const heartSet = new Set(heartIndices(cls.len));
-    for(const h of heartIndices(cls.len)){
-      const bi=sel[h]; const b=balls[bi];
-      const prev=b.c; b.c=merged; b.wob=1.2;
-      alchFx.push({x:b.x,y:b.y,t0:performance.now(),dur:600,from:contribs.slice(),to:merged});
-      if(merged==='W' && prev!=='W') stats.whites++;
+// ================= match finding =================
+function findMatches(){
+  const out=[];
+  for(const line of ALL_LINES){
+    let k=0;
+    while(k<line.length){
+      const c=cells[line[k]].c;
+      if(c==null){ k++; continue; }
+      let j=k+1; while(j<line.length && cells[line[j]].c===c) j++;
+      if(j-k>=3) out.push({ cells:line.slice(k,j), colour:c, len:j-k });
+      k=j;
     }
-    // REAGENT BURN — every non-heart secondary/white ball is one-use: it burns
-    // to a poof of its own colour and refills as a random primary (~0.6s).
-    for(let k=0;k<sel.length;k++){
-      if(heartSet.has(k)) continue;
-      const b=balls[sel[k]];
-      if(b.c==='O'||b.c==='G'||b.c==='P'||b.c==='W'){ burnReagent(sel[k]); stats.burned++; }
+  }
+  return out;
+}
+function hasInstantMatch(){ return findMatches().length>0; }
+// is there a swap of two adjacent balls that would create a 3+ line?
+function hasMatchingMove(){
+  for(let a=0;a<N;a++){
+    for(const b of NEIGH[a]){
+      if(b<=a) continue;
+      const ca=cells[a].c, cb=cells[b].c;
+      if(ca==null||cb==null||ca===cb) continue;
+      cells[a].c=cb; cells[b].c=ca;
+      const hit=findMatches().some(m=>m.cells.includes(a)||m.cells.includes(b));
+      cells[a].c=ca; cells[b].c=cb;
+      if(hit) return true;
     }
-    launchSpell(cls, o, v);
   }
-  stats.casts++;
-  cooldown = CD_DUR;
-  vibrate(24);
-  clearSelection();
-  return {result:cls.type, word:word.join(''), name:nameFor(cls)};
+  return false;
 }
 
-function castWhorl(bi){
-  if(cooldown>0){ return {result:'cooldown'}; }
-  const cx=latCX, cy=latCY;
-  shocks.push({x:cx,y:cy,r:0,maxr:Math.hypot(W,H),t0:performance.now(),dur:520});
-  for(const e of enemies){ if(!e.dead) damageEnemy(e, 60, HEX.W); }
-  for(let k=0;k<20;k++){ const p=mkPuff(cx,cy,HEX.W); p.life+=0.3; puffs.push(p); }
-  if(balls[bi]) balls[bi].c=randPrim(), balls[bi].wob=1.2;
-  stats.whorls++;
-  cooldown = CD_DUR;
-  vibrate([16,20,16]);
-  return {result:'whorl'};
+// ================= board generation =================
+function genNoMatch(){
+  for(const cell of cells){ cell.c=randPrim(); cell.oy=0; cell.shake=0; cell.forgeFx=0; }
+  let guard=0;
+  while(guard++<400 && hasInstantMatch()){
+    for(const m of findMatches()) for(const ci of m.cells) cells[ci].c=randPrim();
+  }
+}
+function rerollBoard(){ genNoMatch(); ensurePlayable(true); }
+
+// ================= remix (deadlock rescue) =================
+// rearrange the SAME multiset into a no-match arrangement that has a matching move
+function remixArrange(){
+  const bag=cells.map(c=>c.c);
+  for(let attempt=0; attempt<60; attempt++){
+    // Fisher–Yates shuffle of the exact same multiset
+    for(let i=bag.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=bag[i]; bag[i]=bag[j]; bag[j]=t; }
+    for(let i=0;i<N;i++) cells[i].c=bag[i];
+    // repair any matches by swapping colours between two board cells (keeps multiset intact)
+    let g=0;
+    while(g++<400 && hasInstantMatch()){
+      const m=findMatches()[0]; const ci=m.cells[(Math.random()*m.cells.length)|0];
+      let dj=-1; for(let t=0;t<60;t++){ const j=(Math.random()*N)|0; if(cells[j].c!==cells[ci].c){ dj=j; break; } }
+      if(dj<0) break; const tmp=cells[ci].c; cells[ci].c=cells[dj].c; cells[dj].c=tmp;
+    }
+    if(!hasInstantMatch() && hasMatchingMove()) return true;
+    for(let i=0;i<N;i++) bag[i]=cells[i].c;   // carry the repaired arrangement into the next reshuffle
+  }
+  return false;
+}
+function remix(force){
+  if(!force && hasMatchingMove()) return false;
+  const before=cells.map(c=>c.c);
+  const ok=remixArrange();
+  if(!ok){ genNoMatch(); if(!hasMatchingMove()) remixArrange(); }   // degenerate fallback
+  // pretty swirl using the *previous* positions as ink trails
+  remixFx={ t0:performance.now(), dur:700, from:before.map((c,i)=>({x:cells[i].x,y:cells[i].y,c})) };
+  chainLabel={ n:-1, life:1.1, text:'whorled!' };
+  for(let i=0;i<N;i++){ cells[i].born=performance.now(); cells[i].oy=0; }
+  stats.remixes++;
+  return true;
+}
+// called after every settling moment
+function ensurePlayable(silent){
+  if(hasMatchingMove()) return false;
+  remix(true);
+  return true;
 }
 
-function normVec(v){ const m=Math.hypot(v.x,v.y)||1; return {x:v.x/m,y:v.y/m}; }
-function nearestEnemyVec(o){
-  let best=null,bd=1e9;
-  for(const e of enemies){ if(e.dead) continue; const d=Math.hypot(e.x-o.x,e.y-o.y); if(d<bd){bd=d;best=e;} }
-  if(best) return normVec({x:best.x-o.x,y:best.y-o.y});
-  return {x:0,y:-1};
-}
-function summonWarrior(col,len,o){
-  const tier=len-2; const r=15+tier*6; const hp=30+tier*30;
-  warriors.push({x:o.x+(Math.random()-0.5)*30, y:o.y-10, r, hp, maxhp:hp, col, tier, atk:6+tier*4, atkT:0});
-  for(let k=0;k<10;k++) puffs.push(mkPuff(o.x,o.y,HEX[col]));
-}
-function launchSpell(cls,o,v){
-  const form=cls.wing, heart=cls.heart;
-  const dmg=DMG_BY_LEN[cls.len] + (heart==='R'?6:heart==='P'?4:heart==='B'?3:2);
-  const speed={R:520,B:420,P:190,O:300,Y:250,G:300,W:240}[form]||300;
-  function one(vv){
-    spells.push({ x:o.x, y:o.y, vx:vv.x*speed, vy:vv.y*speed,
-      form, wing:cls.wing, heart, dmg, life:2.4, r:(form==='P'||form==='W')?20:form==='B'?10:13,
-      tint:HEX[heart], col:HEX[cls.wing], pierce:form==='B', trail:[], lob:form==='Y',
-      pool:form==='G', gravity:form==='Y'?260:0, t:0 });
+// ================= swap =================
+function adjacent(a,b){ return NEIGH[a].includes(b); }
+function swapCore(a,b){
+  if(a===b || a<0 || b<0 || a>=N || b>=N) return {type:'blocked', reason:'bad'};
+  if(!adjacent(a,b)) return {type:'blocked', reason:'nonadjacent'};
+  const ca=cells[a].c, cb=cells[b].c;
+  if(ca==null||cb==null) return {type:'blocked', reason:'empty'};
+  if(ca===cb) return {type:'blocked', reason:'same-colour'};   // no-op, costs nothing
+  cells[a].c=cb; cells[b].c=ca;
+  const trig=findMatches().filter(m=>m.cells.includes(a)||m.cells.includes(b));
+  if(trig.length>0){
+    animSwap(a,b);
+    const res=resolveBoard({a,b});
+    stats.swaps++;
+    vibrate(24);
+    ensurePlayable();
+    return {type:'match', matches:res.firstMatches, forged:res.forged, surged:res.surged, chain:res.depth};
   }
-  if(form==='O'){ const s=0.32; one(rot(v,-s)); one(v); one(rot(v,s)); }
-  else one(v);
+  // no match
+  if(cooldown>0){ cells[a].c=ca; cells[b].c=cb; refuse(a,b); vibrate([10,24,10]); return {type:'blocked', reason:'cooldown'}; }
+  animSwap(a,b);
+  cooldown=CD_DUR; stats.swaps++;
+  vibrate(16);
+  ensurePlayable();
+  return {type:'positional'};
 }
-function rot(v,a){ const c=Math.cos(a),s=Math.sin(a); return {x:v.x*c-v.y*s,y:v.x*s+v.y*c}; }
-function doFizzle(sel){
-  for(const i of sel){ const b=balls[i]; for(let k=0;k<3;k++){ const p=mkPuff(b.x,b.y,HEX[b.c]); p.life*=0.7; puffs.push(p); } }
-  vibrate([12,30,12]);
+function animSwap(a,b){ cells[a].shake=Math.max(cells[a].shake,0.35); cells[b].shake=Math.max(cells[b].shake,0.35);
+  cells[a].born=performance.now(); cells[b].born=performance.now(); }
+function refuse(a,b){ cells[a].shake=0.5; cells[b].shake=0.5; }
+
+// ================= resolution & casting =================
+function resolveBoard(swapInfo){
+  let depth=0, forgedTotal=0, surged=false, firstMatches=null;
+  let guard=0;
+  while(guard++<40){
+    const matches=findMatches();
+    if(!matches.length) break;
+    depth++;
+    if(depth===1) firstMatches=matches;
+    const mult=Math.pow(1.15, depth-1);
+    const clearSet=new Set();
+    for(const m of matches){
+      castProjectile(m, ladder(m.colour,m.len)*mult, mult);
+      stats.matches++; stats.casts++;
+      for(const ci of m.cells) clearSet.add(ci);
+    }
+    // forge / surge — only the swap round
+    let forgeThis=null;
+    if(depth===1 && swapInfo){
+      const trig=matches.filter(m=>m.cells.includes(swapInfo.a)||m.cells.includes(swapInfo.b));
+      const tcol=[...new Set(trig.map(m=>m.colour))];
+      if(tcol.length>=2){
+        stats.doubles++;
+        const prim=new Set(); for(const c of tcol) for(const p of DECOMP[c]) prim.add(p);
+        if(prim.has('R')&&prim.has('Y')&&prim.has('B')){ surgeMeters(); surged=true; }
+        else { const ps=tcol.filter(c=>PRIMS.includes(c)); if(ps.length>=2) forgeThis={colour:MIX[ps[0]+ps[1]], count:FORGE_COUNT}; }
+      }
+    }
+    // pop meters + clear
+    for(const ci of clearSet){ const c=cells[ci].c; if(c==null) continue;
+      if(isSec(c)){ addMeter(c); stats.secPopped++; } spawnClearPuffs(cells[ci].x,cells[ci].y,c); cells[ci].c=null; }
+    applyGravity(forgeThis, swapInfo);
+    if(forgeThis){ forgedTotal+=forgeThis.count; stats.forged+=forgeThis.count; }
+    if(depth>1) chainLabel={n:depth,life:1.1};
+  }
+  stats.maxChain=Math.max(stats.maxChain, depth);
+  return {depth, forged:forgedTotal, surged, firstMatches:firstMatches||[]};
 }
-// reagent burn: flame/poof of the ball's own colour, then refill as a primary
-function burnReagent(bi){
-  const b=balls[bi];
-  for(let k=0;k<7;k++){ const p=mkPuff(b.x,b.y,HEX[b.c]); p.vy-=40; p.life+=0.15; puffs.push(p); }
-  burnFx.push({x:b.x,y:b.y,col:b.c,t0:performance.now(),dur:520});
-  b.consumed=true; b.refillT=REFILL_DUR;   // reuse the pure-run refill mechanism
+function applyGravity(forge, swapInfo){
+  const newSlots=[];
+  for(const col of COLUMNS){
+    const survivors=[];
+    for(let k=0;k<col.length;k++){ const ci=col[k]; if(cells[ci].c!=null) survivors.push({c:cells[ci].c,fromK:k}); }
+    const nEmpty=col.length-survivors.length;
+    for(let k=0;k<col.length;k++){ const ci=col[k];
+      if(k<nEmpty){ cells[ci].c=null; cells[ci]._new=true; cells[ci].oy=-((nEmpty-k)*ROW_DY+ROW_DY+18); newSlots.push(ci); }
+      else { const s=survivors[k-nEmpty]; cells[ci].c=s.c; cells[ci].oy=(s.fromK-k)*ROW_DY; }
+    }
+  }
+  if(forge && forge.count>0 && swapInfo){
+    const sx=(cells[swapInfo.a].x+cells[swapInfo.b].x)/2, sy=(cells[swapInfo.a].y+cells[swapInfo.b].y)/2;
+    newSlots.sort((i,j)=>((cells[i].x-sx)**2+(cells[i].y-sy)**2)-((cells[j].x-sx)**2+(cells[j].y-sy)**2));
+    for(let k=0;k<forge.count && k<newSlots.length;k++){ cells[newSlots[k]].c=forge.colour; cells[newSlots[k]].forgeFx=performance.now(); }
+  }
+  for(const ci of newSlots){ if(cells[ci].c==null) cells[ci].c=randPrim(); cells[ci]._new=false; cells[ci].born=performance.now(); }
+  // debug: guarantee no cascade from the refill (reroll only NEW cells until stable)
+  if(SAFE_REFILL){ const nset=new Set(newSlots); let g=0;
+    while(g++<300){ const bad=findMatches().flatMap(m=>m.cells).filter(ci=>nset.has(ci));
+      if(!bad.length) break; for(const ci of bad) cells[ci].c=randPrim(); } }
 }
-// SWAP: two selected balls trade colours; costs a full cooldown (a turn not casting)
-function doSwap(sel){
-  if(cooldown>0){ clearSelection(); return {result:'cooldown'}; }
-  const a=sel[0], b=sel[1];
-  const ba=balls[a], bb=balls[b];
-  if(!ba||!bb||ba.consumed||bb.consumed){ clearSelection(); return {result:'nofit'}; }
-  const ca=ba.c, cb=bb.c;
-  ba.c=cb; bb.c=ca; ba.wob=1.2; bb.wob=1.2;
-  // juice: goo-morph past each other + landing pops
-  swapFx.push({ax:ba.x,ay:ba.y,bx:bb.x,by:bb.y,ca,cb,t0:performance.now(),dur:340,popped:false});
-  stats.swaps++;
-  cooldown = CD_DUR;
-  vibrate(18);
-  clearSelection();
-  return {result:'swap'};
+function centroidCells(arr){ let sx=0,sy=0; for(const i of arr){ sx+=cells[i].x; sy+=cells[i].y; }
+  const n=Math.max(1,arr.length); return {x:sx/n,y:sy/n}; }
+function nearestEnemy(o){ let best=null,bd=1e9; for(const e of enemies){ if(e.dead) continue;
+  const d=(e.x-o.x)**2+(e.y-o.y)**2; if(d<bd){bd=d;best=e;} } return best; }
+function norm(v){ const m=Math.hypot(v.x,v.y)||1; return {x:v.x/m,y:v.y/m}; }
+function castProjectile(m, dmg, mult){
+  const o=centroidCells(m.cells);
+  const spec=SPELLS[m.colour]||SPELLS.R;
+  if(spec.dmgMul) dmg*=spec.dmgMul;
+  const tgt=nearestEnemy(o);
+  const v=tgt?norm({x:tgt.x-o.x,y:tgt.y-o.y}):{x:0,y:-1};
+  for(const ci of m.cells) castGoo.push({x:cells[ci].x,y:cells[ci].y,tx:o.x,ty:o.y,r:ballRad*0.7,col:m.colour,t:0,dur:0.24});
+  spells.push({ x:o.x,y:o.y, vx:v.x*spec.speed, vy:v.y*spec.speed, colour:m.colour, col:HEX[m.colour],
+    dmg, r:spec.r, life:2.4, pierce:!!spec.pierce, aoe:spec.aoe||0, pool:!!spec.pool, applies:spec.applies||null,
+    trail:[], t:0 });
 }
+
+// ================= meters / whorl =================
+function addMeter(c){ if(whorlReady) return; meters[c]=Math.min(1,meters[c]+1/POPS); checkWhorl(); }
+function surgeMeters(){ if(whorlReady) return; for(const k of SECS) meters[k]=Math.min(1,meters[k]+0.4); checkWhorl(); }
+function checkWhorl(){ if(!whorlReady && meters.O>=1 && meters.G>=1 && meters.P>=1){ whorlReady=true; meters.O=meters.G=meters.P=1;
+  for(let k=0;k<10;k++) sparks.push(mkSpark(sigilX,sigilY,ACCENT)); vibrate([12,20,12]); } }
+function tapWhorl(){ if(!whorlReady) return {ok:false};
+  shocks.push({x:sigilX,y:latCY,r:0,maxr:Math.hypot(W,H),t0:performance.now(),dur:640});
+  for(const e of enemies){ if(!e.dead) damageEnemy(e,100,ACCENT); }
+  for(let k=0;k<24;k++){ const p=mkPuff(sigilX,latCY,ACCENT); p.life+=0.3; puffs.push(p); }
+  meters={O:0,G:0,P:0}; whorlReady=false; stats.whorls++; vibrate([18,26,18]);
+  return {ok:true};
+}
+function fillBars(){ meters={O:1,G:1,P:1}; checkWhorl(); }
+
+// ================= enemies =================
+function spawnEnemy(){ const hp=Math.random()<0.5?20:40; const r=hp===20?18:24;
+  const col=PRIMS[(Math.random()*3)|0];
+  enemies.push({x:r+8+Math.random()*(W-2*r-16), y:-r-6, r, hp, maxhp:hp, col:HEX[col], wob:Math.random()*6.28,
+    dead:false, death:0, burn:0, chill:0, poison:0, pStacks:0, bAcc:0, pAcc:0}); }
+function spawnEnemyAt(x,y,hp){ hp=hp||20; const r=hp===20?18:24;
+  enemies.push({x,y,r,hp,maxhp:hp,col:HEX.R,wob:0,dead:false,death:0,burn:0,chill:0,poison:0,pStacks:0,bAcc:0,pAcc:0}); }
+function damageEnemy(e,dmg,col,quiet){ if(e.dead) return; e.hp-=dmg; e.wob+=1.6;
+  dmgPops.push({x:e.x,y:e.y-e.r-4,life:0.9,val:Math.round(dmg),col:col||INK});
+  if(!quiet) for(let k=0;k<6;k++) puffs.push(mkPuff(e.x,e.y,col||e.col));
+  if(e.hp<=0){ e.dead=true; e.death=0; stats.kills++;
+    for(let k=0;k<12;k++){ const p=mkPuff(e.x,e.y,e.col); p.life+=0.2; puffs.push(p); } } }
+
+// ================= particles =================
 function mkPuff(x,y,col){ const a=Math.random()*6.28, sp=40+Math.random()*90;
   return {x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-30,life:0.5+Math.random()*0.3,max:0.8,r:4+Math.random()*5,col}; }
+function mkSpark(x,y,col){ const a=Math.random()*6.28, sp=60+Math.random()*120;
+  return {x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.6,max:0.6,r:3+Math.random()*3,col}; }
+function spawnClearPuffs(x,y,c){ const col=HEX[c]; for(let k=0;k<5;k++) puffs.push(mkPuff(x,y,col)); }
 function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
-// ---------------- enemies ----------------
-function spawnEnemy(){
-  const hp=Math.random()<0.5?20:40; const r=hp===20?18:24;
-  const col=PRIMS[(Math.random()*3)|0];
-  enemies.push({x:r+Math.random()*(W-2*r), y:-r-6, r, hp, maxhp:hp, col:HEX[col], wob:Math.random()*6.28, dead:false, death:0});
-}
-function damageEnemy(e,dmg,col){
-  if(e.dead) return;
-  e.hp-=dmg; e.wob+=1.6;
-  dmgPops.push({x:e.x,y:e.y-e.r-4,life:0.9,val:Math.round(dmg),col:col||INK});
-  for(let k=0;k<6;k++) puffs.push(mkPuff(e.x,e.y,col||e.col));
-  if(e.hp<=0){ e.dead=true; e.death=0; stats.kills++;
-    for(let k=0;k<12;k++){ const p=mkPuff(e.x,e.y,e.col); p.life+=0.2; puffs.push(p); } }
-}
-
-// ---------------- update loop ----------------
+// ================= update =================
 let last=performance.now();
-function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now; update(dt); render(now); requestAnimationFrame(tick); }
-
+function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now; if(auto) update(dt); render(now); requestAnimationFrame(tick); }
 function update(dt){
-  cooldown=Math.max(0,cooldown-dt);
-  lockout=Math.max(0,lockout-dt);
-
-  // ball wobble + consumed refill (dt-driven so LAB.step is deterministic)
   const now=performance.now();
-  for(const b of balls){
-    b.wob*=Math.pow(0.02,dt);
-    if(b.consumed){ b.refillT-=dt; if(b.refillT<=0){ b.consumed=false; b.c=randPrim(); b.wob=1.2; b.born=now; } }
-  }
-
+  cooldown=Math.max(0,cooldown-dt);
+  // cells settle
+  for(const cell of cells){ cell.oy+=(0-cell.oy)*Math.min(1,dt*13); if(Math.abs(cell.oy)<0.3) cell.oy=0;
+    cell.shake=Math.max(0,cell.shake-dt*2.4); }
+  // cast goo
+  for(const g of castGoo){ g.t+=dt; g.x+=(g.tx-g.x)*Math.min(1,dt*15); g.y+=(g.ty-g.y)*Math.min(1,dt*15);
+    g.r+=(ballRad*0.5-g.r)*Math.min(1,dt*10); }
+  castGoo=castGoo.filter(g=>g.t<g.dur);
   // spells
-  for(const s of spells){
-    s.t+=dt; s.life-=dt;
-    if(s.gravity) s.vy+=s.gravity*dt;
-    s.x+=s.vx*dt; s.y+=s.vy*dt;
+  for(const s of spells){ s.t+=dt; s.life-=dt; s.x+=s.vx*dt; s.y+=s.vy*dt;
     s.trail.push({x:s.x,y:s.y}); if(s.trail.length>10) s.trail.shift();
     for(const e of enemies){ if(e.dead) continue;
-      if(Math.hypot(e.x-s.x,e.y-s.y)<e.r+s.r*0.7){ damageEnemy(e,s.dmg,s.col); spawnSplash(s.x,s.y,s.col);
-        if(!s.pierce) s.life=0; else s.dmg*=0.7; break; } }
-    if(s.lob && s.vy>0 && s.y>H*0.5){ spawnSplash(s.x,s.y,s.col);
-      for(const e of enemies){ if(!e.dead && Math.hypot(e.x-s.x,e.y-s.y)<50) damageEnemy(e,s.dmg*0.8,s.col); } s.life=0; }
+      if(Math.hypot(e.x-s.x,e.y-s.y)<e.r+s.r*0.7){
+        let d=s.dmg;
+        if(e.chill>0 && (s.colour==='R'||s.colour==='O')){ d*=1.5; e.chill=0; iceCrack(e.x,e.y); }
+        damageEnemy(e,d,s.col);
+        if(s.applies==='burn'){ e.burn=Math.max(e.burn,2); }
+        else if(s.applies==='chill'){ e.chill=2.5; }
+        if(s.aoe){ for(const o of enemies){ if(o.dead||o===e) continue; if(Math.hypot(o.x-s.x,o.y-s.y)<s.aoe) damageEnemy(o,d*0.6,s.col,true); }
+          for(let k=0;k<8;k++){ const p=mkPuff(s.x,s.y,HEX.O); p.r+=2; puffs.push(p); } }
+        if(s.pool){ pools.push({x:s.x,y:s.y,r:26,life:3.0,max:3.0,tick:0}); }
+        if(!s.pierce) s.life=0; else s.dmg*=0.72;
+        break;
+      }
+    }
+    if(s.pool && s.life<=0.02 && !s._pooled){ s._pooled=true; pools.push({x:s.x,y:s.y,r:26,life:3.0,max:3.0,tick:0}); }
     if(s.y<-40||s.x<-40||s.x>W+40||s.y>H+40) s.life=0;
   }
   spells=spells.filter(s=>s.life>0);
-
-  // warriors
-  for(const wr of warriors){
-    wr.y-=34*dt; wr.atkT-=dt;
-    for(const e of enemies){ if(e.dead) continue;
-      if(Math.hypot(e.x-wr.x,e.y-wr.y)<e.r+wr.r){ wr.y+=34*dt*0.9;
-        if(wr.atkT<=0){ damageEnemy(e,wr.atk,HEX[wr.col]); wr.atkT=0.5; wr.hp-=6; } } }
-    if(wr.y<-30) wr.hp=0;
-  }
-  warriors=warriors.filter(w=>w.hp>0);
-
-  // enemies drift
+  // venom pools — poison enemies over them
+  for(const pl of pools){ pl.life-=dt; pl.tick-=dt;
+    if(pl.tick<=0){ pl.tick=0.4; for(const e of enemies){ if(!e.dead && Math.hypot(e.x-pl.x,e.y-pl.y)<pl.r){ e.poison=Math.max(e.poison,1.2); e.pStacks=Math.min(4,e.pStacks+1); } } } }
+  pools=pools.filter(p=>p.life>0);
+  // enemies + dots + drift
   for(const e of enemies){ if(e.dead){ e.death+=dt; continue; }
-    e.y+=ESPEED*dt; e.wob+=dt*1.4;
-    if(e.y>leakY){ e.dead=true; e.death=0; stats.leaks++; for(let k=0;k<6;k++) puffs.push(mkPuff(e.x,e.y,e.col)); } }
+    let sp=ESPEED; if(e.chill>0){ e.chill-=dt; sp*=0.5; }
+    e.y+=sp*dt; e.wob+=dt*1.4;
+    if(e.burn>0){ e.burn-=dt; e.bAcc+=3*dt; if(e.bAcc>=1){ const d=Math.floor(e.bAcc); e.bAcc-=d; damageEnemy(e,d,HEX.R,true); } }
+    if(e.poison>0){ e.poison-=dt; e.pAcc+=(2+e.pStacks)*dt; if(e.pAcc>=1){ const d=Math.floor(e.pAcc); e.pAcc-=d; damageEnemy(e,d,HEX.G,true); } if(e.poison<=0) e.pStacks=0; }
+    if(e.y>leakY){ e.dead=true; e.death=0; stats.leaks++; for(let k=0;k<6;k++) puffs.push(mkPuff(e.x,e.y,e.col)); }
+  }
   enemies=enemies.filter(e=>!e.dead||e.death<0.4);
-
-  // spawn
+  // spawn (auto play only)
   spawnT+=dt; if(spawnT>=SPAWN){ spawnT-=SPAWN; if(enemies.filter(e=>!e.dead).length<14) spawnEnemy(); }
-
   // particles
   for(const p of puffs){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.vx*=Math.pow(0.1,dt); }
   puffs=puffs.filter(p=>p.life>0);
+  for(const p of sparks){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=Math.pow(0.2,dt); p.vy*=Math.pow(0.2,dt); }
+  sparks=sparks.filter(p=>p.life>0);
   for(const d of dmgPops){ d.life-=dt; d.y-=34*dt; } dmgPops=dmgPops.filter(d=>d.life>0);
-  alchFx=alchFx.filter(a=>now-a.t0<a.dur);
-  for(const s of swapFx){ const f=(now-s.t0)/s.dur;
-    if(!s.popped && f>=0.82){ s.popped=true;
-      for(let k=0;k<5;k++){ puffs.push(mkPuff(s.bx,s.by,HEX[s.ca])); puffs.push(mkPuff(s.ax,s.ay,HEX[s.cb])); } } }
-  swapFx=swapFx.filter(s=>now-s.t0<s.dur);
-  burnFx=burnFx.filter(s=>now-s.t0<s.dur);
   shocks=shocks.filter(s=>now-s.t0<s.dur);
-
-  updateBlobs(dt);
+  if(remixFx && now-remixFx.t0>=remixFx.dur) remixFx=null;
+  if(chainLabel){ chainLabel.life-=dt; if(chainLabel.life<=0) chainLabel=null; }
   updateStatsUI();
 }
-function spawnSplash(x,y,col){ for(let k=0;k<9;k++){ const p=mkPuff(x,y,col); p.r+=2; puffs.push(p); } }
 
-// ---------------- metaball blobs ----------------
-function updateBlobs(dt){
-  const n=blobs.length;
-  for(let k=0;k<n;k++){ const b=blobs[k];
-    if(aiming){ const ang=(k/n)*6.28; b.tx=pointer.x+Math.cos(ang+performance.now()/300)*6;
-      b.ty=pointer.y+Math.sin(ang+performance.now()/300)*6; b.r+=(16-b.r)*Math.min(1,dt*8); }
-    else { const w=balls[b.bi]; b.tx=w.x; b.ty=w.y; b.r+=(ballRad*0.74-b.r)*Math.min(1,dt*10); }
-    b.x+=(b.tx-b.x)*Math.min(1,dt*16); b.y+=(b.ty-b.y)*Math.min(1,dt*16);
-  }
-}
-
-// ---------------- render ----------------
+// ================= render =================
 function render(now){
   ctx.clearRect(0,0,W,H);
+  drawBoardBack();
   drawFieldLine();
   drawEnemies(now);
-  drawWarriors(now);
+  drawPools(now);
   drawSpells(now);
-  drawSelectionLine();
   drawBalls(now);
-  drawMetaChain(now);
-  drawAlch(now);
-  drawSwapFx(now);
-  drawBurns(now);
+  drawCastGoo();
+  drawBars(now);
+  drawSigil(now);
+  drawCooldownRing();
   drawShocks(now);
-  drawCooldown(now);
+  drawRemix(now);
   drawPuffs();
   drawDmgPops();
-  drawWord(now);
-  drawAim(now);
+  drawChain(now);
 }
-
-function drawFieldLine(){
-  const y=leakY;
+function drawBoardBack(){
   ctx.save();
+  const pad=ballRad+12;
+  ctx.beginPath();
+  // hex outline of the board region (approx rounded)
+  roundRect(latCX-3*COL_DX-pad, topY-6, 6*COL_DX+2*pad, (latCY+3*ROW_DY)-(topY)+pad+ballRad, 26);
+  ctx.fillStyle='rgba(255,253,246,.5)'; ctx.strokeStyle='rgba(44,39,51,.10)'; ctx.lineWidth=2;
+  ctx.fill(); ctx.stroke(); ctx.restore();
+}
+function drawFieldLine(){ ctx.save();
   ctx.strokeStyle='rgba(44,39,51,.14)'; ctx.lineWidth=2; ctx.setLineDash([2,7]); ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(14,y); ctx.lineTo(W-14,y); ctx.stroke();
-  ctx.restore();
-}
-function stickerCircle(x,y,r,fill,rim,lw){
-  ctx.save();
+  ctx.beginPath(); ctx.moveTo(14,leakY); ctx.lineTo(W-14,leakY); ctx.stroke(); ctx.restore(); }
+function stickerCircle(x,y,r,fill,rim,lw){ ctx.save();
   ctx.shadowColor='rgba(44,39,51,.28)'; ctx.shadowBlur=0; ctx.shadowOffsetY=3;
   ctx.beginPath(); ctx.arc(x,y,r,0,6.2832); ctx.fillStyle=fill; ctx.fill();
-  ctx.shadowColor='transparent'; ctx.lineWidth=lw||2.5; ctx.strokeStyle=rim||INK; ctx.stroke();
-  ctx.restore();
-}
-function drawSelectionLine(){
-  if(selection.length<2 || aiming) return;
-  ctx.save();
-  ctx.strokeStyle='rgba(255,209,92,.75)'; ctx.lineWidth=ballRad*1.5; ctx.lineCap='round'; ctx.lineJoin='round';
-  ctx.beginPath();
-  for(let k=0;k<selection.length;k++){ const b=balls[selection[k]]; k?ctx.lineTo(b.x,b.y):ctx.moveTo(b.x,b.y); }
-  ctx.stroke(); ctx.restore();
-}
+  ctx.shadowColor='transparent'; ctx.lineWidth=lw||2.5; ctx.strokeStyle=rim||INK; ctx.stroke(); ctx.restore(); }
 function drawBalls(now){
-  for(let i=0;i<balls.length;i++){
-    const b=balls[i];
-    let r=b.rad + Math.sin(now/170+i)*0.6 + b.wob*3;
-    let alpha=1, sc=1;
-    if(b.consumed){ const f=Math.min(1,1-b.refillT/REFILL_DUR); sc=1-0.55*f; alpha=1-f; }
-    else if(now-b.born<300){ const f=(now-b.born)/300; sc=0.6+0.4*f; }
-    if(alpha<=0.02) continue;
-    ctx.save(); ctx.globalAlpha=alpha;
-    const rr=r*sc;
-    const sel=selection.includes(i);
-    stickerCircle(b.x,b.y,rr,HEX[b.c],INK,sel?4:3);
-    // white/prism sparkle
-    if(b.c==='W'){
-      ctx.strokeStyle='rgba(155,98,214,.5)'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(b.x,b.y,rr-4,0,6.2832); ctx.stroke();
-      const tw=0.5+0.5*Math.sin(now/220+i);
-      ctx.fillStyle='rgba(255,255,255,'+(0.6+0.4*tw)+')';
-      for(const [dx,dy] of [[0,-rr*0.5],[rr*0.5,0.15*rr],[-rr*0.45,0.2*rr]]){
-        ctx.beginPath(); ctx.arc(b.x+dx,b.y+dy,2.1,0,6.28); ctx.fill(); }
+  const remixing = remixFx && (now-remixFx.t0)<remixFx.dur;
+  for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null) continue;
+    let x=b.x, y=b.y+b.oy;
+    if(b.shake>0) x+=Math.sin(now/26+i)*b.shake*5;
+    if(remixing){ const f=ease((now-remixFx.t0)/remixFx.dur); // swirl in from a spin around centre
+      const ang=(i*0.53)+(1-f)*5.0; const rr=(1-f)*(90+((i*13)%60));
+      x=latCX+Math.cos(ang)*rr + (b.x-latCX)*f; y=latCY+Math.sin(ang)*rr*0.7 + (b.y-latCY)*f;
     }
+    let r=ballRad + Math.sin(now/170+i)*0.6;
+    const age=now-b.born; if(age<260){ const f=age/260; r*=0.62+0.38*f; }
+    const sel=(i===selIdx);
+    stickerCircle(x,y,r,HEX[b.c],INK,sel?4:3);
+    // secondary sparkle ring
+    if(isSec(b.c)){ ctx.save(); ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.arc(x,y,r-4,0,6.2832); ctx.stroke(); ctx.restore(); }
     // glossy highlight
-    ctx.beginPath(); ctx.arc(b.x-rr*0.3,b.y-rr*0.34,rr*0.24,0,6.28);
-    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
-    if(sel){ ctx.beginPath(); ctx.arc(b.x,b.y,rr+3,0,6.28); ctx.strokeStyle=ACCENT; ctx.lineWidth=2.5; ctx.stroke(); }
-    ctx.restore();
+    ctx.beginPath(); ctx.arc(x-r*0.3,y-r*0.34,r*0.24,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
+    // forge sparkle
+    if(b.forgeFx && now-b.forgeFx<600){ const f=(now-b.forgeFx)/600; ctx.save(); ctx.globalAlpha=1-f;
+      for(let k=0;k<4;k++){ const a=k*1.57+f*4; const rr=r+3+f*10;
+        ctx.beginPath(); ctx.arc(x+Math.cos(a)*rr,y+Math.sin(a)*rr,2.2*(1-f)+1,0,6.28); ctx.fillStyle=ACCENT; ctx.fill(); }
+      ctx.restore(); }
+    if(sel){ ctx.beginPath(); ctx.arc(x,y,r+4,0,6.28); ctx.strokeStyle=ACCENT; ctx.lineWidth=2.6; ctx.stroke();
+      for(const ni of NEIGH[i]){ const nb=cells[ni]; ctx.beginPath(); ctx.arc(nb.x,nb.y+nb.oy,ballRad+2,0,6.28);
+        ctx.strokeStyle='rgba(255,209,92,.4)'; ctx.lineWidth=2; ctx.stroke(); } }
   }
 }
 function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
-function drawMetaChain(now){
-  if(blobs.length===0) return;
-  sizeOff();
-  const sx=off.width/W, sy=off.height/H;
+function drawCastGoo(){
+  if(castGoo.length===0) return;
+  sizeOff(); const sx=off.width/W, sy=off.height/H;
   octx.setTransform(1,0,0,1,0,0); octx.clearRect(0,0,off.width,off.height);
   octx.globalCompositeOperation='lighter';
-  for(const b of blobs){
-    const R=b.r*2.5*sx; const gx=b.x*sx, gy=b.y*sy; const [r,g,bl]=hexToRgb(HEX[b.col]);
+  for(const g of castGoo){ const R=g.r*2.6*sx, gx=g.x*sx, gy=g.y*sy; const [r,gr,bl]=hexToRgb(HEX[g.col]);
     const grd=octx.createRadialGradient(gx,gy,0,gx,gy,R);
-    grd.addColorStop(0,`rgba(${r},${g},${bl},1)`); grd.addColorStop(0.55,`rgba(${r},${g},${bl},.55)`);
-    grd.addColorStop(1,`rgba(${r},${g},${bl},0)`);
-    octx.fillStyle=grd; octx.beginPath(); octx.arc(gx,gy,R,0,6.2832); octx.fill();
-  }
+    grd.addColorStop(0,`rgba(${r},${gr},${bl},1)`); grd.addColorStop(0.55,`rgba(${r},${gr},${bl},.55)`); grd.addColorStop(1,`rgba(${r},${gr},${bl},0)`);
+    octx.fillStyle=grd; octx.beginPath(); octx.arc(gx,gy,R,0,6.2832); octx.fill(); }
   octx.globalCompositeOperation='source-over';
-  const img=octx.getImageData(0,0,off.width,off.height); const d=img.data;
+  const img=octx.getImageData(0,0,off.width,off.height), d=img.data;
   for(let p=0;p<d.length;p+=4){ const a=d[p+3];
-    if(a>150) d[p+3]=255; else if(a>92) d[p+3]=Math.round((a-92)/58*255); else d[p+3]=0;
-    if(d[p+3]>0){ const mx=Math.max(d[p],d[p+1],d[p+2])||1; const k=Math.min(1,235/mx);
-      d[p]=Math.min(255,d[p]*k*1.05); d[p+1]=Math.min(255,d[p+1]*k*1.05); d[p+2]=Math.min(255,d[p+2]*k*1.05); } }
+    if(a>150) d[p+3]=255; else if(a>92) d[p+3]=Math.round((a-92)/58*255); else d[p+3]=0; }
   octx.putImageData(img,0,0);
-  ctx.save(); ctx.imageSmoothingEnabled=true;
-  ctx.globalAlpha=0.42; ctx.drawImage(off,0,0,off.width,off.height,-1.5,-1.5,W+3,H+3);
-  ctx.globalCompositeOperation='source-atop'; ctx.fillStyle='rgba(44,39,51,.22)'; ctx.fillRect(0,0,W,H);
-  ctx.globalCompositeOperation='source-over';
-  ctx.globalAlpha=0.8; ctx.drawImage(off,0,0,off.width,off.height,0,0,W,H);
-  ctx.restore();
-  ctx.save();
-  for(const b of blobs){ ctx.beginPath(); ctx.arc(b.x-b.r*0.3,b.y-b.r*0.32,b.r*0.22,0,6.2832);
-    ctx.fillStyle='rgba(255,255,255,.7)'; ctx.fill(); }
-  ctx.restore();
+  ctx.save(); ctx.imageSmoothingEnabled=true; ctx.globalAlpha=0.85; ctx.drawImage(off,0,0,off.width,off.height,0,0,W,H); ctx.restore();
 }
-function drawAlch(now){
-  for(const a of alchFx){
-    const f=(now-a.t0)/a.dur;                // 0..1
-    const R=(1-f)*ballRad*1.7 + ballRad*0.3;
+function drawBars(now){
+  const cols={O:HEX.O,G:HEX.G,P:HEX.P};
+  SECS.forEach((c,i)=>{ const x=barX[i];
     ctx.save();
-    // swirl of contributing primaries collapsing inward
-    for(let k=0;k<a.from.length;k++){
-      const base=(k/a.from.length)*6.28;
-      const ang=base + f*7;
-      const rad=R*(1-f*0.6);
-      const px=a.x+Math.cos(ang)*rad, py=a.y+Math.sin(ang)*rad;
-      ctx.globalAlpha=1-f; ctx.beginPath(); ctx.arc(px,py,4.5*(1-f)+1.5,0,6.28);
-      ctx.fillStyle=HEX[a.from[k]]; ctx.fill();
-    }
-    // ring pulse
-    ctx.globalAlpha=(1-f)*0.8; ctx.beginPath(); ctx.arc(a.x,a.y,ballRad+8+f*14,0,6.28);
-    ctx.strokeStyle=HEX[a.to]; ctx.lineWidth=3*(1-f)+0.5; ctx.stroke();
+    // track
+    ctx.shadowColor='rgba(44,39,51,.22)'; ctx.shadowOffsetY=2;
+    roundRect(x,barTop,barW,barH,barW/2); ctx.fillStyle=PAPER2; ctx.fill();
+    ctx.shadowColor='transparent'; ctx.lineWidth=2.4; ctx.strokeStyle=INK; ctx.stroke();
+    // fill
+    const fv=meters[c]; const fh=(barH-6)*fv;
+    if(fh>1){ roundRect(x+3,barTop+3+(barH-6-fh),barW-6,fh,(barW-6)/2); ctx.fillStyle=cols[c]; ctx.fill(); }
+    if(whorlReady){ ctx.globalAlpha=0.4+0.4*Math.sin(now/180+i); roundRect(x,barTop,barW,barH,barW/2); ctx.strokeStyle=ACCENT; ctx.lineWidth=2.4; ctx.stroke(); ctx.globalAlpha=1; }
+    // label
+    ctx.fillStyle=INK; ctx.font='700 9px Fredoka, sans-serif'; ctx.textAlign='center';
+    ctx.fillText(c, x+barW/2, barTop+barH+11);
     ctx.restore();
-  }
+  });
 }
-function drawSwapFx(now){
-  for(const s of swapFx){
-    const f=Math.min(1,(now-s.t0)/s.dur);
-    const e=f<0.5?2*f*f:1-Math.pow(-2*f+2,2)/2;   // easeInOutQuad
-    const dx=s.bx-s.ax, dy=s.by-s.ay; const len=Math.hypot(dx,dy)||1;
-    const px=-dy/len, py=dx/len; const arc=Math.sin(f*Math.PI)*ballRad*0.55;
-    const x1=s.ax+dx*e+px*arc, y1=s.ay+dy*e+py*arc;   // ca travelling a->b (bulge +)
-    const x2=s.bx-dx*e-px*arc, y2=s.by-dy*e-py*arc;   // cb travelling b->a (bulge -)
-    const rr=ballRad*0.7*(1-0.18*Math.sin(f*Math.PI));
-    ctx.save();
-    // metaball smear bridging the two travelling spots
-    const grd=ctx.createLinearGradient(x1,y1,x2,y2);
-    grd.addColorStop(0,HEX[s.ca]); grd.addColorStop(1,HEX[s.cb]);
-    ctx.strokeStyle=grd; ctx.lineWidth=rr*1.25*(1-f*0.5); ctx.lineCap='round';
-    ctx.globalAlpha=0.5*(1-f);
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    ctx.globalAlpha=1;
-    stickerCircle(x1,y1,rr,HEX[s.ca],INK,2.5);
-    stickerCircle(x2,y2,rr,HEX[s.cb],INK,2.5);
-    ctx.beginPath(); ctx.arc(x1-rr*0.3,y1-rr*0.32,rr*0.22,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(x2-rr*0.3,y2-rr*0.32,rr*0.22,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill();
-    ctx.restore();
-  }
-}
-function drawBurns(now){
-  for(const s of burnFx){
-    const f=Math.min(1,(now-s.t0)/s.dur);
-    const rise=f*ballRad*1.2;
-    const r=ballRad*0.55*(1-f*0.45);
-    ctx.save(); ctx.globalAlpha=(1-f);
-    ctx.beginPath(); ctx.ellipse(s.x, s.y-rise, r*0.72, r*1.25, 0, 0, 6.28);
-    ctx.fillStyle=HEX[s.col]; ctx.fill();
-    ctx.globalAlpha=(1-f)*0.85;
-    ctx.beginPath(); ctx.arc(s.x, s.y-rise-r*0.2, r*0.42, 0, 6.28);
-    ctx.fillStyle='rgba(255,240,205,.95)'; ctx.fill();
-    // ember ring
-    ctx.globalAlpha=(1-f)*0.6; ctx.beginPath(); ctx.arc(s.x,s.y,ballRad*(0.4+f*0.9),0,6.28);
-    ctx.strokeStyle=HEX[s.col]; ctx.lineWidth=2.5*(1-f); ctx.stroke();
-    ctx.restore();
-  }
-}
-function drawShocks(now){
-  for(const s of shocks){
-    const f=(now-s.t0)/s.dur; const r=f*s.maxr;
-    ctx.save(); ctx.globalAlpha=(1-f)*0.85;
-    ctx.beginPath(); ctx.arc(s.x,s.y,r,0,6.28); ctx.strokeStyle=HEX.W; ctx.lineWidth=18*(1-f)+2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(s.x,s.y,r,0,6.28); ctx.strokeStyle='rgba(155,98,214,.7)'; ctx.lineWidth=4*(1-f); ctx.stroke();
-    ctx.restore();
-  }
-}
-function drawCooldown(now){
-  if(cooldown<=0) return;
-  const f=cooldown/CD_DUR;   // 1 -> 0
+function drawSigil(now){
+  const x=sigilX, y=sigilY; const lit=whorlReady;
+  const pulse=lit?(1+0.08*Math.sin(now/160)):1;
+  const r=sigilR*pulse;
   ctx.save();
-  // subtle radial sweep around lattice centre
-  const R=2.4*rowH+ballRad+14;
-  ctx.globalAlpha=0.16*f;
-  ctx.beginPath(); ctx.arc(latCX,latCY,R,0,6.28); ctx.fillStyle=INK; ctx.fill();
-  ctx.globalAlpha=0.55*f;
-  ctx.beginPath(); ctx.arc(latCX,latCY,R-4,-Math.PI/2,-Math.PI/2+f*6.2832);
-  ctx.strokeStyle=ACCENT; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+  if(lit){ ctx.shadowColor='rgba(255,209,92,.9)'; ctx.shadowBlur=18; }
+  ctx.beginPath(); ctx.arc(x,y,r,0,6.2832);
+  ctx.fillStyle=lit?ACCENT:'rgba(255,253,246,.7)'; ctx.fill();
+  ctx.shadowBlur=0; ctx.lineWidth=3; ctx.strokeStyle=lit?INK:'rgba(44,39,51,.35)'; ctx.stroke();
+  // spiral
+  ctx.beginPath(); const turns=2.4, steps=48;
+  for(let k=0;k<=steps;k++){ const t=k/steps; const a=t*turns*6.2832 + (lit?now/500:0); const rr=r*0.82*t;
+    const px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr; k?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+  ctx.strokeStyle=lit?INK:'rgba(44,39,51,.3)'; ctx.lineWidth=lit?2.6:2; ctx.lineCap='round'; ctx.stroke();
   ctx.restore();
 }
-function drawEnemies(now){
-  for(const e of enemies){ const t=e.dead?(1-e.death/0.4):1; if(t<=0) continue;
-    const r=e.r*(e.dead?(0.6+0.4*t):1)+Math.sin(e.wob)*1.5;
-    ctx.save(); ctx.globalAlpha=e.dead?t:1; stickerCircle(e.x,e.y,r,e.col,INK,3);
-    ctx.beginPath(); const frac=Math.max(0,e.hp/e.maxhp);
-    ctx.arc(e.x,e.y,r+5,-Math.PI/2,-Math.PI/2+frac*6.2832); ctx.strokeStyle='rgba(44,39,51,.4)'; ctx.lineWidth=2.5; ctx.stroke();
-    ctx.restore(); }
+function drawCooldownRing(){
+  if(cooldown<=0) return; const f=cooldown/CD_DUR;
+  ctx.save();
+  ctx.globalAlpha=0.5*f; ctx.beginPath();
+  ctx.arc(sigilX,sigilY,sigilR+6,-Math.PI/2,-Math.PI/2+f*6.2832);
+  ctx.strokeStyle='rgba(44,39,51,.55)'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.stroke(); ctx.restore();
 }
-function drawWarriors(now){
-  for(const wr of warriors){ const r=wr.r+Math.sin(now/180+wr.x)*1.5;
-    stickerCircle(wr.x,wr.y,r,HEX[wr.col],INK,3);
-    ctx.save(); ctx.fillStyle=INK;
-    ctx.beginPath(); ctx.arc(wr.x-r*0.3,wr.y-r*0.1,2.4,0,6.28); ctx.fill();
-    ctx.beginPath(); ctx.arc(wr.x+r*0.3,wr.y-r*0.1,2.4,0,6.28); ctx.fill();
-    ctx.fillStyle='rgba(44,39,51,.2)'; ctx.fillRect(wr.x-r,wr.y+r+4,r*2,3);
-    ctx.fillStyle='#57c268'; ctx.fillRect(wr.x-r,wr.y+r+4,r*2*Math.max(0,wr.hp/wr.maxhp),3); ctx.restore(); }
-}
-function drawSpells(now){
-  for(const s of spells){
-    for(let k=0;k<s.trail.length;k++){ const p=s.trail[k]; const a=k/s.trail.length;
-      ctx.beginPath(); ctx.arc(p.x,p.y,s.r*a*0.8,0,6.28);
-      ctx.fillStyle=s.col+Math.floor(a*120).toString(16).padStart(2,'0'); ctx.fill(); }
-    stickerCircle(s.x,s.y,s.r,s.col,INK,2.5);
-    ctx.beginPath(); ctx.arc(s.x-s.r*0.3,s.y-s.r*0.3,s.r*0.3,0,6.28); ctx.fillStyle='rgba(255,255,255,.7)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(s.x,s.y,s.r*0.35,0,6.28); ctx.fillStyle=s.tint; ctx.fill();
-  }
-}
+function drawPools(now){ for(const pl of pools){ const a=Math.max(0,pl.life/pl.max);
+  ctx.save(); ctx.globalAlpha=0.28*a+0.06; ctx.beginPath(); ctx.ellipse(pl.x,pl.y,pl.r,pl.r*0.5,0,0,6.28);
+  ctx.fillStyle=HEX.G; ctx.fill(); ctx.globalAlpha=0.5*a; ctx.lineWidth=2; ctx.strokeStyle=HEX.G; ctx.stroke(); ctx.restore(); } }
+function drawShocks(now){ for(const s of shocks){ let f=(now-s.t0)/s.dur; if(f<0)f=0; if(f>=1)continue; const r=f*s.maxr;
+  ctx.save(); ctx.globalAlpha=(1-f)*0.85;
+  ctx.beginPath(); ctx.arc(s.x,s.y,r,0,6.28); ctx.strokeStyle=ACCENT; ctx.lineWidth=18*(1-f)+2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(s.x,s.y,r,0,6.28); ctx.strokeStyle='rgba(44,39,51,.5)'; ctx.lineWidth=4*(1-f); ctx.stroke(); ctx.restore(); } }
+function drawRemix(now){ if(!remixFx) return; const f=(now-remixFx.t0)/remixFx.dur;
+  if(f<0||f>=1) return;
+  ctx.save(); ctx.globalAlpha=(1-f)*0.5;
+  for(const fp of remixFx.from){ const a=(1-f)*4; const rr=(1-f)*70;
+    const x=latCX+(fp.x-latCX)*f+Math.cos(a)*rr, y=latCY+(fp.y-latCY)*f+Math.sin(a)*rr*0.7;
+    ctx.beginPath(); ctx.arc(x,y,ballRad*0.4*(1-f)+2,0,6.28); ctx.fillStyle=HEX[fp.c]; ctx.fill(); }
+  ctx.globalAlpha=(1-f)*0.4; ctx.beginPath(); ctx.arc(latCX,latCY,(f*180)+10,0,6.28);
+  ctx.strokeStyle='rgba(44,39,51,.4)'; ctx.lineWidth=3*(1-f); ctx.stroke(); ctx.restore(); }
+function drawEnemies(now){ for(const e of enemies){ const t=e.dead?(1-e.death/0.4):1; if(t<=0) continue;
+  const r=e.r*(e.dead?(0.6+0.4*t):1)+Math.sin(e.wob)*1.5;
+  ctx.save(); ctx.globalAlpha=e.dead?t:1; stickerCircle(e.x,e.y,r,e.col,INK,3);
+  if(e.chill>0){ ctx.strokeStyle='rgba(61,139,223,.8)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(e.x,e.y,r+2,0,6.28); ctx.stroke(); }
+  if(e.burn>0){ ctx.fillStyle='rgba(239,74,90,.5)'; ctx.beginPath(); ctx.arc(e.x,e.y-r,2.6,0,6.28); ctx.fill(); }
+  ctx.beginPath(); const frac=Math.max(0,e.hp/e.maxhp);
+  ctx.arc(e.x,e.y,r+5,-Math.PI/2,-Math.PI/2+frac*6.2832); ctx.strokeStyle='rgba(44,39,51,.4)'; ctx.lineWidth=2.5; ctx.stroke();
+  // face
+  ctx.fillStyle=INK; ctx.beginPath(); ctx.arc(e.x-r*0.32,e.y-r*0.1,2.2,0,6.28); ctx.arc(e.x+r*0.32,e.y-r*0.1,2.2,0,6.28); ctx.fill();
+  ctx.restore(); } }
+function drawSpells(now){ for(const s of spells){
+  for(let k=0;k<s.trail.length;k++){ const p=s.trail[k], a=k/s.trail.length;
+    ctx.beginPath(); ctx.arc(p.x,p.y,s.r*a*0.8,0,6.28);
+    ctx.fillStyle=s.col+Math.floor(a*120).toString(16).padStart(2,'0'); ctx.fill(); }
+  stickerCircle(s.x,s.y,s.r,s.col,INK,2.5);
+  ctx.beginPath(); ctx.arc(s.x-s.r*0.3,s.y-s.r*0.3,s.r*0.3,0,6.28); ctx.fillStyle='rgba(255,255,255,.7)'; ctx.fill(); } }
 function drawPuffs(){ for(const p of puffs){ const a=Math.max(0,p.life/p.max);
-  ctx.beginPath(); ctx.arc(p.x,p.y,p.r*a,0,6.28); ctx.fillStyle=p.col; ctx.globalAlpha=a; ctx.fill(); ctx.globalAlpha=1; } }
+  ctx.beginPath(); ctx.arc(p.x,p.y,p.r*a,0,6.28); ctx.fillStyle=p.col; ctx.globalAlpha=a; ctx.fill(); ctx.globalAlpha=1; }
+  for(const p of sparks){ const a=Math.max(0,p.life/p.max); ctx.beginPath(); ctx.arc(p.x,p.y,p.r*a,0,6.28);
+    ctx.fillStyle=p.col; ctx.globalAlpha=a; ctx.fill(); ctx.globalAlpha=1; } }
 function drawDmgPops(){ for(const d of dmgPops){ const a=Math.max(0,d.life/0.9);
   ctx.save(); ctx.globalAlpha=a; ctx.font='700 18px Fredoka, sans-serif'; ctx.textAlign='center';
   ctx.lineWidth=3.5; ctx.strokeStyle=PAPER; ctx.strokeText(d.val,d.x,d.y); ctx.fillStyle=d.col; ctx.fillText(d.val,d.x,d.y); ctx.restore(); } }
-
-function drawWord(now){
-  if(selection.length===0) return;
-  const word=selection.map(i=>balls[i].c);
-  const isSwap = selection.length===2;
-  const cls=classify(word);
-  const valid = !isSwap && cls.type!=='fizzle';
-  // display text + colour
-  let disp='', dispCol=INK;
-  if(isSwap){ disp=' ⇄ swap'; dispCol=INK; }
-  else if(valid){ disp=' — '+nameFor(cls); dispCol=INK; }
-  else if(word.length>=3){ disp=' …fizzle'; dispCol='#ef4a5a'; }
-  const y=leakY-30;
-  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
-  const dotR=6, gap=18; const totalW=(word.length-1)*gap;
-  ctx.font='700 14px Fredoka, sans-serif';
-  const lblW = disp?ctx.measureText(disp).width:0;
-  const dotsW=totalW+dotR*2; const blockW=dotsW+lblW+8; let bx=W/2-blockW/2;
-  ctx.save(); ctx.beginPath(); roundRect(bx-12,y-16,blockW+24,32,14);
-  ctx.fillStyle=PAPER2; ctx.strokeStyle=INK; ctx.lineWidth=2.5; ctx.shadowColor='rgba(44,39,51,.25)'; ctx.shadowOffsetY=3;
-  ctx.fill(); ctx.shadowColor='transparent'; ctx.stroke(); ctx.restore();
-  let cx=bx+dotR;
-  for(let k=0;k<word.length;k++){ ctx.beginPath(); ctx.arc(cx,y,dotR,0,6.28);
-    ctx.fillStyle=HEX[word[k]]; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=INK; ctx.stroke(); cx+=gap; }
-  cx=cx-gap+dotR+4; ctx.textAlign='left';
-  if(disp){ ctx.fillStyle=dispCol; ctx.fillText(disp,cx,y); }
-  ctx.restore();
-}
-function drawAim(now){
-  if(!aiming) return;
-  const o=centroid(selection); const v=normVec(aimVec);
-  ctx.save(); ctx.strokeStyle='rgba(44,39,51,.5)'; ctx.lineWidth=3; ctx.setLineDash([3,9]); ctx.lineCap='round';
-  const len=220; ctx.beginPath(); ctx.moveTo(o.x,o.y); ctx.lineTo(o.x+v.x*len,o.y+v.y*len); ctx.stroke(); ctx.setLineDash([]);
-  const ax=o.x+v.x*len, ay=o.y+v.y*len; const perp={x:-v.y,y:v.x};
-  ctx.beginPath(); ctx.moveTo(ax+v.x*12,ay+v.y*12);
-  ctx.lineTo(ax-v.x*8+perp.x*9,ay-v.y*8+perp.y*9); ctx.lineTo(ax-v.x*8-perp.x*9,ay-v.y*8-perp.y*9);
-  ctx.closePath(); ctx.fillStyle='rgba(44,39,51,.6)'; ctx.fill(); ctx.restore();
-}
+function drawChain(now){ if(!chainLabel) return; const a=Math.max(0,chainLabel.life/1.1);
+  const txt=chainLabel.text||('chain ×'+chainLabel.n);
+  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 20px Fredoka, sans-serif';
+  const y=topY-24-(1-a)*10;
+  ctx.lineWidth=4; ctx.strokeStyle=PAPER; ctx.strokeText(txt,W/2,y); ctx.fillStyle=chainLabel.text?HEX.P:ACCENT; ctx.fillText(txt,W/2,y); ctx.restore(); }
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
   ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function ease(t){ t=Math.max(0,Math.min(1,t)); return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
+function iceCrack(x,y){ for(let k=0;k<8;k++){ const p=mkSpark(x,y,HEX.B); sparks.push(p); } }
 
-// ---------------- pointer handling ----------------
-function getPos(ev){
-  const rect=canvas.getBoundingClientRect(); let cx,cy;
-  if(ev.touches && ev.touches.length){ cx=ev.touches[0].clientX; cy=ev.touches[0].clientY; }
-  else if(ev.changedTouches && ev.changedTouches.length){ cx=ev.changedTouches[0].clientX; cy=ev.changedTouches[0].clientY; }
+// ================= input =================
+function getPos(ev){ const rect=canvas.getBoundingClientRect(); let cx,cy;
+  if(ev.touches&&ev.touches.length){ cx=ev.touches[0].clientX; cy=ev.touches[0].clientY; }
+  else if(ev.changedTouches&&ev.changedTouches.length){ cx=ev.changedTouches[0].clientX; cy=ev.changedTouches[0].clientY; }
   else { cx=ev.clientX; cy=ev.clientY; }
-  return {x:cx-rect.left, y:cy-rect.top};
-}
-function onDown(ev){
-  if(lockout>0) return;
-  const p=getPos(ev); const i=ballAt(p.x,p.y);
-  if(i<0) return;
-  ev.preventDefault();
-  dragging=true; moved=false; startIdx=i; startPos=p; pointer=p; committed=-1; aiming=false;
-  selection=[i]; balls[i].wob=Math.max(balls[i].wob,0.5); syncBlobs();
-}
-function onMove(ev){
-  if(!dragging) return;
-  const p=getPos(ev); pointer=p; ev.preventDefault();
-  if(!moved){ if(Math.hypot(p.x-startPos.x,p.y-startPos.y)>TAP_TOL) moved=true; else return; }
-  if(committed<0){ if(Math.hypot(p.x-startPos.x,p.y-startPos.y)>COMMIT_TOL) commitAxis(); else return; }
-  updateSelection();
-}
-function onUp(ev){
-  if(!dragging) return;
-  ev.preventDefault();
-  pointer=getPos(ev);
-  if(!moved){
-    const b=balls[startIdx];
-    if(b && !b.consumed && b.c==='W') castWhorl(startIdx);
-    else if(b) b.wob=1;                        // tiny wobble on non-white tap
-    clearSelection(); return;
+  return {x:cx-rect.left, y:cy-rect.top}; }
+function ballAt(x,y){ let best=-1,bd=ballRad*1.25; for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null) continue;
+  const d=Math.hypot(x-b.x,y-b.y); if(d<bd){bd=d;best=i;} } return best; }
+let dragStart=-1, downPos={x:0,y:0}, movedFar=false, ptr={x:0,y:0};
+function onDown(ev){ const p=getPos(ev);
+  if(whorlReady && Math.hypot(p.x-sigilX,p.y-sigilY)<=sigilR+6){ ev.preventDefault(); tapWhorl(); dragStart=-1; return; }
+  const i=ballAt(p.x,p.y); if(i<0){ return; }
+  ev.preventDefault(); dragStart=i; downPos=p; ptr=p; movedFar=false; }
+function onMove(ev){ if(dragStart<0) return; const p=getPos(ev); ptr=p; ev.preventDefault();
+  if(!movedFar && Math.hypot(p.x-downPos.x,p.y-downPos.y)>ballRad*0.5) movedFar=true; }
+function onUp(ev){ if(dragStart<0) return; ev.preventDefault(); const p=getPos(ev); ptr=p;
+  const start=dragStart; dragStart=-1;
+  if(movedFar){
+    // drag-nudge onto nearest neighbour in the drag direction
+    let best=-1,bd=1e9; for(const ni of NEIGH[start]){ const n=cells[ni]; const d=(n.x-p.x)**2+(n.y-p.y)**2; if(d<bd){bd=d;best=ni;} }
+    if(best>=0){ swapCore(start,best); selIdx=-1; return; }
   }
-  if(selection.length<2){                       // dragged a hair, no 2nd ball: no-op/tap
-    const b=balls[startIdx]; if(b) b.wob=1; clearSelection(); return;
-  }
-  if(selection.length===2){ doSwap(selection.slice()); return; }
-  let vec = aiming ? aimVec : nearestEnemyVec(centroid(selection));
-  castFromSelection(vec);
+  // tap
+  if(selIdx<0){ selIdx=start; }
+  else if(selIdx===start){ selIdx=-1; }
+  else if(adjacent(selIdx,start)){ swapCore(selIdx,start); selIdx=-1; }
+  else { selIdx=start; }
 }
 canvas.addEventListener('mousedown', onDown);
 window.addEventListener('mousemove', onMove);
@@ -819,81 +692,76 @@ canvas.addEventListener('touchmove', onMove, {passive:false});
 canvas.addEventListener('touchend', onUp, {passive:false});
 canvas.addEventListener('touchcancel', onUp, {passive:false});
 
-// ---------------- UI wiring ----------------
+// ================= drawer wiring =================
 const gear=document.getElementById('gear'), drawer=document.getElementById('drawer');
 gear.addEventListener('click', ()=> drawer.classList.toggle('open'));
 document.getElementById('drawerClose').addEventListener('click', ()=> drawer.classList.remove('open'));
-
-const sCd=document.getElementById('sCd'), vCd=document.getElementById('vCd');
-const sSpawn=document.getElementById('sSpawn'), vSpawn=document.getElementById('vSpawn');
-const sSpeed=document.getElementById('sSpeed'), vSpeed=document.getElementById('vSpeed');
-sCd.value=CD_DUR; vCd.textContent=CD_DUR.toFixed(1);
-sSpawn.value=SPAWN; vSpawn.textContent=SPAWN.toFixed(1);
-sSpeed.value=ESPEED; vSpeed.textContent=ESPEED;
-sCd.addEventListener('input', ()=>{ CD_DUR=parseFloat(sCd.value); vCd.textContent=CD_DUR.toFixed(1); lsSet('whlab2_cd',CD_DUR); });
-sSpawn.addEventListener('input', ()=>{ SPAWN=parseFloat(sSpawn.value); vSpawn.textContent=SPAWN.toFixed(1); });
-sSpeed.addEventListener('input', ()=>{ ESPEED=parseFloat(sSpeed.value); vSpeed.textContent=ESPEED; });
-function rerollBoard(){ for(const b of balls){ b.c=randPrim(); b.consumed=false; b.refillT=0; b.wob=1; b.born=performance.now(); } }
+function bindSlider(id,vid,set,fmt){ const s=document.getElementById(id), v=document.getElementById(vid);
+  s.addEventListener('input', ()=>{ set(parseFloat(s.value)); v.textContent=fmt(parseFloat(s.value)); }); return {s,v}; }
+const uiCd=bindSlider('sCd','vCd',x=>{ CD_DUR=x; lsSet('whlab2_cd',x); }, x=>x.toFixed(1));
+const uiForge=bindSlider('sForge','vForge',x=>{ FORGE_COUNT=x|0; lsSet('whlab2_forge',x|0); }, x=>String(x|0));
+const uiPops=bindSlider('sPops','vPops',x=>{ POPS=x|0; lsSet('whlab2_pops',x|0); }, x=>String(x|0));
+const uiSpawn=bindSlider('sSpawn','vSpawn',x=>SPAWN=x, x=>x.toFixed(1));
+const uiSpeed=bindSlider('sSpeed','vSpeed',x=>ESPEED=x, x=>String(x|0));
+uiCd.s.value=CD_DUR; uiCd.v.textContent=CD_DUR.toFixed(1);
+uiForge.s.value=FORGE_COUNT; uiForge.v.textContent=String(FORGE_COUNT);
+uiPops.s.value=POPS; uiPops.v.textContent=String(POPS);
+uiSpawn.s.value=SPAWN; uiSpawn.v.textContent=SPAWN.toFixed(1);
+uiSpeed.s.value=ESPEED; uiSpeed.v.textContent=String(ESPEED);
 document.getElementById('bReroll').addEventListener('click', rerollBoard);
 document.getElementById('bClear').addEventListener('click', ()=>{ enemies=[]; });
-
+document.getElementById('bFill').addEventListener('click', fillBars);
 function updateStatsUI(){
+  document.getElementById('stMatches').textContent=stats.matches;
+  document.getElementById('stDoubles').textContent=stats.doubles;
+  document.getElementById('stForged').textContent=stats.forged;
+  document.getElementById('stSec').textContent=stats.secPopped;
+  document.getElementById('stWhorls').textContent=stats.whorls;
+  document.getElementById('stChain').textContent=stats.maxChain;
   document.getElementById('stCasts').textContent=stats.casts;
-  document.getElementById('stFizzles').textContent=stats.fizzles;
   document.getElementById('stKills').textContent=stats.kills;
   document.getElementById('stLeaks').textContent=stats.leaks;
-  document.getElementById('stWords').textContent=stats.words;
-  document.getElementById('stWhorls').textContent=stats.whorls;
-  document.getElementById('stWhites').textContent=stats.whites;
-  document.getElementById('stSwaps').textContent=stats.swaps;
-  document.getElementById('stBurned').textContent=stats.burned;
-  document.getElementById('stAvg').textContent=(stats.words?(stats.totalLen/stats.words):0).toFixed(1);
+  document.getElementById('stRemix').textContent=stats.remixes;
 }
 
-// ---------------- debug handle ----------------
-function segmentFor(sIdx, axis, len){
-  const line=lineOf(sIdx, axis); const si=line.indexOf(sIdx);
-  if(si<0) return null;
-  if(si+len<=line.length) return line.slice(si,si+len);
-  if(si-len+1>=0){ const s=line.slice(si-len+1,si+1); return s; }
-  return null;
-}
+// ================= debug handle =================
 window.LAB = {
-  get balls(){ return balls.map((b,i)=>({i, q:b.q, r:b.r, c:b.c, x:b.x, y:b.y, consumed:!!b.consumed})); },
-  get selection(){ return selection.slice(); },
-  get word(){ return selection.map(i=>balls[i].c).join(''); },
-  get stats(){ return Object.assign({avgLen: stats.words?stats.totalLen/stats.words:0}, stats); },
-  get enemies(){ return enemies.map(e=>({x:e.x,y:e.y,hp:e.hp,dead:e.dead})); },
-  get counts(){ return {enemies:enemies.length, spells:spells.length, warriors:warriors.length, puffs:puffs.length, alch:alchFx.length, shocks:shocks.length}; },
+  get cells(){ return cells.map((b,i)=>({i, q:b.q, r:b.r, c:b.c, x:b.x, y:b.y})); },
+  get meters(){ return {O:meters.O, G:meters.G, P:meters.P}; },
+  get whorlReady(){ return whorlReady; },
+  get stats(){ return Object.assign({}, stats); },
+  get enemies(){ return enemies.map(e=>({x:e.x,y:e.y,hp:e.hp,dead:e.dead,chill:e.chill,burn:e.burn})); },
   get cooldown(){ return cooldown; },
   get cooldownDur(){ return CD_DUR; },
-  get lockout(){ return lockout; },
-  get center(){ return CENTER_IDX; },
-  setCooldownDur(v){ CD_DUR=Math.max(0.5,Math.min(4.0,v)); sCd.value=CD_DUR; vCd.textContent=CD_DUR.toFixed(1); lsSet('whlab2_cd',CD_DUR); },
-  clearCooldown(){ cooldown=0; lockout=0; },
-  classify(arr){ return classify(arr); },
-  merge(arr){ return mergeColours(arr); },
-  segment(sIdx,axis,len){ return segmentFor(sIdx, typeof axis==='number'?axis:{A:0,B:1,C:2}[axis], len); },
-  setBall(idx,colour){ if(balls[idx]){ balls[idx].c=colour; balls[idx].consumed=false; balls[idx].refillT=0; balls[idx].wob=1; } },
-  tapBall(idx){ const b=balls[idx]; if(!b) return {result:'nofit'};
-    if(!b.consumed && b.c==='W') return castWhorl(idx); b.wob=1; return {result:'wobble'}; },
-  // synthesize a straight-line cast; axis 0/1/2 or 'A'/'B'/'C'; aimVec optional (else auto-target)
-  castLine(sIdx, axis, len, aimVec){
-    const ax = typeof axis==='number'?axis:{A:0,B:1,C:2}[axis];
-    const seg=segmentFor(sIdx, ax, len);
-    if(!seg || seg.length<len) return {result:'nofit'};
-    selection=seg; syncBlobs();
-    return castFromSelection(aimVec||null);
-  },
-  swap(idxA,idxB){ if(!balls[idxA]||!balls[idxB]) return {result:'nofit'}; return doSwap([idxA,idxB]); },
-  spawnEnemyAt(x,y,hp){ hp=hp||20; enemies.push({x,y,r:hp===20?18:24,hp,maxhp:hp,col:HEX.R,wob:0,dead:false,death:0}); },
+  get counts(){ return {enemies:enemies.length, spells:spells.length, pools:pools.length, castGoo:castGoo.length}; },
+  neighbors(i){ return NEIGH[i]?NEIGH[i].slice():[]; },
+  colours(){ return cells.map(c=>c.c); },
+  setBall(idx,colour){ if(cells[idx]){ cells[idx].c=colour; cells[idx].oy=0; cells[idx]._new=false; } },
+  swap(a,b){ return swapCore(a,b); },
+  findMatches(){ return findMatches().map(m=>({cells:m.cells.slice(), colour:m.colour, len:m.len})); },
+  hasMatchingMove(){ return hasMatchingMove(); },
+  hasInstantMatch(){ return hasInstantMatch(); },
+  remix(){ return remix(true); },
+  tapWhorl(){ return tapWhorl(); },
+  fillBars(){ fillBars(); },
+  spawnEnemyAt(x,y,hp){ spawnEnemyAt(x,y,hp); },
   clearEnemies(){ enemies=[]; },
   rerollBoard(){ rerollBoard(); },
-  step(ms){ update((ms||16)/1000); }
+  setCooldown(sec){ cooldown=Math.max(0,sec); },
+  clearCooldown(){ cooldown=0; },
+  setCooldownDur(v){ CD_DUR=Math.max(0.5,Math.min(4,v)); uiCd.s.value=CD_DUR; uiCd.v.textContent=CD_DUR.toFixed(1); lsSet('whlab2_cd',CD_DUR); },
+  setForge(n){ FORGE_COUNT=Math.max(1,Math.min(3,n|0)); uiForge.s.value=FORGE_COUNT; uiForge.v.textContent=String(FORGE_COUNT); lsSet('whlab2_forge',FORGE_COUNT); },
+  setPops(n){ POPS=Math.max(3,Math.min(8,n|0)); uiPops.s.value=POPS; uiPops.v.textContent=String(POPS); lsSet('whlab2_pops',POPS); },
+  pause(){ auto=false; }, resume(){ auto=true; }, get auto(){ return auto; },
+  setSafeRefill(v){ SAFE_REFILL=!!v; },
+  step(ms){ let t=ms||16; while(t>0){ update(Math.min(16,t)/1000); t-=16; } },
+  sigil(){ return {x:sigilX,y:sigilY,r:sigilR}; }
 };
 
-// ---------------- boot ----------------
+// ================= boot =================
 layout();
+genNoMatch();
+ensurePlayable(true);
 requestAnimationFrame(tick);
 })();
 </script>
