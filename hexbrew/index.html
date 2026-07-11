@@ -916,8 +916,9 @@ function getPos(ev){ const rect=canvas.getBoundingClientRect(); let cx,cy;
   return {x:cx-rect.left, y:cy-rect.top}; }
 function ballAt(x,y){ let best=-1,bd=ballRad*1.3; for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null||b.c==='K') continue;
   const d=Math.hypot(x-b.x,y-b.y); if(d<bd){bd=d;best=i;} } return best; }
-// drag feedback: A follows the pointer (clamped), B leans reciprocally, release
-// past ~45% of spacing commits, short release springs back with a wobble.
+// drag feedback: A follows the pointer (clamped), B leans reciprocally. Dragging
+// past ~45% of spacing commits the swap immediately (finger still down — release
+// is just letting go); a short release springs back with a wobble.
 const DRAG_CAP=0.55, DRAG_COMMIT=0.45, DRAG_PICK=0.15, LEAN=0.25;
 let dragStart=-1, downPos={x:0,y:0}, movedFar=false;
 let dragOff={x:0,y:0}, dragTgt=-1, dragLean={x:0,y:0};
@@ -946,25 +947,27 @@ function onMove(ev){ if(dragStart<0) return; const p=getPos(ev); ev.preventDefau
     const f=Math.min(1, Math.hypot(dragOff.x,dragOff.y)/cap);
     dragLean={x:(A.x-B.x)*LEAN*f, y:(A.y-B.y)*LEAN*f}; }
   else dragLean={x:0,y:0};
+  // drag far enough and the swap just happens — no need to let go
+  if(dragTgt>=0){ const B=cells[dragTgt];
+    if(A.c!==B.c){
+      const dx=B.x-A.x, dy=B.y-A.y, dl=Math.hypot(dx,dy)||1;
+      const proj=(dragOff.x*dx+dragOff.y*dy)/dl;
+      if(proj>=DRAG_COMMIT*ROW_DY){
+        const start=dragStart, tgt=dragTgt, off={x:dragOff.x,y:dragOff.y}, lean={x:dragLean.x,y:dragLean.y};
+        clearDrag();
+        const res=swapCore(start,tgt);
+        if(res.type==='match'||res.type==='positional'){
+          springTo(tgt, (A.x+off.x)-B.x, (A.y+off.y)-B.y);
+          springTo(start, (B.x+lean.x)-A.x, (B.y+lean.y)-A.y);
+        } else { springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
+        selIdx=-1;
+      } } }
 }
 function onUp(ev){ if(dragStart<0) return; ev.preventDefault(); const p=getPos(ev);
   const start=dragStart, tgt=dragTgt, off={x:dragOff.x,y:dragOff.y}, lean={x:dragLean.x,y:dragLean.y};
   clearDrag();
   if(movedFar){
-    if(tgt>=0){ const A=cells[start], B=cells[tgt];
-      const dx=B.x-A.x, dy=B.y-A.y, dl=Math.hypot(dx,dy)||1;
-      const proj=(off.x*dx+off.y*dy)/dl;
-      if(proj>=DRAG_COMMIT*ROW_DY){
-        const res=swapCore(start,tgt);
-        if(res.type==='match'||res.type==='positional'){
-          // colours swapped: hand the current dragged positions to the springs (no snap-back-then-swap)
-          springTo(tgt, (A.x+off.x)-B.x, (A.y+off.y)-B.y);
-          springTo(start, (B.x+lean.x)-A.x, (B.y+lean.y)-A.y);
-        } else { // blocked (same colour / resolving / no moves): spring back + refusal shake (in swapCore)
-          springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
-        selIdx=-1; return;
-      } }
-    // short release: both spring back with an eased wobble
+    // commit happens mid-drag now — any release that gets here springs back
     springTo(start, off.x, off.y); if(tgt>=0) springTo(tgt, lean.x, lean.y);
     SFX.spring(); selIdx=-1; return;
   }
