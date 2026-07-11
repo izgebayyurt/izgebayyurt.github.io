@@ -59,7 +59,7 @@ Monetization → In-App Purchases → **+** (both are **Non-Consumable**):
 | Display name | Remove Ads | Everything |
 | Description | No more ad breaks — ever. | All 7 packs, the 150-level Medley, daily archive, and every chapter unlocked. No ads. |
 
-- [ ] Each IAP needs a **review screenshot**: use `store-assets/screen-08-packs.png` (shows the locked/unlocked catalogue) — any real in-app image ≥640px is accepted.
+- [ ] Each IAP needs a **review screenshot**: use `store-assets/screen-03-packs.png` (a Medley board showing the pack mechanics) — any real in-app image ≥640px is accepted.
 - [ ] Optional but nice: upload `iap-noads-1024.png` / `iap-everything-1024.png` as the **promotional images** (App Store Promotion section) so the IAPs can be featured on your product page.
 - [ ] Monetization → App-Specific Shared Secret → generate → paste into RevenueCat (step 3 last box).
 - [ ] Both IAPs must be attached to the version in step 8 ("In-App Purchases" section on the version page) the first time they ship.
@@ -183,14 +183,14 @@ more ways than one — but never as many as you'd hope.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
 **Screenshots** — upload the eight from `store-assets/` in this order (6.7" slot; Apple auto-scales for smaller devices, or re-shoot at 1242×2688 if you want a tailored 5.5" set):
-1. `screen-01-hero.png` — Mix colors. Light it up.
-2. `screen-02-mix.png` — Easy to learn, hard to master
-3. `screen-04-medley.png` — Portals, bridges & prisms
-4. `screen-03-brown.png` — Discover new blends
-5. `screen-05-tally.png` — Crack the number clues
+1. `screen-01-hero.png` — Mix colors and drag the lines to their matching square!
+2. `screen-02-levels.png` — 250+ levels with different board sizes
+3. `screen-03-packs.png` — Try custom packs with 8+ unique mechanics: bridges, portals, prisms and more!
+4. `screen-04-portals.png` — Warp through portals
+5. `screen-05-bridges.png` — Cross over bridges
 6. `screen-06-prisms.png` — Split light with prisms
-7. `screen-07-daily.png` — A new puzzle every day
-8. `screen-08-packs.png` — 7 puzzle packs to unlock
+7. `screen-07-numbers.png` — Crack the number clues
+8. `screen-08-daily.png` — A new puzzle every day
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 
