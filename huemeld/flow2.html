@@ -1063,7 +1063,11 @@ function renderPaths(){
     runs.forEach(function(rn,ri){ legs.push({cells:rn, color:HEX[E.col], blend:(ri===runs.length-1)?bl:null}); });
   }); });
   junctions.forEach(function(J){ if(!J.leg.length) return;
-    splitRuns(J.leg).forEach(function(rn){ legs.push({cells:rn, color:HEX[J.sec], blend:null}); }); });
+    // a blend that feeds a CHAIN junction (secondary -> brown) washes into the child's colour,
+    // exactly like a primary feeder washes into its junction's blend
+    var jbl=(J.jun!=null && J.jun>=0 && junctions[J.jun]) ? HEX[junctions[J.jun].sec] : null;
+    var jruns=splitRuns(J.leg);
+    jruns.forEach(function(rn,ri){ legs.push({cells:rn, color:HEX[J.sec], blend:(ri===jruns.length-1)?jbl:null}); }); });
 
   function line(pts,a,b){ ctx.beginPath(); ctx.moveTo(pts[a][0],pts[a][1]); for(var i=a+1;i<=b;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
   function dab(cells,pts,i,w){ ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1], rad(cells[i],w),0,6.2832); ctx.fill(); }
