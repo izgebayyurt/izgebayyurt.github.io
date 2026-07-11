@@ -357,8 +357,10 @@ let inkFx=[];                         // scrub wipe animations {x,y,born,seed}
 function randPrim(){ return PALETTE[(Math.random()*PALETTE.length)|0]; }
 function inkGoal(){ return goals.find(g=>g.t==='ink'); }
 
-// ================= match finding (white = wildcard) =================
-function matchesColour(c,col){ return c===col || c==='W'; }
+// ================= match finding (white = SECONDARY-only wildcard) =================
+// White joins O/G/P lines only — a brewed white can never be swept away by a random
+// primary cascade; spending it is always a deliberate secondary match.
+function matchesColour(c,col){ return c===col || (c==='W' && isSec(col)); }
 function findMatches(){
   const out=[];
   const COLOURS=['R','Y','B','O','G','P'];
