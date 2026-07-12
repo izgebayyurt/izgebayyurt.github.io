@@ -34,7 +34,9 @@ body{
 
 /* ---------- top HUD ---------- */
 /* goal chips: centered on their own row, prime real estate */
-.chips{ position:fixed; top:calc(env(safe-area-inset-top) + 10px); left:60px; right:58px; z-index:4;
+/* 84px gutters: back button (left) and the MOVES numeral (right) each keep clear air,
+   even with 5 goal chips on a 360-428px screen */
+.chips{ position:fixed; top:calc(env(safe-area-inset-top) + 10px); left:84px; right:84px; z-index:4;
   display:none; flex-wrap:wrap; gap:6px; justify-content:center; pointer-events:none; }
 .chip{ display:flex; align-items:center; gap:6px; background:var(--paper2); border:2.5px solid var(--ink);
   border-radius:999px; box-shadow:0 3px 0 var(--shadow); padding:4px 11px 4px 6px; font-family:var(--font-d);
@@ -83,9 +85,9 @@ body{
 .gpill .dot{ width:15px; height:15px; border-radius:50%; border:2px solid var(--ink); }
 .gpill .gicon{ display:flex; align-items:center; gap:3px; font-size:13px; }
 /* level select: named cards with goal icons */
-.lvwrap{ max-height:72vh; overflow-y:auto; padding:4px 2px; }
-.lvgrid{ display:grid; grid-template-columns:repeat(2,160px); gap:10px; }
-.lv{ width:160px; min-height:58px; border-radius:14px; background:var(--card); border:3px solid var(--ink);
+.lvwrap{ max-height:72vh; overflow-y:auto; padding:4px 2px; width:100%; max-width:334px; }
+.lvgrid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.lv{ width:100%; max-width:160px; min-height:58px; border-radius:14px; background:var(--card); border:3px solid var(--ink);
   box-shadow:0 4px 0 var(--shadow); font-family:var(--font-d); cursor:pointer; padding:7px 10px 8px;
   display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; touch-action:manipulation;
   transition:transform .08s var(--calm), box-shadow .08s var(--calm); }
@@ -212,7 +214,7 @@ const RING1=ringQR(1), RING2=ringQR(2);   // 6 and 12 cells
 //  L14 chain ≥3 occurs naturally every handful of cascading swaps.
 //  (boom goal type retained in code for future levels; palette path likewise, currently unused.)
 const LEVELS = [
-  { name:'Warm-up',        goals:[{t:'col',c:'R',need:36}], moves:18 },
+  { name:'Warm-up',        goals:[{t:'col',c:'R',need:36}], moves:21 },
   { name:'Two of a Kind',  goals:[{t:'col',c:'R',need:45},{t:'col',c:'B',need:45}], moves:22 },
   { name:'Triple Order',   goals:[{t:'col',c:'R',need:48},{t:'col',c:'Y',need:48},{t:'col',c:'B',need:48}], moves:24 },
   { name:'The Gift',       goals:[{t:'col',c:'R',need:50}], moves:20, seed:[{q:3,r:0,c:'K'}] },
@@ -236,8 +238,13 @@ function starThresholds(moves){ return { s3:Math.max(2,Math.round(moves*0.35)), 
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 function loadProgress(){ try{ const p=JSON.parse(lsGet('hb_progress',''));
-    if(p&&p.v===2&&p.unlocked) return p;
-    if(p&&p.unlocked) return { v:2, unlocked:Math.min(p.unlocked,16), stars:p.stars||{} };  // migrate v1 gracefully
+    // v1 or v2 alike: never trust stored shape — clamp unlocked into [1, LEVELS.length]
+    // (a corrupt {unlocked:-5} must not lock every level) and coerce stars to a plain object.
+    if(p&&p.unlocked){
+      const unlocked=Math.min(Math.max(1,p.unlocked|0),LEVELS.length);
+      const stars=(p.stars&&typeof p.stars==='object'&&!Array.isArray(p.stars))?p.stars:{};
+      return { v:2, unlocked, stars };
+    }
   }catch(e){}
   return { v:2, unlocked:1, stars:{} }; }
 function saveProgress(){ lsSet('hb_progress', JSON.stringify(progress)); }
@@ -285,6 +292,7 @@ const SFX=(()=>{
   return {
     init, get ready(){ return ready; }, get muted(){ return muted; },
     setMuted(m){ muted=!!m; lsSet('hb_mute',muted?'1':'0'); },
+    resume(){ try{ if(ac&&ac.state==='suspended') ac.resume(); }catch(e){} },
     pop(step){ tone(pfreq(step),{type:'triangle',d:0.13,peak:0.2}); },                 // pew — pitch climbs per ball
     swap(){ tone(120,{type:'sine',d:0.06,peak:0.24}); },                               // low soft thunk
     refuse(){ tone(90,{type:'square',d:0.05,peak:0.07}); tone(82,{type:'square',d:0.05,peak:0.07,delay:0.075}); },
@@ -328,12 +336,9 @@ function layout(){
   topY=latCY-3*ROW_DY-ballRad;
   for(let i=0;i<N;i++){ const [q,r]=CELLS_QR[i];
     cells[i].x=latCX+COL_DX*q; cells[i].y=latCY+ROW_DY*(r+q/2); }
+  chipRectsDirty=true;
 }
-window.addEventListener('resize', ()=>{ layout(); });
-
-// offscreen metaball for pop squish
-const off=document.createElement('canvas'), octx=off.getContext('2d');
-function sizeOff(){ off.width=Math.round(W*0.55); off.height=Math.round(H*0.55); }
+window.addEventListener('resize', ()=>{ layout(); wake(); });
 
 // ================= state =================
 // cell: {q,r,x,y,c, oy, shake, born, forgeFx, bombBorn, fresh}
@@ -346,6 +351,7 @@ let collect={R:0,Y:0,B:0,O:0,G:0,P:0,W:0};
 let movesLeft=0;
 let resolver=null;
 let lastResolve=null;
+let pendingWin=null;          // {t}: win earned, card held back until pops/flyers/goo drain (cap 700ms)
 let selIdx=-1;
 let puffs=[], sparks=[], flyers=[], shocks=[], popGoo=[];
 let pops=[];   // ripple-pop queue: mechanics applied instantly, FX/audio fire per-ball with a spatial stagger
@@ -683,6 +689,7 @@ function stepResolver(dt){
 function adjacent(a,b){ return NEIGH[a].includes(b); }
 function swapCore(a,b){
   if(state!=='play') return {type:'blocked',reason:'state'};
+  if(pendingWin) return {type:'blocked',reason:'won'};   // win earned — card is on its way
   if(resolver) { refuse(a,b); return {type:'blocked',reason:'resolving'}; }
   if(movesLeft<=0) return {type:'blocked',reason:'nomoves'};
   if(a===b||a<0||b<0||a>=N||b>=N) return {type:'blocked',reason:'bad'};
@@ -706,8 +713,10 @@ function refuse(a,b){ if(cells[a])cells[a].shake=0.5; if(cells[b])cells[b].shake
 function onSettle(){
   if(state!=='play') return;
   ensurePlayable();
-  if(goals.length && goals.every(g=>remainingOf(g)<=0)){ winLevel(); }
-  else if(movesLeft<=0){ loseLevel(); }
+  // win is EARNED here, but the card waits (update()) for the last flyer to land, the
+  // chip to visibly complete and goalDone to ring — then the card shows with SFX.win.
+  if(goals.length && goals.every(g=>remainingOf(g)<=0)){ if(!pendingWin) pendingWin={t:0}; }
+  else if(movesLeft<=0){ loseLevel(); }   // lose stays immediate
 }
 
 // ================= level flow =================
@@ -720,7 +729,7 @@ function loadLevel(n){
   PALETTE=(L.palette&&L.palette.length)?L.palette.slice():PRIMS.slice();
   ink=new Array(N).fill(0); inkFx=[];
   if(L.ink) for(const [q,r] of L.ink){ const i=IDX[KEY(q,r)]; if(i!==undefined) ink[i]=1; }
-  resolver=null; lastResolve=null; selIdx=-1; winInfo=null;
+  resolver=null; lastResolve=null; pendingWin=null; selIdx=-1; winInfo=null;
   puffs=[]; sparks=[]; flyers=[]; shocks=[]; popGoo=[]; pops=[]; remixFx=null; chainLabel=null; brewLabel=null; flashFx=null;
   dragStart=-1; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0};
   for(const c of cells){ c.oy=0; c.vy=0; c.land=0; c.fx=0; c.fy=0; c.fvx=0; c.fvy=0; }
@@ -758,8 +767,31 @@ function brewFlash(text,col){ brewLabel={text,col,life:1.2,born:performance.now(
 function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
 // ================= update / render =================
-let last=performance.now();
-function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now; update(dt,now); render(now); requestAnimationFrame(tick); }
+// render-on-demand: the RAF loop stays alive (cheap early-out) but update()+render()
+// only run while something is actually animating, plus ONE final frame after going
+// idle so the last drawn frame is never stale. wake() forces a frame after events
+// isAnimating can't see (tap-selection, state changes, resize, tab return).
+let last=performance.now(), idleDrawn=false;
+function wake(){ idleDrawn=false; }
+function isAnimating(now){
+  if(resolver||pendingWin) return true;
+  if(pops.length||flyers.length||puffs.length||sparks.length||popGoo.length||shocks.length||inkFx.length) return true;
+  if(dragStart>=0) return true;
+  if(remixFx||chainLabel||brewLabel||flashFx) return true;
+  if(state==='start'||state==='select') return false;   // canvas is a bare clear under the overlay
+  for(const c of cells){
+    if(c.oy!==0||c.vy!==0||c.shake>0||c.fx||c.fy||c.fvx||c.fvy) return true;
+    if(c.land && now-c.land<140) return true;
+    if(now-c.born<260) return true;
+    if(c.forgeFx && now-c.forgeFx<600) return true;
+    if(c.c==='K'||c.c==='W') return true;       // fuse flame / prism sparkle animate continuously
+  }
+  return false;
+}
+function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now;
+  const active=isAnimating(now);
+  if(active||!idleDrawn){ update(dt,now); render(now); idleDrawn=!active; }
+  requestAnimationFrame(tick); }
 function update(dt,now){
   stepResolver(dt);
   const FG=ROW_DY*55; // gravity: balls accelerate into holes instead of easing (a 1-row drop ≈ 190ms, visible)
@@ -777,7 +809,8 @@ function update(dt,now){
   // ripple pops: fire each queued pop when its stagger delay elapses (pew pew pew)
   for(const p of pops){ if(p.fired) continue; p.delay-=dt;
     if(p.delay<=0){ p.fired=true;
-      popGoo.push({x:p.x,y:p.y,tx:p.tx,ty:p.ty,r:ballRad*0.85,col:colOf(p.c),t:0,dur:0.26});
+      const gcol=colOf(p.c);
+      popGoo.push({x:p.x,y:p.y,tx:p.tx,ty:p.ty,r:ballRad*0.85,col:gcol,rgb:hexToRgb(gcol),t:0,dur:0.26});
       spawnClearPuffs(p.x,p.y,p.c);
       if(p.c==='W') for(let s=0;s<8;s++) sparks.push(mkSpark(p.x,p.y,WHITEC));
       if(p.goal) spawnFlyer(p.x,p.y,p.c,p.goal);
@@ -805,6 +838,19 @@ function update(dt,now){
   if(chainLabel){ chainLabel.life-=dt; if(chainLabel.life<=0) chainLabel=null; }
   if(brewLabel){ brewLabel.life-=dt; if(brewLabel.life<=0) brewLabel=null; }
   if(flashFx && now-flashFx.born>=flashFx.dur) flashFx=null;
+  // defensive caps: drop the oldest if a pathological cascade floods a queue
+  if(puffs.length>240) puffs.splice(0,puffs.length-240);
+  if(sparks.length>200) sparks.splice(0,sparks.length-200);
+  if(popGoo.length>80) popGoo.splice(0,popGoo.length-80);
+  if(pops.length>80) pops.splice(0,pops.length-80);
+  if(flyers.length>80) flyers.splice(0,flyers.length-80);
+  // held-back win: give the celebration a beat to visibly land (last flyer → chip tick →
+  // goalDone ring, chip pulse, goo tails) before the card + SFX.win. Hard cap 700ms.
+  if(pendingWin && state==='play'){
+    pendingWin.t+=dt;
+    const drained = pops.length===0 && flyers.length===0 && popGoo.length===0;
+    if((drained && pendingWin.t>=0.25) || pendingWin.t>=0.7){ pendingWin=null; winLevel(); }
+  }
   updateHUD();
 }
 function render(now){
@@ -913,21 +959,19 @@ function drawBomb(x,y,r,now,i){
   ctx.beginPath(); ctx.arc(x+r*0.7,y-r*1.15,1.8*fl,0,6.28); ctx.fillStyle='#fff6d8'; ctx.fill();
 }
 function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+// goo blobs, drawn DIRECTLY on the main context — no offscreen render, no getImageData
+// readback. The old metaball threshold produced a solid core out to ~1.3r with a short
+// soft falloff to ~1.9r at 0.8 alpha; a radial gradient with a hard shoulder matches it.
 function drawPopGoo(){
   if(popGoo.length===0) return;
-  sizeOff(); const sx=off.width/W, sy=off.height/H;
-  octx.setTransform(1,0,0,1,0,0); octx.clearRect(0,0,off.width,off.height);
-  octx.globalCompositeOperation='lighter';
-  for(const g of popGoo){ const R=g.r*2.6*sx, gx=g.x*sx, gy=g.y*sy; const [r,gr,bl]=hexToRgb(g.col);
-    const grd=octx.createRadialGradient(gx,gy,0,gx,gy,R);
-    grd.addColorStop(0,`rgba(${r},${gr},${bl},1)`); grd.addColorStop(0.55,`rgba(${r},${gr},${bl},.55)`); grd.addColorStop(1,`rgba(${r},${gr},${bl},0)`);
-    octx.fillStyle=grd; octx.beginPath(); octx.arc(gx,gy,R,0,6.2832); octx.fill(); }
-  octx.globalCompositeOperation='source-over';
-  const img=octx.getImageData(0,0,off.width,off.height), d=img.data;
-  for(let p=0;p<d.length;p+=4){ const a=d[p+3];
-    if(a>150) d[p+3]=255; else if(a>92) d[p+3]=Math.round((a-92)/58*255); else d[p+3]=0; }
-  octx.putImageData(img,0,0);
-  ctx.save(); ctx.imageSmoothingEnabled=true; ctx.globalAlpha=0.8; ctx.drawImage(off,0,0,off.width,off.height,0,0,W,H); ctx.restore();
+  ctx.save(); ctx.globalAlpha=0.8;
+  for(const g of popGoo){ const R=g.r*1.9;
+    const [r,gr,bl]=g.rgb;
+    const grd=ctx.createRadialGradient(g.x,g.y,0,g.x,g.y,R);
+    grd.addColorStop(0,g.col); grd.addColorStop(0.68,g.col);
+    grd.addColorStop(1,`rgba(${r},${gr},${bl},0)`);
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(g.x,g.y,R,0,6.2832); ctx.fill(); }
+  ctx.restore();
 }
 function drawShocks(now){ for(const s of shocks){ let f=(now-s.t0)/s.dur; if(f<0)f=0; if(f>=1)continue; const r=f*s.maxr;
   ctx.save(); ctx.globalAlpha=(1-f)*0.85;
@@ -959,8 +1003,6 @@ function drawBrew(now){ if(!brewLabel) return; const a=Math.max(0,brewLabel.life
   ctx.fillStyle=brewLabel.col; ctx.fillText(brewLabel.text,W/2,y); ctx.restore(); }
 function drawFlash(now){ if(!flashFx) return; const f=(now-flashFx.born)/flashFx.dur; if(f<0||f>=1) return;
   ctx.save(); ctx.globalAlpha=(1-f)*0.16; ctx.fillStyle=flashFx.col; ctx.fillRect(0,0,W,H); ctx.restore(); }
-function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function ease(t){ t=Math.max(0,Math.min(1,t)); return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
 
 // ================= HUD (DOM) =================
@@ -987,9 +1029,19 @@ function buildChips(){
     el.appendChild(goalIconEl(g));
     const num=document.createElement('span'); num.className='num';
     el.appendChild(num); chipsEl.appendChild(el); g.chipEl=el; g.numEl=num; }
+  chipRectsDirty=true;
 }
-function chipCenter(g){ if(!g||!g.chipEl) return {x:W/2,y:40}; const r=g.chipEl.getBoundingClientRect();
-  return { x:r.left+r.width/2, y:r.top+r.height/2 }; }
+// chip rects are cached and re-measured only when layout could have moved them
+// (build, resize, state toggle, chip text/done change) — never per flyer per frame.
+// If the chip row is hidden (zero rect, e.g. the win card just showed), the last
+// known centre is kept so in-flight flyers still land somewhere sensible.
+let chipRectsDirty=true;
+function chipCenter(g){
+  if(chipRectsDirty){
+    for(const gg of goals){ if(!gg.chipEl) continue; const r=gg.chipEl.getBoundingClientRect();
+      if(r.width>0||r.height>0) gg.rect={ x:r.left+r.width/2, y:r.top+r.height/2 }; }
+    chipRectsDirty=false; }
+  return (g&&g.rect) || {x:W/2,y:40}; }
 function pulseChip(g){ if(!g||!g.chipEl) return; g.chipEl.classList.remove('pulse'); void g.chipEl.offsetWidth; g.chipEl.classList.add('pulse');
   setTimeout(()=>g.chipEl&&g.chipEl.classList.remove('pulse'),160); }
 // chip DISPLAY lags mechanics: contributions still queued (unfired pops) or in flight
@@ -1000,17 +1052,21 @@ function inFlightTo(g){ let n=0;
   return n; }
 function dispRemaining(g){ const shown=Math.max(0, goalProgress(g)-inFlightTo(g));
   return Math.max(0, g.need-shown); }
+let hudMoves=null, hudLow=null;
 function updateHUD(){
   for(const g of goals){ if(!g.numEl) continue; const rem=dispRemaining(g);
+    if(rem===g.prev) continue;                    // cache: only touch the DOM on change
     if(rem<=0){ g.chipEl.classList.add('done'); g.numEl.textContent=''; }
     else { g.chipEl.classList.remove('done'); g.numEl.textContent=(g.t==='chain')?('×'+g.need):rem; }
+    chipRectsDirty=true;                          // text/done change can shift the chip row
     // brew/white/boom/chain tick at the forge/detonation/chain moment (no flyers for these)
     if(g.prev!==undefined && rem<g.prev && (g.t==='brew'||g.t==='white'||g.t==='boom'||g.t==='chain')){
       pulseChip(g); SFX.tick(g.t==='boom'?'K':'W');
       if(rem<=0) SFX.goalDone(); }
     g.prev=rem; }
-  movesNum.textContent=movesLeft;
-  movesBox.classList.toggle('low', movesLeft<=5 && state==='play');
+  if(hudMoves!==movesLeft){ hudMoves=movesLeft; movesNum.textContent=movesLeft; }
+  const low = movesLeft<=5 && state==='play';
+  if(hudLow!==low){ hudLow=low; movesBox.classList.toggle('low', low); }
 }
 
 // ================= screens =================
@@ -1023,6 +1079,7 @@ function setState(s){ state=s;
   chipsEl.style.display=play?'flex':'none';
   movesBox.style.display=play?'block':'none';
   backBtn.classList.toggle('show', play);
+  chipRectsDirty=true; wake();
 }
 function goSelect(){ buildLvGrid(); setState('select'); }
 function buildLvGrid(){ const grid=document.getElementById('lvGrid'); grid.innerHTML='';
@@ -1069,9 +1126,15 @@ muteBtn.addEventListener('click', ()=>{ try{ SFX.init(); }catch(e){} SFX.setMute
 muteIcon();
 
 // ================= input =================
+// a drag is OWNED by the finger (touch identifier) that started it — extra fingers
+// can neither steal the dragged ball nor cancel the drag by lifting.
+let dragTouchId=null;
+function findTouch(list,id){ if(list){ for(let k=0;k<list.length;k++){ if(list[k].identifier===id) return list[k]; } } return null; }
 function getPos(ev){ const rect=canvas.getBoundingClientRect(); let cx,cy;
-  if(ev.touches&&ev.touches.length){ cx=ev.touches[0].clientX; cy=ev.touches[0].clientY; }
-  else if(ev.changedTouches&&ev.changedTouches.length){ cx=ev.changedTouches[0].clientX; cy=ev.changedTouches[0].clientY; }
+  if(ev.changedTouches){ // touch event: prefer the owning finger, else first changed/active
+    const t=(dragTouchId!=null && (findTouch(ev.touches,dragTouchId)||findTouch(ev.changedTouches,dragTouchId)))
+            || ev.changedTouches[0] || (ev.touches&&ev.touches[0]);
+    cx=t.clientX; cy=t.clientY; }
   else { cx=ev.clientX; cy=ev.clientY; }
   return {x:cx-rect.left, y:cy-rect.top}; }
 function ballAt(x,y){ let best=-1,bd=ballRad*1.3; for(let i=0;i<N;i++){ const b=cells[i]; if(b.c==null||b.c==='K') continue;
@@ -1083,12 +1146,20 @@ const DRAG_CAP=0.55, DRAG_COMMIT=0.45, DRAG_PICK=0.15, LEAN=0.25;
 let dragStart=-1, downPos={x:0,y:0}, movedFar=false;
 let dragOff={x:0,y:0}, dragTgt=-1, dragLean={x:0,y:0};
 function springTo(i,ox,oy){ const c=cells[i]; if(!c) return; c.fx=ox; c.fy=oy; c.fvx=0; c.fvy=0; }
-function clearDrag(){ dragStart=-1; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0}; }
-function onDown(ev){ if(state!=='play') return; const p=getPos(ev);
+function clearDrag(){ dragStart=-1; dragTouchId=null; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0}; }
+function onDown(ev){ wake(); if(state!=='play') return;
+  if(dragStart>=0) return;                                   // a drag is live — ignore extra fingers
+  const isTouch=!!ev.changedTouches;
+  const p=getPos(ev);
   const i=ballAt(p.x,p.y); if(i<0){ return; }
   ev.preventDefault(); dragStart=i; downPos=p; movedFar=false;
+  dragTouchId=(isTouch&&ev.changedTouches[0])?ev.changedTouches[0].identifier:null;
   dragOff={x:0,y:0}; dragTgt=-1; dragLean={x:0,y:0}; }
-function onMove(ev){ if(dragStart<0) return; const p=getPos(ev); ev.preventDefault();
+function onMove(ev){ if(dragStart<0) return;
+  const isTouch=!!ev.changedTouches;
+  if(isTouch!==(dragTouchId!=null)) return;                  // wrong input family for this drag
+  if(isTouch && !findTouch(ev.touches,dragTouchId) && !findTouch(ev.changedTouches,dragTouchId)) return; // not our finger
+  const p=getPos(ev); ev.preventDefault();
   if(!movedFar && Math.hypot(p.x-downPos.x,p.y-downPos.y)>ballRad*0.5) movedFar=true;
   const A=cells[dragStart];
   let vx=p.x-A.x, vy=p.y-A.y; const mag=Math.hypot(vx,vy);
@@ -1123,7 +1194,11 @@ function onMove(ev){ if(dragStart<0) return; const p=getPos(ev); ev.preventDefau
         selIdx=-1;
       } } }
 }
-function onUp(ev){ if(dragStart<0) return; ev.preventDefault(); const p=getPos(ev);
+function onUp(ev){ if(dragStart<0) return;
+  const isTouch=!!ev.changedTouches;
+  if(isTouch!==(dragTouchId!=null)) return;                  // wrong input family for this drag
+  if(isTouch && !findTouch(ev.changedTouches,dragTouchId)) return; // another finger lifted — drag lives on
+  ev.preventDefault(); wake(); const p=getPos(ev);
   const start=dragStart, tgt=dragTgt, off={x:dragOff.x,y:dragOff.y}, lean={x:dragLean.x,y:dragLean.y};
   clearDrag();
   if(movedFar){
@@ -1144,6 +1219,8 @@ canvas.addEventListener('touchstart', onDown, {passive:false});
 canvas.addEventListener('touchmove', onMove, {passive:false});
 canvas.addEventListener('touchend', onUp, {passive:false});
 canvas.addEventListener('touchcancel', onUp, {passive:false});
+// returning to the tab: resume a suspended AudioContext and repaint the (possibly stale) frame
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ SFX.resume(); wake(); } });
 
 // ================= debug handle =================
 window.HB = {
@@ -1168,6 +1245,9 @@ window.HB = {
   get audio(){ return { ready:SFX.ready, muted:SFX.muted }; },
   setMuted(m){ SFX.setMuted(m); },
   get winState(){ return (state==='win')?'win':(state==='lose'?'lose':null); },
+  get winPending(){ return !!pendingWin; },
+  get flyersInFlight(){ return flyers.length; },
+  get drag(){ return { start:dragStart, touch:dragTouchId }; },
   get winInfo(){ return winInfo?Object.assign({},winInfo):null; },
   get progress(){ return JSON.parse(JSON.stringify(progress)); },
   colours(){ return cells.map(c=>c.c); },
@@ -1189,7 +1269,7 @@ window.HB = {
   loadLevel(n){ loadLevel(n); },
   goSelect(){ goSelect(); },
   step(ms){ let t=ms||16; while(t>0){ const d=Math.min(16,t)/1000; update(d,performance.now()); t-=16; } },
-  settle(maxMs){ let t=maxMs||20000; while(resolver && t>0){ update(0.016,performance.now()); t-=16; } return !resolver; },
+  settle(maxMs){ let t=maxMs||20000; while((resolver||pendingWin) && t>0){ update(0.016,performance.now()); t-=16; } return !resolver; },
   levels(){ return LEVELS.map(l=>({name:l.name,goals:l.goals.map(g=>Object.assign({},g)),moves:l.moves,
     palette:l.palette?l.palette.slice():null, ink:l.ink?l.ink.length:0, seed:l.seed?l.seed.map(s=>Object.assign({},s)):null})); },
   resetProgress(){ progress={v:2,unlocked:1,stars:{}}; saveProgress(); }
