@@ -298,26 +298,31 @@ const RAMPS = {
     [6, { n: 7, minOpen: 43, counts: 5, zeros: true, gates: 2 }],
     [4, { n: 8, minOpen: 56, counts: 6, zeros: true }],
   ] },
-  mix: { name: "Medley", icon: "✚", desc: "Little bit of everything!", tiers: [
-    // warm-up: one mechanic + a decoration
-    [10, { n: 5, minOpen: 22, jump: 1, gates: 1 }],
-    [10, { n: 5, minOpen: 22, bridge: 1, gates: 1 }],
-    [10, { n: 6, minOpen: 31, jump: 1, ice: 2 }],
-    [10, { n: 6, minOpen: 31, bridge: 1, gates: 2, arrows: 1 }],
-    [10, { build: "fork", n: 6, minOpen: 31, gates: 2, ice: 2 }],
-    [10, { build: "chain", n: 6, minOpen: 30, counts: 2, zeros: true }],
-    [10, { build: "prism", n: 6, minOpen: 30, gates: 2 }],
-    // COMBOS: two or more mechanics on one board
-    // (counters never share a board with bridges: a bridge cell wears two
-    //  colours, which would make a neighbouring clue ambiguous)
-    [10, { build: "chain", n: 6, minOpen: 30, jump: 1 }],
-    [10, { build: "prism", n: 6, minOpen: 30, bridge: 1 }],
-    [10, { n: 7, minOpen: 42, jump: 1, bridge: 1, gates: 2 }],
-    [10, { build: "fork", n: 7, minOpen: 42, gates: 2, counts: 3, zeros: true }],
-    [10, { build: "chain", n: 7, minOpen: 41, bridge: 1, ice: 2 }],
-    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, counts: 3, zeros: true }],
-    [10, { n: 7, minOpen: 41, jump: 2, bridge: 1, ice: 2 }],
-    [10, { build: "chain", n: 7, minOpen: 41, jump: 1, bridge: 1 }],
+  /* Medley: EVERY level is a combo of >=2 pack mechanics (plain colour gates
+     are campaign furniture and don't count). Tiers sit in three difficulty
+     BANDS of five specs; genPacks round-robins the levels inside each band so
+     consecutive levels are always different combos.
+     (Counters never share a board with bridges: a bridge cell wears two
+     colours, which would make a neighbouring clue ambiguous.) */
+  mix: { name: "Medley", icon: "✚", desc: "Little bit of everything!", bandSize: 5, tiers: [
+    // band 1 — warm-up pairs
+    [10, { n: 5, minOpen: 22, jump: 1, bridge: 1 }],                                  // portal + overpass
+    [10, { n: 6, minOpen: 31, jump: 1, ice: 2 }],                                     // portal + ice
+    [10, { n: 6, minOpen: 31, bridge: 1, gates: 2, arrows: 1 }],                      // overpass + arrows
+    [10, { build: "chain", n: 6, minOpen: 30, counts: 2, zeros: true }],              // brown + numbers
+    [10, { build: "prism", n: 6, minOpen: 30, bridge: 1 }],                           // prism + overpass
+    // band 2 — bigger pairs
+    [10, { build: "chain", n: 6, minOpen: 30, jump: 1 }],                             // brown + portal
+    [10, { build: "prism", n: 6, minOpen: 30, gates: 2, arrows: 2 }],                 // prism + arrows
+    [10, { n: 7, minOpen: 42, jump: 1, bridge: 1, gates: 2 }],                        // portal + overpass
+    [10, { build: "fork", n: 7, minOpen: 42, ice: 2, counts: 2, zeros: true }],       // ice + numbers
+    [10, { build: "chain", n: 7, minOpen: 41, bridge: 1, ice: 2 }],                   // brown + overpass + ice
+    // band 3 — triples
+    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, counts: 3, zeros: true }],     // prism + portal + numbers
+    [10, { build: "fork", n: 7, minOpen: 42, jump: 1, gates: 2, arrows: 2 }],         // portal + arrows
+    [10, { n: 7, minOpen: 41, jump: 2, bridge: 1, ice: 2 }],                          // portal + overpass + ice
+    [10, { build: "chain", n: 7, minOpen: 41, jump: 1, bridge: 1 }],                  // brown + portal + overpass
+    [10, { build: "chain", n: 7, minOpen: 43, ice: 2, counts: 2, zeros: true }],      // brown + ice + numbers
   ] },
 };
 
@@ -340,8 +345,22 @@ export function genPacks(seed) {
       }
       if (made < count) process.stderr.write(`  (pack ${id} tier short ${made}/${count} n${base.n})\n`);
     }
-    packs.push({ id, name: P.name, icon: P.icon, desc: P.desc, levels });
-    sols[id] = gestList;
+    let outLevels = levels, outGest = gestList;
+    if (P.bandSize) {
+      // interleave inside each band of `bandSize` tiers so neighbours differ
+      outLevels = []; outGest = [];
+      const per = P.tiers.map(([count]) => count);
+      let base = 0;
+      for (let t0 = 0; t0 < P.tiers.length; t0 += P.bandSize) {
+        const starts = [], counts = [];
+        for (let t = t0; t < Math.min(t0 + P.bandSize, P.tiers.length); t++) { starts.push(base); counts.push(per[t]); base += per[t]; }
+        for (let k = 0; k < Math.max(...counts); k++)
+          for (let j = 0; j < starts.length; j++)
+            if (k < counts[j]) { outLevels.push(levels[starts[j] + k]); outGest.push(gestList[starts[j] + k]); }
+      }
+    }
+    packs.push({ id, name: P.name, icon: P.icon, desc: P.desc, levels: outLevels });
+    sols[id] = outGest;
   }
   return { packs, sols };
 }
