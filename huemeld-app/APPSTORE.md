@@ -9,7 +9,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 |---|---|
 | Capacitor wrapper (AdMob + RevenueCat wired) | `huemeld-app/` |
 | Native bridge with placeholders to fill | `huemeld-app/native.js` |
-| 8 App Store screenshots, 6.7" (1290×2796) | `huemeld-app/store-assets/screen-*.png` |
+| 8 App Store screenshots, 6.9" (1320×2868, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
 | IAP promo images (1024×1024) | `huemeld-app/store-assets/iap-*.png` |
 | App icon, App Store size (1024×1024) | `huemeld-app/store-assets/appicon-1024.png` |
 | Privacy policy (live once pushed) | https://izgebayyurt.github.io/huemeld/privacy.html |
@@ -59,7 +59,7 @@ Monetization → In-App Purchases → **+** (both are **Non-Consumable**):
 | Display name | Remove Ads | Huemeld Pro |
 | Description | No more ad breaks — ever. | All 7 packs, the 150-level Medley, daily archive, and every chapter unlocked. No ads. |
 
-- [ ] Each IAP needs a **review screenshot**: use `store-assets/screen-03-packs.png` (a Medley board showing the pack mechanics) — any real in-app image ≥640px is accepted.
+- [ ] Each IAP needs a **review screenshot**: use `store-assets/screen-03-packs.jpg` (a Medley board showing the pack mechanics) — any real in-app image ≥640px is accepted.
 - [ ] Optional but nice: upload `iap-noads-1024.png` / `iap-everything-1024.png` as the **promotional images** (App Store Promotion section) so the IAPs can be featured on your product page.
 - [ ] Monetization → App-Specific Shared Secret → generate → paste into RevenueCat (step 3 last box).
 - [ ] Both IAPs must be attached to the version in step 8 ("In-App Purchases" section on the version page) the first time they ship.
@@ -181,15 +181,15 @@ more ways than one — but never as many as you'd hope.
 **Marketing URL** (optional): same.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
-**Screenshots** — upload the eight from `store-assets/` in this order (6.7" slot; Apple auto-scales for smaller devices, or re-shoot at 1242×2688 if you want a tailored 5.5" set):
-1. `screen-01-hero.png` — Mix colors and drag the lines to their matching square!
-2. `screen-02-levels.png` — 250+ levels with different board sizes
-3. `screen-03-packs.png` — Try custom packs with 8+ unique mechanics: bridges, portals, prisms and more!
-4. `screen-04-portals.png` — Warp through portals
-5. `screen-05-bridges.png` — Cross over bridges
-6. `screen-06-prisms.png` — Split light with prisms
-7. `screen-07-numbers.png` — Crack the number clues
-8. `screen-08-daily.png` — A new puzzle every day!
+**Screenshots** — upload the eight from `store-assets/` in this order (the 6.9" slot: 1320×2868 is the canonical size, and Apple auto-scales for every smaller iPhone; JPEG because ASC rejects PNGs with an alpha channel):
+1. `screen-01-hero.jpg` — Mix colors and drag the lines to their matching square!
+2. `screen-02-levels.jpg` — 250+ levels with different board sizes
+3. `screen-03-packs.jpg` — Try custom packs with 8+ unique mechanics: bridges, portals, prisms and more!
+4. `screen-04-portals.jpg` — Warp through portals
+5. `screen-05-bridges.jpg` — Cross over bridges
+6. `screen-06-prisms.jpg` — Split light with prisms
+7. `screen-07-numbers.jpg` — Crack the number clues
+8. `screen-08-daily.jpg` — A new puzzle every day!
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 
