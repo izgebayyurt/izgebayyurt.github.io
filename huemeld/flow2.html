@@ -133,6 +133,12 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcsub{ font-size:11px; color:var(--ink-soft); font-weight:600; line-height:1.3; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
 .mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
+#ovMech{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovMech .panel{ max-width:320px; }
+#ovMech .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
+.mechicon{ margin:2px 0 6px; }
+.mechblurb{ font-size:14px !important; margin-top:2px; }
+.mk.mechhow{ height:40px; padding:0 16px; font-size:13.5px; background:#bfe3ff; margin-top:8px; }
 /* hub action buttons: full card width, generous tap targets */
 #ovPick .panel > .mk{ width:100%; max-width:280px; height:68px; flex:0 0 auto; margin:10px auto 0; padding:0 12px; font-size:18px; }
 /* the Huemeld Pro upsell: full-screen, extra-dark backdrop */
@@ -220,6 +226,15 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
         <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)">How to play</button>
+      </div>
+    </div>
+    <div class="ov" id="ovMech">
+      <div class="panel">
+        <div id="mechIcon" class="mechicon"></div>
+        <h2 id="mechTitle">New mechanic</h2>
+        <p id="mechBlurb" class="mechblurb"></p>
+        <button class="mk" id="btnMechWatch">▶ Watch how it works</button>
+        <button class="mk" id="btnMechOk" style="background:var(--card);color:var(--ink)">Got it</button>
       </div>
     </div>
     <div class="ov" id="ovWin">
@@ -550,6 +565,7 @@ function loadPackLevel(pi, k){
   document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
   applyLevel(pk.levels[k]);
   if(k===0 && pk.desc) toast(pk.name+": "+pk.desc.toLowerCase());
+  maybeMechIntro(pk.levels[k]);
 }
 /* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
    Synthetic pointer events run through the REAL input handlers (demoFiring lets them
@@ -570,18 +586,16 @@ function stopDemo(){   // clear timers + chrome; does NOT touch the board
   demoing=false; demoFiring=false;
   ghostEl.style.display="none"; demobanEl.classList.remove("show"); demoskipEl.classList.remove("show");
 }
-function endDemo(){ stopDemo(); loadLevel(0); toast("Your turn!"); }
-function playDemo(){
-  var demo=LEVELS[0] && LEVELS[0].demo;
+var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
+function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast("Your turn!"); }
+function playDemoOn(demo, caps){   // the board is already loaded; the ghost replays `demo` with `caps`
   if(!demo || demoing) return false;
-  loadLevel(0);
   demoing=true;
   ghostEl.style.display="block"; ghostEl.style.transition="left .27s linear, top .27s linear";
   demoskipEl.classList.add("show");
-  var CAP=["Drag a line out of a circle…","…meet the other colour: they MIX! Ride it to the ✦","Cover the board. Light the ✦. That's the game."];
   var t=800, STEP=290;
   demo.forEach(function(cells,gi){
-    demoAt(t,function(){ demobanEl.textContent=CAP[Math.min(gi,CAP.length-1)]; demobanEl.classList.add("show"); });
+    demoAt(t,function(){ demobanEl.textContent=caps[Math.min(gi,caps.length-1)]; demobanEl.classList.add("show"); });
     demoAt(t,function(){ fireDemo("pointerdown",cells[0]); });
     cells.forEach(function(c,i){ if(i===0) return; demoAt(t+i*STEP,function(){ fireDemo("pointermove",c); }); });
     t+=cells.length*STEP+450;
@@ -590,6 +604,13 @@ function playDemo(){
   });
   demoAt(t+1400,endDemo);
   return true;
+}
+function playDemo(){
+  var demo=LEVELS[0] && LEVELS[0].demo;
+  if(!demo || demoing) return false;
+  loadLevel(0);
+  demoReturn=null;   // hand back to campaign level 1
+  return playDemoOn(demo, ["Drag a line out of a circle…","…meet the other colour: they MIX! Ride it to the ✦","Cover the board. Light the ✦. That's the game."]);
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
 function cs(){ return board.clientWidth/N; }
@@ -1456,6 +1477,70 @@ window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 
+/* ---------- mechanic tutorials: a pop-up card the first time a mechanic
+   appears, with the ghost hand teaching it on that pack's first board.
+   Rewatchable from the pack's page in the picker; seen-flags persist. ---------- */
+var MECHS={
+  brown:{ name:"Brown", blurb:"Run the THIRD primary into a mixed line: it melts into brown.",
+    caps:["Mix two primaries into a secondary…","…then run the THIRD primary into it: brown!","Brown squares want the full triple mix."] },
+  arrows:{ name:"Arrows", blurb:"Arrows only pass their colour — ridden straight through, the way they point.",
+    caps:["This gate points a direction…","…ride it STRAIGHT through, the way it points.","Wrong colour or wrong way won't do."] },
+  ice:{ name:"Ice", blurb:"Frozen cells can't hold a turn — lines pass straight through.",
+    caps:["Ice is slippery…","…lines cross it in a straight line only.","Plan your turns before the freeze!"] },
+  portals:{ name:"Portals", blurb:"A line entering one spiral pops out of its twin.",
+    caps:["Dive into a spiral…","…and pop out of its twin across the board!","The line carries on from there."] },
+  bridges:{ name:"Overpass", blurb:"Two lines can share a bridge cell — one crosses straight over the other.",
+    caps:["A bridge lets lines CROSS…","…straight over, straight under. No mixing.","Two lines, one cell — only on bridges."] },
+  prisms:{ name:"Prisms", blurb:"Feed a prism its blend and it splits back into the two primaries.",
+    caps:["Feed the prism its secondary colour…","…it splits into the two primaries!","Route BOTH rays home to finish."] },
+  tally:{ name:"Numbers", blurb:"A numbered tile counts its colour in the 3×3 around it, itself included — match it exactly.",
+    caps:["This tile counts its colour around itself…","…the 3×3 block, tile included: EXACTLY that many.","A zero means: keep that colour away!"] }
+};
+function levelMechs(L){
+  var m=[];
+  if((L.ci||[]).some(function(t){ return t[0]==="N"; })) m.push("brown");
+  if((L.gates||[]).some(function(g){ return g[3]; })) m.push("arrows");
+  if(L.ice && L.ice.length) m.push("ice");
+  if(L.portals && L.portals.length) m.push("portals");
+  if(L.bridges && L.bridges.length) m.push("bridges");
+  if(L.prisms && L.prisms.length) m.push("prisms");
+  if(L.counts && L.counts.length) m.push("tally");
+  return m;
+}
+function mechSeen(){ try{ return JSON.parse(localStorage.getItem("hm_flow2_mech")||"{}"); }catch(_e){ return {}; } }
+function markMechSeen(k){ var o=mechSeen(); o[k]=1; localStorage.setItem("hm_flow2_mech", JSON.stringify(o)); }
+var mechQueue=[], mechCur=null, ovMech=null;
+function showMechCard(k, rewatch){
+  mechCur=k; var M=MECHS[k];
+  document.getElementById("mechIcon").innerHTML=packIcon(k,40);
+  document.getElementById("mechTitle").textContent=(rewatch?"":"New mechanic: ")+M.name;
+  document.getElementById("mechBlurb").textContent=M.blurb;
+  ovMech.classList.add("show");
+}
+function showNextMech(){ if(mechQueue.length) showMechCard(mechQueue.shift(), false); }
+function maybeMechIntro(L){
+  if(demoing) return;
+  var seen=mechSeen();
+  var fresh=levelMechs(L).filter(function(k){ return !seen[k]; });
+  if(fresh.length){ mechQueue=fresh; showNextMech(); }
+}
+function watchMech(k){
+  var M=MECHS[k], pi=-1;
+  for(var i=0;i<PACKS.length;i++) if(PACKS[i].id===k) pi=i;
+  var dl = pi>=0 && PACKS[pi].levels[0];
+  if(!dl || !dl.demo){ showNextMech(); return; }
+  // remember where the player was; the ghost teaches on the pack's first board
+  var back = mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
+  demoReturn=function(){
+    if(back.p!=null) loadPackLevel(back.p, back.k);
+    else if(back.d!=null) loadDaily(back.d);
+    else loadLevel(back.l);
+    showNextMech();   // Medley intros can queue two mechanics
+  };
+  isTut=false; mode="campaign"; lvNameEl.textContent=M.name;
+  applyLevel(dl);
+  playDemoOn(dl.demo, M.caps);
+}
 /* ---------- inline SVG icons (no emoji): stroke follows text colour ---------- */
 function icn(name,sz,extra){
   var W=' width="'+(sz||18)+'" height="'+(sz||18)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.16em"';
@@ -1560,6 +1645,8 @@ function renderPicker(){
     document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
     var ph2='<button class="mk pickback">← All levels</button>';
     if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
+    if(MECHS[pk2.id] && pk2.levels[0] && pk2.levels[0].demo)
+      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">▶ How '+pk2.name+' works</button>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
       var open=packLevelUnlocked(k);
@@ -1578,6 +1665,8 @@ function renderPicker(){
 }
 document.getElementById("packsArea").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
+  var hw=e.target.closest(".mechhow");
+  if(hw){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); showMechCard(hw.dataset.mech, true); return; }
   var card=e.target.closest(".pickcard");
   if(card){ ensureAudio(); pickView={pk:+card.dataset.pack}; renderPicker(); return; }
   var b=e.target.closest(".pkbtn"); if(!b || b.dataset.p==null) return;
@@ -1621,6 +1710,14 @@ document.getElementById("btnArch").addEventListener("click", function(){ ensureA
   else ovUp.classList.add("show");
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
+ovMech=document.getElementById("ovMech");
+document.getElementById("btnMechOk").addEventListener("click", function(){ ensureAudio();
+  if(mechCur) markMechSeen(mechCur); mechCur=null;
+  ovMech.classList.remove("show"); showNextMech(); });
+document.getElementById("btnMechWatch").addEventListener("click", function(){ ensureAudio();
+  var k=mechCur; if(k) markMechSeen(k); mechCur=null;
+  ovMech.classList.remove("show");
+  if(k) watchMech(k); });
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
@@ -1659,11 +1756,14 @@ function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNa
 var solveCount=+(localStorage.getItem("hm_flow2_solves")||0);
 var AD_HONEYMOON=15;   // the first session is sacred: no interstitials before this many solves
 function maybeInterstitial(){
+  if(entNoAds()){ localStorage.removeItem("hm_flow2_addue"); return; }
+  // the due flag persists: closing the app on an ad slot only defers it
+  if(solveCount>=AD_HONEYMOON && solveCount%4===0) localStorage.setItem("hm_flow2_addue","1");
   var n=nativeBridge();
-  if(!n || !n.interstitial || entNoAds()) return;
-  if(solveCount<AD_HONEYMOON) return;
-  if(solveCount%4===0){ try{ n.interstitial(); }catch(_e){} }
+  if(!n || !n.interstitial) return;
+  if(localStorage.getItem("hm_flow2_addue")==="1"){ try{ n.interstitial(); }catch(_e){} }
 }
+window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue"); };
 
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");

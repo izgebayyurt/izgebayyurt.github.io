@@ -97,6 +97,9 @@ const CHAPTERS = [
 // side packs use their own rng stream so campaign/daily stay byte-identical per seed
 const pk = genPacks(seed + 777);
 SOL.packs = pk.sols;
+// each mechanic pack's level 1 carries its solution as `demo` so the shell's
+// ghost hand can teach the mechanic (mix is combos of already-taught ones)
+pk.packs.forEach((p) => { if (p.id !== "mix" && pk.sols[p.id][0]) p.levels[0].demo = pk.sols[p.id][0].gest; });
 pk.packs.forEach((p) => process.stderr.write(`pack ${p.id}: ${p.levels.length} levels\n`));
 
 // levels are solvable by construction; end-to-end winnability is verified
