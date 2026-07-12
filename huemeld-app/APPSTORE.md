@@ -82,7 +82,7 @@ npx cap open ios         # opens Xcode
 In Xcode:
 
 - [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
-- [ ] `ios/App/App/Info.plist`: replace the `GADApplicationIdentifier` placeholder with your AdMob **App ID** from step 2 (the one with `~`).
+- [ ] `ios/App/App/Info.plist`: `GADApplicationIdentifier` currently holds Google's SAMPLE app id (`…3940256099942544~1458002511`) so dev builds run with test ads out of the box — replace it with your real AdMob **App ID** from step 2 (the one with `~`) before the release build.
 - [ ] Same file: SKAdNetworkItems currently has Google's own entry (`cstr6suwn9.skadnetwork`) — paste the rest of [Google's current list](https://developers.google.com/admob/ios/quick-start#update_your_infoplist) (~50 entries) for better ad attribution. Optional but recommended.
 
 Notes:
