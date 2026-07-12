@@ -32,7 +32,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 ## 3. RevenueCat (10 minutes)
 
 - [ ] New project "Huemeld" → **Add app** → App Store → bundle ID `com.izge.huemeld`.
-- [ ] Copy the **public Apple API key** (starts `appl_`) → paste into `RC_IOS_API_KEY` in `huemeld-app/native.js`.
+- [ ] Copy the **public Apple API key** (starts `appl_`) → paste into `RC_IOS_API_KEY` in `huemeld-app/native.js`. **NOTE:** the file currently holds a `test_` sandbox key for development — replace it with the `appl_` production key before the App Store release build.
 - [ ] Products → add both (identifiers must match ASC exactly, step 5):
   - `com.izge.huemeld.noads`
   - `com.izge.huemeld.everything`
