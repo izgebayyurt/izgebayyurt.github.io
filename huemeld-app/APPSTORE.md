@@ -170,7 +170,7 @@ more ways than one — but never as many as you'd hope.
 **Marketing URL** (optional): same.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
-**Screenshots** — upload the eight from `store-assets/` in this order (the 6.9" slot: 1320×2868 is the canonical size, and Apple auto-scales for every smaller iPhone; JPEG because ASC rejects PNGs with an alpha channel):
+**Screenshots** — upload from `store-assets/` in this order (the 6.9" slot: 1320×2868 is the canonical size, and Apple auto-scales for every smaller iPhone; JPEG because ASC rejects PNGs with an alpha channel; Apple allows up to 10):
 1. `screen-01-hero.jpg` — Mix colors and drag the lines to their matching square!
 2. `screen-02-levels.jpg` — 250+ levels with different board sizes
 3. `screen-03-packs.jpg` — Try custom packs with 8+ unique mechanics: bridges, portals, prisms and more!
@@ -179,6 +179,7 @@ more ways than one — but never as many as you'd hope.
 6. `screen-06-prisms.jpg` — Split light with prisms
 7. `screen-07-numbers.jpg` — Crack the number clues
 8. `screen-08-daily.jpg` — A new puzzle every day!
+9. `screen-09-premium.jpg` — No ads. Every pack. One purchase. (the Huemeld Pro value screen)
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 
