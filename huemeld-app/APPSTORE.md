@@ -9,7 +9,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 |---|---|
 | Capacitor wrapper (AdMob + RevenueCat wired) | `huemeld-app/` |
 | Native bridge with placeholders to fill | `huemeld-app/native.js` |
-| 10 App Store screenshots, 6.9" (1320×2868, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
+| 10 App Store screenshots, 6.5" slot (1284×2778, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
 | IAP promo images (1024×1024) | `huemeld-app/store-assets/iap-*.png` |
 | App icon, App Store size (1024×1024) | `huemeld-app/store-assets/appicon-1024.png` |
 | Privacy policy (live once pushed) | https://izgebayyurt.github.io/huemeld/privacy.html |
@@ -170,7 +170,7 @@ more ways than one — but never as many as you'd hope.
 **Marketing URL** (optional): same.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
-**Screenshots** — upload from `store-assets/` in this order (the 6.9" slot: 1320×2868 is the canonical size, and Apple auto-scales for every smaller iPhone; JPEG because ASC rejects PNGs with an alpha channel; Apple allows up to 10):
+**Screenshots** — upload from `store-assets/` in this order (**1284×2778**, the 6.5"/6.7" size ASC accepts; other accepted sizes for that slot are 1242×2688, and the landscape variants; Apple auto-scales for smaller iPhones; JPEG because ASC rejects PNGs with an alpha channel; up to 10 allowed):
 1. `screen-01-hero.jpg` — Mix colors and drag the lines to their matching square!
 2. `screen-02-levels.jpg` — 250+ levels with different board sizes
 3. `screen-03-packs.jpg` — Try custom packs with 8+ unique mechanics: bridges, portals, prisms and more!
