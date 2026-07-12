@@ -66,39 +66,24 @@ Monetization → In-App Purchases → **+** (both are **Non-Consumable**):
 
 ## 6. Build the Xcode project
 
-On your Mac, in the repo:
+The Xcode project is **already generated and configured** in `huemeld-app/ios/`
+(Info.plist has the ATT string, `GADApplicationIdentifier` placeholder, and
+SKAdNetworkItems; the app icon and dark wordmark splash are in the asset
+catalog; iPhone is locked to portrait). On your Mac:
 
 ```bash
 cd huemeld-app
 npm install
 node sync.mjs            # builds www/ from ../huemeld with the native bridge injected
-npx cap add ios          # first time only — creates ios/
-npx cap sync ios
+npx cap sync ios         # copies www/ into the app + runs pod install
 npx cap open ios         # opens Xcode
 ```
 
 In Xcode:
 
 - [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
-- [ ] Target → General → App Icon: drop in `store-assets/appicon-1024.png` (already rendered at 1024×1024).
-- [ ] Open `ios/App/App/Info.plist` and add, inside the top-level `<dict>`:
-
-```xml
-<key>NSUserTrackingUsageDescription</key>
-<string>Allowing tracking lets us show fewer, better-matched ads. Your puzzles and progress are never shared.</string>
-<key>GADApplicationIdentifier</key>
-<string>ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY</string> <!-- your AdMob APP id from step 2, the one with ~ -->
-<key>SKAdNetworkItems</key>
-<array>
-  <dict>
-    <key>SKAdNetworkIdentifier</key>
-    <string>cstr6suwn9.skadnetwork</string> <!-- Google -->
-  </dict>
-  <!-- Paste the rest of Google's current list here:
-       https://developers.google.com/admob/ios/quick-start#update_your_infoplist
-       (~50 entries; copy the whole <array> they publish and replace this one) -->
-</array>
-```
+- [ ] `ios/App/App/Info.plist`: replace the `GADApplicationIdentifier` placeholder with your AdMob **App ID** from step 2 (the one with `~`).
+- [ ] Same file: SKAdNetworkItems currently has Google's own entry (`cstr6suwn9.skadnetwork`) — paste the rest of [Google's current list](https://developers.google.com/admob/ios/quick-start#update_your_infoplist) (~50 entries) for better ad attribution. Optional but recommended.
 
 Notes:
 - The ATT prompt fires **in-app, lazily** — `native.js` requests tracking authorization right before the *first* interstitial (after the 15-solve honeymoon), so reviewers see it in a sensible context. Nothing else to wire.
