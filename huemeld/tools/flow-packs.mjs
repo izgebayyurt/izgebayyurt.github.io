@@ -226,7 +226,7 @@ function makeMix(spec, rng) {
 
 /* ---- assembly: 25 levels per mechanic pack + the 100-level Medley ---- */
 const RAMPS = {
-  brown: { name: "Brown", icon: "🟤", desc: "Mix all three primaries", tiers: [
+  brown: { name: "Brown", icon: "🟤", desc: "Mix three primary colors", tiers: [
     [8, { build: "chain", n: 5, minOpen: 22 }],
     [8, { build: "chain", n: 6, minOpen: 31 }],
     [4, { build: "chain", n: 7, minOpen: 42 }],
@@ -236,7 +236,7 @@ const RAMPS = {
     [6, { build: "chain", n: 7, minOpen: 43, gates: 3 }],
     [6, { build: "chain", n: 8, minOpen: 54 }],
   ] },
-  arrows: { name: "Arrows", icon: "➤", desc: "Ride them straight through, the way they point", tiers: [
+  arrows: { name: "Arrows", icon: "➤", desc: "Lines must follow the direction on the sign", tiers: [
     [6, { n: 5, minOpen: 24, gates: 2, arrows: 1, looseness: 0.95 }],
     [6, { n: 6, minOpen: 33, gates: 3, arrows: 2, looseness: 0.95 }],
     [4, { build: "fork", n: 6, minOpen: 31, gates: 3, arrows: 2, looseness: 0.95 }],
@@ -247,7 +247,7 @@ const RAMPS = {
     [6, { n: 8, minOpen: 55, gates: 6, arrows: 5 }],
     [6, { n: 7, minOpen: 44, gates: 5, arrows: 5 }],
   ] },
-  ice: { name: "Ice", icon: "❄", desc: "Cross frozen cells straight", tiers: [
+  ice: { name: "Ice", icon: "❄", desc: "Prevents turning inside", tiers: [
     [6, { n: 5, minOpen: 24, ice: 2, looseness: 0.95 }],
     [6, { n: 6, minOpen: 33, ice: 3, looseness: 0.95 }],
     [4, { build: "fork", n: 6, minOpen: 31, ice: 3, looseness: 0.95 }],
@@ -258,7 +258,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 44, ice: 6 }],
     [6, { n: 8, minOpen: 55, ice: 6 }],
   ] },
-  portals: { name: "Portals", icon: "◎", desc: "Lines warp between twins", tiers: [
+  portals: { name: "Portals", icon: "◎", desc: "Who knew lines could be teleported? Well now they do", tiers: [
     [8, { n: 5, minOpen: 23, jump: 1, looseness: 0.95 }],
     [8, { n: 6, minOpen: 32, jump: 1, looseness: 0.95 }],
     [4, { n: 7, minOpen: 43, jump: 1, looseness: 0.95 }],
@@ -268,7 +268,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 42, jump: 2, gates: 2 }],
     [6, { n: 7, minOpen: 42, jump: 3 }],
   ] },
-  bridges: { name: "Bridges", icon: "⌗", desc: "Lines cross over each other", tiers: [
+  bridges: { name: "Overpass", icon: "⌗", desc: "Cross two lines over each other", tiers: [
     [8, { n: 5, minOpen: 23, bridge: 1 }],
     [8, { n: 6, minOpen: 32, bridge: 1 }],
     [4, { n: 7, minOpen: 43, bridge: 2 }],
@@ -278,7 +278,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 42, bridge: 2, gates: 2 }],
     [6, { n: 8, minOpen: 54, bridge: 3 }],
   ] },
-  prisms: { name: "Prisms", icon: "◈", desc: "Split a blend back apart", tiers: [
+  prisms: { name: "Prisms", icon: "◈", desc: "Split a mixed line back to its components", tiers: [
     [8, { build: "prism", n: 5, minOpen: 22 }],
     [8, { build: "prism", n: 6, minOpen: 31 }],
     [4, { build: "prism", n: 7, minOpen: 42 }],
@@ -288,7 +288,7 @@ const RAMPS = {
     [6, { build: "prism", n: 7, minOpen: 41, gates: 2, arrows: 2 }],
     [6, { build: "prism", n: 8, minOpen: 53 }],
   ] },
-  tally: { name: "Numbers", icon: "③", desc: "Exact colour counts around a tile", tiers: [
+  tally: { name: "Numbers", icon: "③", desc: "Match the color count around the numbered tile", tiers: [
     [8, { n: 5, minOpen: 24, counts: 1 }],
     [8, { n: 6, minOpen: 32, counts: 2 }],
     [6, { n: 6, minOpen: 32, counts: 3, zeros: true }],
@@ -298,7 +298,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 43, counts: 5, zeros: true, gates: 2 }],
     [4, { n: 8, minOpen: 56, counts: 6, zeros: true }],
   ] },
-  mix: { name: "Medley", icon: "✚", desc: "Every mechanic, mixed together", tiers: [
+  mix: { name: "Medley", icon: "✚", desc: "Little bit of everything!", tiers: [
     // warm-up: one mechanic + a decoration
     [10, { n: 5, minOpen: 22, jump: 1, gates: 1 }],
     [10, { n: 5, minOpen: 22, bridge: 1, gates: 1 }],

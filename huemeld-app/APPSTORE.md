@@ -154,7 +154,7 @@ SEVEN PUZZLE PACKS (350 more levels)
 • Arrows — ride them straight through, the way they point
 • Ice — frozen tiles keep your line running straight
 • Portals — pink spirals teleport your flow across the board
-• Bridges — cross your own lines on overpasses
+• Overpass — cross two lines over each other
 • Prisms — feed a secondary in, two primaries burst out
 • Numbers — counter tiles demand exactly N cells of their color
 

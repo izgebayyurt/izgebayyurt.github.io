@@ -132,7 +132,15 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcname{ font-weight:700; font-size:15px; }
 .pickcard .pcsub{ font-size:11px; color:var(--ink-soft); font-weight:600; line-height:1.3; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
-.mk.pickback{ height:38px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
+.mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
+/* hub action buttons: full card width, generous tap targets */
+#ovPick .panel > .mk{ width:100%; max-width:280px; height:54px; margin:10px auto 0; padding:0 12px; font-size:16px; }
+/* the Everything upsell */
+#ovUp .panel{ max-width:320px; }
+.updesc{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink-soft); margin:4px 0 0; }
+.uplist{ list-style:none; padding:0; margin:10px 0 2px; font-family:var(--font-d); font-weight:600; font-size:14.5px; color:var(--ink); text-align:left; }
+.uplist li{ margin:9px 0; line-height:1.35; }
+#ovUp .mk{ width:100%; height:52px; padding:0 12px; }
 .tip{ width:var(--bw); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
@@ -199,13 +207,29 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     <div class="ov" id="ovPick">
       <div class="panel">
         <h2 id="pickTitle">Levels</h2>
-        <button class="mk" id="btnContinue" style="background:#ffd15c;margin-top:4px">▶ Continue</button>
-        <button class="mk" id="btnDaily" style="background:#c9f0c0;margin-top:4px">★ Daily Puzzle</button>
+        <button class="mk" id="btnContinue" style="background:#ffd15c">▶ Continue</button>
+        <button class="mk" id="btnDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
+        <button class="mk" id="btnArch" style="background:#e8d5ff">📅 Daily Archive</button>
         <div id="archArea"></div>
-        <button class="mk" id="btnHow" style="background:#bfe3ff;margin-top:8px">How to play</button>
+        <button class="mk" id="btnHow" style="background:#bfe3ff">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
         <div id="packsArea"></div>
         <button class="mk" id="btnPickClose">Close</button>
+      </div>
+    </div>
+    <div class="ov" id="ovUp">
+      <div class="panel">
+        <h2>✦ Everything</h2>
+        <p class="updesc">One purchase, the whole game:</p>
+        <ul class="uplist">
+          <li>🚫 No ads, ever</li>
+          <li>🧩 All 7 puzzle packs · 350 levels</li>
+          <li>✚ The 150-level Medley</li>
+          <li>📅 Daily archive — replay the last 3 weeks</li>
+          <li>🔓 Every chapter unlocked instantly</li>
+        </ul>
+        <button class="mk" id="btnUpBuy">✦ Everything · $4.99</button>
+        <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
       </div>
     </div>
     <div class="ov" id="ovSet">
@@ -1409,7 +1433,7 @@ requestAnimationFrame(frame);
 /* ---------- level picker & controls ----------
    Two-level picker: the HUB lists Continue/Daily plus one CARD per chapter and
    per pack; tapping a card opens that set's level grid with a back button. */
-var pickView=null;   // null = hub; {ch:c} = a chapter's grid; {pk:pi} = a pack's grid
+var pickView=null;   // null = hub; {ch:c} = a chapter's grid; {pk:pi} = a pack's grid; {arch:1} = daily archive
 function renderPicker(){
   var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), nd=0;
   for(var i0=0;i0<LEVELS.length;i0++) if(done[i0]) nd++;
@@ -1422,7 +1446,10 @@ function renderPicker(){
   db.textContent = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? "  🔥"+stk : "");
   db.style.display = root ? "" : "none";
   document.getElementById("btnHow").style.display = root ? "" : "none";
-  document.getElementById("archArea").style.display = root ? "" : "none";
+  var ab=document.getElementById("btnArch");
+  ab.style.display = root ? "" : "none";
+  ab.textContent = "📅 Daily Archive" + (entFull() ? "" : " 🔒");
+  document.getElementById("archArea").style.display = (pickView && pickView.arch) ? "" : "none";
   // continue: the first unsolved level in an UNLOCKED chapter
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
   var cb=document.getElementById("btnContinue");
@@ -1430,17 +1457,7 @@ function renderPicker(){
   if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
   if(root){
     document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
-    // daily ARCHIVE: full-game owners can replay the last 3 weeks
-    var ah="";
-    if(DAILY.length){
-      if(entFull()){
-        ah+='<div class="packhead">📅 Archive<span class="pksub">past dailies</span></div><div class="pkgrid">';
-        for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
-          ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
-        ah+='</div>';
-      } else ah='<div class="packdesc">🔒 Daily archive — included with the full game</div>';
-    }
-    document.getElementById("archArea").innerHTML=ah;
+    document.getElementById("archArea").innerHTML="";
     // one card per chapter (later chapters unlock by solving 2/3 of the one before)
     for(var c=0;c<CHAPTERS.length;c++){
       var CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
@@ -1455,13 +1472,22 @@ function renderPicker(){
     var ph='<div class="packtitle">Puzzle Packs</div>';
     PACKS.forEach(function(pk,pi){
       var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
-      var psub=(pk.desc||"")+(entFull()?"":" · first "+PACK_FREE+" free");
+      var psub=pk.desc||"";
       ph+='<button class="pickcard'+(mode==="pack"&&curPack===pi?" cur":"")+'" data-pack="'+pi+'">'
         +'<span class="pcic">'+(pk.icon||"◆")+'</span>'
         +'<span class="pcmain"><span class="pcname">'+pk.name+'</span><span class="pcsub">'+psub+'</span></span>'
         +'<span class="pcprog">'+ndp+"/"+pk.levels.length+'</span></button>';
     });
     pa.innerHTML=ph;
+  } else if(pickView.arch){
+    // daily ARCHIVE: full-game owners can replay the last 3 weeks
+    document.getElementById("pickTitle").textContent="📅 Daily Archive";
+    var ah='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
+      ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
+    ah+='</div>';
+    document.getElementById("archArea").innerHTML=ah;
+    pg.innerHTML=""; pa.innerHTML="";
   } else if(pickView.ch!=null){
     var cc=pickView.ch, CHV=CHAPTERS[cc], s=chapterStart(cc);
     document.getElementById("pickTitle").textContent="Chapter "+(cc+1)+" · "+CHV.name;
@@ -1474,7 +1500,7 @@ function renderPicker(){
     var pi2=pickView.pk, pk2=PACKS[pi2], d2=pd[pk2.id]||{}, ndp2=0; for(var q2 in d2) if(d2[q2]) ndp2++;
     document.getElementById("pickTitle").textContent=(pk2.icon?pk2.icon+" ":"")+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
     var ph2='<button class="mk pickback">← All levels</button>';
-    if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+(entFull()?"":" · first "+PACK_FREE+" free")+'</div>';
+    if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
       var open=packLevelUnlocked(k);
@@ -1506,8 +1532,21 @@ document.getElementById("btnPick").addEventListener("click", function(){ ensureA
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
+  if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
   var b=e.target.closest(".pkbtn"); if(!b || b.dataset.ago==null) return;
   ensureAudio(); ovPick.classList.remove("show"); loadDaily(+b.dataset.ago);
+});
+// archive: owners browse it; everyone else gets the Everything pitch
+var ovUp=document.getElementById("ovUp");
+document.getElementById("btnArch").addEventListener("click", function(){ ensureAudio();
+  if(entFull()){ pickView={arch:1}; renderPicker(); }
+  else ovUp.classList.add("show");
+});
+document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
+document.getElementById("btnUpBuy").addEventListener("click", function(){
+  var nb=nativeBridge();
+  if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); toast("✦ Everything unlocked — thank you!"); renderPicker(); } });
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
