@@ -1480,7 +1480,10 @@ function packIcon(id,sz){
     case "ice": return W+'<g stroke="#9ed2ff" stroke-width="2"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M12 6.4 9.9 4.9M12 6.4l2.1-1.5M12 17.6l-2.1 1.5M12 17.6l2.1 1.5"/></g>'+E;
     case "portals": return W+'<path d="M12 12m0-1.2a1.2 1.2 0 0 1 1.2 1.2 2.6 2.6 0 0 1-2.6 2.6A4.4 4.4 0 0 1 6.2 10.2 6.4 6.4 0 0 1 12.6 3.8 8 8 0 0 1 20.6 11.8" stroke="#f45fa8" stroke-width="2.6"/>'+E;
     case "bridges": return W+'<path d="M12 3.5v17" stroke="#f6c445" stroke-width="2.8"/><path d="M4 9.2h16M4 14.8h16" stroke="#efe7d6" stroke-width="2.4"/>'+E;
-    case "prisms": return W+'<path d="M12 4 21 19.5H3z" fill="#f2913d" stroke="none"/><path d="M12 4 3 19.5h4.5" stroke="#ef4a5a" stroke-width="2.4"/><path d="M12 4 21 19.5h-4.5" stroke="#f6c445" stroke-width="2.4"/>'+E;
+    case "prisms": return '<svg width="'+(sz||22)+'" height="'+(sz||22)+'" viewBox="0 0 100 100" style="vertical-align:-0.22em;overflow:visible">'
+      +'<path d="M50 10 L92 86 L8 86 Z" fill="#f2913d" stroke="var(--line)" stroke-width="12" stroke-linejoin="round"/>'
+      +'<path d="M50 10 L8 86 L50 86" fill="none" stroke="#ef4a5a" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>'
+      +'<path d="M50 10 L92 86 L50 86" fill="none" stroke="#f6c445" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>'+E;
     case "tally": return W+'<rect x="4" y="4" width="16" height="16" rx="4.5" stroke="#3d8bdf" stroke-width="2.4"/><text x="12" y="16.6" text-anchor="middle" font-family="Fredoka,sans-serif" font-size="12" font-weight="700" fill="#3d8bdf">3</text>'+E;
     case "mix": return W+'<g stroke-width="3.4"><path d="M12 4.5v15" stroke="#57c268"/><path d="M4.5 12h15" stroke="#9b62d6"/></g>'+E;
   }
