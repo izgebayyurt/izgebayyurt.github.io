@@ -9,7 +9,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 |---|---|
 | Capacitor wrapper (AdMob + RevenueCat wired) | `huemeld-app/` |
 | Native bridge with placeholders to fill | `huemeld-app/native.js` |
-| 8 App Store screenshots, 6.9" (1320×2868, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
+| 10 App Store screenshots, 6.9" (1320×2868, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
 | IAP promo images (1024×1024) | `huemeld-app/store-assets/iap-*.png` |
 | App icon, App Store size (1024×1024) | `huemeld-app/store-assets/appicon-1024.png` |
 | Privacy policy (live once pushed) | https://izgebayyurt.github.io/huemeld/privacy.html |
