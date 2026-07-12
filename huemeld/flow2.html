@@ -140,7 +140,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 #ovUp .panel{ max-width:320px; }
 .updesc{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink-soft); margin:4px 0 0; }
 .uplist{ list-style:none; padding:0; margin:10px 0 2px; font-family:var(--font-d); font-weight:600; font-size:14.5px; color:var(--ink); text-align:left; }
-.uplist li{ margin:9px 0; line-height:1.35; }
+.uplist li{ margin:9px 0; line-height:1.35; display:flex; align-items:center; gap:9px; }
+.uplist .upic{ display:inline-flex; color:var(--ink-soft); flex:0 0 auto; }
 #ovUp .mk{ width:100%; height:66px; padding:0 12px; }
 /* main menu: opaque full-screen home, other overlays (z10) stack above it */
 #ovMenu{ position:fixed; border-radius:0; background:var(--paper); z-index:30; }  /* above the game (helpfab is 20), below every other overlay (40) */
@@ -189,7 +190,7 @@ body.menuopen .helpfab{ display:none; }
 <body>
   <div class="top">
     <div style="display:flex;gap:10px">
-      <button class="mkk" id="btnHome" title="Menu">🏠</button>
+      <button class="mkk" id="btnHome" title="Menu"></button>
       <button class="mkk" id="btnPick">☰ levels</button>
     </div>
     <button class="mkk" id="btnSet" title="Settings">⚙</button>
@@ -233,7 +234,7 @@ body.menuopen .helpfab{ display:none; }
         <h2 id="pickTitle">Levels</h2>
         <button class="mk" id="btnContinue" style="background:#ffd15c">▶ Continue</button>
         <button class="mk" id="btnDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
-        <button class="mk" id="btnArch" style="background:#e8d5ff">📅 Daily Archive</button>
+        <button class="mk" id="btnArch" style="background:#e8d5ff">Daily Archive</button>
         <div id="archArea"></div>
         <button class="mk" id="btnHow" style="background:#bfe3ff">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
@@ -246,11 +247,11 @@ body.menuopen .helpfab{ display:none; }
         <h2>✦ Huemeld Pro</h2>
         <p class="updesc">One purchase, the whole game:</p>
         <ul class="uplist">
-          <li>🚫 No ads, ever</li>
-          <li>🧩 All 7 puzzle packs · 350 levels</li>
-          <li>✚ Plus the 150 level medley for extra challenges!</li>
-          <li>📅 Daily archive — replay the last 3 weeks</li>
-          <li>🔓 Every chapter unlocked instantly</li>
+          <li><span class="upic"></span>No ads, ever</li>
+          <li><span class="upic"></span>All 7 puzzle packs · 350 levels</li>
+          <li><span class="upic"></span>Plus the 150 level medley for extra challenges!</li>
+          <li><span class="upic"></span>Daily archive — replay the last 3 weeks</li>
+          <li><span class="upic"></span>Every chapter unlocked instantly</li>
         </ul>
         <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
         <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
@@ -347,7 +348,8 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
 function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
-function packLevelUnlocked(k){ return entFull() || k<PACK_FREE; }
+var UNLOCK_ALL=true;   // DEV: every chapter + pack level open. Set false before release (APPSTORE.md step 7).
+function packLevelUnlocked(k){ return UNLOCK_ALL || entFull() || k<PACK_FREE; }
 function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
 function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
 function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
@@ -358,7 +360,7 @@ function solvedInChapter(c){
   return n;
 }
 function chapterUnlocked(c){
-  if(c<=0 || entFull()) return true;
+  if(c<=0 || UNLOCK_ALL || entFull()) return true;
   return solvedInChapter(c-1) >= chapterNeed(c-1);
 }
 
@@ -505,7 +507,7 @@ function loadLevel(i){
   var ch=chapterOf(want);
   if(!chapterUnlocked(ch)){
     var prev=CHAPTERS[ch-1];
-    toast("🔒 "+CHAPTERS[ch].name+" — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
+    toast(CHAPTERS[ch].name+" is locked — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
     return;
   }
   isTut=false; mode="campaign";
@@ -541,7 +543,7 @@ function loadDaily(off){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
-  if(!packLevelUnlocked(k)){ toast("🔒 The "+pk.name+" teaser ends here — get every pack with Huemeld Pro!"); return; }
+  if(!packLevelUnlocked(k)){ toast("The "+pk.name+" teaser ends here — get every pack with Huemeld Pro!"); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
   lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
@@ -1061,7 +1063,7 @@ function checkWin(){
   if(mode==="daily"){
     var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     var stk2=dailyStreak();
-    document.getElementById("winMsg").textContent=(dailyOff?"Archive daily solved!":"Daily solved")+(stk2>1 ? " — 🔥 "+stk2+"-day streak!" : (dailyOff?"":" — see you tomorrow!"));
+    document.getElementById("winMsg").textContent=(dailyOff?"Archive daily solved!":"Daily solved")+(stk2>1 ? " — "+stk2+"-day streak!" : (dailyOff?"":" — see you tomorrow!"));
     wn.style.display=""; wn.textContent="Back to levels";
   } else if(mode==="pack"){
     var pk=PACKS[curPack];
@@ -1454,6 +1456,36 @@ window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 
+/* ---------- inline SVG icons (no emoji): stroke follows text colour ---------- */
+function icn(name,sz,extra){
+  var W=' width="'+(sz||18)+'" height="'+(sz||18)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.16em"';
+  var I={
+    home:'<path d="M4 10.2 12 3.5l8 6.7V20a1 1 0 0 1-1 1h-4.6v-5.6h-4.8V21H5a1 1 0 0 1-1-1z"/>',
+    cal:'<rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/><circle cx="12" cy="15.5" r="1.6" fill="currentColor" stroke="none"/>',
+    lock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+    flame:'<path d="M12 3.5c.6 3-3.8 5-3.8 9a5.8 5.8 0 0 0 11.6 0c0-2.6-1.4-4.3-2.8-5.8.2 1.6-.4 2.6-1.4 3.1C15.9 7.6 14.6 4.7 12 3.5z" fill="currentColor" stroke="none"/>',
+    noads:'<circle cx="12" cy="12" r="8.6"/><path d="M6 6.2 18 17.8"/>',
+    packs:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+    unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>'
+  };
+  return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
+}
+/* pack badges: little pictures of the mechanic itself, in its colours */
+function packIcon(id,sz){
+  var W='<svg width="'+(sz||22)+'" height="'+(sz||22)+'" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.22em">';
+  var E='</svg>';
+  switch(id){
+    case "brown": return W+'<circle cx="12" cy="12" r="8" fill="#a8703f" stroke="var(--line)" stroke-width="2.2"/>'+E;
+    case "arrows": return W+'<path d="M6 5.5 12.5 12 6 18.5M12 5.5 18.5 12 12 18.5" stroke="#efe7d6" stroke-width="2.8"/>'+E;
+    case "ice": return W+'<g stroke="#9ed2ff" stroke-width="2"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M12 6.4 9.9 4.9M12 6.4l2.1-1.5M12 17.6l-2.1 1.5M12 17.6l2.1 1.5"/></g>'+E;
+    case "portals": return W+'<path d="M12 12m0-1.2a1.2 1.2 0 0 1 1.2 1.2 2.6 2.6 0 0 1-2.6 2.6A4.4 4.4 0 0 1 6.2 10.2 6.4 6.4 0 0 1 12.6 3.8 8 8 0 0 1 20.6 11.8" stroke="#f45fa8" stroke-width="2.6"/>'+E;
+    case "bridges": return W+'<path d="M12 3.5v17" stroke="#f6c445" stroke-width="2.8"/><path d="M4 9.2h16M4 14.8h16" stroke="#efe7d6" stroke-width="2.4"/>'+E;
+    case "prisms": return W+'<path d="M12 4 21 19.5H3z" fill="#f2913d" stroke="none"/><path d="M12 4 3 19.5h4.5" stroke="#ef4a5a" stroke-width="2.4"/><path d="M12 4 21 19.5h-4.5" stroke="#f6c445" stroke-width="2.4"/>'+E;
+    case "tally": return W+'<rect x="4" y="4" width="16" height="16" rx="4.5" stroke="#3d8bdf" stroke-width="2.4"/><text x="12" y="16.6" text-anchor="middle" font-family="Fredoka,sans-serif" font-size="12" font-weight="700" fill="#3d8bdf">3</text>'+E;
+    case "mix": return W+'<g stroke-width="3.4"><path d="M12 4.5v15" stroke="#57c268"/><path d="M4.5 12h15" stroke="#9b62d6"/></g>'+E;
+  }
+  return icn("packs",sz);
+}
 /* ---------- level picker & controls ----------
    Two-level picker: the HUB lists Continue/Daily plus one CARD per chapter and
    per pack; tapping a card opens that set's level grid with a back button. */
@@ -1467,12 +1499,12 @@ function renderPicker(){
   var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
   // hub-only rows
   var db=document.getElementById("btnDaily"), stk=dailyStreak();
-  db.textContent = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? "  🔥"+stk : "");
+  db.innerHTML = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
   db.style.display = root ? "" : "none";
   document.getElementById("btnHow").style.display = root ? "" : "none";
   var ab=document.getElementById("btnArch");
   ab.style.display = root ? "" : "none";
-  ab.textContent = "📅 Daily Archive" + (entFull() ? "" : " 🔒");
+  ab.innerHTML = icn("cal",17)+" Daily Archive" + (entFull() ? "" : "  "+icn("lock",15));
   document.getElementById("archArea").style.display = (pickView && pickView.arch) ? "" : "none";
   // continue: the first unsolved level in an UNLOCKED chapter
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
@@ -1487,7 +1519,7 @@ function renderPicker(){
       var CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
       var sub = unl ? CH.n+" levels" : "Solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name;
       h+='<button class="pickcard'+(unl?"":" lk")+(mode==="campaign"&&chapterOf(li)===c?" cur":"")+'" data-ch="'+c+'">'
-        +'<span class="pcic">'+(unl?(c+1):"🔒")+'</span>'
+        +'<span class="pcic">'+(unl?(c+1):icn("lock",18))+'</span>'
         +'<span class="pcmain"><span class="pcname">Chapter '+(c+1)+' · '+CH.name+'</span><span class="pcsub">'+sub+'</span></span>'
         +'<span class="pcprog">'+sv+"/"+CH.n+'</span></button>';
     }
@@ -1498,14 +1530,14 @@ function renderPicker(){
       var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
       var psub=pk.desc||"";
       ph+='<button class="pickcard'+(mode==="pack"&&curPack===pi?" cur":"")+'" data-pack="'+pi+'">'
-        +'<span class="pcic">'+(pk.icon||"◆")+'</span>'
+        +'<span class="pcic">'+packIcon(pk.id,22)+'</span>'
         +'<span class="pcmain"><span class="pcname">'+pk.name+'</span><span class="pcsub">'+psub+'</span></span>'
         +'<span class="pcprog">'+ndp+"/"+pk.levels.length+'</span></button>';
     });
     pa.innerHTML=ph;
   } else if(pickView.arch){
     // daily ARCHIVE: full-game owners can replay the last 3 weeks
-    document.getElementById("pickTitle").textContent="📅 Daily Archive";
+    document.getElementById("pickTitle").textContent="Daily Archive";
     var ah='<button class="mk pickback">← All levels</button><div class="pkgrid">';
     for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
       ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
@@ -1522,13 +1554,13 @@ function renderPicker(){
     pg.innerHTML=h; pa.innerHTML="";
   } else {
     var pi2=pickView.pk, pk2=PACKS[pi2], d2=pd[pk2.id]||{}, ndp2=0; for(var q2 in d2) if(d2[q2]) ndp2++;
-    document.getElementById("pickTitle").textContent=(pk2.icon?pk2.icon+" ":"")+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
+    document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
     var ph2='<button class="mk pickback">← All levels</button>';
     if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
       var open=packLevelUnlocked(k);
-      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?"✓":(open?"":"🔒"))+'</span></button>';
+      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?"✓":(open?"":icn("lock",10)))+'</span></button>';
     }
     ph2+='</div>';
     pg.innerHTML=""; pa.innerHTML=ph2;
@@ -1554,11 +1586,12 @@ document.getElementById("btnPick").addEventListener("click", function(){ ensureA
   pickView = mode==="pack" ? {pk:curPack} : mode==="campaign" ? {ch:chapterOf(li)} : null;
   renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
-/* ---------- main menu: home screen at boot, 🏠 brings it back ---------- */
+/* ---------- main menu: home screen at boot, the home button brings it back ---------- */
 var ovMenu=document.getElementById("ovMenu"), firstRun=false;
 function showMenu(){ ovMenu.classList.add("show"); document.body.classList.add("menuopen"); }
 function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
 document.body.classList.add("menuopen");   // the menu is up when the page opens
+document.getElementById("btnHome").innerHTML=icn("home",17);
 document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
 document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
   // very first play: show the game with the ghost hand instead of telling it
@@ -1578,6 +1611,8 @@ document.getElementById("archArea").addEventListener("click", function(e){
 });
 // archive: owners browse it; everyone else gets the Huemeld Pro pitch
 var ovUp=document.getElementById("ovUp");
+(function(){ var ic=["noads","packs","mix","cal","unlock"], li=document.querySelectorAll("#ovUp .upic");
+  for(var i=0;i<li.length;i++) li[i].innerHTML = ic[i]==="mix" ? packIcon("mix",18) : icn(ic[i],18); })();
 document.getElementById("btnArch").addEventListener("click", function(){ ensureAudio();
   if(entFull()){ pickView={arch:1}; renderPicker(); }
   else ovUp.classList.add("show");
@@ -1593,7 +1628,7 @@ document.getElementById("pkgrid").addEventListener("click", function(e){
   var card=e.target.closest(".pickcard");
   if(card){
     var c=+card.dataset.ch;
-    if(!chapterUnlocked(c)){ toast("🔒 "+CHAPTERS[c].name+" — solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name+" to unlock"); return; }
+    if(!chapterUnlocked(c)){ toast(CHAPTERS[c].name+" is locked — solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name+" to unlock"); return; }
     ensureAudio(); pickView={ch:c}; renderPicker(); return;
   }
   var b=e.target.closest(".pkbtn"); if(!b) return;
