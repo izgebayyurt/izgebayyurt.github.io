@@ -134,6 +134,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
 .mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
 #ovMech{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovSet{ background:rgba(10,7,16,.92); }   /* fade the board behind the settings panel */
 #ovMech .panel{ max-width:320px; }
 #ovMech .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
 .mechicon{ margin:2px 0 6px; }
@@ -280,7 +281,7 @@ body.menuopen .helpfab{ display:none; }
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnRestore" style="display:none;background:var(--card);margin-top:6px;font-size:13px">Restore Purchases</button>
+        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px">Restore Purchases</button>
         <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
         <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
         <button class="mk" id="btnSetClose">Done</button>

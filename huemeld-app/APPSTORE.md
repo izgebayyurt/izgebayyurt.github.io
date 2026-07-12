@@ -179,7 +179,8 @@ more ways than one — but never as many as you'd hope.
 6. `screen-06-prisms.jpg` — Split light with prisms
 7. `screen-07-numbers.jpg` — Crack the number clues
 8. `screen-08-daily.jpg` — A new puzzle every day!
-9. `screen-09-premium.jpg` — No ads. Every pack. One purchase. (the Huemeld Pro value screen)
+9. `screen-09-noads.jpg` — Remove ads forever — just $2.99 (the $2.99 Remove Ads tier)
+10. `screen-10-premium.jpg` — No ads. Every pack. One purchase. (the $4.99 Huemeld Pro value screen)
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 
