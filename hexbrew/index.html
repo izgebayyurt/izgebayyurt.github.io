@@ -69,7 +69,10 @@ body{
 .tag{ font-family:var(--font-d); font-weight:600; font-size:16px; color:var(--ink-soft); margin-top:-6px; letter-spacing:.6px; }
 .big{ font-family:var(--font-d); font-weight:700; font-size:38px; text-shadow:0 3px 0 var(--shadow); }
 .sub{ font-family:var(--font-u); font-weight:700; font-size:15px; color:var(--ink-soft); text-align:center; max-width:280px; }
-.stars{ display:flex; gap:12px; font-size:44px; }
+.stars{ display:flex; gap:12px; font-size:44px; position:relative; }
+.wspark{ position:absolute; width:9px; height:9px; border-radius:50%; background:var(--accent); border:2px solid var(--ink);
+  pointer-events:none; transform:translate(-50%,-50%); animation:wspark .62s var(--calm) forwards; }
+@keyframes wspark{ to{ transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.25); opacity:0; } }
 .stars .s{ opacity:.28; filter:grayscale(1); transition:transform .3s var(--pop); }
 .stars .s.on{ opacity:1; filter:none; }
 .btn{ font-family:var(--font-d); font-weight:700; font-size:20px; padding:13px 30px; cursor:pointer;
@@ -113,6 +116,33 @@ body{
   transition:transform .08s var(--calm), box-shadow .08s var(--calm); touch-action:manipulation; }
 .mutebtn:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
 .lvtitle{ font-family:var(--font-d); font-weight:700; font-size:30px; text-shadow:0 3px 0 var(--shadow); }
+/* ---------- help "?" button + recipe overlay ---------- */
+.helpbtn{ position:fixed; left:60px; bottom:calc(env(safe-area-inset-bottom) + 12px); z-index:10;
+  width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-d); font-weight:700; font-size:23px; line-height:1; padding-bottom:2px; cursor:pointer;
+  color:var(--ink); background:var(--card); border:2.5px solid var(--ink); box-shadow:0 3px 0 var(--shadow);
+  transition:transform .08s var(--calm), box-shadow .08s var(--calm); touch-action:manipulation; }
+.helpbtn:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.hcard{ background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:0 5px 0 var(--shadow);
+  padding:16px 18px 17px; max-width:320px; width:calc(100% - 40px); text-align:left; }
+.hcard .htitle{ font-family:var(--font-d); font-weight:700; font-size:22px; text-align:center; margin-bottom:9px; }
+.hrow{ display:flex; align-items:center; gap:6px; font-family:var(--font-d); font-weight:700; font-size:16px; margin:5px 0; }
+.hrow b{ color:var(--ink-soft); font-weight:700; }
+.hdot{ width:19px; height:19px; border-radius:50%; border:2.5px solid var(--ink); box-shadow:0 2px 0 var(--shadow); flex:none; }
+.hrow .hlbl{ margin-left:4px; font-size:14px; color:var(--ink-soft); }
+.hsep{ height:2px; background:rgba(44,39,51,.16); border-radius:2px; margin:11px 0 9px; }
+.hline{ font-family:var(--font-u); font-weight:700; font-size:13px; line-height:1.4; color:var(--ink); margin:6px 0; }
+.hline b{ font-weight:800; }
+/* ---------- first-encounter teaching card ---------- */
+.fecard{ position:fixed; left:50%; top:calc(env(safe-area-inset-top) + 96px); z-index:8;
+  transform:translateX(-50%) translateY(-10px) scale(.9); transform-origin:top center;
+  max-width:300px; width:calc(100% - 44px); background:var(--card); border:3px solid var(--ink);
+  border-radius:16px; box-shadow:0 5px 0 var(--shadow); padding:11px 16px 12px; text-align:center;
+  opacity:0; pointer-events:none; transition:opacity .28s var(--pop), transform .28s var(--pop); }
+.fecard.show{ opacity:1; transform:translateX(-50%) translateY(0) scale(1); pointer-events:auto; }
+.fecard .ft{ font-family:var(--font-d); font-weight:700; font-size:19px; margin-bottom:3px; }
+.fecard .fl{ font-family:var(--font-u); font-weight:700; font-size:13px; line-height:1.34; color:var(--ink-soft); }
+.fecard .fl b{ font-weight:800; }
 </style>
 </head>
 <body>
@@ -120,8 +150,10 @@ body{
 
 <div class="backbtn" id="backBtn">‹</div>
 <div class="mutebtn" id="muteBtn">🔊</div>
+<div class="helpbtn" id="helpBtn">?</div>
 <div class="chips" id="chips"></div>
 <div class="moves" id="movesBox"><b id="movesNum">0</b><small>moves</small></div>
+<div class="fecard" id="fecard"></div>
 
 <!-- start -->
 <div class="screen show" id="scrStart">
@@ -147,6 +179,22 @@ body{
   </div>
 </div>
 
+<!-- recipe / help overlay (opened by the "?" sticker; closes on tap) -->
+<div class="screen" id="scrHelp">
+  <div class="hcard">
+    <div class="htitle">how to brew</div>
+    <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#f6c445"></span><b>=</b><span class="hdot" style="background:#f2913d"></span><span class="hlbl">orange</span></div>
+    <div class="hrow"><span class="hdot" style="background:#f6c445"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#57c268"></span><span class="hlbl">green</span></div>
+    <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#9b62d6"></span><span class="hlbl">purple</span></div>
+    <div class="hsep"></div>
+    <div class="hline"><b>white</b> — brew three colours in one swap. white is wild, but only joins brewed colours.</div>
+    <div class="hline"><b>bomb</b> — pop 7+ balls at once to forge one; it blows after your next match.</div>
+    <div class="hline"><b>ink</b> — pop on a stained cell to scrub it; a bomb scrubs everything it hits.</div>
+    <div class="hline">a swap that matches nothing still moves — and still costs a move.</div>
+  </div>
+  <button class="btn" id="btnHelpClose">got it</button>
+</div>
+
 <!-- lose -->
 <div class="screen" id="scrLose">
   <div class="big">out of moves</div>
@@ -166,7 +214,7 @@ const PRIMS = ['R','Y','B'];
 const SECS  = ['O','G','P'];
 const HEX = { R:'#ef4a5a', Y:'#f6c445', B:'#3d8bdf', O:'#f2913d', G:'#57c268', P:'#9b62d6' };
 const WHITEC='#faf6ec', BOMBC='#2c2733';
-const INK = '#2c2733', PAPER='#f0e6cf', PAPER2='#fbf5e6', ACCENT='#ffd15c';
+const INK = '#2c2733', INK_SOFT='#6b6472', PAPER='#f0e6cf', PAPER2='#fbf5e6', ACCENT='#ffd15c';
 const DECOMP = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'] };
 const MIX = { RY:'O', YR:'O', RB:'P', BR:'P', YB:'G', BY:'G' };
 const NAME = { R:'red', Y:'yellow', B:'blue', O:'orange', G:'green', P:'purple', W:'white' };
@@ -296,13 +344,23 @@ const SFX=(()=>{
     pop(step){ tone(pfreq(step),{type:'triangle',d:0.13,peak:0.2}); },                 // pew — pitch climbs per ball
     swap(){ tone(120,{type:'sine',d:0.06,peak:0.24}); },                               // low soft thunk
     refuse(){ tone(90,{type:'square',d:0.05,peak:0.07}); tone(82,{type:'square',d:0.05,peak:0.07,delay:0.075}); },
+    move(){ tone(420,{type:'sine',d:0.08,peak:0.09}); tone(560,{type:'sine',d:0.11,peak:0.08,delay:0.055}); }, // soft deliberate "moved" — not the buzz
     spring(){ tone(300,{type:'sine',d:0.1,peak:0.1,slide:170}); },                     // tiny boing
     brew(){ tone(659,{type:'triangle',d:0.22,peak:0.16}); tone(988,{type:'triangle',d:0.3,peak:0.14,delay:0.09}); },
     white(){ tone(659,{d:0.25,peak:0.14}); tone(831,{d:0.28,peak:0.13,delay:0.11}); tone(1047,{d:0.4,peak:0.13,delay:0.22}); },
     fuse(){ noise({dur:0.3,peak:0.08,f0:2800,ftype:'highpass'}); },                    // fuse hiss
-    boom(){ tone(150,{type:'sine',a:0.008,d:0.5,peak:0.4,slide:50}); noise({dur:0.32,peak:0.22,f0:900,f1:120,ftype:'lowpass'}); },
+    // staggered chain booms: rising pitch (semis), shorter tails deeper in the queue
+    boom(opts){ const {delay=0,semis=0,tail=1}=opts||{}; const m=Math.pow(2,semis/12);
+      tone(150*m,{type:'sine',a:0.008,d:0.5*tail,peak:0.4,slide:50*m,delay});
+      noise({dur:0.32*tail,peak:0.22,f0:900,f1:120,ftype:'lowpass',delay}); },
+    chain(d){ d=Math.max(2,d|0); const base=392*Math.pow(2,Math.min(9,d-2)/6);         // sting rises with depth
+      tone(base,{type:'triangle',d:0.13,peak:0.15}); tone(base*1.5,{type:'triangle',d:0.18,peak:0.12,delay:0.06}); },
     tick(c){ tone(TICKF[c]||700,{type:'triangle',d:0.05,peak:0.12}); },                // flyer reaches chip
     goalDone(){ tone(784,{d:0.12,peak:0.14}); tone(1175,{d:0.24,peak:0.13,delay:0.08}); },
+    goalsMulti(){ tone(784,{type:'triangle',d:0.14,peak:0.15}); tone(1047,{type:'triangle',d:0.2,peak:0.13,delay:0.07});
+      tone(1319,{type:'triangle',d:0.26,peak:0.12,delay:0.14}); },                     // ≥2 goals in one round
+    star(i){ const f=[523,659,784,988][i%4]; tone(f,{type:'triangle',d:0.26,peak:0.16}); tone(f*2,{type:'triangle',d:0.16,peak:0.07,delay:0.02}); },
+    flourish(){ [784,988,1175,1568].forEach((f,i)=>tone(f,{type:'triangle',d:0.24,peak:0.14,delay:i*0.07})); },
     win(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:'triangle',d:0.3,peak:0.16,delay:i*0.13})); },
     lose(){ tone(392,{type:'triangle',d:0.3,peak:0.15}); tone(311,{type:'triangle',d:0.45,peak:0.14,delay:0.18}); },
     warn(){ tone(330,{type:'sine',d:0.09,peak:0.1}); },                                // low-moves tick
@@ -344,6 +402,7 @@ window.addEventListener('resize', ()=>{ layout(); wake(); });
 // cell: {q,r,x,y,c, oy, shake, born, forgeFx, bombBorn, fresh}
 const cells = CELLS_QR.map(([q,r])=>({q,r,x:0,y:0,c:'R',oy:0,vy:0,land:0,shake:0,born:0,forgeFx:0,bombBorn:0,fresh:false,
   fx:0,fy:0,fvx:0,fvy:0}));   // fx/fy: spring-back offset (drag release / post-commit hand-off)
+                              // bombBorn doubles as a clear-spawned bomb's reveal gate (0 = still condensing behind its pop-ghost)
 let state='start';            // start|select|play|win|lose
 let level=1;                  // 1-based
 let goals=[];                 // [{c,need,disp,chipEl}]
@@ -355,7 +414,18 @@ let pendingWin=null;          // {t}: win earned, card held back until pops/flye
 let selIdx=-1;
 let puffs=[], sparks=[], flyers=[], shocks=[], popGoo=[];
 let pops=[];   // ripple-pop queue: mechanics applied instantly, FX/audio fire per-ball with a spatial stagger
-let remixFx=null, chainLabel=null, brewLabel=null, flashFx=null;
+let remixFx=null, chainLabel=null, brewLabel=null, flashFx=null, moveTell=null;
+let lastMoveTell=0;                        // count of positional "moved" tells (debug)
+let goalsDoneAtSwap=0;                     // goals already complete when the current swap committed
+// hitstop + micro-shake impact system (papery, conservative). Freezes dt a frame or two
+// and offsets the whole board a few px, decaying ~150ms; cooperates with the dirty system.
+let shakeMag=0, shakeT=0, hitstopFrames=0;
+const SHAKE_DUR=0.15;
+function impact(mag, hs, flashCol, flashDur){
+  shakeMag=Math.max(shakeMag,mag); shakeT=SHAKE_DUR;
+  if(hs) hitstopFrames=Math.max(hitstopFrames,hs);
+  if(flashCol) flashFx={col:flashCol,born:performance.now(),dur:flashDur||300};
+}
 let stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, swaps:0, cascades:0, remixes:0 };
 let winInfo=null;
 let PALETTE=PRIMS.slice();            // per-level spawn palette (refill + initial fill)
@@ -548,7 +618,7 @@ function clearRound(matches, depth){
   else if(distinct.length===2 && distinct.every(c=>PRIMS.includes(c))){
     const mix=MIX[distinct[0]+distinct[1]]; if(mix) order={type:'sec',colour:mix,count:FORGE_COUNT}; }
   if(order && resolver){ resolver.pendingForge.push(order);
-    if(order.type==='white'){ brewFlash('white!', WHITEC); SFX.white(); }
+    if(order.type==='white'){ brewFlash('white!', WHITEC, true); SFX.white(); impact(2.2, 1); } // medium shake+hitstop; brewFlash carries the prism flash
     else { brewFlash('brewed!', HEX[order.colour]); SFX.brew(); } }
   // bombs from big connected groups
   const bombCells=findBombCentroids(clearSet);
@@ -564,18 +634,19 @@ function clearRound(matches, depth){
     else { if(collect[c]!==undefined) collect[c]++; goalT=goalFor(c); }
     const scrub=scrubInkAt(ci);                     // popping ON an inked cell scrubs it
     const gt=gooTarget[ci]||{x:cells[ci].x,y:cells[ci].y};
-    pops.push({ x:cells[ci].x, y:cells[ci].y+cells[ci].oy, tx:gt.x, ty:gt.y, c, goal:goalT,
+    pops.push({ ci, x:cells[ci].x, y:cells[ci].y+cells[ci].oy, tx:gt.x, ty:gt.y, c, goal:goalT,
                 scrub, inkG:scrub?inkGoal():null,
                 delay:k*POP_STAGGER, step:resolver?resolver.popStep++:k, fired:false });
     k++;
     cells[ci].c=null; cells[ci].fresh=false; }
   // extend the squish so compaction/refill start after the last pew
   if(resolver) resolver.t=SQUISH_DUR + k*POP_STAGGER;
-  // place bombs
-  for(const bc of bombCells){ cells[bc].c='K'; cells[bc].bombBorn=performance.now(); cells[bc].oy=0; stats.bombs++;
+  // place bombs — bombBorn=0 gates the sprite until this cell's ripple pop fires, so the
+  // bomb condenses out of the popping ball instead of drawing under the still-waiting ghost
+  for(const bc of bombCells){ cells[bc].c='K'; cells[bc].bombBorn=0; cells[bc].oy=0; stats.bombs++;
     SFX.fuse();
     for(let s=0;s<8;s++) sparks.push(mkSpark(cells[bc].x,cells[bc].y,ACCENT)); }
-  if(depth>1) chainLabel={n:depth,life:1.0};
+  if(depth>1){ chainLabel={n:depth,life:1.0}; SFX.chain(depth); if(depth>=4) impact(1.8, 1, null, 0); } // deep chain: light impact
   stats.maxChain=Math.max(stats.maxChain, depth);
 }
 function startResolve(origin){
@@ -619,13 +690,20 @@ function refillEmpties(orders){
 }
 function detonateBombs(){
   const start=[]; for(let i=0;i<N;i++) if(cells[i].c==='K') start.push(i);
-  if(start.length) SFX.boom();
+  if(!start.length) return;
+  impact(3.2, 2, '#fff6d8', 220);              // strongest hitstop + brief white flash
   const queue=start.slice(), done=new Set();
-  let scrubbedAny=false;
+  let scrubbedAny=false, order=0;
+  // MECHANICS are one step (collection/scrub happen at once); only the boom AUDIO/FX
+  // stagger as the queue drains — one boom per bomb, ~120ms apart, rising pitch, shorter tails.
   while(queue.length){ const bi=queue.shift(); if(done.has(bi)) continue; done.add(bi);
     stats.boomsDet++;
-    shocks.push({x:cells[bi].x,y:cells[bi].y,r:0,maxr:ROW_DY*3.4,t0:performance.now(),dur:520});
-    for(let k=0;k<14;k++){ const p=mkPuff(cells[bi].x,cells[bi].y,ACCENT); p.life+=0.2; puffs.push(p); }
+    const delay=order*0.12;
+    SFX.boom({ delay, semis:order*2, tail:Math.max(0.45, 1-order*0.12) });
+    stats.boomsPlayed++;
+    shocks.push({x:cells[bi].x,y:cells[bi].y,r:0,maxr:ROW_DY*3.4,t0:performance.now()+delay*1000,dur:520});
+    for(let k=0;k<14;k++){ const p=mkPuff(cells[bi].x,cells[bi].y,ACCENT); p.life+=0.2; p.delay=delay; puffs.push(p); }
+    order++;
     cells[bi].c=null; cells[bi].bombBorn=0;
     for(let ci=0;ci<N;ci++){ if(hexDist(ci,bi)<=1){
       // detonation scrubs EVERY cell in its radius, occupied or not
@@ -637,7 +715,7 @@ function detonateBombs(){
       else { collectBall(ci,c); cells[ci].c=null; cells[ci].fresh=false; } } }
   }
   if(scrubbedAny) SFX.scrub();
-  vibrate([18,26,18]);
+  const cnt=done.size; vibrate(cnt>1 ? Array.from({length:cnt*2},(_,i)=>i%2?24:16) : [18,26,18]); // scale with count
 }
 function wetInkRepair(){
   // A settled ball may only ever STAY or POP — never change colour. Recolours happen
@@ -665,21 +743,28 @@ function wetInkRepair(){
 }
 function stepResolver(dt){
   if(!resolver) return;
-  resolver.t-=dt; if(resolver.t>0) return;
+  resolver.t-=dt;
+  if(resolver.phase==='fall'){
+    // advance when the board has physically settled (every ball landed), so each ball keeps
+    // its own landing squash; the timer is only a safety cap for a straggler.
+    const settled = cells.every(c=>c.oy===0 && c.vy===0);
+    if(!settled && resolver.t>0) return;
+    for(const c of cells){ if(c.oy!==0||c.vy!==0){ c.oy=0; c.vy=0; c.land=performance.now(); } } // cap: snap stragglers, still with a squash
+    resolver.phase='beat'; resolver.t=BEAT_DUR;
+    return;
+  }
+  if(resolver.t>0) return;
   if(resolver.phase==='squish'){
     const maxDrop=compactColumns();
     let rows=0; // refill immediately each round — wet-ink bias keeps new balls from matching on arrival
     if(cells.some(c=>c.c==null)){ rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; }
     wetInkRepair(); // recolour mid-air refills only; settled balls stay or pop, never flip
-    resolver.phase='fall'; resolver.t=0.10+Math.sqrt(Math.max(maxDrop,rows))*0.2;
-  } else if(resolver.phase==='fall'){
-    for(const c of cells){ c.oy=0; c.vy=0; }
-    resolver.phase='beat'; resolver.t=BEAT_DUR;
+    resolver.phase='fall'; resolver.t=0.12+Math.sqrt(Math.max(maxDrop,rows))*0.26; // safety cap ≥ physical fall time
   } else {
     wetInkRepair(); // everything settled here: fresh-fed matches are legitimised and pop as chains
     let matches=findMatches();
     if(matches.length){ resolver.depth++; clearRound(matches,resolver.depth); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
-    else if(cells.some(c=>c.c==null)){ const rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=0.10+Math.sqrt(rows)*0.2; }
+    else if(cells.some(c=>c.c==null)){ const rows=refillEmpties(resolver.pendingForge); resolver.pendingForge=[]; resolver.phase='fall'; resolver.t=0.12+Math.sqrt(rows)*0.26; }
     else if(cells.some(c=>c.c==='K')){ detonateBombs(); resolver.phase='squish'; resolver.t=SQUISH_DUR; }
     else { for(const c of cells) c.fresh=false; lastResolve={depth:resolver.depth}; resolver=null; onSettle(); }
   }
@@ -687,28 +772,41 @@ function stepResolver(dt){
 
 // ================= swap =================
 function adjacent(a,b){ return NEIGH[a].includes(b); }
+// ALL rejections route through refuse(): a hard refuse (illegal move) shakes + buzzes;
+// a soft refuse ("wait" — mid-resolution or win-pending) only nudges, no buzz, since it's
+// not an error. The drag path suppresses its own SFX.spring when swapCore already refused.
 function swapCore(a,b){
   if(state!=='play') return {type:'blocked',reason:'state'};
-  if(pendingWin) return {type:'blocked',reason:'won'};   // win earned — card is on its way
-  if(resolver) { refuse(a,b); return {type:'blocked',reason:'resolving'}; }
-  if(movesLeft<=0) return {type:'blocked',reason:'nomoves'};
+  if(pendingWin){ refuse(a,b,true); return {type:'blocked',reason:'won'}; }   // win earned — card is on its way
+  if(resolver){ refuse(a,b,true); return {type:'blocked',reason:'resolving'}; } // "wait" isn't an error
+  if(movesLeft<=0){ refuse(a,b); return {type:'blocked',reason:'nomoves'}; }
   if(a===b||a<0||b<0||a>=N||b>=N) return {type:'blocked',reason:'bad'};
-  if(!adjacent(a,b)){ return {type:'blocked',reason:'nonadjacent'}; }
+  if(!adjacent(a,b)){ refuse(a,b); return {type:'blocked',reason:'nonadjacent'}; }
   const ca=cells[a].c, cb=cells[b].c;
-  if(ca==null||cb==null||ca==='K'||cb==='K') return {type:'blocked',reason:'empty'};
+  if(ca==null||cb==null||ca==='K'||cb==='K'){ refuse(a,b); return {type:'blocked',reason:'empty'}; }
   if(ca===cb){ refuse(a,b); return {type:'blocked',reason:'same'}; }
   cells[a].c=cb; cells[b].c=ca; animSwap(a,b);
   const trig=findMatches().filter(m=>m.cells.includes(a)||m.cells.includes(b));
   movesLeft--; stats.swaps++; vibrate(20); SFX.swap();
+  goalsDoneAtSwap=goals.filter(g=>remainingOf(g)<=0).length;
   if(movesLeft>0 && movesLeft<=3) SFX.warn();
   if(trig.length>0){ startResolve({x:(cells[a].x+cells[b].x)/2, y:(cells[a].y+cells[b].y)/2}); return {type:'match'}; }
-  // positional swap — legal, no bounce-back, costs the move
+  // positional swap — legal, no bounce-back, costs the move; a "moved" tell reads it as deliberate
+  moveTellAt(a,b);
   ensurePlayable(); onSettle();
   return {type:'positional'};
 }
-function animSwap(a,b){ cells[a].shake=Math.max(cells[a].shake,0.3); cells[b].shake=Math.max(cells[b].shake,0.3);
-  cells[a].born=performance.now(); cells[b].born=performance.now(); }
-function refuse(a,b){ if(cells[a])cells[a].shake=0.5; if(cells[b])cells[b].shake=0.5; SFX.refuse(); }
+// tap-tap / programmatic swap physicality: slide each ball in from the other's seat and
+// spring home (reuse the fx springs); crucially do NOT reset born, so no birth-shrink blink.
+function animSwap(a,b){
+  springTo(a, cells[b].x-cells[a].x, cells[b].y-cells[a].y);
+  springTo(b, cells[a].x-cells[b].x, cells[a].y-cells[b].y);
+}
+function moveTellAt(a,b){ const x=(cells[a].x+cells[b].x)/2, y=(cells[a].y+cells[b].y)/2;
+  moveTell={x,y,life:1.0}; lastMoveTell++; SFX.move(); wake(); }
+function refuse(a,b,soft){ const s=soft?0.28:0.5;
+  if(cells[a])cells[a].shake=Math.max(cells[a].shake,s); if(cells[b])cells[b].shake=Math.max(cells[b].shake,s);
+  if(!soft) SFX.refuse(); wake(); }
 
 function onSettle(){
   if(state!=='play') return;
@@ -716,7 +814,12 @@ function onSettle(){
   // win is EARNED here, but the card waits (update()) for the last flyer to land, the
   // chip to visibly complete and goalDone to ring — then the card shows with SFX.win.
   if(goals.length && goals.every(g=>remainingOf(g)<=0)){ if(!pendingWin) pendingWin={t:0}; }
-  else if(movesLeft<=0){ loseLevel(); }   // lose stays immediate
+  else {
+    // ≥2 goals finished this single round → one small unified sting (win supersedes it)
+    const doneNow=goals.filter(g=>remainingOf(g)<=0).length;
+    if(doneNow-goalsDoneAtSwap>=2) SFX.goalsMulti();
+    if(movesLeft<=0){ loseLevel(); }   // lose stays immediate
+  }
 }
 
 // ================= level flow =================
@@ -730,11 +833,13 @@ function loadLevel(n){
   ink=new Array(N).fill(0); inkFx=[];
   if(L.ink) for(const [q,r] of L.ink){ const i=IDX[KEY(q,r)]; if(i!==undefined) ink[i]=1; }
   resolver=null; lastResolve=null; pendingWin=null; selIdx=-1; winInfo=null;
-  puffs=[]; sparks=[]; flyers=[]; shocks=[]; popGoo=[]; pops=[]; remixFx=null; chainLabel=null; brewLabel=null; flashFx=null;
+  puffs=[]; sparks=[]; flyers=[]; shocks=[]; popGoo=[]; pops=[]; remixFx=null; chainLabel=null; brewLabel=null; flashFx=null; moveTell=null;
+  shakeMag=0; shakeT=0; hitstopFrames=0; goalsDoneAtSwap=0;
   dragStart=-1; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0};
   for(const c of cells){ c.oy=0; c.vy=0; c.land=0; c.fx=0; c.fy=0; c.fvx=0; c.fvy=0; }
-  stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, boomsDet:0, inkScrubbed:0,
+  stats={ matches:0, maxChain:0, forges:0, whites:0, bombs:0, boomsDet:0, boomsPlayed:0, inkScrubbed:0,
           brewedBy:{O:0,G:0,P:0}, swaps:0, cascades:0, remixes:0 };
+  hideFECard();
   layout();
   genNoMatch();
   applySeeds(L.seed);
@@ -742,6 +847,7 @@ function loadLevel(n){
   buildChips();
   setState('play');
   updateHUD();
+  if(LEVEL_TEACH[n]) showFECard(LEVEL_TEACH[n]);   // once-per-mechanic teaching card
 }
 function winLevel(){
   const th=starThresholds(LEVELS[level-1].moves);
@@ -751,8 +857,7 @@ function winLevel(){
   if(level+1>progress.unlocked && level<LEVELS.length) progress.unlocked=level+1;
   saveProgress();
   setState('win');
-  showWinScreen();
-  SFX.win();
+  showWinScreen();   // handles the staggered star reveal + audio
 }
 function loseLevel(){ setState('lose'); showLoseScreen(); SFX.lose(); }
 
@@ -763,7 +868,8 @@ function mkSpark(x,y,col){ const a=Math.random()*6.28, sp=60+Math.random()*120;
   return {x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.6,max:0.6,r:3+Math.random()*3,col}; }
 function spawnClearPuffs(x,y,c){ const col=colOf(c); for(let k=0;k<5;k++) puffs.push(mkPuff(x,y,col)); }
 function spawnFlyer(x,y,c,g){ flyers.push({x,y,c,g,t:0,dur:0.5,started:performance.now()}); }
-function brewFlash(text,col){ brewLabel={text,col,life:1.2,born:performance.now()}; flashFx={col,born:performance.now(),dur:420}; vibrate([10,20]); }
+function brewFlash(text,col,big){ brewLabel={text,col,life:big?1.7:1.2,born:performance.now(),big:!!big};
+  flashFx={col,born:performance.now(),dur:big?520:420}; vibrate(big?[12,26,12]:[10,20]); }
 function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 
 // ================= update / render =================
@@ -777,7 +883,8 @@ function isAnimating(now){
   if(resolver||pendingWin) return true;
   if(pops.length||flyers.length||puffs.length||sparks.length||popGoo.length||shocks.length||inkFx.length) return true;
   if(dragStart>=0) return true;
-  if(remixFx||chainLabel||brewLabel||flashFx) return true;
+  if(remixFx||chainLabel||brewLabel||flashFx||moveTell) return true;
+  if((shakeMag>0&&shakeT>0)||hitstopFrames>0) return true;   // impact shake/hitstop counts as animating
   if(state==='start'||state==='select') return false;   // canvas is a bare clear under the overlay
   for(const c of cells){
     if(c.oy!==0||c.vy!==0||c.shake>0||c.fx||c.fy||c.fvx||c.fvy) return true;
@@ -789,6 +896,7 @@ function isAnimating(now){
   return false;
 }
 function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now;
+  if(hitstopFrames>0){ hitstopFrames--; dt=0; }   // freeze a frame or two on impact
   const active=isAnimating(now);
   if(active||!idleDrawn){ update(dt,now); render(now); idleDrawn=!active; }
   requestAnimationFrame(tick); }
@@ -816,13 +924,16 @@ function update(dt,now){
       if(p.goal) spawnFlyer(p.x,p.y,p.c,p.goal);
       if(p.scrub){ inkFx.push({x:p.x,y:p.y,born:performance.now(),seed:(p.x*7+p.y)|0});
         SFX.scrub(); if(p.inkG) spawnFlyer(p.x,p.y,'I',p.inkG); }
+      // a bomb was seeded on this cell — reveal it now, condensing out of the popping ball
+      if(p.ci!=null && cells[p.ci].c==='K' && !cells[p.ci].bombBorn) cells[p.ci].bombBorn=performance.now();
       SFX.pop(p.step);
     } }
   pops=pops.filter(p=>!p.fired);
   for(const g of popGoo){ g.t+=dt; g.x+=(g.tx-g.x)*Math.min(1,dt*13); g.y+=(g.ty-g.y)*Math.min(1,dt*13);
     g.r+=(ballRad*0.35-g.r)*Math.min(1,dt*8); }
   popGoo=popGoo.filter(g=>g.t<g.dur);
-  for(const p of puffs){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.vx*=Math.pow(0.1,dt); }
+  for(const p of puffs){ if(p.delay&&p.delay>0){ p.delay-=dt; continue; } // staggered bomb puffs hold until their boom
+    p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=180*dt; p.vx*=Math.pow(0.1,dt); }
   puffs=puffs.filter(p=>p.life>0);
   for(const p of sparks){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=Math.pow(0.2,dt); p.vy*=Math.pow(0.2,dt); }
   sparks=sparks.filter(p=>p.life>0);
@@ -837,6 +948,8 @@ function update(dt,now){
   if(remixFx && now-remixFx.t0>=remixFx.dur) remixFx=null;
   if(chainLabel){ chainLabel.life-=dt; if(chainLabel.life<=0) chainLabel=null; }
   if(brewLabel){ brewLabel.life-=dt; if(brewLabel.life<=0) brewLabel=null; }
+  if(moveTell){ moveTell.life-=dt*1.5; if(moveTell.life<=0) moveTell=null; }
+  if(shakeT>0){ shakeT-=dt; if(shakeT<=0){ shakeT=0; shakeMag=0; } }
   if(flashFx && now-flashFx.born>=flashFx.dur) flashFx=null;
   // defensive caps: drop the oldest if a pathological cascade floods a queue
   if(puffs.length>240) puffs.splice(0,puffs.length-240);
@@ -856,6 +969,9 @@ function update(dt,now){
 function render(now){
   ctx.clearRect(0,0,W,H);
   if(state==='start'||state==='select'){ return; }  // overlays cover the board
+  let shook=false;
+  if(shakeMag>0 && shakeT>0){ const m=shakeMag*(shakeT/SHAKE_DUR);
+    ctx.save(); ctx.translate((Math.random()*2-1)*m, (Math.random()*2-1)*m); shook=true; }
   drawBoardBack();
   drawInk(now);
   drawPops(now);
@@ -867,7 +983,9 @@ function render(now){
   drawFlyers(now);
   drawChain(now);
   drawBrew(now);
-  drawFlash(now);
+  drawMoveTell(now);
+  if(shook) ctx.restore();
+  drawFlash(now);   // full-screen flash sits above the shake
 }
 function drawBoardBack(){
   // no card/border — balls sit directly on the paper; only faint wells mark the cells
@@ -926,7 +1044,7 @@ function drawOneBall(i,now,remixing){
       x=latCX+Math.cos(ang)*rr + (b.x-latCX)*f; y=latCY+Math.sin(ang)*rr*0.7 + (b.y-latCY)*f; }
     let r=(ballRad + Math.sin(now/170+i)*0.6)*scale;
     const age=now-b.born; if(age<260){ const f=age/260; r*=0.62+0.38*f; }
-    if(b.c==='K'){ drawBomb(x,y,r,now,i); return; }
+    if(b.c==='K'){ if(b.bombBorn) drawBomb(x,y,r,now,i); return; }  // hidden until its pop fires (condenses out of the ball)
     let sq=0; if(b.land){ const la=now-b.land; if(la<140) sq=1-la/140; else b.land=0; }
     if(sq>0){ ctx.save(); ctx.translate(x,y); ctx.scale(1+0.16*sq,1-0.22*sq); ctx.translate(-x,-y); }
     const sel=(i===selIdx);
@@ -973,7 +1091,7 @@ function drawPopGoo(){
     ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(g.x,g.y,R,0,6.2832); ctx.fill(); }
   ctx.restore();
 }
-function drawShocks(now){ for(const s of shocks){ let f=(now-s.t0)/s.dur; if(f<0)f=0; if(f>=1)continue; const r=f*s.maxr;
+function drawShocks(now){ for(const s of shocks){ let f=(now-s.t0)/s.dur; if(f<0)continue; if(f>=1)continue; const r=f*s.maxr;
   ctx.save(); ctx.globalAlpha=(1-f)*0.85;
   ctx.beginPath(); ctx.arc(s.x,s.y,r,0,6.28); ctx.strokeStyle=ACCENT; ctx.lineWidth=14*(1-f)+2; ctx.stroke();
   ctx.beginPath(); ctx.arc(s.x,s.y,r,0,6.28); ctx.strokeStyle='rgba(44,39,51,.5)'; ctx.lineWidth=4*(1-f); ctx.stroke(); ctx.restore(); } }
@@ -993,14 +1111,27 @@ function drawFlyers(now){ for(const f of flyers){ if(f.cx==null) continue;
   ctx.beginPath(); ctx.arc(f.cx-rr*0.3,f.cy-rr*0.3,rr*0.28,0,6.28); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill(); } }
 function drawChain(now){ if(!chainLabel) return; const a=Math.max(0,chainLabel.life/1.1);
   const txt=chainLabel.text||('chain ×'+chainLabel.n);
-  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 20px Fredoka, sans-serif';
+  // font + accent saturation scale with depth (×2 modest → ×5 loud)
+  const depth=Math.max(2,chainLabel.n||2);
+  const sz=chainLabel.text?20:Math.min(46,18+depth*5);
+  let fill;
+  if(chainLabel.text) fill=HEX.P;
+  else { const t=Math.min(1,(depth-2)/3); fill='hsl(43,'+Math.round(72+t*28)+'%,'+Math.round(62-t*8)+'%)'; }
+  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
   const y=topY-22-(1-a)*10;
-  ctx.lineWidth=4; ctx.strokeStyle=PAPER; ctx.strokeText(txt,W/2,y); ctx.fillStyle=chainLabel.text?HEX.P:ACCENT; ctx.fillText(txt,W/2,y); ctx.restore(); }
-function drawBrew(now){ if(!brewLabel) return; const a=Math.max(0,brewLabel.life/1.2);
-  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 26px Fredoka, sans-serif';
+  ctx.lineWidth=4+sz*0.06; ctx.strokeStyle=PAPER; ctx.strokeText(txt,W/2,y); ctx.fillStyle=fill; ctx.fillText(txt,W/2,y); ctx.restore(); }
+function drawBrew(now){ if(!brewLabel) return; const big=brewLabel.big;
+  const a=Math.max(0,brewLabel.life/(big?1.7:1.2));
+  const sz=big?36:26;   // white! reads bigger + lingers longer than brewed!
+  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
   const y=latCY-(1-a)*30;
   ctx.lineWidth=5; ctx.strokeStyle=INK; ctx.strokeText(brewLabel.text,W/2,y);
   ctx.fillStyle=brewLabel.col; ctx.fillText(brewLabel.text,W/2,y); ctx.restore(); }
+function drawMoveTell(now){ if(!moveTell) return; const a=Math.max(0,moveTell.life);
+  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 15px Fredoka, sans-serif';
+  const y=moveTell.y-8-(1-a)*26;
+  ctx.lineWidth=4; ctx.strokeStyle=PAPER; ctx.strokeText('moved',moveTell.x,y);
+  ctx.fillStyle=INK_SOFT; ctx.fillText('moved',moveTell.x,y); ctx.restore(); }
 function drawFlash(now){ if(!flashFx) return; const f=(now-flashFx.born)/flashFx.dur; if(f<0||f>=1) return;
   ctx.save(); ctx.globalAlpha=(1-f)*0.16; ctx.fillStyle=flashFx.col; ctx.fillRect(0,0,W,H); ctx.restore(); }
 function ease(t){ t=Math.max(0,Math.min(1,t)); return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
@@ -1079,6 +1210,7 @@ function setState(s){ state=s;
   chipsEl.style.display=play?'flex':'none';
   movesBox.style.display=play?'block':'none';
   backBtn.classList.toggle('show', play);
+  if(!play){ hideFECard(); closeHelp(); }
   chipRectsDirty=true; wake();
 }
 function goSelect(){ buildLvGrid(); setState('select'); }
@@ -1098,9 +1230,28 @@ function buildLvGrid(){ const grid=document.getElementById('lvGrid'); grid.inner
     el.appendChild(nm); el.appendChild(ic);
     if(unlocked) el.addEventListener('click', ()=>loadLevel(i));
     grid.appendChild(el); } }
+function starBurst(container, starEl){
+  const cr=container.getBoundingClientRect(), sr=starEl.getBoundingClientRect();
+  const cx=sr.left+sr.width/2-cr.left, cy=sr.top+sr.height/2-cr.top;
+  for(let k=0;k<10;k++){ const s=document.createElement('span'); s.className='wspark';
+    const a=(k/10)*6.2832+Math.random(), d=24+Math.random()*22;
+    s.style.left=cx+'px'; s.style.top=cy+'px';
+    s.style.setProperty('--dx',Math.round(Math.cos(a)*d)+'px');
+    s.style.setProperty('--dy',Math.round(Math.sin(a)*d)+'px');
+    container.appendChild(s); setTimeout(()=>s.remove(),700); }
+}
 function showWinScreen(){
-  const stars=document.getElementById('winStars').children;
-  for(let k=0;k<3;k++) stars[k].classList.toggle('on', k<winInfo.stars);
+  const starsEl=document.getElementById('winStars'); const stars=starsEl.children;
+  const n=winInfo.stars;
+  for(let k=0;k<3;k++) stars[k].classList.remove('on');
+  if(n<=1){ for(let k=0;k<n;k++) stars[k].classList.add('on'); SFX.win(); }   // 1-star: as before
+  else {
+    // stagger reveals ~150ms apart, rising per-star notes; 3rd star gets a spark burst + flourish
+    for(let k=0;k<n;k++){ (function(k){ setTimeout(()=>{ if(state!=='win') return;
+      stars[k].classList.add('on'); SFX.star(k);
+      if(k===2 && n===3){ SFX.flourish(); starBurst(starsEl, stars[k]); }
+    }, 200+k*160); })(k); }
+  }
   const nm=LEVELS[level-1].name;
   document.getElementById('winSub').textContent = (level<LEVELS.length)
     ? `“${nm}” cleared · ${winInfo.moves} move${winInfo.moves===1?'':'s'} to spare · ${winInfo.stars}★`
@@ -1124,6 +1275,37 @@ const muteBtn=document.getElementById('muteBtn');
 function muteIcon(){ muteBtn.textContent=SFX.muted?'🔇':'🔊'; }
 muteBtn.addEventListener('click', ()=>{ try{ SFX.init(); }catch(e){} SFX.setMuted(!SFX.muted); muteIcon(); });
 muteIcon();
+
+// ================= teaching: first-encounter cards + "?" recipe overlay =================
+const feCard=document.getElementById('fecard');
+const scrHelp=document.getElementById('scrHelp'), helpBtn=document.getElementById('helpBtn');
+let feTimer=null;
+const SEEN=(()=>{ try{ const o=JSON.parse(lsGet('hb_seen','{}')); return (o&&typeof o==='object')?o:{}; }catch(e){ return {}; } })();
+function seenSave(){ lsSet('hb_seen', JSON.stringify(SEEN)); }
+function tint(txt,col){ return '<b style="color:'+col+'">'+txt+'</b>'; }
+// one card per mechanic, shown at the START of the level that first demands it
+const LEVEL_TEACH={ 4:'bomb', 5:'brew', 7:'white', 9:'ink' };
+const FECARDS={
+  bomb:{ title:'a gift', html:'the '+tint('bomb',INK)+' — pops 7+ at once forge one. it blows after your next match.' },
+  brew:{ title:'brewing', html:'complete two colour matches in ONE swap: '
+          +tint('R',HEX.R)+'+'+tint('Y',HEX.Y)+'='+tint('orange',HEX.O)+' · '
+          +tint('Y',HEX.Y)+'+'+tint('B',HEX.B)+'='+tint('green',HEX.G)+' · '
+          +tint('R',HEX.R)+'+'+tint('B',HEX.B)+'='+tint('purple',HEX.P) },
+  white:{ title:'white', html:tint('white',INK)+' — brew three colours in one go. white is wild, but only joins brewed colours.' },
+  ink:{ title:'ink', html:tint('ink',INK)+' — pop a ball on a stained cell to scrub it clean. bombs scrub everything they hit.' }
+};
+function showFECard(key){ const card=FECARDS[key]; if(!card||SEEN[key]) return;
+  SEEN[key]=1; seenSave();
+  feCard.innerHTML='<div class="ft">'+card.title+'</div><div class="fl">'+card.html+'</div>';
+  feCard.classList.add('show'); wake();
+  clearTimeout(feTimer); feTimer=setTimeout(hideFECard, 2500);   // auto-dismiss
+}
+function hideFECard(){ if(feCard){ feCard.classList.remove('show'); } clearTimeout(feTimer); feTimer=null; }
+feCard.addEventListener('click', hideFECard);                    // tap-to-dismiss
+function openHelp(){ try{ SFX.init(); }catch(e){} scrHelp.classList.add('show'); wake(); }
+function closeHelp(){ if(scrHelp) scrHelp.classList.remove('show'); }
+helpBtn.addEventListener('click', openHelp);
+scrHelp.addEventListener('click', closeHelp);                    // close on tap anywhere
 
 // ================= input =================
 // a drag is OWNED by the finger (touch identifier) that started it — extra fingers
@@ -1268,6 +1450,22 @@ window.HB = {
   forceRemix(){ return remix(true); },
   loadLevel(n){ loadLevel(n); },
   goSelect(){ goSelect(); },
+  // wave-2 teaching / feel debug
+  get lastMoveTell(){ return lastMoveTell; },
+  get moveTellActive(){ return !!moveTell; },
+  get helpOpen(){ return scrHelp.classList.contains('show'); },
+  openHelp(){ openHelp(); }, closeHelp(){ closeHelp(); },
+  get feVisible(){ return feCard.classList.contains('show'); },
+  get seen(){ return Object.assign({},SEEN); },
+  resetSeen(){ for(const k in SEEN) delete SEEN[k]; seenSave(); },
+  cellFx(i){ const c=cells[i]; return c?{fx:c.fx,fy:c.fy,fvx:c.fvx,fvy:c.fvy}:null; },
+  cellBorn(i){ return cells[i]?cells[i].born:0; },
+  get shake(){ return {mag:shakeMag,t:shakeT,hitstop:hitstopFrames}; },
+  get boomsPlayed(){ return stats.boomsPlayed; },
+  get resolverPhase(){ return resolver?resolver.phase:null; },
+  cellOy(i){ return cells[i]?cells[i].oy:0; },
+  allOySettled(){ return cells.every(c=>c.oy===0&&c.vy===0); },
+  bombRevealed(i){ return !!(cells[i]&&cells[i].c==='K'&&cells[i].bombBorn); },
   step(ms){ let t=ms||16; while(t>0){ const d=Math.min(16,t)/1000; update(d,performance.now()); t-=16; } },
   settle(maxMs){ let t=maxMs||20000; while((resolver||pendingWin) && t>0){ update(0.016,performance.now()); t-=16; } return !resolver; },
   levels(){ return LEVELS.map(l=>({name:l.name,goals:l.goals.map(g=>Object.assign({},g)),moves:l.moves,
