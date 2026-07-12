@@ -100,7 +100,7 @@ Notes:
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
   - [ ] Sandbox-buy Huemeld Pro → all packs, Medley, daily archive, and locked chapters open instantly.
-- [ ] Flip `USE_TEST_ADS = false` in `native.js`, re-run `node sync.mjs && npx cap sync ios`, re-archive, re-upload. **This is the build you submit.**
+- [ ] Flip `USE_TEST_ADS = false` in `native.js` **and** `UNLOCK_ALL = false` in `huemeld/flow2.html` (the dev switch that opens every chapter/pack level), re-run `node sync.mjs && npx cap sync ios`, re-archive, re-upload. **This is the build you submit.**
 
 ## 8. Store listing (paste-ready)
 
