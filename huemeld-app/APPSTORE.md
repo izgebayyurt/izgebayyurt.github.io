@@ -82,6 +82,7 @@ npx cap open ios         # opens Xcode
 In Xcode:
 
 - [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
+- [ ] Same tab: **+ Capability → iCloud → check "Key-value storage"** (the entitlements file `App/App.entitlements` is already wired in — this just registers the service on your App ID). It powers the save mirror: delete + reinstall restores progress from iCloud.
 - [ ] `ios/App/App/Info.plist`: `GADApplicationIdentifier` currently holds Google's SAMPLE app id (`…3940256099942544~1458002511`) so dev builds run with test ads out of the box — replace it with your real AdMob **App ID** from step 2 (the one with `~`) before the release build.
 - [ ] Same file: SKAdNetworkItems currently has Google's own entry (`cstr6suwn9.skadnetwork`) — paste the rest of [Google's current list](https://developers.google.com/admob/ios/quick-start#update_your_infoplist) (~50 entries) for better ad attribution. Optional but recommended.
 
@@ -100,6 +101,9 @@ Notes:
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
   - [ ] Sandbox-buy Huemeld Pro → all packs, Medley, daily archive, and locked chapters open instantly.
+  - [ ] Open a pack for the first time → the "New mechanic" card pops once; **Watch how it works** runs the ghost demo and returns; the card never re-appears; the pack's picker page has "How it works" to rewatch.
+  - [ ] Force-quit the app the moment an ad should show (every 4th solve past 15) → relaunch → the owed ad shows on the very next solve.
+  - [ ] Play a few levels, background the app (saves push to iCloud), delete it, reinstall from TestFlight → progress is back after first launch (same iCloud account).
 - [ ] Flip `USE_TEST_ADS = false` in `native.js` **and** `UNLOCK_ALL = false` in `huemeld/flow2.html` (the dev switch that opens every chapter/pack level), re-run `node sync.mjs && npx cap sync ios`, re-archive, re-upload. **This is the build you submit.**
 
 ## 8. Store listing (paste-ready)
