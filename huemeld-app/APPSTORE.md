@@ -109,7 +109,7 @@ Notes:
 ## 8. Store listing (paste-ready)
 
 **Name** (30 max): `Huemeld`
-**Subtitle** (30 max): `Melt colors. Fill the board.`
+**Subtitle** (30 max): `Mix colors. Fill the board.`
 
 **Promotional text** (170 max, editable without review):
 > A color-mixing puzzle with 250 free levels, a daily puzzle, and seven mechanic packs — portals, prisms, bridges, counters and more.
@@ -117,10 +117,10 @@ Notes:
 **Description**:
 
 ```
-Draw pipes of light. Where they meet, colors melt.
+Draw pipes of light. Where they meet, colors mix.
 
 Huemeld is a color-mixing puzzle: every board has glowing sources and
-empty squares that need exactly the right hue. Red and yellow melt into
+empty squares that need exactly the right hue. Red and yellow mix into
 orange. Blue and yellow make green. All three primaries? That's brown —
 if you can route them together.
 
@@ -128,7 +128,7 @@ Fill the whole board. Leave nothing dark.
 
 EASY TO LEARN
 • Draw a line from each glowing circle
-• Lines that meet in a junction melt into a new color
+• Lines that meet in a junction mix into a new color
 • Light every square and cover the board to win
 
 HARD TO PUT DOWN
