@@ -120,6 +120,19 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
 .pkbtn.cur{ background:#ffd15c; color:#2c2733; }
 .pkbtn.lk{ opacity:.32; pointer-events:none; }
+/* hub cards: one button per chapter / pack, drilling into its level grid */
+.pickcard{ display:flex; align-items:center; gap:10px; width:100%; max-width:280px; margin:8px auto 0; padding:9px 12px;
+  border:2.5px solid var(--line); border-radius:14px; background:var(--card); box-shadow:0 3px 0 var(--shadow);
+  cursor:pointer; font-family:var(--font-d); color:var(--ink); text-align:left; }
+.pickcard:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.pickcard.cur{ border-color:#ffd15c; }
+.pickcard.lk{ opacity:.5; }
+.pickcard .pcic{ font-size:19px; min-width:24px; text-align:center; font-weight:800; }
+.pickcard .pcmain{ display:flex; flex-direction:column; min-width:0; }
+.pickcard .pcname{ font-weight:700; font-size:15px; }
+.pickcard .pcsub{ font-size:11px; color:var(--ink-soft); font-weight:600; line-height:1.3; }
+.pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
+.mk.pickback{ height:38px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
 .tip{ width:var(--bw); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
@@ -1393,62 +1406,103 @@ window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 
-/* ---------- level picker & controls ---------- */
+/* ---------- level picker & controls ----------
+   Two-level picker: the HUB lists Continue/Daily plus one CARD per chapter and
+   per pack; tapping a card opens that set's level grid with a back button. */
+var pickView=null;   // null = hub; {ch:c} = a chapter's grid; {pk:pi} = a pack's grid
 function renderPicker(){
-  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), h="", nd=0;
+  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), nd=0;
   for(var i0=0;i0<LEVELS.length;i0++) if(done[i0]) nd++;
-  // the campaign is CHAPTERED: later chapters unlock by solving 2/3 of the one before
-  for(var c=0;c<CHAPTERS.length;c++){
-    var s=chapterStart(c), CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
-    h+='<div class="packhead">'+(unl?"":"🔒 ")+"Chapter "+(c+1)+" · "+CH.name+'<span class="pksub">'+sv+"/"+CH.n+"</span></div>";
-    if(!unl) h+='<div class="packdesc">Solve '+(chapterNeed(c-1)-solvedInChapter(c-1))+' more in '+CHAPTERS[c-1].name+' to unlock</div>';
-    h+='<div class="pkgrid">';
-    for(var i=s;i<s+CH.n && i<LEVELS.length;i++)
-      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+(unl?"":" lk")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
-    h+='</div>';
-  }
-  document.getElementById("pkgrid").innerHTML=h;
-  document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
   var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
+  var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
+  var root=!pickView, h="";
+  var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
+  // hub-only rows
   var db=document.getElementById("btnDaily"), stk=dailyStreak();
   db.textContent = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? "  🔥"+stk : "");
+  db.style.display = root ? "" : "none";
+  document.getElementById("btnHow").style.display = root ? "" : "none";
+  document.getElementById("archArea").style.display = root ? "" : "none";
   // continue: the first unsolved level in an UNLOCKED chapter
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
   var cb=document.getElementById("btnContinue");
-  cb.style.display = cont<0 ? "none" : "";
+  cb.style.display = (root && cont>=0) ? "" : "none";
   if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
-  // daily ARCHIVE: full-game owners can replay the last 3 weeks
-  var ah="";
-  if(DAILY.length){
-    if(entFull()){
-      ah+='<div class="packhead">📅 Archive<span class="pksub">past dailies</span></div><div class="pkgrid">';
-      for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
-        ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
-      ah+='</div>';
-    } else ah='<div class="packdesc">🔒 Daily archive — included with the full game</div>';
-  }
-  document.getElementById("archArea").innerHTML=ah;
-  // side packs: 5 free teaser levels each; the rest come with the full game
-  var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}"), ph="";
-  PACKS.forEach(function(pk,pi){
-    var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
-    ph+='<div class="packhead">'+(pk.icon||"")+' '+pk.name+'<span class="pksub">'+ndp+"/"+pk.levels.length+"</span></div>";
-    if(pk.desc) ph+='<div class="packdesc">'+pk.desc+(entFull()?"":" · first "+PACK_FREE+" free")+'</div>';
-    ph+='<div class="pkgrid">';
-    for(var k=0;k<pk.levels.length;k++){
-      var open=packLevelUnlocked(k);
-      ph+='<button class="pkbtn'+(mode==="pack"&&curPack===pi&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d[k]?"✓":(open?"":"🔒"))+'</span></button>';
+  if(root){
+    document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
+    // daily ARCHIVE: full-game owners can replay the last 3 weeks
+    var ah="";
+    if(DAILY.length){
+      if(entFull()){
+        ah+='<div class="packhead">📅 Archive<span class="pksub">past dailies</span></div><div class="pkgrid">';
+        for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
+          ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
+        ah+='</div>';
+      } else ah='<div class="packdesc">🔒 Daily archive — included with the full game</div>';
     }
-    ph+='</div>';
-  });
-  document.getElementById("packsArea").innerHTML = ph ? '<div class="packtitle">Puzzle Packs</div>'+ph : "";
+    document.getElementById("archArea").innerHTML=ah;
+    // one card per chapter (later chapters unlock by solving 2/3 of the one before)
+    for(var c=0;c<CHAPTERS.length;c++){
+      var CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
+      var sub = unl ? CH.n+" levels" : "Solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name;
+      h+='<button class="pickcard'+(unl?"":" lk")+(mode==="campaign"&&chapterOf(li)===c?" cur":"")+'" data-ch="'+c+'">'
+        +'<span class="pcic">'+(unl?(c+1):"🔒")+'</span>'
+        +'<span class="pcmain"><span class="pcname">Chapter '+(c+1)+' · '+CH.name+'</span><span class="pcsub">'+sub+'</span></span>'
+        +'<span class="pcprog">'+sv+"/"+CH.n+'</span></button>';
+    }
+    pg.innerHTML=h;
+    // one card per pack (5 free teaser levels each; the rest come with the full game)
+    var ph='<div class="packtitle">Puzzle Packs</div>';
+    PACKS.forEach(function(pk,pi){
+      var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
+      var psub=(pk.desc||"")+(entFull()?"":" · first "+PACK_FREE+" free");
+      ph+='<button class="pickcard'+(mode==="pack"&&curPack===pi?" cur":"")+'" data-pack="'+pi+'">'
+        +'<span class="pcic">'+(pk.icon||"◆")+'</span>'
+        +'<span class="pcmain"><span class="pcname">'+pk.name+'</span><span class="pcsub">'+psub+'</span></span>'
+        +'<span class="pcprog">'+ndp+"/"+pk.levels.length+'</span></button>';
+    });
+    pa.innerHTML=ph;
+  } else if(pickView.ch!=null){
+    var cc=pickView.ch, CHV=CHAPTERS[cc], s=chapterStart(cc);
+    document.getElementById("pickTitle").textContent="Chapter "+(cc+1)+" · "+CHV.name;
+    h='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    for(var i=s;i<s+CHV.n && i<LEVELS.length;i++)
+      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+    h+='</div>';
+    pg.innerHTML=h; pa.innerHTML="";
+  } else {
+    var pi2=pickView.pk, pk2=PACKS[pi2], d2=pd[pk2.id]||{}, ndp2=0; for(var q2 in d2) if(d2[q2]) ndp2++;
+    document.getElementById("pickTitle").textContent=(pk2.icon?pk2.icon+" ":"")+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
+    var ph2='<button class="mk pickback">← All levels</button>';
+    if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+(entFull()?"":" · first "+PACK_FREE+" free")+'</div>';
+    ph2+='<div class="pkgrid">';
+    for(var k=0;k<pk2.levels.length;k++){
+      var open=packLevelUnlocked(k);
+      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?"✓":(open?"":"🔒"))+'</span></button>';
+    }
+    ph2+='</div>';
+    pg.innerHTML=""; pa.innerHTML=ph2;
+  }
+  // scroll: top of the view, or centre the current level's button in a grid
+  var panel=ovPick.querySelector(".panel");
+  if(panel){
+    panel.scrollTop=0;
+    var curB=panel.querySelector(".pkbtn.cur");
+    if(curB) panel.scrollTop = curB.getBoundingClientRect().top - panel.getBoundingClientRect().top - panel.clientHeight/2;
+  }
 }
 document.getElementById("packsArea").addEventListener("click", function(e){
+  if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
+  var card=e.target.closest(".pickcard");
+  if(card){ ensureAudio(); pickView={pk:+card.dataset.pack}; renderPicker(); return; }
   var b=e.target.closest(".pkbtn"); if(!b || b.dataset.p==null) return;
   ensureAudio(); loadPackLevel(+b.dataset.p, +b.dataset.k);
 });
 document.getElementById("btnContinue").addEventListener("click", function(){ ensureAudio(); loadLevel(+this.dataset.i||0); });
-document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio(); renderPicker(); ovPick.classList.add("show"); });
+document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio();
+  // open where the player is: their pack, their chapter, or the hub
+  pickView = mode==="pack" ? {pk:curPack} : mode==="campaign" ? {ch:chapterOf(li)} : null;
+  renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
@@ -1456,6 +1510,13 @@ document.getElementById("archArea").addEventListener("click", function(e){
   ensureAudio(); ovPick.classList.remove("show"); loadDaily(+b.dataset.ago);
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
+  if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
+  var card=e.target.closest(".pickcard");
+  if(card){
+    var c=+card.dataset.ch;
+    if(!chapterUnlocked(c)){ toast("🔒 "+CHAPTERS[c].name+" — solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name+" to unlock"); return; }
+    ensureAudio(); pickView={ch:c}; renderPicker(); return;
+  }
   var b=e.target.closest(".pkbtn"); if(!b) return;
   ensureAudio(); loadLevel(+b.dataset.i);
 });
