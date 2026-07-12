@@ -51,12 +51,12 @@ Work top to bottom; each step tells you exactly what to paste where.
 
 Monetization → In-App Purchases → **+** (both are **Non-Consumable**):
 
-| Field | No Ads | Everything |
+| Field | No Ads | Huemeld Pro |
 |---|---|---|
-| Reference name | Remove Ads | Everything |
+| Reference name | Remove Ads | Huemeld Pro |
 | Product ID | `com.izge.huemeld.noads` | `com.izge.huemeld.everything` |
 | Price | $2.99 (Tier 3) | $4.99 (Tier 5) |
-| Display name | Remove Ads | Everything |
+| Display name | Remove Ads | Huemeld Pro |
 | Description | No more ad breaks — ever. | All 7 packs, the 150-level Medley, daily archive, and every chapter unlocked. No ads. |
 
 - [ ] Each IAP needs a **review screenshot**: use `store-assets/screen-03-packs.png` (a Medley board showing the pack mechanics) — any real in-app image ≥640px is accepted.
@@ -112,10 +112,10 @@ Notes:
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, no service-worker weirdness (the wrapper strips it).
   - [ ] Solve 15 levels → next 4th solve shows the **ATT prompt** then a **test interstitial** (test ads are on).
-  - [ ] Settings shows **Remove Ads · $2.99**, **✦ Everything · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
+  - [ ] Settings shows **Remove Ads · $2.99**, **✦ Huemeld Pro · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
-  - [ ] Sandbox-buy Everything → all packs, Medley, daily archive, and locked chapters open instantly.
+  - [ ] Sandbox-buy Huemeld Pro → all packs, Medley, daily archive, and locked chapters open instantly.
 - [ ] Flip `USE_TEST_ADS = false` in `native.js`, re-run `node sync.mjs && npx cap sync ios`, re-archive, re-upload. **This is the build you submit.**
 
 ## 8. Store listing (paste-ready)
@@ -210,7 +210,7 @@ Because AdMob serves ads (and may use the IDFA when the user allows tracking):
 - [ ] Version page → attach the release build from step 7's second upload.
 - [ ] Attach both IAPs to the version.
 - [ ] **App Review notes**, paste:
-  > Free puzzle game with two one-time purchases. To reach ads quickly: ads only start after 15 solved levels (then every 4th solve; the ATT prompt appears right before the first ad). Purchases: Settings (gear icon) → "Remove Ads" / "Everything" / "Restore Purchases". No account or login required.
+  > Free puzzle game with two one-time purchases. To reach ads quickly: ads only start after 15 solved levels (then every 4th solve; the ATT prompt appears right before the first ad). Purchases: Settings (gear icon) → "Remove Ads" / "Huemeld Pro" / "Restore Purchases". No account or login required.
 - [ ] Release option: "Automatically release after approval" (or manual if you want to coordinate).
 - [ ] Submit for review. First reviews typically take 1–3 days.
 

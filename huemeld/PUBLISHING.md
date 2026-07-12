@@ -84,7 +84,7 @@ The privacy policy Apple requires is live at `huemeld/privacy.html`.
   interstitials after a 15-solve honeymoon. The deep free tier IS the funnel:
   anyone who plays 250 levels is ready to pay for silence and hungry for packs.
 - **$2.99 — No Ads** → flips `hm_flow2_ent_noads` (bridge: `buyRemoveAds(cb)`).
-- **$4.99 — Everything** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
+- **$4.99 — Huemeld Pro** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
   no ads + all 7 packs + the 150-level Medley (500 levels) + the daily archive
   (last 3 weeks replayable, streak-repairing) + instant chapter unlock.
 Both purchase buttons live in Settings and appear only when the native bridge

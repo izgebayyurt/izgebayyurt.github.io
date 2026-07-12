@@ -134,13 +134,13 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
 .mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
 /* hub action buttons: full card width, generous tap targets */
-#ovPick .panel > .mk{ width:100%; max-width:280px; height:54px; margin:10px auto 0; padding:0 12px; font-size:16px; }
-/* the Everything upsell */
+#ovPick .panel > .mk{ width:100%; max-width:280px; height:81px; flex:0 0 auto; margin:10px auto 0; padding:0 12px; font-size:18px; }
+/* the Huemeld Pro upsell */
 #ovUp .panel{ max-width:320px; }
 .updesc{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink-soft); margin:4px 0 0; }
 .uplist{ list-style:none; padding:0; margin:10px 0 2px; font-family:var(--font-d); font-weight:600; font-size:14.5px; color:var(--ink); text-align:left; }
 .uplist li{ margin:9px 0; line-height:1.35; }
-#ovUp .mk{ width:100%; height:52px; padding:0 12px; }
+#ovUp .mk{ width:100%; height:78px; padding:0 12px; }
 .tip{ width:var(--bw); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 .tip b{ color:var(--ink); }
 .cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
@@ -219,7 +219,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
     </div>
     <div class="ov" id="ovUp">
       <div class="panel">
-        <h2>✦ Everything</h2>
+        <h2>✦ Huemeld Pro</h2>
         <p class="updesc">One purchase, the whole game:</p>
         <ul class="uplist">
           <li>🚫 No ads, ever</li>
@@ -228,7 +228,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
           <li>📅 Daily archive — replay the last 3 weeks</li>
           <li>🔓 Every chapter unlocked instantly</li>
         </ul>
-        <button class="mk" id="btnUpBuy">✦ Everything · $4.99</button>
+        <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
         <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
       </div>
     </div>
@@ -239,7 +239,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
         <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
-        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Everything · $4.99</button>
+        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
         <button class="mk" id="btnRestore" style="display:none;background:var(--card);margin-top:6px;font-size:13px">Restore Purchases</button>
         <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
         <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
@@ -517,7 +517,7 @@ function loadDaily(off){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
-  if(!packLevelUnlocked(k)){ toast("🔒 The "+pk.name+" teaser ends here — get every pack with the full game!"); return; }
+  if(!packLevelUnlocked(k)){ toast("🔒 The "+pk.name+" teaser ends here — get every pack with Huemeld Pro!"); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
   lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
@@ -1536,7 +1536,7 @@ document.getElementById("archArea").addEventListener("click", function(e){
   var b=e.target.closest(".pkbtn"); if(!b || b.dataset.ago==null) return;
   ensureAudio(); ovPick.classList.remove("show"); loadDaily(+b.dataset.ago);
 });
-// archive: owners browse it; everyone else gets the Everything pitch
+// archive: owners browse it; everyone else gets the Huemeld Pro pitch
 var ovUp=document.getElementById("ovUp");
 document.getElementById("btnArch").addEventListener("click", function(){ ensureAudio();
   if(entFull()){ pickView={arch:1}; renderPicker(); }
@@ -1546,7 +1546,7 @@ document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
-  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); toast("✦ Everything unlocked — thank you!"); renderPicker(); } });
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } });
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -1604,7 +1604,7 @@ var ovSet=document.getElementById("ovSet");
   rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
     nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } }); });
   fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
-    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Everything unlocked — thank you!"); } }); });
+    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Huemeld Pro unlocked — thank you!"); } }); });
   rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast("Available in the app"); return; }
     nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
 })();
