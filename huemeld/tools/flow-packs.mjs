@@ -50,19 +50,54 @@ function spreadPick(cands, want, rng) {
 /* ---- per-pack level makers (return {lv, gest} or null) ---- */
 
 /* place `spec.gates` colour gates on the solution (first `spec.arrows` of them
-   directional), keeping clear of endpoints, junctions, prisms + any `extra` cells */
+   directional), keeping clear of endpoints, junctions, prisms + any `extra` cells.
+
+   Arrows are ice-with-a-heading: the line must run STRAIGHT through, entering
+   and leaving the arrow's way. So arrow cells must be straight cells of the
+   solution — and to make each arrow actually constrain (would the solve be
+   more straightforward without it?), it must have at least one open off-axis
+   neighbour: a cell where a reroute could have turned, which the arrow forbids.
+   Corridor cells (walls/edges on both sides force straightness anyway) never
+   get an arrow. Cells with BOTH side neighbours open constrain most, so they
+   are preferred. */
 function placeGates(L, spec, rng, extra) {
   const skip = keepOut(L, true);
   (L.prisms || []).forEach(([, r, c]) => { skip.add(key(r, c));
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => skip.add(key(r + dr, c + dc))); });
   if (extra) extra.forEach((k2) => skip.add(k2));
   const cands = pathInteriors(L.gest).filter((x) => !skip.has(key(x.r, x.c)));
-  const picked = spreadPick(cands, spec.gates, rng);
-  if (!picked) return null;
-  return picked.map((x, i) => {
-    const col = L.paint.get(key(x.r, x.c));
-    return (spec.arrows && i < spec.arrows) ? [col, x.r, x.c, DIRL(x.din)] : [col, x.r, x.c];
-  });
+  if (!spec.arrows) {              // gate-only path: byte-stable with old data
+    const picked = spreadPick(cands, spec.gates, rng);
+    if (!picked) return null;
+    return picked.map((x) => [L.paint.get(key(x.r, x.c)), x.r, x.c]);
+  }
+  const wallSet = new Set((L.walls || []).map(([r, c]) => key(r, c)));
+  const open = (r, c) => r >= 0 && c >= 0 && r < L.n && c < L.n && !wallSet.has(key(r, c));
+  const adj = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
+  const scored = cands
+    .filter((x) => x.din[0] === x.dout[0] && x.din[1] === x.dout[1])
+    .map((x) => ({ ...x, off: (open(x.r + x.din[1], x.c + x.din[0]) ? 1 : 0) + (open(x.r - x.din[1], x.c - x.din[0]) ? 1 : 0) }))
+    .filter((x) => x.off > 0);
+  const pool = [...shuffle(scored.filter((x) => x.off === 2), rng), ...shuffle(scored.filter((x) => x.off === 1), rng)];
+  const arrows = [];
+  for (const x of pool) {
+    if (arrows.length >= spec.arrows) break;
+    if (arrows.some((h) => adj(h, x))) continue;
+    arrows.push(x);
+  }
+  if (arrows.length < spec.arrows) return null;
+  const taken = new Set(arrows.map((x) => key(x.r, x.c)));
+  const plain = [];
+  for (const g of shuffle(cands.filter((x) => !taken.has(key(x.r, x.c))), rng)) {
+    if (plain.length >= spec.gates - spec.arrows) break;
+    if (plain.some((h) => adj(h, g)) || arrows.some((h) => adj(h, g))) continue;
+    plain.push(g);
+  }
+  if (plain.length < spec.gates - spec.arrows) return null;
+  return [
+    ...arrows.map((x) => [L.paint.get(key(x.r, x.c)), x.r, x.c, DIRL(x.din)]),
+    ...plain.map((x) => [L.paint.get(key(x.r, x.c)), x.r, x.c]),
+  ];
 }
 
 /* counter tiles: EXACTLY nv cells of the 3×3 block around (and including) the
@@ -191,7 +226,7 @@ function makeMix(spec, rng) {
 
 /* ---- assembly: 25 levels per mechanic pack + the 100-level Medley ---- */
 const RAMPS = {
-  brown: { name: "Brown", icon: "🟤", desc: "Mix all three primaries", tiers: [
+  brown: { name: "Brown", icon: "🟤", desc: "Mix three primary colors", tiers: [
     [8, { build: "chain", n: 5, minOpen: 22 }],
     [8, { build: "chain", n: 6, minOpen: 31 }],
     [4, { build: "chain", n: 7, minOpen: 42 }],
@@ -201,7 +236,7 @@ const RAMPS = {
     [6, { build: "chain", n: 7, minOpen: 43, gates: 3 }],
     [6, { build: "chain", n: 8, minOpen: 54 }],
   ] },
-  arrows: { name: "Arrows", icon: "➤", desc: "Gates with a direction", tiers: [
+  arrows: { name: "Arrows", icon: "➤", desc: "Lines must follow the direction on the sign", tiers: [
     [6, { n: 5, minOpen: 24, gates: 2, arrows: 1, looseness: 0.95 }],
     [6, { n: 6, minOpen: 33, gates: 3, arrows: 2, looseness: 0.95 }],
     [4, { build: "fork", n: 6, minOpen: 31, gates: 3, arrows: 2, looseness: 0.95 }],
@@ -212,7 +247,7 @@ const RAMPS = {
     [6, { n: 8, minOpen: 55, gates: 6, arrows: 5 }],
     [6, { n: 7, minOpen: 44, gates: 5, arrows: 5 }],
   ] },
-  ice: { name: "Ice", icon: "❄", desc: "Cross frozen cells straight", tiers: [
+  ice: { name: "Ice", icon: "❄", desc: "Prevents turning inside", tiers: [
     [6, { n: 5, minOpen: 24, ice: 2, looseness: 0.95 }],
     [6, { n: 6, minOpen: 33, ice: 3, looseness: 0.95 }],
     [4, { build: "fork", n: 6, minOpen: 31, ice: 3, looseness: 0.95 }],
@@ -223,7 +258,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 44, ice: 6 }],
     [6, { n: 8, minOpen: 55, ice: 6 }],
   ] },
-  portals: { name: "Portals", icon: "◎", desc: "Lines warp between twins", tiers: [
+  portals: { name: "Portals", icon: "◎", desc: "Who knew lines could be teleported? Well now they do", tiers: [
     [8, { n: 5, minOpen: 23, jump: 1, looseness: 0.95 }],
     [8, { n: 6, minOpen: 32, jump: 1, looseness: 0.95 }],
     [4, { n: 7, minOpen: 43, jump: 1, looseness: 0.95 }],
@@ -233,7 +268,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 42, jump: 2, gates: 2 }],
     [6, { n: 7, minOpen: 42, jump: 3 }],
   ] },
-  bridges: { name: "Bridges", icon: "⌗", desc: "Lines cross over each other", tiers: [
+  bridges: { name: "Overpass", icon: "⌗", desc: "Cross two lines over each other", tiers: [
     [8, { n: 5, minOpen: 23, bridge: 1 }],
     [8, { n: 6, minOpen: 32, bridge: 1 }],
     [4, { n: 7, minOpen: 43, bridge: 2 }],
@@ -243,7 +278,7 @@ const RAMPS = {
     [6, { n: 7, minOpen: 42, bridge: 2, gates: 2 }],
     [6, { n: 8, minOpen: 54, bridge: 3 }],
   ] },
-  prisms: { name: "Prisms", icon: "◈", desc: "Split a blend back apart", tiers: [
+  prisms: { name: "Prisms", icon: "◈", desc: "Split a mixed line back to its components", tiers: [
     [8, { build: "prism", n: 5, minOpen: 22 }],
     [8, { build: "prism", n: 6, minOpen: 31 }],
     [4, { build: "prism", n: 7, minOpen: 42 }],
@@ -253,7 +288,7 @@ const RAMPS = {
     [6, { build: "prism", n: 7, minOpen: 41, gates: 2, arrows: 2 }],
     [6, { build: "prism", n: 8, minOpen: 53 }],
   ] },
-  tally: { name: "Tally", icon: "③", desc: "Exact colour counts around a tile", tiers: [
+  tally: { name: "Numbers", icon: "③", desc: "Match the color count around the numbered tile", tiers: [
     [8, { n: 5, minOpen: 24, counts: 1 }],
     [8, { n: 6, minOpen: 32, counts: 2 }],
     [6, { n: 6, minOpen: 32, counts: 3, zeros: true }],
@@ -263,22 +298,24 @@ const RAMPS = {
     [6, { n: 7, minOpen: 43, counts: 5, zeros: true, gates: 2 }],
     [4, { n: 8, minOpen: 56, counts: 6, zeros: true }],
   ] },
-  mix: { name: "Medley", icon: "✚", desc: "Every mechanic, mixed together", tiers: [
+  mix: { name: "Medley", icon: "✚", desc: "Little bit of everything!", tiers: [
     // warm-up: one mechanic + a decoration
     [10, { n: 5, minOpen: 22, jump: 1, gates: 1 }],
     [10, { n: 5, minOpen: 22, bridge: 1, gates: 1 }],
     [10, { n: 6, minOpen: 31, jump: 1, ice: 2 }],
     [10, { n: 6, minOpen: 31, bridge: 1, gates: 2, arrows: 1 }],
     [10, { build: "fork", n: 6, minOpen: 31, gates: 2, ice: 2 }],
-    [10, { build: "chain", n: 6, minOpen: 30, gates: 2 }],
+    [10, { build: "chain", n: 6, minOpen: 30, counts: 2, zeros: true }],
     [10, { build: "prism", n: 6, minOpen: 30, gates: 2 }],
     // COMBOS: two or more mechanics on one board
+    // (counters never share a board with bridges: a bridge cell wears two
+    //  colours, which would make a neighbouring clue ambiguous)
     [10, { build: "chain", n: 6, minOpen: 30, jump: 1 }],
     [10, { build: "prism", n: 6, minOpen: 30, bridge: 1 }],
     [10, { n: 7, minOpen: 42, jump: 1, bridge: 1, gates: 2 }],
-    [10, { build: "fork", n: 7, minOpen: 42, bridge: 1, gates: 2 }],
+    [10, { build: "fork", n: 7, minOpen: 42, gates: 2, counts: 3, zeros: true }],
     [10, { build: "chain", n: 7, minOpen: 41, bridge: 1, ice: 2 }],
-    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, gates: 2 }],
+    [10, { build: "prism", n: 7, minOpen: 41, jump: 1, counts: 3, zeros: true }],
     [10, { n: 7, minOpen: 41, jump: 2, bridge: 1, ice: 2 }],
     [10, { build: "chain", n: 7, minOpen: 41, jump: 1, bridge: 1 }],
   ] },

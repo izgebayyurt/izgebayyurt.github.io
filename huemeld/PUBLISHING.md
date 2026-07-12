@@ -25,7 +25,9 @@ Levels are **generated and proven** — every level has exactly one solution, an
 each is machine-checked (solver + an end-to-end replay through the real engine).
 
 ```
-node huemeld/tools/flow-app.mjs --seed 20260709   # writes flow-data.js (campaign + daily)
+node huemeld/tools/flow-app.mjs   # writes flow-data.js (campaign + daily + packs)
+# NOTE: no --seed! The shipped data uses the tool's default seed (20260712);
+# passing a different seed regenerates EVERY level and invalidates verification.
 ```
 
 - `tools/flow-solve.mjs` — exact solution counter + one-solution extractor.
@@ -66,24 +68,15 @@ The purchase persists in `localStorage` (`hm_flow2_noads`), which suppresses
 interstitials. For real receipts, have `buyRemoveAds` verify with the store and
 mirror the flag.
 
-### Wrapping with Capacitor (outline)
+### Wrapping with Capacitor — BUILT, see `huemeld-app/`
 
-```sh
-npm i -D @capacitor/cli && npx cap init "Huemeld" com.izge.huemeld
-# point webDir at a folder containing flow2.html + flow-data.js + sw.js + icons
-npm i @capacitor/android @capacitor/ios
-npx cap add android && npx cap add ios
-```
-
-Then add an ads plugin (e.g. **AdMob**: `@capacitor-community/admob`) and IAP
-(**RevenueCat** `@revenuecat/purchases-capacitor`, or `@capacitor-community/in-app-purchases`),
-and implement `window.HuemeldNative` in a small bootstrap that runs before
-`flow2.html` (or inject it via `cap`'s `appLaunchUrl`/a preload script). Set the
-app's start page to `flow2.html`.
-
-**Accounts you'll need:** Apple Developer ($99/yr), Google Play ($25 once), and an
-AdMob account (+ a RevenueCat account if you use it). Store review expects a
-privacy policy and, for ads, an ATT prompt on iOS.
+The wrapper now exists at the repo root: **`huemeld-app/`** contains the Capacitor
+project (AdMob interstitials + RevenueCat purchases, `native.js` bridge,
+`sync.mjs` build step) and **`huemeld-app/APPSTORE.md`** is the complete
+step-by-step App Store Connect checklist — accounts, ad units, IAP setup,
+Info.plist/ATT snippets, paste-ready store metadata, and the 8 ready-made
+screenshots + IAP promo images in `huemeld-app/store-assets/`.
+The privacy policy Apple requires is live at `huemeld/privacy.html`.
 
 ### The model (final — fully wired in the shell)
 - **Free**: the whole 250-level campaign (chapters gate by progress: solve 2/3 to
@@ -91,7 +84,7 @@ privacy policy and, for ads, an ATT prompt on iOS.
   interstitials after a 15-solve honeymoon. The deep free tier IS the funnel:
   anyone who plays 250 levels is ready to pay for silence and hungry for packs.
 - **$2.99 — No Ads** → flips `hm_flow2_ent_noads` (bridge: `buyRemoveAds(cb)`).
-- **$4.99 — Everything** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
+- **$4.99 — Huemeld Pro** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
   no ads + all 7 packs + the 150-level Medley (500 levels) + the daily archive
   (last 3 weeks replayable, streak-repairing) + instant chapter unlock.
 Both purchase buttons live in Settings and appear only when the native bridge
