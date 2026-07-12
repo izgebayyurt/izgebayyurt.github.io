@@ -145,12 +145,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 /* main menu: opaque full-screen home, other overlays (z10) stack above it */
 #ovMenu{ position:fixed; border-radius:0; background:var(--paper); z-index:30; }  /* above the game (helpfab is 20), below every other overlay (40) */
 .mminner{ display:flex; flex-direction:column; align-items:center; width:min(300px,86vw); }
-.mmlogo{ font-family:var(--font-d); font-weight:800; font-size:54px; line-height:1; letter-spacing:1px; text-shadow:0 3px 0 var(--shadow); }
+.mmlogo{ font-family:var(--font-d); font-weight:800; font-size:54px; line-height:1; letter-spacing:1px; text-shadow:0 3px 0 var(--shadow); margin-bottom:14px; }
 .mmlogo span:nth-child(1){color:#ef4a5a} .mmlogo span:nth-child(2){color:#f2913d}
 .mmlogo span:nth-child(3){color:#f6c445} .mmlogo span:nth-child(4){color:#57c268}
 .mmlogo span:nth-child(5){color:#3d8bdf} .mmlogo span:nth-child(6){color:#9b62d6}
 .mmlogo span:nth-child(7){color:#a8703f}
-.mmtag{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink-soft); margin:8px 0 16px; }
 #ovMenu .mk{ width:100%; height:64px; margin-top:12px; padding:0 12px; font-size:18px; }
 body.menuopen .helpfab{ display:none; }
 .tip{ width:var(--bw); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
@@ -215,7 +214,6 @@ body.menuopen .helpfab{ display:none; }
     <div class="ov show" id="ovMenu">
       <div class="mminner">
         <div class="mmlogo"><span>H</span><span>u</span><span>e</span><span>m</span><span>e</span><span>l</span><span>d</span></div>
-        <div class="mmtag">Melt colors. Fill the board.</div>
         <button class="mk" id="btnMenuPlay" style="background:#ffd15c">▶ Play</button>
         <button class="mk" id="btnMenuDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
         <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
@@ -576,19 +574,19 @@ function playDemo(){
   if(!demo || demoing) return false;
   loadLevel(0);
   demoing=true;
-  ghostEl.style.display="block"; ghostEl.style.transition="left .14s linear, top .14s linear";
+  ghostEl.style.display="block"; ghostEl.style.transition="left .27s linear, top .27s linear";
   demoskipEl.classList.add("show");
   var CAP=["Drag a line out of a circle…","…meet the other colour: they MIX! Ride it to the ✦","Cover the board. Light the ✦. That's the game."];
-  var t=500, STEP=150;
+  var t=800, STEP=290;
   demo.forEach(function(cells,gi){
     demoAt(t,function(){ demobanEl.textContent=CAP[Math.min(gi,CAP.length-1)]; demobanEl.classList.add("show"); });
     demoAt(t,function(){ fireDemo("pointerdown",cells[0]); });
     cells.forEach(function(c,i){ if(i===0) return; demoAt(t+i*STEP,function(){ fireDemo("pointermove",c); }); });
-    t+=cells.length*STEP+220;
+    t+=cells.length*STEP+450;
     demoAt(t,function(){ fireDemo("pointerup",cells[cells.length-1]); });
-    t+=650;
+    t+=1300;
   });
-  demoAt(t+900,endDemo);
+  demoAt(t+1400,endDemo);
   return true;
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
