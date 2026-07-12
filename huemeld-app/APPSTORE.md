@@ -11,7 +11,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 | Native bridge with placeholders to fill | `huemeld-app/native.js` |
 | 8 App Store screenshots, 6.7" (1290×2796) | `huemeld-app/store-assets/screen-*.png` |
 | IAP promo images (1024×1024) | `huemeld-app/store-assets/iap-*.png` |
-| App icon 1024 source (upscale the 512 or re-run the generator) | `huemeld/icon-512.png` |
+| App icon, App Store size (1024×1024) | `huemeld-app/store-assets/appicon-1024.png` |
 | Privacy policy (live once pushed) | https://izgebayyurt.github.io/huemeld/privacy.html |
 
 ---
@@ -80,8 +80,7 @@ npx cap open ios         # opens Xcode
 In Xcode:
 
 - [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
-- [ ] Target → General → App Icon: drop in a 1024×1024 PNG. Generate it from the repo icon:
-      `sips -z 1024 1024 ../huemeld/icon-512.png --out AppIcon-1024.png` (or re-run the icon script at S=1024).
+- [ ] Target → General → App Icon: drop in `store-assets/appicon-1024.png` (already rendered at 1024×1024).
 - [ ] Open `ios/App/App/Info.plist` and add, inside the top-level `<dict>`:
 
 ```xml

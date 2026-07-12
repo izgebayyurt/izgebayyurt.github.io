@@ -17,8 +17,10 @@ let html = readFileSync(join(SRC, "flow2.html"), "utf8");
 // native bridge must exist before the game script runs
 html = html.replace('<script src="flow-data.js"></script>',
   '<script src="native.js"></script>\n<script src="flow-data.js"></script>');
-// no service worker inside the app shell
-html = html.replace(/if\("serviceWorker" in navigator\)\{[^}]*\}\);\s*\}/, "/* service worker: web build only */");
+// no service worker inside the app shell (the registration is one full line)
+html = html.replace(/^if\("serviceWorker".*$/m, "/* service worker: web build only */");
+if (html.includes("serviceWorker")) throw new Error("service worker registration not fully stripped — check flow2.html");
+if (!html.includes('<script src="native.js">')) throw new Error("native.js injection point not found — check flow2.html");
 writeFileSync(join(WWW, "index.html"), html);
 
 for (const f of ["flow-data.js", "icon-192.png", "icon-512.png", "icon-180.png"]) {
