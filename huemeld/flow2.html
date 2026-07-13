@@ -189,6 +189,10 @@ body.menuopen .helpfab{ display:none; }
 .tgl i{ position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--line); transition:left .16s; }
 .tgl[aria-pressed="true"]{ background:#8fd39b; }
 .tgl[aria-pressed="true"] i{ left:23px; }
+.vol{ -webkit-appearance:none; appearance:none; width:150px; height:8px; flex:0 0 auto; border-radius:999px; background:var(--paper); border:2.5px solid var(--line); box-shadow:inset 0 1px 2px rgba(0,0,0,.25); cursor:pointer; }
+.vol::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid var(--line); box-shadow:0 2px 3px rgba(0,0,0,.3); cursor:pointer; }
+.vol::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid var(--line); box-shadow:0 2px 3px rgba(0,0,0,.3); cursor:pointer; }
+.vol:disabled{ opacity:.4; }
 /* colour-blind glyph on dots */
 .dot .cb{ position:absolute; z-index:3; font-family:var(--font-d); font-weight:700; font-size:12px; color:#fff; -webkit-text-stroke:.8px var(--line); left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
 .dot.sq .cb{ top:31%; }   /* the ✦ objectives are squares — lift the colour-blind glyph clear of the star */
@@ -280,6 +284,7 @@ body.menuopen .helpfab{ display:none; }
         <h2>Settings</h2>
         <div class="setrow"><span>Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span>Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
@@ -308,6 +313,7 @@ body.menuopen .helpfab{ display:none; }
   </div>
   <div class="actionbar">
     <button class="mkk" id="btnUndo" title="Undo last move">↶ Undo</button>
+    <button class="mkk" id="btnHint" title="Reveal a pipe">Hint</button>
     <button class="mkk" id="btnReset" title="Reset level">↻ Reset</button>
   </div>
   <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
@@ -418,6 +424,10 @@ function updateUndoUI(){ var b=document.getElementById("btnUndo"); if(b) b.disab
 var mode="campaign";           // "campaign" | "daily"
 var soundOn = localStorage.getItem("hm_flow2_sound")!=="0";
 var cbOn = localStorage.getItem("hm_flow2_cb")==="1";
+// volume 0..1; a soft-knee compressor lets the top of the range push genuinely
+// LOUDER (perceived) without harsh clipping. Default 0.7 sits well above the old fixed 0.85.
+var volume = (function(){ var v=parseFloat(localStorage.getItem("hm_flow2_vol")); return isNaN(v)?0.7:Math.max(0,Math.min(1,v)); })();
+function volGain(v){ return v*3.0; }   // 0..3.0 master gain (old ceiling was 0.85)
 /* theme — dark by default. INK is the canvas outline colour, kept in sync. */
 var theme = localStorage.getItem("hm_flow2_theme")==="light" ? "light" : "dark";
 var INK = theme==="light" ? "#2c2733" : "#141019";
@@ -443,8 +453,17 @@ function dailyIndexFor(d){ if(!DAILY.length) return 0; var n=Math.floor(Date.UTC
 /* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
 var actx=null, master=null;
 function ensureAudio(){
-  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); master=actx.createGain(); master.gain.value=0.85; master.connect(actx.destination); }catch(e){ actx=null; } }
+  if(!actx){ try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    master=actx.createGain(); master.gain.value=volGain(volume);
+    var comp=actx.createDynamicsCompressor();   // tame peaks so a loud setting stays clean
+    master.connect(comp); comp.connect(actx.destination);
+  }catch(e){ actx=null; } }
   if(actx&&actx.state==="suspended") actx.resume();
+}
+function setVolume(v){
+  volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
+  if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
 }
 /* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
 function voice(freq,dur,o){
@@ -493,8 +512,12 @@ function sfxDone(){ bell(659.25,0.5,0.06); setTimeout(function(){ bell(987.77,0.
 function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.055); }, i*115); }); }
 
 /* ---------- level state ---------- */
+var curLevelObj=null, ghostStrokes=[], hintOrder=null, hintN=0;   // rewarded-ad hints
 function applyLevel(L){
   if(demoing) stopDemo();   // navigating anywhere cancels a running ghost demo
+  // reset revealed hints only when the LEVEL actually changes — a Reset reloads the
+  // same object, so a hint the player watched an ad for survives the reset.
+  if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; }
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
   undoStack=[]; preGesture=null;
@@ -518,7 +541,7 @@ function applyLevel(L){
     comp.forEach(function(pc){ ems.push({col:pc, r:p[1], c:p[2], legs:[], lock:ti, max:1}); });
   });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
-  buildGrid(); renderDots(); renderPaths(); updateUndoUI();
+  buildGrid(); renderDots(); renderPaths(); updateUndoUI(); updateHintUI();
 }
 function loadLevel(i){
   var want=Math.max(0, Math.min(LEVELS.length-1, i));
@@ -1067,6 +1090,7 @@ function coverage(){
   return Object.keys(set).length;
 }
 function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
+function hideToast(){ if(toastTid) clearTimeout(toastTid); toastEl.classList.remove("show"); }
 /* every DRAWN ray must end at a junction (merged) or a delivered circle — no loose ends */
 function noDangling(){
   for(var e=0;e<ems.length;e++){ var L=ems[e].legs;
@@ -1090,7 +1114,7 @@ function checkWin(){
   if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
   if(!countersOK()){ toast("A number tile needs its EXACT count!"); return; }
   solved=true; preGesture=null; sfxWin(); playWinCascade();
-  updateUndoUI();
+  updateUndoUI(); updateHintUI();
   if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
   var wn=document.getElementById("btnWinNext");
@@ -1188,11 +1212,29 @@ function playWinCascade(){
    smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Living paint
    glosses travel the pipes; a junction blooms on merge; delivery pulses; the win sweeps the whole
    tree. Passes: shadow, ink, colour, living gloss + sweeps (clipped), blooms, shimmer, confetti. */
+// a revealed hint pipe: a soft dashed guide in the emitter's colour, drawn UNDER
+// the real pipes so the player's own line paints right over it as they trace it.
+function drawGhostHints(s){
+  ctx.save(); ctx.lineJoin="round"; ctx.lineCap="round";
+  function path(pts){ ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
+  ghostStrokes.forEach(function(G){
+    var pts=G.cells.map(function(c){ return [c[1]*s+s/2, c[0]*s+s/2]; });
+    if(!pts.length) return;
+    ctx.setLineDash([]);                                   // wide soft halo
+    ctx.globalAlpha=0.14; ctx.strokeStyle=G.color; ctx.lineWidth=s*0.40; if(pts.length>1) path(pts);
+    ctx.setLineDash([s*0.16, s*0.14]);                     // dashed core reads as a guide, not a real pipe
+    ctx.globalAlpha=0.62; ctx.lineWidth=s*0.14; if(pts.length>1) path(pts);
+    ctx.setLineDash([]); ctx.globalAlpha=0.7; ctx.fillStyle=G.color;  // dot marks where the pipe begins
+    ctx.beginPath(); ctx.arc(pts[0][0],pts[0][1], s*0.1,0,6.2832); ctx.fill();
+  });
+  ctx.restore();
+}
 function renderPaths(){
   var s=cs(); if(!s) return;
   var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  if(ghostStrokes.length) drawGhostHints(s);
   var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
   var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
@@ -1565,7 +1607,8 @@ function icn(name,sz,extra){
     flame:'<path d="M12 3.5c.6 3-3.8 5-3.8 9a5.8 5.8 0 0 0 11.6 0c0-2.6-1.4-4.3-2.8-5.8.2 1.6-.4 2.6-1.4 3.1C15.9 7.6 14.6 4.7 12 3.5z" fill="currentColor" stroke="none"/>',
     noads:'<circle cx="12" cy="12" r="8.6"/><path d="M6 6.2 18 17.8"/>',
     packs:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
-    unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>'
+    unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>',
+    bulb:'<path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.45 1.1 1.2 1.1 2.2h5c0-1 .5-1.75 1.1-2.2A6 6 0 0 0 12 3z"/>'
   };
   return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
 }
@@ -1690,11 +1733,11 @@ document.getElementById("btnContinue").addEventListener("click", function(){ ens
 document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio();
   // open where the player is: their pack, their chapter, or the hub
   pickView = mode==="pack" ? {pk:curPack} : mode==="campaign" ? {ch:chapterOf(li)} : null;
-  renderPicker(); ovPick.classList.add("show"); });
+  hideToast(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 /* ---------- main menu: home screen at boot, the home button brings it back ---------- */
 var ovMenu=document.getElementById("ovMenu"), firstRun=false;
-function showMenu(){ ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
+function showMenu(){ hideToast(); ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
 function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
 document.body.classList.add("menuopen");   // the menu is up when the page opens
 updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
@@ -1707,7 +1750,7 @@ document.getElementById("btnMenuPlay").addEventListener("click", function(){ ens
     else document.getElementById("ovHelp").classList.add("show");
   } });
 document.getElementById("btnMenuDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); loadDaily(0); });
-document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; renderPicker(); ovPick.classList.add("show"); });
+document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; hideToast(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
 document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
@@ -1803,6 +1846,48 @@ window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue");
   if(!entNoAds() && adNudge%3===0) setTimeout(function(){ showUpsell("ads"); }, 700);
 };
 
+/* ---------- rewarded-ad hints: watch a video, reveal a ghost of one pipe ----------
+   Solution strokes ship as L.sol (or L.demo on tutorial/pack-1 boards). Longest
+   pipe first — the most informative. Premium/no-ads players and the plain web
+   build get hints for free; free-tier native players watch a rewarded video. */
+function levelSol(){ return curLevelObj && (curLevelObj.sol || curLevelObj.demo) || null; }
+function ensureHintOrder(){
+  if(hintOrder) return;
+  var sol=levelSol();
+  hintOrder = sol ? sol.slice().sort(function(a,b){ return b.length-a.length; }) : [];
+}
+function ghostColorFor(cells){
+  var h=cells[0], sq=(curLevelObj&&curLevelObj.sq)||[];
+  for(var i=0;i<sq.length;i++) if(sq[i][1]===h[0] && sq[i][2]===h[1]) return HEX[sq[i][0]]||"#dfe8f7";
+  return "#dfe8f7";   // prism rays / feeds don't start on a source square — neutral ghost
+}
+function grantHint(){
+  ensureHintOrder();
+  if(hintN>=hintOrder.length){ toast("Every pipe is already showing"); return; }
+  var st=hintOrder[hintN++];
+  ghostStrokes.push({cells:st, color:ghostColorFor(st)});
+  renderPaths(); updateHintUI();
+  toast(hintN>=hintOrder.length ? "Last pipe revealed — trace the dotted line" : "A pipe revealed — trace the dotted line");
+}
+function updateHintUI(){
+  var b=document.getElementById("btnHint"); if(!b) return;
+  ensureHintOrder();
+  if(!hintOrder.length){ b.style.display="none"; return; }   // no solution shipped for this board
+  b.style.display=""; b.disabled = solved || hintN>=hintOrder.length;
+}
+document.getElementById("btnHint").addEventListener("click", function(){
+  ensureAudio();
+  if(demoing || solved) return;
+  ensureHintOrder();
+  if(!hintOrder.length){ toast("No hint for this puzzle"); return; }
+  if(hintN>=hintOrder.length){ toast("Every pipe is already showing"); return; }
+  var nb=nativeBridge();
+  if(entNoAds() || !nb || !nb.rewarded){ grantHint(); return; }   // paid players + web: free hints
+  toast("Loading a video for your hint…");
+  nb.rewarded(function(ok){ if(ok) grantHint(); else toast("No hint yet — the video didn't finish"); });
+});
+document.getElementById("btnHint").innerHTML = icn("bulb",16)+" Hint";
+
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
 (function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds"), fl=document.getElementById("btnFull"), rs=document.getElementById("btnRestore");
@@ -1826,11 +1911,17 @@ var ovSet=document.getElementById("ovSet");
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
   document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
-  document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false"); }
+  document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false");
+  var vs=document.getElementById("volSlide"); if(vs){ vs.value=Math.round(volume*100); vs.disabled=!soundOn; } }
 document.getElementById("btnSet").addEventListener("click", function(){ syncToggles(); ovSet.classList.add("show"); });
 document.getElementById("btnSetClose").addEventListener("click", function(){ ovSet.classList.remove("show"); });
 document.getElementById("tglTheme").addEventListener("click", function(){ theme = theme==="dark"?"light":"dark"; localStorage.setItem("hm_flow2_theme",theme); applyTheme(); renderDots(); syncToggles(); });
 document.getElementById("tglSound").addEventListener("click", function(){ soundOn=!soundOn; localStorage.setItem("hm_flow2_sound",soundOn?"1":"0"); if(soundOn)ensureAudio(); syncToggles(); });
+(function(){ var vs=document.getElementById("volSlide"); if(!vs) return;
+  vs.addEventListener("input", function(){ ensureAudio(); setVolume((+vs.value||0)/100);
+    // a quick blip so the player HEARS the level they're setting
+    if(soundOn) bell(660,0.16,0.06); });
+})();
 document.getElementById("tglCB").addEventListener("click", function(){ cbOn=!cbOn; localStorage.setItem("hm_flow2_cb",cbOn?"1":"0"); syncToggles(); renderDots(); });
 /* "How to play" in the picker opens the same ? legend */
 document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); document.getElementById("ovHelp").classList.add("show"); });
@@ -1871,6 +1962,7 @@ window.__flow={
   winFx:function(){ playWinCascade(); },
   fx:function(){ return {rejects:rejects.length, blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
   render:function(){ renderPaths(); },
+  hints:function(){ return {shown:ghostStrokes.length, order:(hintOrder?hintOrder.length:null), has:!!levelSol()}; },
   mode:function(){ return mode; },
   daily:loadDaily,
   pack:loadPackLevel,

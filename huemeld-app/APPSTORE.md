@@ -27,7 +27,8 @@ Work top to bottom; each step tells you exactly what to paste where.
 - [ ] AdMob → Apps → **Add app** → iOS → "Huemeld" (say "not yet listed" — you can link the store listing after launch).
 - [ ] Copy the **App ID** — looks like `ca-app-pub-1234567890123456~0987654321` (note the `~`). You'll paste it into Info.plist in step 6.
 - [ ] Inside the app → **Ad units → Add ad unit → Interstitial**, name it "solve-break". Copy the **unit ID** (`ca-app-pub-…/…` with a `/`).
-- [ ] In `huemeld-app/native.js`: set `IOS_INTERSTITIAL_ID` to that unit ID. Leave `USE_TEST_ADS = true` until step 9.
+- [ ] Add a second ad unit → **Rewarded**, name it "hint-reveal". Copy its unit ID — this powers the "watch a video → reveal a pipe" hint button.
+- [ ] In `huemeld-app/native.js`: set `IOS_INTERSTITIAL_ID` and `IOS_REWARDED_ID` to those unit IDs. Leave `USE_TEST_ADS = true` until step 9.
 
 ## 3. RevenueCat (10 minutes)
 
@@ -106,6 +107,7 @@ Notes:
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, no service-worker weirdness (the wrapper strips it).
   - [ ] Fresh install → the **ATT prompt** shows at launch. Then solve 15 levels → the next 4th solve shows a **test interstitial** (test ads are on).
+  - [ ] Tap **Hint** (💡, in the action bar) → a **rewarded test video** plays; finish it → a dotted ghost pipe appears. Close it early → no hint. Tapping Hint again reveals the next pipe. (Paid/No-Ads players get hints free, no video.)
   - [ ] Settings shows **Remove Ads · $2.99**, **✦ Huemeld Pro · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
@@ -144,7 +146,8 @@ HARD TO PUT DOWN
 • 250 free levels across five chapters
 • A new daily puzzle every day — keep your streak alive
 • Undo, unlimited retries, no timers, no move limits
-• Color-blind labels, sound toggle, light & dark themes
+• Stuck? Reveal a pipe for a hint whenever you need one
+• Color-blind labels, volume slider, light & dark themes
 
 SEVEN PUZZLE PACKS (350 more levels)
 • Brown — chain all three primaries into deep blends
