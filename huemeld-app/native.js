@@ -76,16 +76,21 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
 
   function buy(productId, entKey, cb) {
     if (!Purchases) { cb(false); return; }
-    Purchases.purchaseStoreProduct({ product: { identifier: productId } })
-      .catch(function () {
-        // fallback path for plugin versions that take the id directly
-        return Purchases.purchaseProduct({ productIdentifier: productId });
-      })
+    // purchaseStoreProduct needs a REAL StoreProduct from the store — a synthesized
+    // {identifier} is rejected and no purchase sheet ever appears. Fetch it first,
+    // then purchase that object. If the product can't be fetched (not configured in
+    // App Store Connect, not yet "Ready to Submit", or no sandbox account signed in),
+    // getProducts returns an empty list -> report failure instead of hanging.
+    Purchases.getProducts({ productIdentifiers: [productId] })
       .then(function (res) {
-        var e = entsOf(res);
-        cb(entKey === "full" ? e.full : e.noads);
+        var product = res && res.products && res.products[0];
+        if (!product) { cb(false); return; }               // product unavailable
+        return Purchases.purchaseStoreProduct({ product: product }).then(function (pr) {
+          var e = entsOf(pr);
+          cb(entKey === "full" ? e.full : e.noads);
+        });
       })
-      .catch(function () { cb(false); });
+      .catch(function () { cb(false); });                  // user cancelled or purchase failed
   }
 
   window.HuemeldNative = {
