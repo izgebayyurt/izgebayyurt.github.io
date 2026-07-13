@@ -205,7 +205,6 @@
       <div class="mini"><span class="lbl">Tempo</span><input type="range" id="bpm" min="52" max="128" step="1"></div>
       <div class="mini"><span class="lbl">Swing</span><input type="range" id="swing" min="0" max="60" step="1"></div>
       <div class="mini"><span class="lbl">Master</span><input type="range" id="master" min="0" max="100" step="1"></div>
-      <button class="btn ghost sm" id="vinyl" title="Vinyl crackle">💿 Vinyl crackle</button>
     </div>
   </div>
 
@@ -253,6 +252,7 @@
   <button class="btn ghost sm" id="qmDice" title="Random pattern, this bar">🎲</button>
   <button class="btn ghost sm" id="qmCopy" title="Copy previous bar's pattern here">⧉ ◀</button>
   <button class="btn ghost sm" id="qmClear" title="Clear this bar">⌫ Clear</button>
+  <button class="btn ghost sm" id="qmFx" title="Effects for this whole bar">✨ FX</button>
   <button class="btn sm" id="qmEdit">✏️ Edit</button>
 </div>
 
@@ -419,7 +419,7 @@ let P;
 function defaultProject(){
   const mk=(deg,ext)=>({deg,ext,fx:[]});
   return {
-    bpm:78, swing:16, master:0.85, stepsPerBar:16, root:0, scale:'dorian', vinyl:true,
+    bpm:78, swing:16, master:0.85, stepsPerBar:16, root:0, scale:'dorian',
     chords:[mk(1,'7'),mk(4,'7'),mk(0,'7'),mk(5,'7')],
     tracks:[
       {type:'drum', name:'Drums', kit:'lofi', vol:.9, mute:false, solo:false, grid:emptyDrum(4)},
@@ -476,21 +476,7 @@ function makeGraph(ctx){
   const fb=ctx.createGain(); fb.gain.value=.30; delay.connect(fb); fb.connect(delay);
   const delWet=ctx.createGain(); delWet.gain.value=DEL_BASE; delay.connect(delWet); delWet.connect(warm);
   const B={ctx,master,dry,rev,delay,revWet,delWet,warm};
-  addVinyl(B);           // always present; gain follows P.vinyl so it can toggle live
   return B;
-}
-// looping vinyl hiss + random crackle, summed into master
-function addVinyl(B){
-  const{ctx}=B,secs=4,sr=ctx.sampleRate,buf=ctx.createBuffer(1,sr*secs,sr),d=buf.getChannelData(0);
-  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*.012;          // base hiss
-  const pops=Math.floor(secs*26);
-  for(let k=0;k<pops;k++){const pos=Math.floor(Math.random()*(d.length-2)),amp=(Math.random()*.4+.15)*(Math.random()<.5?-1:1);
-    d[pos]+=amp;d[pos+1]+=amp*.5;}                                    // crackle
-  const s=ctx.createBufferSource();s.buffer=buf;s.loop=true;
-  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=900;
-  const g=ctx.createGain();g.gain.value=P.vinyl?.6:0;
-  s.connect(hp);hp.connect(g);g.connect(B.master);s.start(0);
-  B.vinyl=g;
 }
 
 // pitched voices ---------------------------------------------------
@@ -1233,8 +1219,6 @@ function bindUI(){
   $('#bpm').oninput=e=>{P.bpm=+e.target.value;$('#bpm').title=P.bpm+' bpm';
     if(live)live.delay.delayTime.setTargetAtTime((60/P.bpm)*.75,live.ctx.currentTime,.05);};
   $('#swing').oninput=e=>{P.swing=+e.target.value;};
-  $('#vinyl').onclick=()=>{P.vinyl=!P.vinyl;$('#vinyl').classList.toggle('act',P.vinyl);
-    if(live&&live.vinyl)live.vinyl.gain.setTargetAtTime(P.vinyl?.6:0,live.ctx.currentTime,.05);};
   $('#master').oninput=e=>{P.master=e.target.value/100;if(live)live.master.gain.setTargetAtTime(P.master,live.ctx.currentTime,.03);};
   // key / scale / dice / zoom / follow
   $('#root').onchange=e=>{P.root=+e.target.value;refreshChordNames();if(openTrack!=null&&!$('#clipEditor').hidden)renderClipGrid();if(openChordBar!=null&&!$('#chordEditor').hidden)renderChordEditor();};
@@ -1271,6 +1255,7 @@ function bindUI(){
   $('#qmClear').onclick=()=>{if(qmTrack==null)return;clearBar(qmTrack,qmBar);};
   $('#qmCopy').onclick=()=>{if(qmTrack==null)return;copyPrevBar(qmTrack,qmBar);};
   $('#qmEdit').onclick=()=>{const ti=qmTrack,b=qmBar;closeQuick();if(ti!=null)openClip(ti,b);};
+  $('#qmFx').onclick=()=>{const b=qmBar;closeQuick();if(b!=null)openChord(b);};
   document.addEventListener('pointerdown',e=>{
     if($('#quickMenu').hidden)return;
     if(e.target.closest&&(e.target.closest('#quickMenu')))return;
@@ -1318,7 +1303,6 @@ function boot(){try{
   KEYS.forEach((k,i)=>opt($('#root'),i,k,i===P.root));
   Object.entries(SCALE_NAMES).forEach(([k,n])=>opt($('#scale'),k,n,k===P.scale));
   $('#bpm').value=P.bpm;$('#swing').value=P.swing;$('#master').value=P.master*100;
-  $('#vinyl').classList.toggle('act',P.vinyl);
   applyPreset(P.tracks[0],'Boom bap');       // Drums
   applyPreset(P.tracks[3],'Plucky melody');  // Lead (nylon guitar)
   barw = window.innerWidth<700 ? Math.max(120,Math.floor((window.innerWidth-98-14)/2)) : 210;
