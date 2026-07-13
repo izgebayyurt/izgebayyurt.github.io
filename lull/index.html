@@ -82,6 +82,8 @@
     font:800 12px ui-rounded;color:var(--ink);padding:6px 10px;cursor:pointer;}
   .suggchip:active{transform:translate(1px,2px);box-shadow:.5px 1px 0 var(--ink);}
   .suggchip .star{color:var(--acc);}
+  .fxchip.on{background:var(--acc);color:#fff;}
+  .chord .fxbadge{font-size:10px;height:13px;line-height:13px;letter-spacing:1px;margin-top:1px;}
 
   /* bar navigator (sync-scroll all grids; mobile-friendly) */
   .barnav{position:sticky;top:0;z-index:20;display:flex;gap:6px;align-items:center;overflow-x:auto;
@@ -166,6 +168,7 @@
       <div class="pill" id="extPill"></div>
       <button class="btn ghost sm" id="delChord">Remove bar</button>
       <div class="sugg" id="chordSugg"></div>
+      <div class="sugg" id="chordFx"></div>
     </div>
   </div>
 
@@ -208,6 +211,15 @@ const EXTS=['triad','7','sus2','sus4','add9'];
 // which scale degrees tend to follow each degree (functional harmony, 0=I..6=vii)
 const NEXT={0:[3,4,5,1,2],1:[4,6,3,0],2:[5,3,1,0],3:[4,0,1,5],4:[0,5,3,1],5:[3,1,4,0],6:[0,2,4]};
 function suggestAfter(deg){return (NEXT[deg]||[0,3,4,5]).slice(0,5);}
+// per-bar effects the user can toggle on any bar
+const FX=[
+  {id:'reverb',name:'Reverb',emo:'🌫'},{id:'echo',name:'Echo',emo:'🔊'},
+  {id:'arp',   name:'Arp',   emo:'🎹'},{id:'muffle',name:'Muffle',emo:'🎚'},
+  {id:'lift',  name:'Lift 8ve',emo:'⬆'},{id:'drop',name:'Drum drop',emo:'🥁'},
+];
+const FXMAP=Object.fromEntries(FX.map(e=>[e.id,e]));
+// effect-send base / boosted levels
+const REV_BASE=.5,REV_HI=.95, DEL_BASE=.24,DEL_HI=.5, WARM_BASE=9000,WARM_LO=700;
 const mtof=m=>440*Math.pow(2,(m-69)/12);
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 
@@ -284,7 +296,7 @@ const KITP={
 // ---------- project state ----------
 let P;
 function defaultProject(){
-  const mk=(deg,ext)=>({deg,ext});
+  const mk=(deg,ext)=>({deg,ext,fx:[]});
   return {
     bpm:78, swing:16, master:0.85, stepsPerBar:16, root:0, scale:'dorian', vinyl:true,
     chords:[mk(1,'7'),mk(4,'7'),mk(0,'7'),mk(5,'7')],
@@ -334,15 +346,15 @@ function noiseBuf(ctx){if(_noise.has(ctx))return _noise.get(ctx);const n=ctx.sam
 
 function makeGraph(ctx){
   const master=ctx.createGain(); master.gain.value=P.master;
-  const warm=ctx.createBiquadFilter(); warm.type='lowpass'; warm.frequency.value=9000; warm.Q.value=.2;
+  const warm=ctx.createBiquadFilter(); warm.type='lowpass'; warm.frequency.value=WARM_BASE; warm.Q.value=.2;
   warm.connect(master); master.connect(ctx.destination);
   const dry=ctx.createGain(); dry.connect(warm);
   const rev=ctx.createConvolver(); rev.buffer=makeIR(ctx,2.6,2.3);
-  const revWet=ctx.createGain(); revWet.gain.value=.5; rev.connect(revWet); revWet.connect(warm);
+  const revWet=ctx.createGain(); revWet.gain.value=REV_BASE; rev.connect(revWet); revWet.connect(warm);
   const delay=ctx.createDelay(1.0); delay.delayTime.value=(60/P.bpm)*.75;
   const fb=ctx.createGain(); fb.gain.value=.30; delay.connect(fb); fb.connect(delay);
-  const delWet=ctx.createGain(); delWet.gain.value=.24; delay.connect(delWet); delWet.connect(warm);
-  const B={ctx,master,dry,rev,delay};
+  const delWet=ctx.createGain(); delWet.gain.value=DEL_BASE; delay.connect(delWet); delWet.connect(warm);
+  const B={ctx,master,dry,rev,delay,revWet,delWet,warm};
   addVinyl(B);           // always present; gain follows P.vinyl so it can toggle live
   return B;
 }
@@ -493,27 +505,37 @@ function audible(t){if(t.mute)return false;if(anySolo())return t.solo;return tru
 // trigger everything that lands on global step `s` at audio time `t`
 function triggerStep(B,s,t){
   const spb=P.stepsPerBar, scaleArr=SCALES[P.scale], root=P.root;
-  const barIdx=Math.floor(s/spb), inBar=s%spb, beat=inBar%4===0;
+  const barIdx=Math.floor(s/spb), inBar=s%spb;
+  const ch=P.chords[barIdx%P.chords.length], fx=ch.fx||[];
+  const lift=fx.includes('lift')?12:0;
+  // per-bar global effects: set send/filter targets at each bar boundary
+  if(inBar===0){
+    B.revWet.gain.setTargetAtTime(fx.includes('reverb')?REV_HI:REV_BASE,t,.05);
+    B.delWet.gain.setTargetAtTime(fx.includes('echo')  ?DEL_HI:DEL_BASE,t,.05);
+    B.warm.frequency.setTargetAtTime(fx.includes('muffle')?WARM_LO:WARM_BASE,t,.05);
+  }
   const solo=anySolo();
   for(const tr of P.tracks){
     if(tr.mute)continue; if(solo&&!tr.solo)continue;
     const vel=tr.vol;
     if(tr.type==='drum'){
+      if(fx.includes('drop'))continue;                          // breakdown: drums out
       for(let r=0;r<DRUM_ROWS.length;r++) if(tr.grid[r][s]) playDrum(B,DRUM_ROWS[r],t,vel,tr.kit);
       continue;
     }
     // synth
-    const spec=SYNTHS[tr.inst], octBase=48+(spec.oct+tr.oct)*12;
+    const spec=SYNTHS[tr.inst], octBase=48+(spec.oct+tr.oct)*12+lift;
     if(tr.src==='chord'){
-      const ch=P.chords[barIdx%P.chords.length];
-      if(tr.role==='pad'){
+      const arpNow=tr.role==='arp'||(tr.role==='pad'&&fx.includes('arp'));
+      if(tr.role==='bass'){
+        if(inBar%8===0){const m=chordTones(ch,scaleArr,root,octBase-12)[0];playSynth(B,tr.inst,mtof(m),t,4*stepDur(),vel);}
+      }else if(arpNow){
+        const rate=2; if(inBar%rate===0){const tones=chordTones(ch,scaleArr,root,octBase);
+          const seq=tones.concat(tones.map(m=>m+12));const idx=Math.floor(s/rate)%seq.length;playSynth(B,tr.inst,mtof(seq[idx]),t,rate*stepDur()*.9,vel);}
+      }else{                                                    // held pad
         if(inBar===0){const tones=chordTones(ch,scaleArr,root,octBase);const dur=spb*stepDur();
           tones.forEach(m=>playSynth(B,tr.inst,mtof(m),t,dur,vel*.9/Math.sqrt(tones.length)));}
-      }else if(tr.role==='bass'){
-        if(inBar%8===0){const m=chordTones(ch,scaleArr,root,octBase-12)[0];playSynth(B,tr.inst,mtof(m),t,4*stepDur(),vel);}
-      }else if(tr.role==='arp'){
-        const rate=2; if(inBar%rate===0){const tones=chordTones(ch,scaleArr,root,octBase);
-          const seq=tones.concat(tones.map(m=>m+12));const idx=Math.floor(s/rate)%seq.length;playSynth(B,tr.inst,mtof(seq[idx]),t,rate*stepDur()*.9,vel);}}
+      }
     }else{
       // piano-roll notes
       const notes=tr.notes||(tr.notes=computeNotes(tr.grid));
@@ -601,7 +623,8 @@ function renderChords(){
   const scaleArr=SCALES[P.scale];
   P.chords.forEach((ch,i)=>{
     const el=document.createElement('div');el.className='chord'+(i===P.sel?' sel':'');el.draggable=true;el.dataset.i=i;
-    el.innerHTML=`<div class="bar">BAR ${i+1}</div><div class="nm">${chordName(ch,scaleArr,P.root)}</div><div class="playing"></div>`;
+    const badges=(ch.fx||[]).map(id=>FXMAP[id]?FXMAP[id].emo:'').join('');
+    el.innerHTML=`<div class="bar">BAR ${i+1}</div><div class="nm">${chordName(ch,scaleArr,P.root)}</div><div class="fxbadge">${badges}</div><div class="playing"></div>`;
     el.onclick=e=>{if(el._dragged){el._dragged=false;return;}P.sel=i;renderChords();renderChordEdit();};
     el.ondragstart=e=>{el._dragged=true;e.dataTransfer.setData('text',i);e.dataTransfer.effectAllowed='move';};
     el.ondragover=e=>{e.preventDefault();el.classList.add('drop');};
@@ -611,7 +634,7 @@ function renderChords(){
     lane.appendChild(el);
   });
   const add=document.createElement('div');add.className='chordadd';add.textContent='＋';add.title='Add a bar (suggested chord)';
-  add.onclick=()=>{const last=P.chords[P.chords.length-1];P.chords.push({deg:suggestAfter(last.deg)[0],ext:'7'});
+  add.onclick=()=>{const last=P.chords[P.chords.length-1];P.chords.push({deg:suggestAfter(last.deg)[0],ext:'7',fx:[]});
     P.sel=P.chords.length-1;resizeGrids();renderAll();};
   lane.appendChild(add);
 }
@@ -635,6 +658,12 @@ function renderChordEdit(){
     const b=document.createElement('button');b.className='suggchip';
     b.innerHTML=(d===ch.deg?'<span class="star">★</span> ':'')+chordName(cand,sc,P.root);
     b.onclick=()=>{ch.deg=d;ch.ext='7';renderChords();renderChordEdit();};sg.appendChild(b);});
+  // per-bar effects
+  const fx=ch.fx||(ch.fx=[]),fr=$('#chordFx');fr.innerHTML='';
+  const fl=document.createElement('span');fl.className='lbl';fl.textContent='Effects this bar';fr.appendChild(fl);
+  FX.forEach(e=>{const on=fx.includes(e.id);const b=document.createElement('button');b.className='suggchip fxchip'+(on?' on':'');
+    b.innerHTML=e.emo+' '+e.name;
+    b.onclick=()=>{const i=fx.indexOf(e.id);if(i>=0)fx.splice(i,1);else fx.push(e.id);renderChords();renderChordEdit();};fr.appendChild(b);});
 }
 $('#delChord').onclick=()=>{if(P.chords.length<=1)return;P.chords.splice(P.sel,1);P.sel=Math.max(0,P.sel-1);resizeGrids();renderAll();};
 
@@ -817,7 +846,7 @@ function bindTransport(){
   $('#chordDice').onclick=()=>{
     const progs=[[0,5,3,4],[0,3,4,3],[1,4,0,5],[5,3,0,4],[0,4,5,3],[3,4,0,5]];
     const rng=mulberry32((Date.now())>>>0);const pat=progs[Math.floor(rng()*progs.length)];
-    P.chords=pat.map(d=>({deg:d,ext:rng()<.6?'7':'triad'}));P.sel=0;resizeGrids();renderAll();
+    P.chords=pat.map(d=>({deg:d,ext:rng()<.6?'7':'triad',fx:[]}));P.sel=0;resizeGrids();renderAll();
   };
   $('#exportWav').onclick=async()=>{const b=$('#exportWav'),old=b.textContent;b.disabled=true;b.textContent='Rendering…';
     try{const blob=await renderWav();const url=URL.createObjectURL(blob),a=document.createElement('a');
