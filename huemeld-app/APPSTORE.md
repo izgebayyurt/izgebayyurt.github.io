@@ -82,9 +82,11 @@ npx cap open ios         # opens Xcode
 If the build fails with a wall of `UMPRequestParameters` / `UMPConsentInformation`
 "has been renamed" errors, the UMP pod resolved to 3.x. The AdMob plugin (6.x)
 still uses the `UMP`-prefixed consent classes, which 3.0 renamed. The Podfile
-already pins `GoogleUserMessagingPlatform', '~> 2.3'` to prevent this — if you
-hit it anyway (e.g. a stale lockfile), run `pod update GoogleUserMessagingPlatform`
-in `ios/App`, or delete `ios/App/Podfile.lock` and re-run `npx cap sync ios`.
+pins `GoogleUserMessagingPlatform', '~> 2.3'` (in the `target 'App'` block — **not**
+inside `def capacitor_pods`, which `cap sync` regenerates and would wipe) to prevent
+this. If you hit it anyway (e.g. a stale lockfile), run
+`pod update GoogleUserMessagingPlatform` in `ios/App`, or delete
+`ios/App/Podfile.lock` and re-run `npx cap sync ios`.
 
 In Xcode:
 
