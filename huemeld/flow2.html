@@ -427,7 +427,7 @@ var cbOn = localStorage.getItem("hm_flow2_cb")==="1";
 // volume 0..1; a soft-knee compressor lets the top of the range push genuinely
 // LOUDER (perceived) without harsh clipping. Default 0.7 sits well above the old fixed 0.85.
 var volume = (function(){ var v=parseFloat(localStorage.getItem("hm_flow2_vol")); return isNaN(v)?0.7:Math.max(0,Math.min(1,v)); })();
-function volGain(v){ return v*3.0; }   // 0..3.0 master gain (old ceiling was 0.85)
+function volGain(v){ return v*2.1; }   // 0..2.1 master gain (old fixed level was 0.85; the limiter below keeps loud peaks clean)
 /* theme — dark by default. INK is the canvas outline colour, kept in sync. */
 var theme = localStorage.getItem("hm_flow2_theme")==="light" ? "light" : "dark";
 var INK = theme==="light" ? "#2c2733" : "#141019";
@@ -456,7 +456,11 @@ function ensureAudio(){
   if(!actx){ try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
     master=actx.createGain(); master.gain.value=volGain(volume);
-    var comp=actx.createDynamicsCompressor();   // tame peaks so a loud setting stays clean
+    // brick-wall-ish limiter: stacked sounds (the win cascade especially) would
+    // otherwise clip and distort once the master gain is pushed up. Fast attack +
+    // high ratio + low threshold catch the peaks while everyday sounds pass clean.
+    var comp=actx.createDynamicsCompressor();
+    comp.threshold.value=-6; comp.knee.value=4; comp.ratio.value=18; comp.attack.value=0.002; comp.release.value=0.18;
     master.connect(comp); comp.connect(actx.destination);
   }catch(e){ actx=null; } }
   if(actx&&actx.state==="suspended") actx.resume();
@@ -509,7 +513,7 @@ function sfxJun(){
 /* blend reaches its target: a bright two-note bell */
 function sfxDone(){ bell(659.25,0.5,0.06); setTimeout(function(){ bell(987.77,0.62,0.05); },95); }   // E5 -> B5
 /* win: a rising bell arpeggio */
-function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.055); }, i*115); }); }
+function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.038); }, i*128); }); }
 
 /* ---------- level state ---------- */
 var curLevelObj=null, ghostStrokes=[], hintOrder=null, hintN=0;   // rewarded-ad hints
@@ -1784,7 +1788,7 @@ document.getElementById("btnMenuPro").addEventListener("click", function(){ ensu
 document.getElementById("btnUpNoAds").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.buyRemoveAds){ toast("Available in the app"); return; }
-  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast("Ads removed — thank you!"); } });
+  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast("Ads removed — thank you!"); } else toast("Purchase not completed"); });
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
 ovMech=document.getElementById("ovMech");
@@ -1798,7 +1802,7 @@ document.getElementById("btnMechWatch").addEventListener("click", function(){ en
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
-  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); updateProEntry(); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } });
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); updateProEntry(); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } else toast("Purchase not completed"); });
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -1903,9 +1907,9 @@ var ovSet=document.getElementById("ovSet");
   if(n && n.buyFull && !entFull()) fl.style.display="";
   if(n && n.restore) rs.style.display="";
   rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
-    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } }); });
+    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } else toast("Purchase not completed"); }); });
   fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
-    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Huemeld Pro unlocked — thank you!"); } }); });
+    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Huemeld Pro unlocked — thank you!"); } else toast("Purchase not completed"); }); });
   rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast("Available in the app"); return; }
     nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
 })();
