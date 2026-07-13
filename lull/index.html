@@ -214,6 +214,7 @@
     <select id="root" class="sm"></select>
     <select id="scale" class="sm"></select>
     <button class="btn ghost sm" id="chordDice" title="Random progression">🎲</button>
+    <button class="btn ghost sm" id="dupAll" title="Double the song: append a copy of all bars">×2 bars</button>
     <span class="spacer"></span>
     <button class="btn ghost sm" id="followBtn" title="Follow playhead">👁 Follow</button>
     <span class="lbl">Zoom</span>
@@ -254,7 +255,8 @@
     <button class="btn ghost sm" id="closeClip" title="Close">✕</button>
   </div>
   <div class="sheet-tools">
-    <span id="clipPresetWrap"><select class="sm pattern" id="clipPreset"></select></span>
+    <span id="clipPresetWrap"><select class="sm pattern" id="clipPreset"></select>
+      <span class="pill" id="scopePill"><button id="scopeBar" class="on">This bar</button><button id="scopeAll">All bars</button></span></span>
     <button class="btn ghost sm" id="clipDice" title="Random preset">🎲</button>
     <span class="octgrp" id="octGrp"><button class="btn sm" id="octDown" title="Octave down">▼</button><span id="octLbl">+0</span><button class="btn sm" id="octUp" title="Octave up">▲</button></span>
     <span class="lbl">Vol</span><input type="range" class="vol" id="clipVol" min="0" max="100">
@@ -275,6 +277,7 @@
     <span class="spacer"></span>
     <button class="btn ghost sm" id="moveL" title="Move left">◀ Move</button>
     <button class="btn ghost sm" id="moveR" title="Move right">Move ▶</button>
+    <button class="btn ghost sm" id="dupBar" title="Duplicate this bar (chord + all patterns)">⧉ Duplicate</button>
     <button class="btn ghost sm" id="delChord">Remove bar</button>
     <button class="btn ghost sm" id="closeChord" title="Close">✕</button>
   </div>
@@ -737,52 +740,94 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 // --- (legacy chord-lane / full-grid renderers removed; see timeline UI below) ---
 
 // ---- preset pattern library --------------------------------------
-// drum presets: (grid, barOffset, stepsPerBar, barIndex) => set cells
+// Every preset is per-bar: {cat, fn(grid, barOffset, stepsPerBar, ctx)}
+// where ctx = {ch: chord of that bar, b: bar index, rng: per-bar seeded RNG, tr: track}.
+// applyPreset can target the whole track or any single bar, so patterns
+// and fills mix and match bar by bar.
 const DRUM_PRESETS={
-  'Boom bap':   (g,o,n)=>{K(g,0,o,0);K(g,0,o,10);K(g,1,o,4);K(g,1,o,12);for(let i=0;i<n;i+=2)K(g,3,o,i);},
-  'Laid-back':  (g,o,n)=>{K(g,0,o,0);K(g,1,o,8);for(let i=0;i<n;i+=2)if(i!==8)K(g,3,o,i);K(g,3,o,7);},
-  'Half-time':  (g,o,n)=>{K(g,0,o,0);K(g,1,o,8);for(let i=0;i<n;i+=4)K(g,3,o,i);},
-  'Busy hats':  (g,o,n)=>{K(g,0,o,0);K(g,0,o,10);K(g,1,o,4);K(g,1,o,12);for(let i=0;i<n;i++)K(g,3,o,i);},
-  'Four floor': (g,o,n)=>{for(let i=0;i<n;i+=4)K(g,0,o,i);K(g,2,o,4);K(g,2,o,12);for(let i=1;i<n;i+=2)K(g,3,o,i);},
-  'Jazzy swing':(g,o,n)=>{K(g,0,o,0);K(g,6,o,4);K(g,6,o,12);K(g,3,o,0);K(g,3,o,6);K(g,3,o,8);K(g,3,o,14);K(g,4,o,10);},
-  'Minimal':    (g,o,n)=>{K(g,0,o,0);K(g,0,o,8);for(let i=0;i<n;i+=4)K(g,3,o,i);},
+  // grooves
+  'Boom bap':   {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,10);K(g,1,o,4);K(g,1,o,12);for(let i=0;i<n;i+=2)K(g,3,o,i);}},
+  'Laid-back':  {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,1,o,8);for(let i=0;i<n;i+=2)if(i!==8)K(g,3,o,i);K(g,3,o,7);}},
+  'Head nod':   {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,7);K(g,0,o,10);K(g,1,o,4);K(g,1,o,12);[2,6,8,14].forEach(i=>K(g,3,o,i));}},
+  'Half-time':  {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,1,o,8);for(let i=0;i<n;i+=4)K(g,3,o,i);}},
+  'Shuffle':    {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,10);K(g,1,o,4);K(g,1,o,12);[0,3,6,8,11,14].forEach(i=>K(g,3,o,i));}},
+  'Double-time':{cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,6);K(g,0,o,8);K(g,1,o,4);K(g,1,o,12);for(let i=0;i<n;i++)K(g,3,o,i);}},
+  'Busy hats':  {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,10);K(g,1,o,4);K(g,1,o,12);for(let i=0;i<n;i++)K(g,3,o,i);}},
+  'Four floor': {cat:'Grooves',fn:(g,o,n)=>{for(let i=0;i<n;i+=4)K(g,0,o,i);K(g,2,o,4);K(g,2,o,12);for(let i=1;i<n;i+=2)K(g,3,o,i);}},
+  'Jazzy swing':{cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,6,o,4);K(g,6,o,12);K(g,3,o,0);K(g,3,o,6);K(g,3,o,8);K(g,3,o,14);K(g,4,o,10);}},
+  'Bossa rim':  {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,8);[3,6,10,13].forEach(i=>K(g,6,o,i));for(let i=0;i<n;i+=2)K(g,3,o,i);}},
+  'Sparse':     {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,6,o,8);K(g,3,o,4);K(g,3,o,12);K(g,4,o,14);}},
+  'Minimal':    {cat:'Grooves',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,8);for(let i=0;i<n;i+=4)K(g,3,o,i);}},
+  // fills — drop one on the last bar of a section
+  'Fill: snare run':{cat:'Fills',fn:(g,o,n)=>{K(g,0,o,0);[0,2,4,6].forEach(i=>K(g,3,o,i));[8,10,12,13,14,15].forEach(i=>K(g,1,o,i));}},
+  'Fill: tom roll': {cat:'Fills',fn:(g,o,n)=>{K(g,0,o,0);K(g,1,o,4);[0,2,4,6].forEach(i=>K(g,3,o,i));[8,9,10,11].forEach(i=>K(g,5,o,i));K(g,1,o,12);K(g,1,o,13);K(g,5,o,14);K(g,5,o,15);}},
+  'Fill: buildup':  {cat:'Fills',fn:(g,o,n)=>{[0,4,8,12].forEach(i=>K(g,0,o,i));[0,2,4,6].forEach(i=>K(g,3,o,i));[8,9,10,11,12,13,14,15].forEach(i=>K(g,3,o,i));[8,12,14,15].forEach(i=>K(g,1,o,i));K(g,4,o,15);}},
+  'Fill: stutter':  {cat:'Fills',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,3);K(g,0,o,6);K(g,1,o,10);K(g,1,o,11);K(g,2,o,12);K(g,1,o,14);K(g,1,o,15);}},
+  'Fill: rush':     {cat:'Fills',fn:(g,o,n)=>{K(g,0,o,0);K(g,0,o,8);for(let i=0;i<n;i++)K(g,3,o,i);K(g,1,o,7);K(g,1,o,15);K(g,2,o,15);}},
+  'Fill: halt':     {cat:'Fills',fn:(g,o,n)=>{K(g,0,o,0);K(g,4,o,8);}},
 };
-// synth presets: fill grid from the chord sequence
 const SYNTH_PRESETS={
-  'Block chords':(tr)=>chordGrid(tr,(g,o,n,ch)=>rowsFor(ch,7,4).forEach(r=>note(g,r,o,n))),
-  'Chord stabs': (tr)=>chordGrid(tr,(g,o,n,ch)=>[0,6,10].forEach(s=>rowsFor(ch,7,4).forEach(r=>note(g,r,o+s,2)))),
-  'Offbeat comp':(tr)=>chordGrid(tr,(g,o,n,ch)=>[2,6,10,14].forEach(s=>rowsFor(ch,7,3).forEach(r=>note(g,r,o+s,2)))),
-  'Arp up':      (tr)=>arpGrid(tr,'up'),
-  'Arp up-down': (tr)=>arpGrid(tr,'updown'),
-  'Root pulse':  (tr)=>chordGrid(tr,(g,o,n,ch)=>{const r=rowsFor(ch,0,1)[0];for(let i=0;i<n;i+=4)note(g,r,o+i,3);}),
-  'Walking bass':(tr)=>chordGrid(tr,(g,o,n,ch)=>{const t=rowsFor(ch,0,4);[t[0],t[2]||t[0],t[1],t[3]||t[2]||t[0]].forEach((r,i)=>note(g,r,o+i*4,3));}),
-  'Plucky melody':(tr)=>{tr.grid=emptyGrid(P.chords.length);const spb=P.stepsPerBar,rng=mulberry32(0x51ee|P.chords.length);
-    let w=9;for(let b=0;b<P.chords.length;b++){const ch=P.chords[b],o=b*spb,tones=rowsFor(ch,7,3);
-      for(let i=0;i<spb;i++){const strong=i%4===0;
-        if(strong){w=tones[(i/4)%tones.length];note(tr.grid,w,o+i,2);}
-        else if(rng()<.32){w=Math.max(0,Math.min(SYNTH_ROWS-1,w+(rng()<.5?-1:1)));note(tr.grid,w,o+i,1);}}}
-    tr.notes=computeNotes(tr.grid);},
+  // comping
+  'Block chords':{cat:'Comping',fn:(g,o,n,{ch})=>rowsFor(ch,7,4).forEach(r=>note(g,r,o,n))},
+  'Chord stabs': {cat:'Comping',fn:(g,o,n,{ch})=>[0,6,10].forEach(s=>rowsFor(ch,7,4).forEach(r=>note(g,r,o+s,2)))},
+  'Offbeat comp':{cat:'Comping',fn:(g,o,n,{ch})=>[2,6,10,14].forEach(s=>rowsFor(ch,7,3).forEach(r=>note(g,r,o+s,2)))},
+  'Charleston':  {cat:'Comping',fn:(g,o,n,{ch})=>[0,6].forEach(s=>rowsFor(ch,7,3).forEach(r=>note(g,r,o+s,2)))},
+  'Anticipation':{cat:'Comping',fn:(g,o,n,{ch})=>{rowsFor(ch,7,3).forEach(r=>{note(g,r,o,6);note(g,r,o+14,2);});}},
+  'Broken chord':{cat:'Comping',fn:(g,o,n,{ch})=>{const t=rowsFor(ch,7,4);t.forEach((r,i)=>note(g,r,o+i*4,4));}},
+  'Pedal pulse': {cat:'Comping',fn:(g,o,n,{ch})=>{const t=rowsFor(ch,7,3);note(g,t[t.length-1],o,n);for(let i=0;i<n;i+=2)note(g,t[0],o+i,1);}},
+  // arps
+  'Arp up':      {cat:'Arps',fn:(g,o,n,{ch})=>arpBar(g,o,n,ch,'up',2)},
+  'Arp up-down': {cat:'Arps',fn:(g,o,n,{ch})=>arpBar(g,o,n,ch,'updown',2)},
+  'Arp ripple':  {cat:'Arps',fn:(g,o,n,{ch})=>arpBar(g,o,n,ch,'up',1)},
+  'Arp sparse':  {cat:'Arps',fn:(g,o,n,{ch})=>arpBar(g,o,n,ch,'updown',4)},
+  // bass
+  'Root pulse':  {cat:'Bass',fn:(g,o,n,{ch})=>{const r=rowsFor(ch,0,1)[0];for(let i=0;i<n;i+=4)note(g,r,o+i,3);}},
+  'Walking bass':{cat:'Bass',fn:(g,o,n,{ch})=>{const t=rowsFor(ch,0,4);[t[0],t[2]||t[0],t[1],t[3]||t[2]||t[0]].forEach((r,i)=>note(g,r,o+i*4,3));}},
+  'Octave bounce':{cat:'Bass',fn:(g,o,n,{ch})=>{const r=rowsFor(ch,0,1)[0],hi=Math.min(SYNTH_ROWS-1,r+7);[0,4,8,12].forEach((s,i)=>note(g,i%2?hi:r,o+s,2));}},
+  'Syncopated bass':{cat:'Bass',fn:(g,o,n,{ch})=>{const t=rowsFor(ch,0,3);note(g,t[0],o,3);note(g,t[0],o+6,2);note(g,t[2]||t[0],o+10,2);note(g,t[0],o+14,2);}},
+  'Half notes':  {cat:'Bass',fn:(g,o,n,{ch})=>{const t=rowsFor(ch,0,3);note(g,t[0],o,8);note(g,t[2]||t[0],o+8,8);}},
+  // melody — rng is seeded per bar, so each bar gets its own stable phrase
+  'Plucky melody':{cat:'Melody',fn:(g,o,n,{ch,rng})=>{const tones=rowsFor(ch,7,3);let w=tones[0]||9;
+    for(let i=0;i<n;i++){const strong=i%4===0;
+      if(strong){w=tones[(i/4)%tones.length];note(g,w,o+i,2);}
+      else if(rng()<.32){w=Math.max(0,Math.min(SYNTH_ROWS-1,w+(rng()<.5?-1:1)));note(g,w,o+i,1);}}}},
+  'Motif':       {cat:'Melody',fn:(g,o,n,{ch,rng})=>{const tones=rowsFor(ch,7,4);
+    for(let s=0;s<n;s+=4){const r=tones[Math.floor(rng()*tones.length)];note(g,r,o+s,rng()<.5?2:3);
+      if(rng()<.4){const nb=Math.max(0,Math.min(SYNTH_ROWS-1,r+(rng()<.5?-1:1)));note(g,nb,o+s+2,1);}}}},
+  'Call & response':{cat:'Melody',fn:(g,o,n,{ch,b,rng})=>{const lo=rowsFor(ch,7,3),hi=rowsFor(ch,11,3);
+    const t=(b%2===0)?lo:hi,off=(b%2===0)?0:8;
+    for(let i=0;i<3;i++)note(g,t[Math.floor(rng()*t.length)],o+off+i*2,2);
+    note(g,t[0],o+off+6,2);}},
+  'Descending line':{cat:'Melody',fn:(g,o,n,{ch})=>{const t=rowsFor(ch,7,4),top=Math.min(SYNTH_ROWS-1,(t[t.length-1]||10)+2);
+    for(let i=0;i<8;i++)note(g,Math.max(t[0]||0,top-i),o+i*2,2);}},
 };
-const K=(g,row,o,s)=>{if(o+s<g[row].length)g[row][o+s]=true;};                 // set one drum hit
-const note=(g,row,start,len)=>{for(let i=0;i<len&&start+i<g[row].length;i++)g[row][start+i]=true;};
+const K=(g,row,o,s)=>{if(g[row]&&o+s<g[row].length)g[row][o+s]=true;};        // set one drum hit
+const note=(g,row,start,len)=>{if(!g[row])return;for(let i=0;i<len&&start+i<g[row].length;i++)g[row][start+i]=true;};
 // grid rows for a chord's tones, in register `reg` (scale-steps up), up to `count` tones
 function rowsFor(ch,reg,count){const idx=[0,2,4,6].slice(0,count);
   return idx.map(i=>reg+ch.deg+i).filter(r=>r>=0&&r<SYNTH_ROWS);}
-function chordGrid(tr,fn){tr.grid=emptyGrid(P.chords.length);const spb=P.stepsPerBar;
-  for(let b=0;b<P.chords.length;b++)fn(tr.grid,b*spb,spb,P.chords[b]);tr.notes=computeNotes(tr.grid);}
-function arpGrid(tr,mode){tr.grid=emptyGrid(P.chords.length);const spb=P.stepsPerBar;
-  for(let b=0;b<P.chords.length;b++){const ch=P.chords[b],o=b*spb;let seq=rowsFor(ch,7,4);
-    seq=seq.concat(seq.map(r=>r+7).filter(r=>r<SYNTH_ROWS));
-    if(mode==='updown')seq=seq.concat(seq.slice(1,-1).reverse());
-    let k=0;for(let i=0;i<spb;i+=2){note(tr.grid,seq[k%seq.length],o+i,2);k++;}}
-  tr.notes=computeNotes(tr.grid);}
+function arpBar(g,o,n,ch,mode,rate){let seq=rowsFor(ch,7,4);
+  seq=seq.concat(seq.map(r=>r+7).filter(r=>r<SYNTH_ROWS));
+  if(mode==='updown')seq=seq.concat(seq.slice(1,-1).reverse());
+  let k=0;for(let i=0;i<n;i+=rate){note(g,seq[k%seq.length],o+i,Math.max(1,rate-0));k++;}}
 function presetsFor(tr){return tr.type==='drum'?DRUM_PRESETS:SYNTH_PRESETS;}
-function applyPreset(tr,name){const set=presetsFor(tr),fn=set[name];if(!fn)return;
-  if(tr.type==='drum'){tr.grid=emptyDrum(P.chords.length);const spb=P.stepsPerBar;
-    for(let b=0;b<P.chords.length;b++)fn(tr.grid,b*spb,spb,b);}
-  else fn(tr);}
-function randomPreset(tr){const names=Object.keys(presetsFor(tr));
-  const i=Math.floor((Date.now()>>>4)%names.length);applyPreset(tr,names[i]);}
+// Apply a preset to the whole track (barStart omitted) or to `barCount`
+// bars starting at `barStart` — only the targeted bars are cleared.
+function applyPreset(tr,name,barStart,barCount){
+  const set=presetsFor(tr),p=set[name];if(!p)return;
+  const fn=p.fn||p, spb=P.stepsPerBar, bars=P.chords.length;
+  if(tr.grid.length!==gridRows(tr)||(tr.grid[0]&&tr.grid[0].length!==totalSteps()))resizeGrids();
+  const b0=(barStart==null)?0:Math.max(0,Math.min(bars-1,barStart|0));
+  const nb=(barStart==null)?bars:Math.max(1,Math.min(bars-b0,barCount||1));
+  for(const row of tr.grid)row.fill(false,b0*spb,(b0+nb)*spb);
+  for(let b=b0;b<b0+nb;b++){
+    const ctx={ch:P.chords[b],b,tr,rng:mulberry32((0x51ee^Math.imul(b+1,2654435761))>>>0)};
+    fn(tr.grid,b*spb,spb,ctx);
+  }
+  if(tr.type==='synth')tr.notes=computeNotes(tr.grid);
+}
+function randomPreset(tr,barStart,barCount){const names=Object.keys(presetsFor(tr));
+  const i=Math.floor((Date.now()>>>4)%names.length);applyPreset(tr,names[i],barStart,barCount);}
 
 // helpers
 function opt(sel,val,label,on){const o=document.createElement('option');o.value=val;o.textContent=label;if(on)o.selected=true;sel.appendChild(o);}
@@ -954,7 +999,10 @@ function renderClipEditor(){
   const grid=isGridBased(tr);
   $('#clipPresetWrap').hidden=!grid;
   $('#octGrp').hidden=!(tr.type==='synth'&&tr.src==='grid');
-  if(grid){const ps=$('#clipPreset');ps.textContent='';opt(ps,'','Preset…',true);Object.keys(presetsFor(tr)).forEach(n=>opt(ps,n,n,false));}
+  if(grid){const ps=$('#clipPreset');ps.textContent='';opt(ps,'','Preset…',true);
+    const groups={};Object.entries(presetsFor(tr)).forEach(([n,p])=>{(groups[p.cat||'Patterns']=groups[p.cat||'Patterns']||[]).push(n);});
+    for(const gn in groups){const og=document.createElement('optgroup');og.label=gn;
+      groups[gn].forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;og.appendChild(o);});ps.appendChild(og);}}
   $('#octLbl').textContent=(tr.oct>=0?'+':'')+tr.oct;
   $('#clipVol').value=Math.round(tr.vol*100);
   syncClipMix();
@@ -1021,15 +1069,43 @@ function renderChordEditor(){
     b.onclick=()=>{const i=fx.indexOf(e.id);if(i>=0)fx.splice(i,1);else fx.push(e.id);afterChordEdit();};fr.appendChild(b);});
 }
 function afterChordEdit(){const el=rulerEl(openChordBar);if(el)fillRulerbar(el,openChordBar);renderChordEditor();}
+// preset scope for the clip editor ('bar' = just the open bar, 'all' = whole track)
+let presetScope='bar';
+function setScope(s){presetScope=s;
+  $('#scopeBar').classList.toggle('on',s==='bar');$('#scopeAll').classList.toggle('on',s==='all');}
+// bars are scenes: chord + fx + every track's 16 columns move/copy/delete together
 function moveChord(from,to,keepOpen){
   if(to<0||to>=P.chords.length||from===to)return;
   const[m]=P.chords.splice(from,1);P.chords.splice(to,0,m);
-  buildRuler();
+  const spb=P.stepsPerBar;
+  P.tracks.forEach(tr=>{tr.grid.forEach(row=>{const seg=row.splice(from*spb,spb);row.splice(to*spb,0,...seg);});
+    if(tr.type==='synth')tr.notes=computeNotes(tr.grid);});
+  buildRuler();buildLanes();applyBarw();
   if(P.sel===from)P.sel=to;
   if(keepOpen&&openChordBar!=null)openChordBar=to;
   markRulerSel();
   if(openChordBar!=null&&!$('#chordEditor').hidden)renderChordEditor();
   updateReadout();
+}
+function duplicateBar(b){
+  if(b==null||b<0||b>=P.chords.length)return;
+  if(P.chords.length>=64){alert('Max 64 bars');return;}
+  const spb=P.stepsPerBar,src=P.chords[b];
+  P.chords.splice(b+1,0,{deg:src.deg,ext:src.ext,fx:(src.fx||[]).slice()});
+  P.tracks.forEach(tr=>{tr.grid.forEach(row=>{const seg=row.slice(b*spb,(b+1)*spb);row.splice((b+1)*spb,0,...seg);});
+    if(tr.type==='synth')tr.notes=computeNotes(tr.grid);});
+  P.sel=b+1;if(openChordBar!=null)openChordBar=b+1;
+  renderAll();$('#rBars').textContent=P.chords.length;
+  if(!$('#chordEditor').hidden)renderChordEditor();
+}
+function doubleSong(){
+  const n=P.chords.length;
+  if(n*2>64){alert('Max 64 bars (that is ~3 minutes at 80 bpm)');return;}
+  const spb=P.stepsPerBar;
+  P.chords=P.chords.concat(P.chords.map(c=>({deg:c.deg,ext:c.ext,fx:(c.fx||[]).slice()})));
+  P.tracks.forEach(tr=>{tr.grid.forEach(row=>{const copy=row.slice(0,n*spb);for(const v of copy)row.push(v);});
+    if(tr.type==='synth')tr.notes=computeNotes(tr.grid);});
+  renderAll();$('#rBars').textContent=P.chords.length;
 }
 
 // -- sheets open/close --
@@ -1083,8 +1159,12 @@ function bindUI(){
   $('#closeClip').onclick=closeSheets;
   $('#prevBar').onclick=()=>{if(openBar>0){openBar--;renderClipEditor();}};
   $('#nextBar').onclick=()=>{if(openBar<P.chords.length-1){openBar++;renderClipEditor();}};
-  $('#clipPreset').onchange=e=>{const tr=P.tracks[openTrack];if(tr&&e.target.value){applyPreset(tr,e.target.value);redrawLane(openTrack);renderClipGrid();}e.target.value='';};
-  $('#clipDice').onclick=()=>{const tr=P.tracks[openTrack];if(!tr)return;randomPreset(tr);redrawLane(openTrack);renderClipGrid();};
+  $('#clipPreset').onchange=e=>{const tr=P.tracks[openTrack];if(tr&&e.target.value){
+    applyPreset(tr,e.target.value,presetScope==='bar'?openBar:null,1);redrawLane(openTrack);renderClipGrid();}e.target.value='';};
+  $('#clipDice').onclick=()=>{const tr=P.tracks[openTrack];if(!tr)return;
+    randomPreset(tr,presetScope==='bar'?openBar:null,1);redrawLane(openTrack);renderClipGrid();};
+  $('#scopeBar').onclick=()=>setScope('bar');
+  $('#scopeAll').onclick=()=>setScope('all');
   $('#octDown').onclick=()=>{const tr=P.tracks[openTrack];if(!tr)return;tr.oct=Math.max(-2,tr.oct-1);$('#octLbl').textContent=(tr.oct>=0?'+':'')+tr.oct;renderClipGrid();};
   $('#octUp').onclick=()=>{const tr=P.tracks[openTrack];if(!tr)return;tr.oct=Math.min(2,tr.oct+1);$('#octLbl').textContent=(tr.oct>=0?'+':'')+tr.oct;renderClipGrid();};
   $('#clipVol').oninput=e=>{const tr=P.tracks[openTrack];if(tr)tr.vol=e.target.value/100;};
@@ -1100,12 +1180,18 @@ function bindUI(){
     const cell=el&&el.closest&&el.closest('.cell');if(cell)paintCell(P.tracks[openTrack],+cell.dataset.row,+cell.dataset.step);});
   // chord editor tools
   $('#closeChord').onclick=closeSheets;
-  $('#delChord').onclick=()=>{if(P.chords.length<=1)return;P.chords.splice(openChordBar,1);
+  $('#delChord').onclick=()=>{if(P.chords.length<=1)return;
+    const b=openChordBar,spb=P.stepsPerBar;
+    P.tracks.forEach(tr=>{tr.grid.forEach(row=>row.splice(b*spb,spb));
+      if(tr.type==='synth')tr.notes=computeNotes(tr.grid);});
+    P.chords.splice(b,1);
     if(openChordBar>=P.chords.length)openChordBar=P.chords.length-1;clampSel();resizeGrids();
     buildRuler();buildLanes();applyBarw();updateMix();$('#rBars').textContent=P.chords.length;
     renderChordEditor();markRulerSel();updateReadout();};
   $('#moveL').onclick=()=>{if(openChordBar!=null)moveChord(openChordBar,openChordBar-1,true);};
   $('#moveR').onclick=()=>{if(openChordBar!=null)moveChord(openChordBar,openChordBar+1,true);};
+  $('#dupBar').onclick=()=>{if(openChordBar!=null)duplicateBar(openChordBar);};
+  $('#dupAll').onclick=doubleSong;
   // global
   document.addEventListener('keydown',onKey);
   window.addEventListener('pointerup',()=>{painting=false;paintTrack=null;});
