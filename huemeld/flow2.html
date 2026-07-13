@@ -289,8 +289,7 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
         <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px">Restore Purchases</button>
-        <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
-        <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
+        <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
         <button class="mk" id="btnSetClose">Done</button>
       </div>
     </div>
@@ -1287,8 +1286,7 @@ function renderPaths(){
   // 2 — ink silhouette (opaque: overlaps are fine)
   ctx.strokeStyle=INK; ctx.fillStyle=INK; silhouette(ctx, pipeInk);
   // 3 — colour (gradient into the blend on a feeder's final segment)
-  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
-  legs.forEach(function(L){
+  function paintLegColour(L){
     var pts=L.cells.map(P), last=pts.length-1;
     if(L.blend && pts.length>=2){
       ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
@@ -1305,24 +1303,33 @@ function renderPaths(){
       if(pts.length>1) line(pts,0,last);
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
-  });
-  // 3b — OVERPASS: at a bridge, the later-drawn line crosses OVER. Redraw its
-  //      straight segment with its own outline plus a shadow band, so the under
-  //      line visibly dips beneath (a gap on each side of the deck).
+  }
+  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+  legs.forEach(paintLegColour);
+  // 3b — OVERPASS: at a bridge, the line drawn LAST is on top. Cut the under line
+  //      with a shadow band + ink gap along the over-line's axis (so it visibly
+  //      dips beneath), then redraw the OVER leg's REAL colour — gradient, metaball
+  //      and all — clipped to the deck, so the crossing matches the rest of that
+  //      line instead of showing a flat mismatched patch.
   if(bridges.length){
-    ctx.save(); ctx.lineCap="butt";
+    ctx.save();
     bridges.forEach(function(bc){
-      var ps=pathsAt(bc[0],bc[1]); if(ps.length<2) return;   // nothing to layer until two lines share it
-      var top=ps[ps.length-1], cl=top.cells, i=top.idx;
-      if(i<=0 || i>=cl.length-1) return;
-      var dy=cl[i+1][0]-cl[i][0], dx=cl[i+1][1]-cl[i][1];    // over-line axis (screen: x=dx, y=dy)
+      var through=legs.filter(function(L){ return indexIn(L.cells,bc[0],bc[1])>=0; });
+      if(through.length<2) return;                          // needs two lines sharing the tile
+      var over=through[through.length-1], oi=indexIn(over.cells,bc[0],bc[1]);
+      if(oi<=0 || oi>=over.cells.length-1) return;          // over-line must pass straight through
+      var dy=over.cells[oi+1][0]-over.cells[oi][0], dx=over.cells[oi+1][1]-over.cells[oi][1];  // over-line axis
       var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
+      ctx.lineCap="butt";
       ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
       ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
-      ctx.strokeStyle=HEX[top.col]||"#fff"; ctx.lineWidth=pipeW;
-      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+      ctx.save();                                           // repaint the over leg's colour, clipped to the deck
+      ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();
+      ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+      paintLegColour(over);
+      ctx.restore();
     });
     ctx.restore();
   }
