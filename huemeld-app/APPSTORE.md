@@ -123,7 +123,7 @@ Notes:
 **Subtitle** (30 max): `Mix colors. Fill the board.`
 
 **Promotional text** (170 max, editable without review):
-> A color-mixing puzzle with 250 free levels, a daily puzzle, and seven mechanic packs — portals, prisms, bridges, counters and more.
+> Huemeld is a color-mixing, grid filling puzzle: light up each square with the right colored line! Meld the colors together at the right time to cover the entire grid!
 
 **Description**:
 
