@@ -1569,9 +1569,9 @@ function levelMechs(L){
 }
 function mechSeen(){ try{ return JSON.parse(localStorage.getItem("hm_flow2_mech")||"{}"); }catch(_e){ return {}; } }
 function markMechSeen(k){ var o=mechSeen(); o[k]=1; localStorage.setItem("hm_flow2_mech", JSON.stringify(o)); }
-var mechQueue=[], mechCur=null, ovMech=null;
+var mechQueue=[], mechCur=null, mechRewatch=false, ovMech=null;
 function showMechCard(k, rewatch){
-  mechCur=k; var M=MECHS[k];
+  mechCur=k; mechRewatch=!!rewatch; var M=MECHS[k];
   document.getElementById("mechIcon").innerHTML=packIcon(k,40);
   document.getElementById("mechTitle").textContent=(rewatch?"":"New mechanic: ")+M.name;
   document.getElementById("mechBlurb").textContent=M.blurb;
@@ -1584,13 +1584,19 @@ function maybeMechIntro(L){
   var fresh=levelMechs(L).filter(function(k){ return !seen[k]; });
   if(fresh.length){ mechQueue=fresh; showNextMech(); }
 }
-function watchMech(k){
+function watchMech(k, rewatch){
   var M=MECHS[k], pi=-1;
   for(var i=0;i<PACKS.length;i++) if(PACKS[i].id===k) pi=i;
   var dl = pi>=0 && PACKS[pi].levels[0];
   if(!dl || !dl.demo){ showNextMech(); return; }
-  // remember where the player was; the ghost teaches on the pack's first board
-  var back = mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
+  // where to hand the board back after "now you try":
+  //  - a rewatch launched from the picker: that mechanic's OWN pack, level 1
+  //    (there's no in-pack position to return to — otherwise it falls through to
+  //     campaign level 1, which is the teleport bug)
+  //  - an in-game intro (incl. Medley, which introduces a mechanic from another
+  //    pack): exactly the level the player was on
+  var back = (rewatch && pi>=0) ? {p:pi,k:0}
+    : mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
   demoReturn=function(){
     if(back.p!=null) loadPackLevel(back.p, back.k);
     else if(back.d!=null) loadDaily(back.d);
@@ -1796,9 +1802,9 @@ document.getElementById("btnMechOk").addEventListener("click", function(){ ensur
   if(mechCur) markMechSeen(mechCur); mechCur=null;
   ovMech.classList.remove("show"); showNextMech(); });
 document.getElementById("btnMechWatch").addEventListener("click", function(){ ensureAudio();
-  var k=mechCur; if(k) markMechSeen(k); mechCur=null;
+  var k=mechCur, rw=mechRewatch; if(k) markMechSeen(k); mechCur=null;
   ovMech.classList.remove("show");
-  if(k) watchMech(k); });
+  if(k) watchMech(k, rw); });
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
