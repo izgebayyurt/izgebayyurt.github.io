@@ -77,6 +77,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 @keyframes starSpin{ to{ transform:rotate(360deg) } }
 .dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
 @keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+.discpop{ position:absolute; z-index:8; transform:translate(-50%,-50%); font-family:var(--font-d); font-weight:800; font-size:26px; white-space:nowrap; pointer-events:none; text-shadow:0 2px 9px rgba(0,0,0,.55),0 0 2px rgba(0,0,0,.6); animation:discPop 1.2s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes discPop{ 0%{ opacity:0; transform:translate(-50%,-50%) scale(.4) } 16%{ opacity:1; transform:translate(-50%,-90%) scale(1.18) } 42%{ transform:translate(-50%,-112%) scale(1) } 100%{ opacity:0; transform:translate(-50%,-178%) scale(1) } }
 .dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
 .toast{
   position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
@@ -493,7 +495,12 @@ var TR = {
   "Route BOTH rays home to finish.":"Bitirmek için HER İKİ ışını da yerine ulaştır.", /* 146 */
   "This tile counts its colour around itself…":"Sayılı kareler çevresindeki kendi renginin sayısını belirtir.", /* 147 */
   "…the 3×3 block, tile included: EXACTLY that many.":"3x3'lük blok içerisindeki karenin kendisi dahil bütün doğru renkli kareler sayılır", /* 148 */
-  "A zero means: keep that colour away!":"Eğer bir karenin içinde 0 varsa etrafında o renk yok demektir!"  /* 149 */
+  "A zero means: keep that colour away!":"Eğer bir karenin içinde 0 varsa etrafında o renk yok demektir!",  /* 149 */
+  // — colour-discovery pops —
+  "Orange!":"Turuncu!",                                            /* 150 */
+  "Green!":"Yeşil!",                                               /* 151 */
+  "Purple!":"Mor!",                                                /* 152 */
+  "Brown!":"Kahverengi!"                                           /* 153 */
 };
 function T(s){ if(LANG!=="tr" || s==null) return s; var v=TR[s]; return v!=null ? v : s; }
 function Tf(s){ var a=arguments, r=T(s); for(var i=1;i<a.length;i++) r=r.split("{"+(i-1)+"}").join(a[i]); return r; }
@@ -1190,7 +1197,7 @@ function step(cell){
         oleg2.cells=oleg2.cells.slice(0, o.idx+1);
         junctions.push(NJ2);
         MJ.jun=junctions.length-1; oleg2.jun=junctions.length-1;
-        addBloom(cell[0],cell[1], HEX[ns], 660); drawSteps=0; sfxJun();
+        addBloom(cell[0],cell[1], HEX[ns], 660); drawSteps=0; sfxJun(); hap("medium"); discover(ns,cell[0],cell[1]);
         drag = exc2.length ? null : {t:"jun", i:junctions.length-1};
         renderPaths(); return;
       }
@@ -1215,7 +1222,7 @@ function step(cell){
       oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
       junctions.push(J);
       myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
-      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun();
+      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun(); hap("medium"); discover(sec,cell[0],cell[1]);
       // tip merge (no excess): keep drawing the blend. Mid merge: the excess IS the blend leg - end
       // the drag so the finger doesn't fight the far-away head; grab the junction to reroute.
       drag = excess.length ? null : {t:"jun", i:junctions.length-1};
@@ -1237,7 +1244,7 @@ function step(cell){
       PJ.leg=PJ.leg.slice(0, o.idx+1);   // the parent blend now ends at the new junction (a feeder)
       junctions.push(NJ3);
       myL2.jun=junctions.length-1; PJ.jun=junctions.length-1;
-      addBloom(cell[0],cell[1], HEX[ns2], 660); drawSteps=0; sfxJun();
+      addBloom(cell[0],cell[1], HEX[ns2], 660); drawSteps=0; sfxJun(); hap("medium"); discover(ns2,cell[0],cell[1]);
       drag = exc3.length ? null : {t:"jun", i:junctions.length-1};
       renderPaths(); return;
     }
@@ -1298,7 +1305,7 @@ function checkWin(){
   if(!iceOK()){ toast(T("Lines must pass straight through ice!")); return; }
   if(!bridgesOK()){ toast(T("Bridges must be crossed straight!")); return; }
   if(!countersOK()){ toast(T("A number tile needs its EXACT count!")); return; }
-  solved=true; preGesture=null; sfxWin(); playWinCascade();
+  solved=true; preGesture=null; sfxWin(); playWinCascade(); hap("success");
   updateUndoUI(); updateHintUI();
   if(demoing) return;   // the ghost demo celebrates but earns nothing - no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
@@ -1363,15 +1370,36 @@ function renderDots(){
 }
 /* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
 function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
+/* colour discovery: the FIRST time the player ever mixes a new secondary (or brown),
+   the junction bursts bigger and the colour names itself — teaching + rewarding the
+   core "lines meet, colours mix" hook. Persisted, so it only celebrates once per colour. */
+var discovered=null, DISC_NAME={O:"Orange!",G:"Green!",P:"Purple!",N:"Brown!"};
+function discoveredSet(){ if(!discovered){ try{ discovered=JSON.parse(localStorage.getItem("hm_flow2_discovered")||"{}"); }catch(e){ discovered={}; } } return discovered; }
+function discover(col,r,c){
+  if(demoing || "OGPN".indexOf(col)<0) return;      // only the mixed colours, and not during the ghost demo
+  var D=discoveredSet(); if(D[col]) return;
+  D[col]=1; localStorage.setItem("hm_flow2_discovered", JSON.stringify(D));
+  addBloom(r,c, HEX[col], 1200);                    // an extra-big celebratory bloom on top of the normal one
+  var s=cs(), el=document.createElement("div");
+  el.className="discpop"; el.textContent=T(DISC_NAME[col]||""); el.style.color=HEX[col];
+  el.style.left=(c*s+s/2)+"px"; el.style.top=(r*s+s/2)+"px";
+  dotL.appendChild(el); setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 1300);
+  if(soundOn){ bell(660,0.5,0.05); setTimeout(function(){ bell(990,0.6,0.05); },130); }   // bright rising chime
+  if(nativeBridge() && nativeBridge().haptic) try{ nativeBridge().haptic("success"); }catch(e){}
+}
 var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
 var drawSteps=0;
-function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
+/* native haptics (no-op on web / if the plugin isn't present): a light tick per drawn
+   cell, a medium thump on a colour mix, success on win, error on an illegal move. */
+function hap(kind){ var n=nativeBridge(); if(n && n.haptic){ try{ n.haptic(kind); }catch(e){} } }
+function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; hap("light"); } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
 /* illegal-mix feedback: a haptic buzz + a red X on the contested cell (debounced so a
    held finger doesn't machine-gun it). "the blue can't mix into a delivered red line." */
 function rejectMix(cell){
   var key=cell[0]+","+cell[1], now=nowMs();
   if(key===lastReject.key && now-lastReject.t<600) return;
   lastReject={key:key, t:now};
+  hap("error");
   rejects.push({r:cell[0], c:cell[1], t0:now});
   try{ if(navigator.vibrate) navigator.vibrate(60); }catch(_e){}
   try{ voice(180,0.16,{type:"triangle", to:120, gl:0.12, lp:900, g:0.05, atk:0.004}); }catch(_e){}  // a soft "nope" thud

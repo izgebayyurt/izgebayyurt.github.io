@@ -108,6 +108,8 @@ Notes:
   - [ ] Game boots, plays, dark theme, no service-worker weirdness (the wrapper strips it).
   - [ ] Fresh install → the **ATT prompt** shows at launch. Then solve 15 levels → the next 4th solve shows a **test interstitial** (test ads are on).
   - [ ] Tap **Hint** (💡, in the action bar) → a **rewarded test video** plays; finish it → a dotted ghost pipe appears. Close it early → no hint. Tapping Hint again reveals the next pipe. (Paid/No-Ads players get hints free, no video.)
+  - [ ] **Haptics**: a light tick as you draw across cells, a firmer thump when two colours mix, a success buzz on win. (Wired via `@capacitor/haptics`; `npm install` + `npx cap sync ios` pulls the pod.)
+  - [ ] **Colour discovery**: the FIRST time you ever mix each secondary/brown, the colour names itself with a pop ("Purple!" / "Mor!") and a bright chime. Only once per colour (persisted).
   - [ ] Settings shows **Remove Ads · $2.99**, **✦ Huemeld Pro · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
