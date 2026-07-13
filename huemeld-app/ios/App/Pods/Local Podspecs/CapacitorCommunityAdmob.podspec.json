@@ -1,0 +1,27 @@
+{
+  "name": "CapacitorCommunityAdmob",
+  "version": "6.2.0",
+  "summary": "A native plugin for AdMob",
+  "license": "MIT",
+  "homepage": "git@github.com:capacitor-community/admob.git",
+  "authors": "Masahiko Sakakibara <sakakibara@rdlabo.jp>",
+  "source": {
+    "git": "git@github.com:capacitor-community/admob.git",
+    "tag": "6.2.0"
+  },
+  "source_files": "ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}",
+  "platforms": {
+    "ios": "13.0"
+  },
+  "swift_versions": "5.1",
+  "static_framework": true,
+  "dependencies": {
+    "Capacitor": [
+
+    ],
+    "Google-Mobile-Ads-SDK": [
+      "11.3.0"
+    ]
+  },
+  "swift_version": "5.1"
+}

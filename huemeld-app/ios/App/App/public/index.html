@@ -1,0 +1,1866 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#17131f" />
+<title>Huemeld</title>
+<meta name="description" content="Huemeld — the colour-mixing pipe puzzle. Draw lines, meld the primaries, light every ✦." />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Huemeld" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='m' x1='6' y1='0' x2='26' y2='0' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0.15' stop-color='%23ef4a5a'/%3E%3Cstop offset='0.5' stop-color='%23f2913d'/%3E%3Cstop offset='0.85' stop-color='%23f6c445'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='%23241e2e'/%3E%3Cpath d='M6 26 V13 H26 V6 M16 13 V24' fill='none' stroke='%230e0b14' stroke-width='8.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M6 26 V13' fill='none' stroke='%23ef4a5a' stroke-width='5.6' stroke-linecap='round'/%3E%3Cpath d='M26 13 V6' fill='none' stroke='%23f6c445' stroke-width='5.6' stroke-linecap='round'/%3E%3Cpath d='M6 13 H26' fill='none' stroke='url(%23m)' stroke-width='5.6' stroke-linecap='round'/%3E%3Cpath d='M16 13 V24' fill='none' stroke='%23f2913d' stroke-width='5.6' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='26' r='4.6' fill='%23ef4a5a' stroke='%230e0b14' stroke-width='1.8'/%3E%3Ccircle cx='26' cy='6' r='4.6' fill='%23f6c445' stroke='%230e0b14' stroke-width='1.8'/%3E%3Crect x='11.2' y='20.2' width='9.6' height='9.6' rx='2.9' fill='%23f2913d' stroke='%230e0b14' stroke-width='1.8'/%3E%3Cpath d='M16 22.3 L18.4 25 L16 27.7 L13.6 25 Z' fill='%23fff'/%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* dark is the default */
+  --paper:#17131f; --card:#2a2438; --ink:#efe7d6; --ink-soft:#9a92a6; --line:#141019; --shadow:rgba(0,0,0,.45);
+  --grid:rgba(255,255,255,.07); --bgdot:rgba(255,255,255,.03); --veil:rgba(23,19,31,.92);
+  --font-d:'Fredoka',sans-serif; --font-u:'Nunito',sans-serif;
+}
+:root[data-theme="light"]{
+  --paper:#f3ead6; --card:#fdf8ec; --ink:#2c2733; --ink-soft:#7a7284; --line:#2c2733; --shadow:rgba(44,39,51,.35);
+  --grid:rgba(44,39,51,.12); --bgdot:rgba(44,39,51,.055); --veil:rgba(243,234,214,.9);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  --bw:min(94vw, 60vh, 540px);   /* one knob: the play column's width (board is square) */
+  background:var(--paper);
+  background-image:radial-gradient(var(--bgdot) 1.2px, transparent 1.3px);
+  background-size:22px 22px;
+  font-family:var(--font-u); color:var(--ink);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+}
+.top{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; padding:12px 2px 0; margin-bottom:20px; }
+.helpfab{ position:fixed; right:calc(14px + env(safe-area-inset-right)); bottom:calc(14px + env(safe-area-inset-bottom)); width:44px; z-index:20; }
+.brand{ display:flex; align-items:baseline; gap:8px; }
+.brand a{ text-decoration:none; color:var(--ink); }
+h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
+.arc{ font-family:var(--font-d); font-weight:600; font-size:11px; letter-spacing:2px; color:#fff; background:var(--line); border-radius:6px; padding:3px 7px; transform:rotate(-2deg); }
+.topbtns{ display:flex; gap:7px; }
+.mkk{ height:38px; border-radius:11px; border:2.5px solid var(--line); background:var(--card); box-shadow:0 3px 0 var(--shadow); font-size:15px; cursor:pointer; font-family:var(--font-d); font-weight:600; padding:0 13px; color:var(--ink); }
+.mkk:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.lvbar{ width:var(--bw); display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.lvname{ font-family:var(--font-d); font-weight:700; font-size:17px; }
+.covwrap{ display:flex; align-items:center; justify-content:center; gap:7px; margin-top:3px; }
+.covbar{ width:86px; height:9px; border:2px solid var(--line); border-radius:99px; background:var(--paper); overflow:hidden; }
+.covbar i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#57c268,#8fd39b); transition:width .18s; }
+.cov{ font-size:11.5px; font-weight:800; color:var(--ink-soft); letter-spacing:.5px; }
+.boardwrap{ position:relative; width:var(--bw); }
+.board{
+  position:relative; width:100%; aspect-ratio:1;
+  background:var(--card); border:3px solid var(--line); border-radius:18px;
+  box-shadow:0 5px 0 var(--shadow); overflow:hidden; touch-action:none;
+}
+.gridlayer,.dotlayer{ position:absolute; inset:0; pointer-events:none; }
+.pathlayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.gcell{ position:absolute; }
+.gcell::before{ content:""; position:absolute; left:50%; top:50%; width:14%; height:14%; transform:translate(-50%,-50%); border-radius:50%; background:var(--grid); }
+.gcell.wall::before{ display:none; }
+.gcell.wall::after{ content:""; box-sizing:border-box; position:absolute; left:9%; top:9%; width:82%; height:82%; border-radius:22% 26% 24% 28% / 26% 22% 28% 24%; background:#4a4353; border:2.5px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 5px, rgba(0,0,0,.06) 5px 10px); }
+.dot{ position:absolute; border:3px solid var(--line); box-shadow:1.5px 2px 0 var(--shadow); z-index:4; display:flex; align-items:center; justify-content:center; }
+.dot.sq{ border-radius:26% 32% 28% 34% / 30% 26% 34% 28%; }
+.dot.ci{ border-radius:50%; }
+.dot.prism2{ border:none; background:transparent; box-shadow:none; }
+.dot.prism2.donept{ box-shadow:none; filter:drop-shadow(0 0 6px rgba(87,194,104,.9)) drop-shadow(0 0 2px #fff); border-radius:0; }
+.dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
+.dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
+@keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
+.dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
+@keyframes starSpin{ to{ transform:rotate(360deg) } }
+.dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
+@keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+.dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
+.toast{
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
+  background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
+  padding:7px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s; white-space:nowrap;
+}
+.toast.show{ opacity:1; }
+.ov{
+  position:absolute; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+  background:var(--veil); border-radius:15px; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.ov.show{ opacity:1; pointer-events:auto; }
+.panel{ background:var(--card); border:3px solid var(--line); border-radius:18px; box-shadow:0 5px 0 var(--shadow); padding:22px 26px; text-align:center; max-width:88%; }
+.panel h2{ font-family:var(--font-d); font-weight:700; font-size:24px; margin-bottom:8px; }
+.panel p{ font-size:13px; font-weight:700; color:var(--ink-soft); line-height:1.5; }
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:#2c2733;
+  background:#ffd15c; border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); height:46px; padding:0 28px; font-size:16px; margin-top:13px;
+  transition:transform .08s, box-shadow .08s; touch-action:manipulation;
+}
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.pkgrid{ display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-top:10px; max-width:280px; }
+.packtitle{ font-family:var(--font-d); font-weight:700; font-size:17px; margin:16px 0 2px; }
+.packhead{ font-family:var(--font-d); font-weight:600; font-size:14px; margin-top:10px; color:var(--ink); }
+.packhead .pksub{ font-size:12px; color:var(--ink-soft); font-weight:700; margin-left:6px; }
+.packdesc{ font-family:var(--font-d); font-size:12px; color:var(--ink-soft); font-weight:600; margin-top:1px; }
+#ovPick{ position:fixed; }
+/* the PANEL is the one scroller; the level grid and pack grids keep natural height
+   (a shrinkable grid collapsed to a sliver once the packs section moved in below it) */
+#ovPick .panel{ max-height:86vh; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; }
+#ovPick .pkgrid{ padding:6px 4px; flex:0 0 auto; }
+#packsArea{ flex:0 0 auto; width:100%; }
+#packsArea .pkgrid{ margin-left:auto; margin-right:auto; }
+.pkbtn{
+  width:52px; height:52px; border:3px solid var(--line); border-radius:14px; background:var(--card);
+  box-shadow:0 3px 0 var(--shadow); cursor:pointer; font-family:var(--font-d); font-weight:700; font-size:17px; color:var(--ink);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1;
+}
+.pkbtn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.pkbtn .pkd{ font-size:10px; color:#2f7d3a; font-weight:800; height:11px; }
+.pkbtn.cur{ background:#ffd15c; color:#2c2733; }
+.pkbtn.lk{ opacity:.32; pointer-events:none; }
+/* hub cards: one button per chapter / pack, drilling into its level grid */
+.pickcard{ display:flex; align-items:center; gap:10px; width:100%; max-width:280px; margin:8px auto 0; padding:9px 12px;
+  border:2.5px solid var(--line); border-radius:14px; background:var(--card); box-shadow:0 3px 0 var(--shadow);
+  cursor:pointer; font-family:var(--font-d); color:var(--ink); text-align:left; }
+.pickcard:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--shadow); }
+.pickcard.cur{ border-color:#ffd15c; }
+.pickcard.lk{ opacity:.5; }
+.pickcard .pcic{ font-size:19px; min-width:24px; text-align:center; font-weight:800; }
+.pickcard .pcmain{ display:flex; flex-direction:column; min-width:0; }
+.pickcard .pcname{ font-weight:700; font-size:15px; }
+.pickcard .pcsub{ font-size:11px; color:var(--ink-soft); font-weight:600; line-height:1.3; }
+.pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
+.mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
+#ovMech{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovSet{ position:fixed; border-radius:0; background:rgba(10,7,16,.92); }   /* full-screen fade: cover the top bar + nav, not just the board */
+#ovMech .panel{ max-width:320px; }
+#ovMech .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
+.mechicon{ margin:2px 0 6px; }
+.mechblurb{ font-size:14px !important; margin-top:2px; }
+.mk.mechhow{ height:40px; padding:0 16px; font-size:13.5px; background:#bfe3ff; margin-top:8px; }
+/* hub action buttons: full card width, generous tap targets */
+#ovPick .panel > .mk{ width:100%; max-width:280px; height:68px; flex:0 0 auto; margin:10px auto 0; padding:0 12px; font-size:18px; }
+/* the Huemeld Pro upsell: full-screen, extra-dark backdrop */
+#ovUp{ position:fixed; border-radius:0; background:rgba(10,7,16,.93); }
+#ovUp .panel{ max-width:320px; }
+.updesc{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink-soft); margin:4px 0 0; }
+.uplist{ list-style:none; padding:0; margin:10px 0 2px; font-family:var(--font-d); font-weight:600; font-size:14.5px; color:var(--ink); text-align:left; }
+.uplist li{ margin:9px 0; line-height:1.35; display:flex; align-items:center; gap:9px; }
+.uplist .upic{ display:inline-flex; color:var(--ink-soft); flex:0 0 auto; }
+#ovUp .mk{ width:100%; height:66px; padding:0 12px; }
+/* main menu: opaque full-screen home, other overlays (z10) stack above it */
+#ovMenu{ position:fixed; border-radius:0; background:var(--paper); z-index:30; }  /* above the game (helpfab is 20), below every other overlay (40) */
+.mminner{ display:flex; flex-direction:column; align-items:center; width:min(300px,86vw); }
+.mmlogo{ font-family:var(--font-d); font-weight:800; font-size:54px; line-height:1; letter-spacing:1px; text-shadow:0 3px 0 var(--shadow); margin-bottom:14px; }
+.mmlogo span:nth-child(1){color:#ef4a5a} .mmlogo span:nth-child(2){color:#f2913d}
+.mmlogo span:nth-child(3){color:#f6c445} .mmlogo span:nth-child(4){color:#57c268}
+.mmlogo span:nth-child(5){color:#3d8bdf} .mmlogo span:nth-child(6){color:#9b62d6}
+.mmlogo span:nth-child(7){color:#a8703f}
+#ovMenu .mk{ width:100%; height:64px; margin-top:12px; padding:0 12px; font-size:18px; }
+body.menuopen .helpfab{ display:none; }
+.tip{ width:var(--bw); text-align:center; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
+.tip b{ color:var(--ink); }
+.cdots{ display:flex; gap:6px; justify-content:center; margin-top:14px; }
+.cdots i{ width:8px; height:8px; border-radius:50%; background:rgba(44,39,51,.2); }
+.cdots i.on{ background:var(--ink); }
+.coachmix{ display:flex; gap:14px; justify-content:center; align-items:center; margin-bottom:10px; min-height:0; flex-wrap:wrap; }
+.rules{ text-align:left; margin:4px auto 12px; max-width:270px; }
+.rules p{ margin:7px 0; font-size:14px; }
+.rules b{ color:var(--ink); }
+.coachmix .mx{ display:flex; align-items:center; gap:3px; font-family:var(--font-d); font-weight:700; font-size:15px; color:var(--ink-soft); }
+.coachmix .sw{ width:22px; height:22px; border:2.5px solid var(--line); box-shadow:1px 1.5px 0 var(--shadow); }
+.coachmix .sw.sq{ border-radius:30%; } .coachmix .sw.ci{ border-radius:50%; }
+/* demo "ghost hand" + caption banner + skip */
+.ghost{ position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px; left:0; top:0; border-radius:50%; background:rgba(255,255,255,.5); border:3px solid rgba(44,39,51,.55); box-shadow:0 3px 7px rgba(44,39,51,.32), inset 0 0 0 5px rgba(255,255,255,.35); z-index:9; pointer-events:none; display:none; transition:left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1); }
+.demoban{ width:var(--bw); min-height:46px; margin:0 auto 8px; display:none; align-items:center; justify-content:center; background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13.5px; line-height:1.3; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 var(--shadow); text-align:center; }
+.demoban.show{ display:flex; }
+.demoskip{ display:none; margin:10px auto 0; }
+.demoskip.show{ display:block; }
+/* action bar */
+.actionbar{ width:var(--bw); display:flex; gap:10px; justify-content:center; margin-top:18px; }
+.actionbar .mkk{ height:44px; }
+#btnUndo{ padding:0 18px; font-size:15px; }
+#btnUndo[disabled]{ opacity:.45; }
+/* settings toggles */
+.setrow{ display:flex; align-items:center; justify-content:space-between; gap:20px; margin:12px 2px 0; font-family:var(--font-d); font-weight:600; font-size:15px; }
+.tgl{ width:52px; height:30px; border:2.5px solid var(--line); border-radius:999px; background:var(--paper); box-shadow:inset 0 1px 2px rgba(0,0,0,.25); cursor:pointer; padding:0; position:relative; flex:0 0 auto; }
+.tgl i{ position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--line); transition:left .16s; }
+.tgl[aria-pressed="true"]{ background:#8fd39b; }
+.tgl[aria-pressed="true"] i{ left:23px; }
+/* colour-blind glyph on dots */
+.dot .cb{ position:absolute; z-index:3; font-family:var(--font-d); font-weight:700; font-size:12px; color:#fff; -webkit-text-stroke:.8px var(--line); left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
+.dot.sq .cb{ top:31%; }   /* the ✦ objectives are squares — lift the colour-blind glyph clear of the star */
+</style>
+</head>
+<body>
+  <div class="top">
+    <div style="display:flex;gap:10px">
+      <button class="mkk" id="btnHome" title="Menu"></button>
+      <button class="mkk" id="btnPick">☰ levels</button>
+    </div>
+    <button class="mkk" id="btnSet" title="Settings">⚙</button>
+  </div>
+  <button class="mkk helpfab" id="btnHelp" title="How to play">?</button>
+  <div class="lvbar">
+    <button class="mkk" id="btnPrev">←</button>
+    <div style="text-align:center">
+      <div class="lvname" id="lvName">Level 1</div>
+      <div class="covwrap"><div class="covbar"><i id="covfill"></i></div><div class="cov" id="cov">0/25</div></div>
+    </div>
+    <button class="mkk" id="btnNext">→</button>
+  </div>
+  <div class="demoban" id="demoban"></div>
+  <div class="boardwrap">
+    <div class="board" id="board">
+      <div class="gridlayer" id="gridlayer"></div>
+      <canvas class="pathlayer" id="pathcanvas"></canvas>
+      <div class="dotlayer" id="dotlayer"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="ov show" id="ovMenu">
+      <div class="mminner">
+        <div class="mmlogo"><span>H</span><span>u</span><span>e</span><span>m</span><span>e</span><span>l</span><span>d</span></div>
+        <button class="mk" id="btnMenuPlay" style="background:#ffd15c">▶ Play</button>
+        <button class="mk" id="btnMenuDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
+        <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
+        <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
+        <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)">How to play</button>
+      </div>
+    </div>
+    <div class="ov" id="ovMech">
+      <div class="panel">
+        <div id="mechIcon" class="mechicon"></div>
+        <h2 id="mechTitle">New mechanic</h2>
+        <p id="mechBlurb" class="mechblurb"></p>
+        <button class="mk" id="btnMechWatch">▶ Watch how it works</button>
+        <button class="mk" id="btnMechOk" style="background:var(--card);color:var(--ink)">Got it</button>
+      </div>
+    </div>
+    <div class="ov" id="ovWin">
+      <div class="panel">
+        <h2>Solved! ✦</h2>
+        <p id="winMsg">Every cell painted.</p>
+        <button class="mk" id="btnWinNext">Next →</button>
+      </div>
+    </div>
+    <div class="ov" id="ovPick">
+      <div class="panel">
+        <h2 id="pickTitle">Levels</h2>
+        <button class="mk" id="btnContinue" style="background:#ffd15c">▶ Continue</button>
+        <button class="mk" id="btnDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
+        <button class="mk" id="btnArch" style="background:#e8d5ff">Daily Archive</button>
+        <div id="archArea"></div>
+        <button class="mk" id="btnHow" style="background:#bfe3ff">How to play</button>
+        <div class="pkgrid" id="pkgrid"></div>
+        <div id="packsArea"></div>
+        <button class="mk" id="btnPickClose">Close</button>
+      </div>
+    </div>
+    <div class="ov" id="ovUp">
+      <div class="panel">
+        <h2>✦ Huemeld Pro</h2>
+        <p class="updesc">One purchase, the whole game:</p>
+        <ul class="uplist">
+          <li><span class="upic"></span>No ads, ever</li>
+          <li><span class="upic"></span>All 7 puzzle packs · 350 levels</li>
+          <li><span class="upic"></span>Plus the 150 level medley for extra challenges!</li>
+          <li><span class="upic"></span>Daily archive — replay the last 3 weeks</li>
+          <li><span class="upic"></span>Every chapter unlocked instantly</li>
+        </ul>
+        <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
+        <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
+      </div>
+    </div>
+    <div class="ov" id="ovSet">
+      <div class="panel">
+        <h2>Settings</h2>
+        <div class="setrow"><span>Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
+        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
+        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
+        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px">Restore Purchases</button>
+        <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
+        <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
+        <button class="mk" id="btnSetClose">Done</button>
+      </div>
+    </div>
+    <div class="ov" id="ovHelp">
+      <div class="panel">
+        <h2>How to play</h2>
+        <div class="coachmix" id="helpMix"></div>
+        <div class="rules">
+          <p><b>Drag</b> from a circle to draw a line.</p>
+          <p>When two lines <b>meet</b>, their colours <b>mix</b>.</p>
+          <p>Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
+          <p>A <b>gate</b> only lets its own colour pass.</p>
+          <p>Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
+        </div>
+        <button class="mk" id="btnDemo" style="background:#e6d9ff">▶ Show me</button>
+        <button class="mk" id="btnHelpClose">Got it</button>
+      </div>
+    </div>
+    <div class="ghost" id="ghost"></div>
+  </div>
+  <div class="actionbar">
+    <button class="mkk" id="btnUndo" title="Undo last move">↶ Undo</button>
+    <button class="mkk" id="btnReset" title="Reset level">↻ Reset</button>
+  </div>
+  <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
+
+<script src="native.js"></script>
+<script src="flow-data.js"></script>
+<script>
+(function(){
+"use strict";
+var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6",N:"#a8703f"};
+/* primaries pair into secondaries; a secondary + its MISSING primary makes browN
+   (O+B, G+R, P+Y) — that's how "mix all three" levels chain two junctions. */
+var MIXMAP={RY:"O",BR:"P",BY:"G",BO:"N",GR:"N",PY:"N"};
+var COMPS={O:["R","Y"],G:["B","Y"],P:["B","R"]};   // what a PRISM splits a secondary back into
+function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
+var CBGLYPH={R:"R",Y:"Y",B:"B",O:"O",G:"G",P:"P",N:"Br"};   // colour-blind letters
+
+/* iOS zoom guards */
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+document.addEventListener("gesturechange", function(e){ e.preventDefault(); });
+document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+var lastTE=0;
+document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-lastTE<300 && !e.target.closest("button")) e.preventDefault(); lastTE=now; }, {passive:false});
+
+/* ---------- levels — OFFLINE FALLBACK ONLY. The live campaign + daily pool load
+   from flow-data.js (window.HUEMELD_FLOW); this inline set is used only if that
+   file is missing. Single-emitter style: one R/Y/B square each (free to fork),
+   secondary circles (O/G/P) as the objective, plus COLOUR GATES for challenge.
+   Rebuild the full dataset with: node tools/flow-app.mjs */
+var LEVELS=[
+  { n:5, sq:[["B",0,0],["R",2,4]], ci:[["P",4,1]], walls:[], gates:[["P",3,3]] },
+  { n:5, sq:[["R",0,0],["Y",3,3]], ci:[["O",0,4]], walls:[], gates:[["O",0,2]] },
+  { n:6, sq:[["B",4,4],["R",2,1]], ci:[["P",4,2]], walls:[], gates:[["P",5,1],["P",4,0]] },
+  { n:6, sq:[["R",1,5],["Y",3,4]], ci:[["O",3,0]], walls:[], gates:[["R",5,3],["O",1,1],["O",0,0]] },
+  { n:6, sq:[["Y",2,3],["R",4,5],["B",4,1]], ci:[["O",0,5],["G",0,3]], walls:[[0,0],[0,1],[2,2],[3,0],[3,3]], gates:[["B",5,0],["B",5,3],["B",3,2]] },
+  { n:7, sq:[["Y",2,4],["B",5,1],["R",2,6]], ci:[["G",1,5],["O",6,4]], walls:[[0,2],[2,3],[2,5],[3,3]], gates:[["B",3,1],["O",4,4],["G",0,6]] },
+  { n:7, sq:[["B",2,3],["R",1,0],["Y",2,5]], ci:[["P",5,1],["G",1,2]], walls:[[2,4],[3,3],[3,4]], gates:[["Y",6,6],["P",6,2],["P",3,1],["P",4,2],["P",5,4]] },
+  { n:7, sq:[["Y",3,4],["B",0,0],["R",5,0]], ci:[["G",6,6],["O",5,2]], walls:[[2,4],[5,4],[6,4]], gates:[["B",2,2],["B",0,4],["G",5,5],["O",4,1],["O",3,0],["G",3,6]] },
+];
+
+/* the inline array above is a baked-in FALLBACK (works with no network / before the
+   service worker caches). When flow-data.js loads it supplies the fuller campaign +
+   the daily-puzzle pool. */
+var FALLBACK_LEVELS=LEVELS;
+var FLOWDATA=(typeof window!=="undefined" && window.HUEMELD_FLOW) ? window.HUEMELD_FLOW : null;
+LEVELS = (FLOWDATA && FLOWDATA.campaign && FLOWDATA.campaign.length) ? FLOWDATA.campaign : FALLBACK_LEVELS;
+var DAILY = (FLOWDATA && FLOWDATA.daily) ? FLOWDATA.daily : [];
+var PACKS = (FLOWDATA && FLOWDATA.packs) ? FLOWDATA.packs : [];   // side packs: new mechanics, à-la-carte
+var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLOWDATA.chapters : [{name:"Levels", n:LEVELS.length}];
+
+/* ---------- chapters & entitlements ----------
+   THE MENU: free gets the whole 250-level campaign (gated by progress: solve 2/3
+   of a chapter to open the next), today's daily, and the first PACK_FREE levels
+   of every pack — with interstitials after a honeymoon. $2.99 (noads) silences
+   ads. $4.99 (full) = no ads + every pack + the Medley + the daily archive, and
+   as a bonus opens all chapters instantly. Store purchases flip these flags. */
+function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
+function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
+var PACK_FREE=5;   // free teaser levels per pack
+var UNLOCK_ALL=true;   // DEV: every chapter + pack level open. Set false before release (APPSTORE.md step 7).
+function packLevelUnlocked(k){ return UNLOCK_ALL || entFull() || k<PACK_FREE; }
+function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
+function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
+function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
+function solvedInChapter(c){
+  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+  var s=chapterStart(c), n=0;
+  for(var i=s;i<s+CHAPTERS[c].n;i++) if(done[i]) n++;
+  return n;
+}
+function chapterUnlocked(c){
+  if(c<=0 || UNLOCK_ALL || entFull()) return true;
+  return solvedInChapter(c-1) >= chapterNeed(c-1);
+}
+
+var board=document.getElementById("board"), canvas=document.getElementById("pathcanvas"), ctx=canvas.getContext("2d"),
+    shadowCanvas=document.createElement("canvas"), sctx=shadowCanvas.getContext("2d"),
+    dotL=document.getElementById("dotlayer"),
+    gridL=document.getElementById("gridlayer"), covEl=document.getElementById("cov"),
+    lvNameEl=document.getElementById("lvName"), toastEl=document.getElementById("toast"),
+    ovWin=document.getElementById("ovWin"), ovPick=document.getElementById("ovPick");
+
+var li=Math.min(+(localStorage.getItem("hm_flow2_i")||0), LEVELS.length-1);
+var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
+var walls=[], wallSet={}, gates=[];
+var ices=[], iceSet={}, portals=[];      // pack mechanics: straight-through ice, paired warps
+var bridges=[], bridgeSet={};            // pack mechanic: a cell two lines may CROSS (perpendicular)
+var counters=[];                         // pack mechanic: EXACTLY n of my 8 neighbours wear this colour
+var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
+var DBL_MS=340;
+var isTut=false;
+/* undo — snapshot the board before each gesture, restore on demand */
+var undoStack=[], preGesture=null, UNDO_CAP=60;
+function snapState(){ return JSON.stringify({
+  ems:ems.map(function(E){ return E.legs.map(function(l){ return {c:l.cells.map(function(x){return [x[0],x[1]];}), j:l.jun}; }); }),
+  tg:tgts.map(function(t){ return t.done; }),
+  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun)}; })
+}); }
+function restoreState(str){ var s=JSON.parse(str);
+  s.ems.forEach(function(legs,i){ if(ems[i]) ems[i].legs=legs.map(function(l){ return {cells:l.c.map(function(x){return [x[0],x[1]];}), jun:l.j}; }); });
+  s.tg.forEach(function(d,i){ if(tgts[i]) tgts[i].done=d; });
+  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju)}; });
+  drag=null; renderPaths(); updateUndoUI();
+}
+function pushUndo(){ if(preGesture!=null && preGesture!==snapState()){ undoStack.push(preGesture); if(undoStack.length>UNDO_CAP) undoStack.shift(); } preGesture=null; updateUndoUI(); }
+function updateUndoUI(){ var b=document.getElementById("btnUndo"); if(b) b.disabled = solved || !undoStack.length; }
+
+/* mode + progression + settings */
+var mode="campaign";           // "campaign" | "daily"
+var soundOn = localStorage.getItem("hm_flow2_sound")!=="0";
+var cbOn = localStorage.getItem("hm_flow2_cb")==="1";
+/* theme — dark by default. INK is the canvas outline colour, kept in sync. */
+var theme = localStorage.getItem("hm_flow2_theme")==="light" ? "light" : "dark";
+var INK = theme==="light" ? "#2c2733" : "#141019";
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", theme);
+  INK = theme==="light" ? "#2c2733" : "#141019";
+  var mc=document.querySelector('meta[name=theme-color]'); if(mc) mc.setAttribute("content", theme==="light" ? "#f3ead6" : "#17131f");
+  try{ renderPaths(); }catch(_e){}
+}
+function keyOf(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function dateAgo(n){ var d=new Date(); d.setDate(d.getDate()-n); return d; }
+function todayKey(){ return keyOf(new Date()); }
+/* consecutive solved days ending today (or yesterday, if today's not done yet) */
+function dailyStreak(){
+  var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
+  var d=new Date(), n=0;
+  if(!dd[keyOf(d)]) d.setDate(d.getDate()-1);
+  while(dd[keyOf(d)]){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function dailyIndexFor(d){ if(!DAILY.length) return 0; var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return ((n%DAILY.length)+DAILY.length)%DAILY.length; }
+
+/* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
+var actx=null, master=null;
+function ensureAudio(){
+  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); master=actx.createGain(); master.gain.value=0.85; master.connect(actx.destination); }catch(e){ actx=null; } }
+  if(actx&&actx.state==="suspended") actx.resume();
+}
+/* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
+function voice(freq,dur,o){
+  if(!actx || !soundOn) return; o=o||{};
+  try{
+    var t=actx.currentTime, osc=actx.createOscillator(), f=actx.createBiquadFilter(), g=actx.createGain();
+    osc.type=o.type||"sine"; osc.frequency.setValueAtTime(freq,t);
+    if(o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30,o.to), t+(o.gl||dur*0.8));
+    f.type="lowpass"; f.frequency.setValueAtTime(o.lp||2400,t);
+    var peak=o.g||0.05, atk=o.atk||0.006;
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+atk); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(f); f.connect(g); g.connect(master||actx.destination); osc.start(t); osc.stop(t+dur+0.03);
+  }catch(e){}
+}
+/* a struck bell: fundamental + shimmering overtones */
+function bell(freq,dur,gain){ gain=gain||0.05; voice(freq,dur,{g:gain,lp:3200,atk:0.003}); voice(freq*2.01,dur*0.7,{g:gain*0.42,lp:4200,atk:0.003}); voice(freq*3.0,dur*0.45,{g:gain*0.16,lp:5200,atk:0.002}); }
+/* the drawing melody: a MEAN-REVERTING random walk over two octaves of major
+   pentatonic (14 notes). Each cell: roll a direction (biased back toward centre the
+   farther out you are), then a step size from a normal curve (|Z| notes, so 1 std = 1
+   note), clamped to a 5-note max jump. Sounds musical and alive, never repetitive. */
+var SCALE14=[0,2,4,7,9,12,14,16,19,21,24,26,28,31], MEL_BASE=196.00, MEL_C=6.5;   // G3 base, centre index
+var melIdx=6;
+function gauss(){ var u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.2831853*v); }
+function melodyReset(){ melIdx=3+Math.floor(Math.random()*8); }   // random start, away from the extremes
+function nextNote(){
+  var pUp=Math.max(0.12, Math.min(0.88, 0.5 - (melIdx-MEL_C)/MEL_C*0.55));   // pulled toward centre at the edges
+  var dir=Math.random()<pUp ? 1 : -1;
+  var step=Math.max(1, Math.min(5, Math.round(Math.abs(gauss()))));           // |Z| notes, capped at a 5-note leap
+  melIdx=Math.max(0, Math.min(SCALE14.length-1, melIdx+dir*step));
+  return MEL_BASE*Math.pow(2, SCALE14[melIdx]/12);
+}
+function sfxDraw(step,up){
+  if(!actx) return; var fq=nextNote();
+  voice(fq, 0.12, {type:"sine", to:fq*0.9, gl:0.1, lp:2600, g:up?0.045:0.03, atk:0.003});   // the note
+  voice(fq*2, 0.06, {type:"sine", g:0.009, lp:4200, atk:0.002});                             // faint sparkle
+}
+/* two paints merge: a watery plunk under a warm rising blend chord */
+function sfxJun(){
+  voice(320,0.24,{type:"sine", to:150, gl:0.15, lp:1300, g:0.07, atk:0.004});                     // plunk
+  voice(392,0.28,{type:"triangle", g:0.028, lp:2200, atk:0.02});
+  setTimeout(function(){ voice(587.33,0.3,{type:"triangle", g:0.028, lp:2400, atk:0.02}); },70);
+}
+/* blend reaches its target: a bright two-note bell */
+function sfxDone(){ bell(659.25,0.5,0.06); setTimeout(function(){ bell(987.77,0.62,0.05); },95); }   // E5 -> B5
+/* win: a rising bell arpeggio */
+function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.055); }, i*115); }); }
+
+/* ---------- level state ---------- */
+function applyLevel(L){
+  if(demoing) stopDemo();   // navigating anywhere cancels a running ghost demo
+  N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
+  blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
+  undoStack=[]; preGesture=null;
+  ems=L.sq.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
+  tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
+  walls=(L.walls||[]).map(function(w){ return [w[0],w[1]]; });
+  wallSet={}; walls.forEach(function(w){ wallSet[w[0]+","+w[1]]=1; });
+  gates=(L.gates||[]).map(function(g){ return {col:g[0], r:g[1], c:g[2], dir:g[3]||null}; });
+  ices=(L.ice||[]).map(function(x){ return [x[0],x[1]]; });
+  iceSet={}; ices.forEach(function(x){ iceSet[x[0]+","+x[1]]=1; });
+  portals=(L.portals||[]).map(function(p){ return [p[0],p[1],p[2],p[3]]; });
+  bridges=(L.bridges||[]).map(function(b){ return [b[0],b[1]]; });
+  bridgeSet={}; bridges.forEach(function(b){ bridgeSet[b[0]+","+b[1]]=1; });
+  counters=(L.counts||[]).map(function(k){ return {col:k[0], n:k[1], r:k[2], c:k[3]}; });
+  // PRISMS: a tile that wants its secondary fed IN, then releases the two primaries
+  // back OUT. Modelled as a target (the feed) + two co-located LOCKED 1-ray emitters.
+  (L.prisms||[]).forEach(function(p){
+    var ti=tgts.length;
+    tgts.push({col:p[0], r:p[1], c:p[2], done:false, prism:true});
+    var comp=COMPS[p[0]]||[];
+    comp.forEach(function(pc){ ems.push({col:pc, r:p[1], c:p[2], legs:[], lock:ti, max:1}); });
+  });
+  ovWin.classList.remove("show"); ovPick.classList.remove("show");
+  buildGrid(); renderDots(); renderPaths(); updateUndoUI();
+}
+function loadLevel(i){
+  var want=Math.max(0, Math.min(LEVELS.length-1, i));
+  var ch=chapterOf(want);
+  if(!chapterUnlocked(ch)){
+    var prev=CHAPTERS[ch-1];
+    toast(CHAPTERS[ch].name+" is locked — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
+    return;
+  }
+  isTut=false; mode="campaign";
+  li=want;
+  localStorage.setItem("hm_flow2_i",""+li);
+  lvNameEl.textContent="Level "+(li+1)+(CHAPTERS.length>1 ? " · "+CHAPTERS[ch].name : "");
+  document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
+  document.getElementById("btnNext").style.visibility = li<LEVELS.length-1 ? "" : "hidden";
+  applyLevel(LEVELS[li]);
+  // first FORK level: teach the one move nobody discovers alone — a circle can
+  // feed TWO lines. Pulse the square that has to do it.
+  var L=LEVELS[li];
+  if(L.sq.length>=3 && !localStorage.getItem("hm_flow2_forktip")){
+    localStorage.setItem("hm_flow2_forktip","1");
+    var need={}; L.ci.forEach(function(t){ (COMPS[t[0]]||[]).forEach(function(p){ need[p]=(need[p]||0)+1; }); });
+    var forkCol=null; for(var pc in need) if(need[pc]>1) forkCol=pc;
+    var fe=null; ems.forEach(function(E){ if(E.col===forkCol) fe=E; });
+    toast("New: one circle can FORK — draw a second line from it!");
+    if(fe){ var k=0, iv=setInterval(function(){ if(li>=0) bounceDot(fe.r,fe.c); if(++k>=5) clearInterval(iv); }, 850); }
+  }
+}
+var dailyOff=0;   // 0 = today; >0 = archive, N days ago (full-game perk)
+function loadDaily(off){
+  isTut=false; mode="daily"; dailyOff=off||0;
+  var d=dateAgo(dailyOff);
+  var L = DAILY.length ? DAILY[dailyIndexFor(d)] : LEVELS[li];
+  var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  lvNameEl.textContent = DAILY.length ? ("Daily · "+mo+" "+d.getDate()) : ("Level "+(li+1));
+  document.getElementById("btnPrev").style.visibility="hidden";
+  document.getElementById("btnNext").style.visibility="hidden";
+  applyLevel(L);
+}
+var curPack=-1, packIdx=0;
+function loadPackLevel(pi, k){
+  var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
+  if(!packLevelUnlocked(k)){ toast("The "+pk.name+" teaser ends here — get every pack with Huemeld Pro!"); return; }
+  isTut=false; mode="pack"; curPack=pi; packIdx=k;
+  lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
+  document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
+  document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
+  applyLevel(pk.levels[k]);
+  if(k===0 && pk.desc) toast(pk.name+": "+pk.desc.toLowerCase());
+  maybeMechIntro(pk.levels[k]);
+}
+/* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
+   Synthetic pointer events run through the REAL input handlers (demoFiring lets them
+   through while demoing blocks the player's own touches). */
+var demoing=false, demoFiring=false, demoTimers=[];
+var ghostEl=document.getElementById("ghost"), demobanEl=document.getElementById("demoban"), demoskipEl=document.getElementById("demoskip");
+function demoAt(ms,fn){ demoTimers.push(setTimeout(fn,ms)); }
+function fireDemo(type,cell){
+  var rect=board.getBoundingClientRect(), s=cs();
+  var x=rect.left+cell[1]*s+s/2, y=rect.top+cell[0]*s+s/2;
+  demoFiring=true;
+  try{ board.dispatchEvent(new PointerEvent(type,{clientX:x,clientY:y,isPrimary:true,pointerId:99,bubbles:true})); }catch(_e){}
+  demoFiring=false;
+  ghostEl.style.left=(cell[1]*s+s/2)+"px"; ghostEl.style.top=(cell[0]*s+s/2)+"px";
+}
+function stopDemo(){   // clear timers + chrome; does NOT touch the board
+  demoTimers.forEach(clearTimeout); demoTimers=[];
+  demoing=false; demoFiring=false;
+  ghostEl.style.display="none"; demobanEl.classList.remove("show"); demoskipEl.classList.remove("show");
+}
+var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
+function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast("Your turn!"); }
+function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
+  if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
+  demoing=true;                                             // specific cell to change the caption
+  ghostEl.style.display="block"; ghostEl.style.transition="left .27s linear, top .27s linear";
+  demoskipEl.classList.add("show");
+  marks=marks||{};
+  var t=800, STEP=290;
+  demo.forEach(function(cells,gi){
+    (function(cap){ demoAt(t,function(){ demobanEl.textContent=cap; demobanEl.classList.add("show"); }); })(caps[Math.min(gi,caps.length-1)]);
+    (function(c0){ demoAt(t,function(){ fireDemo("pointerdown",c0); }); })(cells[0]);
+    for(var i=1;i<cells.length;i++){
+      t+=STEP;
+      (function(c){ demoAt(t,function(){ fireDemo("pointermove",c); }); })(cells[i]);
+      var mk=marks[gi+":"+i];
+      if(mk){ (function(cap){ demoAt(t+150,function(){ demobanEl.textContent=cap; }); })(mk.cap); t+=mk.hold; }
+    }
+    t+=450;
+    (function(cl){ demoAt(t,function(){ fireDemo("pointerup",cl); }); })(cells[cells.length-1]);
+    t+=1300;
+  });
+  demoAt(t+1400,endDemo);
+  return true;
+}
+function playDemo(){
+  var demo=LEVELS[0] && LEVELS[0].demo;
+  if(!demo || demoing) return false;
+  loadLevel(0);
+  demoReturn=null;   // hand back to campaign level 1
+  // pause on the mix cell and the gate cell of level 1's baked solution
+  return playDemoOn(demo,
+    ["Drag a line out of a circle…","Now bring in the other colour…","Fill the board and light every square to win!"],
+    { "1:7":  { cap:"Where colours meet, they MIX — red + blue makes purple!", hold:1700 },
+      "1:10": { cap:"A gate passes only its own colour. Purple flows right through.", hold:1900 },
+      "1:18": { cap:"Cover every cell and light each square to win!", hold:1100 } });
+}
+function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
+function cs(){ return board.clientWidth/N; }
+function same(a,b){ return a[0]===b[0] && a[1]===b[1]; }
+function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
+function isWall(r,c){ return !!wallSet[r+","+c]; }
+function paintTarget(){ return N*N - walls.length; }
+function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) return i; return -1; }
+/* a circle of this colour that still needs feeding (prefer an undone one; else any) */
+function tgtFor(col){ var any=null; for(var i=0;i<tgts.length;i++) if(tgts[i].col===col){ if(!tgts[i].done) return tgts[i]; any=any||tgts[i]; } return any; }
+function tgtAt(r,c){ for(var i=0;i<tgts.length;i++) if(tgts[i].r===r && tgts[i].c===c) return tgts[i]; return null; }
+/* the colour of the pipe passing through a cell (feeder = its emitter's primary;
+   blend leg = the junction's secondary), or null if unpainted. Used by colour gates. */
+function colorAt(r,c){
+  for(var j=0;j<junctions.length;j++){ if(indexIn(junctions[j].leg,r,c)>=0) return junctions[j].sec; }
+  for(var e=0;e<ems.length;e++){ for(var l=0;l<ems[e].legs.length;l++){ if(indexIn(ems[e].legs[l].cells,r,c)>=0) return ems[e].col; } }
+  return null;
+}
+function isIce(r,c){ return !!iceSet[r+","+c]; }
+function portTwin(r,c){ for(var i=0;i<portals.length;i++){ var p=portals[i];
+  if(p[0]===r&&p[1]===c) return [p[2],p[3]];
+  if(p[2]===r&&p[3]===c) return [p[0],p[1]]; } return null; }
+/* the pipe (junction blend or emitter ray) whose cells include (r,c) — {cells,idx} */
+function pathAt(r,c){
+  for(var j=0;j<junctions.length;j++){ var jd=indexIn(junctions[j].leg,r,c); if(jd>=0) return {cells:junctions[j].leg, idx:jd}; }
+  for(var e=0;e<ems.length;e++) for(var l=0;l<ems[e].legs.length;l++){ var id=indexIn(ems[e].legs[l].cells,r,c); if(id>=0) return {cells:ems[e].legs[l].cells, idx:id}; }
+  return null;
+}
+var DIRV={U:[-1,0],D:[1,0],L:[0,-1],R:[0,1]};
+/* an arrow gate is ice with a heading: the pipe must run STRAIGHT through,
+   entering AND leaving the arrow's way (no turning inside the cell) */
+function dirOK(G){
+  if(!G.dir) return true;
+  var p=pathAt(G.r,G.c); if(!p) return false;
+  var v=DIRV[G.dir], cl=p.cells, i=p.idx;
+  return i>0 && i<cl.length-1 &&
+    cl[i][0]-cl[i-1][0]===v[0] && cl[i][1]-cl[i-1][1]===v[1] &&
+    cl[i+1][0]-cl[i][0]===v[0] && cl[i+1][1]-cl[i][1]===v[1];
+}
+function gateOK(G){ return colorAt(G.r,G.c)===G.col && dirOK(G); }
+/* every ice cell must be crossed in a straight line — enter one side, leave the opposite */
+function iceOK(){
+  for(var i=0;i<ices.length;i++){ var p=pathAt(ices[i][0],ices[i][1]); if(!p) return false;
+    var cl=p.cells, k=p.idx;
+    if(k<=0 || k>=cl.length-1) return false;
+    if(cl[k+1][0]-cl[k][0]!==cl[k][0]-cl[k-1][0] || cl[k+1][1]-cl[k][1]!==cl[k][1]-cl[k-1][1]) return false;
+  }
+  return true;
+}
+function isBridge(r,c){ return !!bridgeSet[r+","+c]; }
+/* ALL pipes whose cells include (r,c) — a bridge cell can carry two */
+function pathsAt(r,c){
+  var out=[];
+  junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd, col:J.sec}); });
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id, col:E.col}); }); });
+  return out;
+}
+/* the colour a tile visibly WEARS: circles/prisms and emitter dots count as their
+   own colour even before a pipe arrives; otherwise it's the pipe through the cell */
+function cellColorFull(r,c){
+  var T=tgtAt(r,c); if(T) return T.col;
+  for(var e=0;e<ems.length;e++) if(ems[e].r===r && ems[e].c===c) return ems[e].col;
+  /* a junction's mixing cell wears its OUTPUT colour (a chain cell counts as
+     brown, not as the secondary flowing in) — keeps counters consistent */
+  for(var j=0;j<junctions.length;j++){ var J=junctions[j]; if(J.cell && J.cell[0]===r && J.cell[1]===c) return J.sec; }
+  return colorAt(r,c);
+}
+/* counters: how many tiles of the 3×3 block INCLUDING the counter's own cell wear
+   K's colour (max 9 on a pipe cell; a wall clue's own cell is rock, so max 8) */
+function countAround(K){
+  var n=0;
+  for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
+    var rr=K.r+dr, cc=K.c+dc;
+    if(!inb(rr,cc) || isWall(rr,cc)) continue;
+    if(cellColorFull(rr,cc)===K.col) n++;
+  }
+  return n;
+}
+function countersOK(){ for(var i=0;i<counters.length;i++){ if(countAround(counters[i])!==counters[i].n) return false; } return true; }
+/* every bridge cell must be crossed straight by every line on it (1 or 2, perpendicular) */
+function bridgesOK(){
+  for(var i=0;i<bridges.length;i++){
+    var ps=pathsAt(bridges[i][0],bridges[i][1]);
+    if(!ps.length) return false;
+    for(var k=0;k<ps.length;k++){ var cl=ps[k].cells, x=ps[k].idx;
+      if(x<=0 || x>=cl.length-1) return false;
+      if(cl[x+1][0]-cl[x][0]!==cl[x][0]-cl[x-1][0] || cl[x+1][1]-cl[x][1]!==cl[x][1]-cl[x-1][1]) return false;
+    }
+  }
+  return true;
+}
+function bounceDot(r,c){ var rd=[].slice.call(dotL.querySelectorAll(".dot")).filter(function(d){ return +d.dataset.dr===r && +d.dataset.dc===c; })[0]; if(rd){ rd.classList.remove("bounce"); void rd.offsetWidth; rd.classList.add("bounce"); } }
+
+function buildGrid(){
+  var h="", s=100/N;
+  for(var r=0;r<N;r++) for(var c=0;c<N;c++)
+    h+='<div class="gcell'+(wallSet[r+","+c]?" wall":"")+'" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
+  gridL.innerHTML=h;
+}
+/* seeded per-cell wobble — stable within a level, different each level (echoes the tiles' random tilt) */
+function jhash(a,b,salt){ var h=Math.imul(((a+11)*374761397) ^ ((b+7)*668265263) ^ ((salt+3)*2246822519), 2654435761)>>>0; h^=h>>>15; h=Math.imul(h,2246822519)>>>0; h^=h>>>13; return (h>>>0)/4294967295; }
+function jvec(r,c){ return [ (jhash(r,c,li*13+1)-0.5)*2, (jhash(r,c,li*13+2)-0.5)*2 ]; }
+function jbump(r,c){ return (jhash(r,c,li*13+3)-0.5)*2; }
+
+function occAt(r,c){
+  for(var j=0;j<junctions.length;j++){ if(same(junctions[j].cell,[r,c])) return {t:"jun", i:j}; }
+  for(var j2=0;j2<junctions.length;j2++){ var jd=indexIn(junctions[j2].leg,r,c); if(jd>=0) return {t:"jleg", i:j2, idx:jd}; }
+  for(var e=0;e<ems.length;e++){
+    if(ems[e].r===r && ems[e].c===c) return {t:"emdot", e:e};
+    for(var l=0;l<ems[e].legs.length;l++){ var idx=indexIn(ems[e].legs[l].cells,r,c); if(idx>=0) return {t:"em", e:e, l:l, idx:idx}; }
+  }
+  for(var t2=0;t2<tgts.length;t2++){ if(tgts[t2].r===r && tgts[t2].c===c) return {t:"tgt", i:t2}; }
+  return null;
+}
+function dropJunction(j){
+  var J=junctions[j]; if(!J) return;
+  if(J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<j) j--; J=junctions[j]; if(!J) return; }   // a chained child can't outlive its feeder
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) Lg.jun=-1; else if(Lg.jun>j) Lg.jun--; }); });
+  junctions.forEach(function(K,ki){ if(ki===j) return; if(K.jun===j) K.jun=-1; else if(K.jun!=null && K.jun>j) K.jun--; });
+  var t=tgtFor(J.sec); if(t) t.done=false;
+  junctions.splice(j,1);
+}
+function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
+/* re-grabbing a junction/blend severs any chained child it was feeding; returns the (possibly shifted) index */
+function dropChildOf(ji){ var J=junctions[ji];
+  if(J && J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<ji) ji--; }
+  return ji;
+}
+/* tapping a prism cell: >=0 -> start that ray emitter; -2 -> prism unfed (hint);
+   -3 -> prism fully drawn (do nothing); -1 -> not a prism cell */
+function prismStartAt(r,c){
+  var locked=false, anyPrism=false;
+  for(var e=0;e<ems.length;e++){ var E=ems[e];
+    if(E.lock==null || E.r!==r || E.c!==c) continue;
+    anyPrism=true;
+    if(!tgts[E.lock] || !tgts[E.lock].done){ locked=true; continue; }
+    if(!E.legs.length) return e;
+  }
+  if(locked) return -2;
+  return anyPrism ? -3 : -1;
+}
+/* the single source of consistency — run after ANY structural change (retreat, truncate, etc.).
+   Deterministic: derives the valid set of legs/junctions from the raw cell paths. */
+function reconcile(){
+  // A) drop orphaned branch legs: a leg's root must be the emitter cell OR sit on a sibling leg.
+  //    looped, because removing a branch can orphan a branch-of-a-branch.
+  ems.forEach(function(E){
+    var changed=true;
+    while(changed){ changed=false;
+      for(var k=E.legs.length-1;k>=0;k--){
+        var lg=E.legs[k];
+        var bad=!lg.cells.length;
+        if(!bad){ var root=lg.cells[0], onE=(root[0]===E.r&&root[1]===E.c), onSib=false;
+          for(var m=0;m<E.legs.length&&!onSib;m++) if(m!==k && indexIn(E.legs[m].cells,root[0],root[1])>=0) onSib=true;
+          bad=!onE && !onSib; }
+        if(bad){ destroyJunctionOf(lg); E.legs.splice(k,1); changed=true; break; }
+      }
+    }
+  });
+  // B) drop junctions unless BOTH feeders (emitter legs or a parent blend) still
+  //    end exactly on the junction cell. Looped: dropping one can orphan a chain.
+  var stable=false;
+  while(!stable){ stable=true;
+    for(var j=junctions.length-1;j>=0;j--){
+      var J=junctions[j], feeders=[];
+      ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg.cells); }); });
+      junctions.forEach(function(K,ki){ if(ki!==j && K.jun===j) feeders.push(K.leg); });
+      var ok = feeders.length===2 && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
+      if(!ok){ dropJunction(j); stable=false; break; }
+    }
+  }
+  recomputeTargets();
+  // C) a prism that lost its feed retracts its rays
+  var pdrop=false;
+  ems.forEach(function(E){ if(E.lock==null) return; if(tgts[E.lock] && tgts[E.lock].done) return;
+    for(var k=E.legs.length-1;k>=0;k--){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); pdrop=true; } });
+  if(pdrop) recomputeTargets();
+}
+/* Derive each circle's done-state from the CURRENT pipe heads — the single truth.
+   Fixes the stuck-terminal bug: delivering set done=true, but retreating a pipe off
+   a circle used to leave it "done" forever (looked fed, refused new connections). */
+function recomputeTargets(){
+  for(var i=0;i<tgts.length;i++) tgts[i].done=false;
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){
+    if(Lg.jun>=0 || Lg.cells.length<2) return;
+    var h=Lg.cells[Lg.cells.length-1], T=tgtAt(h[0],h[1]);
+    if(T && T.col===E.col) T.done=true;
+  }); });
+  junctions.forEach(function(J){
+    if(!J.leg || J.leg.length<1) return;
+    var h=J.leg[J.leg.length-1], T=tgtAt(h[0],h[1]);
+    if(T && T.col===J.sec) T.done=true;
+  });
+}
+/* drop STRAY emitter legs (just the emitter cell, no pipe) left behind when a fork/branch
+   was started but not drawn — otherwise the phantom leg fills the 2-leg slot and locks the
+   square out of any new line until a double-tap reset. */
+function pruneStrayLegs(){
+  var changed=false;
+  ems.forEach(function(E){ for(var k=E.legs.length-1;k>=0;k--){ if(E.legs[k].cells.length<=1){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); changed=true; } } });
+  if(changed) reconcile();
+}
+/* reconcile, then re-anchor the in-flight drag to its (possibly re-indexed / removed) leg or junction */
+function reconcileAndFixDrag(){
+  var active=(drag && drag.t==="em" && ems[drag.e]) ? ems[drag.e].legs[drag.l] : null;
+  reconcile();
+  if(drag && drag.t==="em"){ var ni=active?ems[drag.e].legs.indexOf(active):-1; if(ni<0) drag=null; else drag.l=ni; }
+  else if(drag && drag.t==="jun"){ if(!junctions[drag.i]) drag=null; }
+}
+
+/* ---------- input ---------- */
+function cellAt(x,y){
+  var rect=board.getBoundingClientRect(), s=cs();
+  var c=Math.floor((x-rect.left)/s), r=Math.floor((y-rect.top)/s);
+  if(!inb(r,c)) return null;
+  return [r,c];
+}
+board.addEventListener("pointerdown", function(e){
+  if(demoing && !demoFiring) return;   // ignore real touches while the demo plays
+  if(!e.isPrimary || solved) return; ensureAudio();
+  var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
+  var o=occAt(cell[0],cell[1]);
+  if(!o) return;
+  preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
+  drawSteps=0; melodyReset();
+  var pri=prismStartAt(cell[0],cell[1]);
+  if(pri===-2){ toast("Feed the prism its colour first!"); drag=null; }
+  else if(pri===-3){ drag=null; }       // fully-drawn prism: retreat rays by their tips (or Undo)
+  else if(pri>=0){
+    var PE=ems[pri];
+    PE.legs.push({cells:[[PE.r,PE.c]], jun:-1});
+    drag={t:"em", e:pri, l:PE.legs.length-1};
+  }
+  else if(o.t==="jun"){
+    var ji=dropChildOf(o.i);
+    var J=junctions[ji]; J.leg=[J.cell.slice()];
+    var tj=tgtFor(J.sec); if(tj) tj.done=false;
+    drag={t:"jun", i:ji};
+  } else if(o.t==="jleg"){
+    var ji2=dropChildOf(o.i);
+    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0,o.idx+1);
+    var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
+    drag={t:"jun", i:ji2};
+  } else if(o.t==="emdot"){
+    var E=ems[o.e];
+    var now=Date.now(), isDbl=(lastEmTap.e===o.e && now-lastEmTap.t<DBL_MS);
+    lastEmTap={e:o.e, t:now};
+    if(isDbl){
+      // double-tap resets the whole square (all rays), starts a fresh one so a double-tap-drag redraws
+      while(E.legs.length){ destroyJunctionOf(E.legs[0]); E.legs.splice(0,1); }
+      E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0};
+      lastEmTap={e:-1, t:0};
+    } else {
+      // reuse a stray (undrawn) ray if any; else add a new ray up to 4 (the square's 4 neighbours); else nothing
+      var strayIdx=-1; for(var li=0;li<E.legs.length;li++) if(E.legs[li].cells.length<=1){ strayIdx=li; break; }
+      if(strayIdx>=0){ E.legs[strayIdx]={cells:[[E.r,E.c]], jun:-1}; drag={t:"em", e:o.e, l:strayIdx}; }
+      else if(E.legs.length<4){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:E.legs.length-1}; }
+      else { drag=null; }   // all 4 rays out — a single tap does nothing (double-tap resets)
+    }
+  } else if(o.t==="em"){
+    var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
+    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
+    else { drag=null; }   // a mid-pipe click does nothing — both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
+  } else return;
+  try{ board.setPointerCapture(e.pointerId); }catch(_e){}
+  renderPaths();
+});
+board.addEventListener("pointermove", function(e){
+  if(demoing && !demoFiring) return;
+  if(!drag || !e.isPrimary) return;
+  var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
+  step(cell);
+});
+board.addEventListener("pointerup", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); pushUndo(); renderPaths(); });
+board.addEventListener("pointercancel", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); pushUndo(); renderPaths(); });
+board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+function legOf(d){ return d.t==="em" ? (ems[d.e].legs[d.l]&&ems[d.e].legs[d.l].cells) : (junctions[d.i]&&junctions[d.i].leg); }
+
+function step(cell){
+  var leg=legOf(drag); if(!leg){ drag=null; return; }
+  var head=leg[leg.length-1];
+  if(same(cell,head)) return;
+  if(leg.length>1 && same(cell, leg[leg.length-2])){
+    // if head and the previous cell aren't adjacent, the last step was a PORTAL WARP:
+    // the finger still hovering on the entry cell is NOT a retreat — ignore it,
+    // or the twin pops the instant it appears (the "portals don't teleport" bug).
+    var pv2=leg[leg.length-2];
+    if(Math.abs(head[0]-pv2[0])+Math.abs(head[1]-pv2[1])!==1) return;
+    leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return;
+  }
+  // retreating back PAST a portal (onto the cell before its entry) pops the warp pair
+  if(leg.length>2 && same(cell, leg[leg.length-3])){
+    var pv3=leg[leg.length-2];
+    if(Math.abs(head[0]-pv3[0])+Math.abs(head[1]-pv3[1])!==1){
+      leg.pop(); leg.pop(); penTick(false); reconcileAndFixDrag(); renderPaths(); return;
+    }
+  }
+  if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
+  if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
+  if(leg.length>1 && tgtAt(head[0],head[1])) return;   // a terminal is an endpoint — no dragging THROUGH it (a prism RAY's root sits on one, hence length>1)
+  if((isIce(head[0],head[1])||isBridge(head[0],head[1])) && leg.length>1){   // no turning on ice or mid-bridge
+    var pv=leg[leg.length-2];
+    if(cell[0]-head[0]!==head[0]-pv[0] || cell[1]-head[1]!==head[1]-pv[1]) return;
+  }
+  var o=occAt(cell[0],cell[1]);
+  if(!o){
+    leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true);   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
+    var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
+    if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){
+      leg.push([tw[0],tw[1]]);
+      addBloom(cell[0],cell[1],"#f45fa8",420); addBloom(tw[0],tw[1],"#f45fa8",560);
+      try{ voice(520,0.16,{type:"sine",to:1240,gl:0.12,lp:2800,g:0.045,atk:0.004}); }catch(_e){}
+    }
+    renderPaths(); return;
+  }
+  // BRIDGE: a second line may cross an occupied bridge cell — perpendicular only
+  if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg") && indexIn(leg,cell[0],cell[1])<0){
+    var d0=[cell[0]-head[0], cell[1]-head[1]];
+    var ps0=pathsAt(cell[0],cell[1]);
+    var okX=ps0.length>0 && ps0.every(function(pp){
+      var cl=pp.cells, x=pp.idx, v=null;
+      if(x>0) v=[cl[x][0]-cl[x-1][0], cl[x][1]-cl[x-1][1]];
+      else if(x<cl.length-1) v=[cl[x+1][0]-cl[x][0], cl[x+1][1]-cl[x][1]];
+      if(!v) return false;
+      return (v[0]!==0)!==(d0[0]!==0);   // different axes
+    });
+    if(okX){ leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true); renderPaths(); }
+    return;   // parallel entry into an occupied bridge is blocked
+  }
+
+  if(drag.t==="jun" && (o.t==="em" || o.t==="emdot")){
+    // swiped back from the junction onto one of ITS feeder pipes (or the feeder's emitter dot,
+    // which is what you hit when the junction sits right next to the square) -> separate the merge
+    var fe=-1, fl=-1;
+    if(o.t==="em" && ems[o.e].legs[o.l] && ems[o.e].legs[o.l].jun===drag.i){ fe=o.e; fl=o.l; }
+    else if(o.t==="emdot"){ var Ee=ems[o.e]; for(var li=0;li<Ee.legs.length;li++){ if(Ee.legs[li].jun===drag.i){ fe=o.e; fl=li; break; } } }
+    if(fe>=0){
+      var jcell=junctions[drag.i].cell.slice();
+      var fleg=ems[fe].legs[fl];
+      destroyJunctionOf(fleg);   // un-merges both feeders (jun -> -1), removes junction + its blend leg
+      if(fleg.cells.length>1 && same(fleg.cells[fleg.cells.length-1], jcell)) fleg.cells.pop();
+      drag={t:"em", e:fe, l:fl};
+      sfxJun(); renderPaths(); return;
+    }
+    // CHAIN: the blend runs into a DIFFERENT primary line -> a deeper mix (browN)
+    if(o.t==="em"){
+      var MJ=junctions[drag.i], oleg2=ems[o.e].legs[o.l];
+      var ns=mixOf(MJ.sec, ems[o.e].col);
+      var oh2=oleg2.cells[oleg2.cells.length-1], oDel2=!!tgtAt(oh2[0],oh2[1]);
+      if(ns && (MJ.jun==null||MJ.jun<0) && oleg2.jun<0 && !oDel2 && tgtFor(ns) && !tgtFor(ns).done
+         && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+        MJ.leg.push(cell);
+        var exc2=oleg2.cells.slice(o.idx+1);
+        var NJ2={cell:cell.slice(), sec:ns, leg:oleg2.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+        oleg2.cells=oleg2.cells.slice(0, o.idx+1);
+        junctions.push(NJ2);
+        MJ.jun=junctions.length-1; oleg2.jun=junctions.length-1;
+        addBloom(cell[0],cell[1], HEX[ns], 660); drawSteps=0; sfxJun();
+        drag = exc2.length ? null : {t:"jun", i:junctions.length-1};
+        renderPaths(); return;
+      }
+      rejectMix(cell); return;
+    }
+  }
+  if(drag.t==="em" && o.t==="em" && o.e!==drag.e){
+    var me=ems[drag.e], other=ems[o.e], oleg=other.legs[o.l];
+    var sec=mixOf(me.col, other.col);
+    var myLeg=me.legs[drag.l];
+    var oHead=oleg.cells[oleg.cells.length-1];
+    var oDelivered=!!tgtAt(oHead[0],oHead[1]);   // the other pipe already delivers to a circle — it isn't free to hijack
+    // the blend is wanted if its own circle needs it, OR it's a stepping stone to a browN circle
+    var secWanted=(tgtFor(sec) && !tgtFor(sec).done) || (tgtFor("N") && !tgtFor("N").done);
+    if(sec && myLeg.jun<0 && oleg.jun<0 && !oDelivered && secWanted
+       && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      // tap into the other pipe ANYWHERE (o.idx, not just its tip): the junction forms there,
+      // and everything on that pipe BEYOND the tap becomes the blend leg (recoloured to the blend)
+      myLeg.cells.push(cell);
+      var excess=oleg.cells.slice(o.idx+1);
+      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+      oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
+      junctions.push(J);
+      myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
+      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun();
+      // tip merge (no excess): keep drawing the blend. Mid merge: the excess IS the blend leg — end
+      // the drag so the finger doesn't fight the far-away head; grab the junction to reroute.
+      drag = excess.length ? null : {t:"jun", i:junctions.length-1};
+      renderPaths(); return;
+    }
+    rejectMix(cell); return;   // an illegal mix (blend already made, or the other pipe already feeds a circle)
+  }
+  // CHAIN (other direction): a primary line runs into an existing blend -> browN
+  if(drag.t==="em" && o.t==="jleg"){
+    var PJ=junctions[o.i], myL2=ems[drag.e].legs[drag.l];
+    var ns2=mixOf(ems[drag.e].col, PJ.sec);
+    var ph=PJ.leg[PJ.leg.length-1], pT=tgtAt(ph[0],ph[1]);
+    var pDel=!!(pT && pT.col===PJ.sec);   // that blend already feeds its circle — don't hijack it
+    if(ns2 && !pDel && myL2.jun<0 && (PJ.jun==null||PJ.jun<0) && tgtFor(ns2) && !tgtFor(ns2).done
+       && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      myL2.cells.push(cell);
+      var exc3=PJ.leg.slice(o.idx+1);
+      var NJ3={cell:cell.slice(), sec:ns2, leg:PJ.leg.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+      PJ.leg=PJ.leg.slice(0, o.idx+1);   // the parent blend now ends at the new junction (a feeder)
+      junctions.push(NJ3);
+      myL2.jun=junctions.length-1; PJ.jun=junctions.length-1;
+      addBloom(cell[0],cell[1], HEX[ns2], 660); drawSteps=0; sfxJun();
+      drag = exc3.length ? null : {t:"jun", i:junctions.length-1};
+      renderPaths(); return;
+    }
+    rejectMix(cell); return;
+  }
+  // DIRECT delivery: a primary line reaches a same-colour circle (no mixing)
+  if(drag.t==="em" && o.t==="tgt"){
+    var TD=tgts[o.i], mine=ems[drag.e].legs[drag.l];
+    if(TD.col===ems[drag.e].col && !TD.done && mine.jun<0){
+      mine.cells.push(cell); TD.done=true; drag=null;
+      addBloom(cell[0],cell[1], HEX[TD.col], 760); addSweep(mine.cells.slice(), "#fff", 0, 480);
+      bounceDot(TD.r,TD.c); sfxDone(); renderPaths(); checkWin(); return;
+    }
+  }
+  // BLEND delivery: a junction's blend reaches its matching secondary circle — or a
+  // PRISM's core (whose co-located ray emitters shadow the target in occAt, so look
+  // the target up by cell, not by occupant type)
+  if(drag.t==="jun" && (o.t==="tgt" || tgtAt(cell[0],cell[1]))){
+    var T=tgtAt(cell[0],cell[1]), J3=junctions[drag.i];
+    if(T.col===J3.sec && !T.done){
+      J3.leg.push(cell); T.done=true;
+      addBloom(cell[0],cell[1], HEX[T.col], 760); addSweep(J3.leg.slice(), "#fff", 0, 480);
+      bounceDot(T.r,T.c); drag=null;
+      sfxDone(); renderPaths(); checkWin(); return;
+    }
+  }
+}
+
+/* ---------- coverage & win ---------- */
+function coverage(){
+  var set={};
+  ems.forEach(function(E){ set[E.r+","+E.c]=1; E.legs.forEach(function(Lg){ Lg.cells.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); });
+  junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); });
+  tgts.forEach(function(T){ set[T.r+","+T.c]=1; });
+  return Object.keys(set).length;
+}
+function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
+/* every DRAWN ray must end at a junction (merged) or a delivered circle — no loose ends */
+function noDangling(){
+  for(var e=0;e<ems.length;e++){ var L=ems[e].legs;
+    for(var l=0;l<L.length;l++){ var lg=L[l]; if(lg.cells.length<=1) continue;
+      if(lg.jun>=0) continue;
+      var h=lg.cells[lg.cells.length-1]; if(tgtAt(h[0],h[1])) continue;
+      return false;
+    }
+  }
+  return true;
+}
+function checkWin(){
+  if(!tgts.every(function(t){ return t.done; })) return;
+  if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
+  if(!noDangling()){ toast("A pipe has a loose end!"); return; }
+  for(var gi=0;gi<gates.length;gi++){ var GG=gates[gi];
+    if(colorAt(GG.r,GG.c)!==GG.col){ toast("A gate needs the right colour!"); return; }
+    if(!dirOK(GG)){ toast("Ride arrows straight through, the way they point!"); return; }
+  }
+  if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
+  if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
+  if(!countersOK()){ toast("A number tile needs its EXACT count!"); return; }
+  solved=true; preGesture=null; sfxWin(); playWinCascade();
+  updateUndoUI();
+  if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
+  solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
+  var wn=document.getElementById("btnWinNext");
+  document.querySelector("#ovWin h2").textContent="Solved! ✦";
+  if(mode==="daily"){
+    var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
+    var stk2=dailyStreak();
+    document.getElementById("winMsg").textContent=(dailyOff?"Archive daily solved!":"Daily solved")+(stk2>1 ? " — "+stk2+"-day streak!" : (dailyOff?"":" — see you tomorrow!"));
+    wn.style.display=""; wn.textContent="Back to levels";
+  } else if(mode==="pack"){
+    var pk=PACKS[curPack];
+    var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
+    (pd[pk.id]=pd[pk.id]||{})[packIdx]=1; localStorage.setItem("hm_flow2_packdone", JSON.stringify(pd));
+    var lastOne = packIdx+1>=pk.levels.length;
+    var teaserEnd = !lastOne && !packLevelUnlocked(packIdx+1);
+    var wm = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length;
+    if(lastOne) wm = pk.name+" — pack complete!";
+    else if(teaserEnd) wm = pk.name+" teaser done — "+(pk.levels.length-PACK_FREE)+" more levels in the full game!";
+    document.getElementById("winMsg").textContent = wm;
+    wn.style.display=""; wn.textContent = (lastOne||teaserEnd) ? "Back to levels" : "Next →";
+  } else {
+    var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+    var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
+    var msg="Whole board covered.";
+    var myCh=chapterOf(li);
+    if(newly && myCh+1<CHAPTERS.length && solvedInChapter(myCh)===chapterNeed(myCh))
+      msg="🎉 Chapter unlocked: "+CHAPTERS[myCh+1].name+"!";
+    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
+    wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
+  }
+  setTimeout(function(){ if(solved) ovWin.classList.add("show"); }, 1250);   // a reset in the window cancels it
+}
+
+/* ---------- render: marker-style SVG pipes with blend gradients ---------- */
+function renderDots(){
+  var s=cs(), h="";
+  function dot(col,r,c,shape,star){
+    var sz=s*0.84, off=(s-sz)/2;
+    var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
+  }
+  ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
+  tgts.forEach(function(T){
+    if(T.prism){   // prism: a GLASS TRIANGLE filled with the secondary it wants fed;
+      // its border splits into the two primaries it releases (half and half)
+      var comp=COMPS[T.col]||["R","Y"], sz=s*0.92, off=(s-sz)/2;
+      h+='<div class="dot prism2" data-dr="'+T.r+'" data-dc="'+T.c+'" style="left:'+(T.c*s+off)+'px;top:'+(T.r*s+off)+'px;width:'+sz+'px;height:'+sz+'px">'
+        +'<svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow:visible">'
+        +'<path d="M50 8 L93 88 L7 88 Z" fill="'+HEX[T.col]+'" stroke="'+INK+'" stroke-width="11" stroke-linejoin="round"/>'
+        +'<path d="M50 8 L7 88 L50 88" fill="none" stroke="'+HEX[comp[0]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
+        +'<path d="M50 8 L93 88 L50 88" fill="none" stroke="'+HEX[comp[1]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
+        +'</svg></div>';
+      return;
+    }
+    h+=dot(T.col,T.r,T.c,"sq",true);   // …objectives are square (gates are square too, so squares read as "goals")
+  });
+  dotL.innerHTML=h;
+}
+/* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
+function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
+var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
+var drawSteps=0;
+function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
+/* illegal-mix feedback: a haptic buzz + a red X on the contested cell (debounced so a
+   held finger doesn't machine-gun it). "the blue can't mix into a delivered red line." */
+function rejectMix(cell){
+  var key=cell[0]+","+cell[1], now=nowMs();
+  if(key===lastReject.key && now-lastReject.t<600) return;
+  lastReject={key:key, t:now};
+  rejects.push({r:cell[0], c:cell[1], t0:now});
+  try{ if(navigator.vibrate) navigator.vibrate(60); }catch(_e){}
+  try{ voice(180,0.16,{type:"triangle", to:120, gl:0.12, lp:900, g:0.05, atk:0.004}); }catch(_e){}  // a soft "nope" thud
+  renderPaths();
+}
+function addBloom(r,c,color,dur){ blooms.push({r:r,c:c,color:color,t0:nowMs(),dur:dur||600}); }
+function polyCum(pts){ var cum=[0],tot=0; for(var i=1;i<pts.length;i++){ tot+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); cum.push(tot); } return {cum:cum,total:tot}; }
+function frac(x){ return x-Math.floor(x); }
+/* a lighter tint of a #rrggbb colour (mix toward white by amt 0..1) */
+function lighten(hex,amt){ var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  r=Math.round(r+(255-r)*amt); g=Math.round(g+(255-g)*amt); b=Math.round(b+(255-b)*amt); return "rgb("+r+","+g+","+b+")"; }
+function ptAtLen(pts,cum,len){ if(pts.length===1) return pts[0]; if(len<=0) return pts[0]; for(var i=1;i<pts.length;i++){ if(cum[i]>=len){ var seg=(cum[i]-cum[i-1])||1,t=(len-cum[i-1])/seg; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t]; } } return pts[pts.length-1]; }
+function addSweep(cells,color,delay,dur){ var s=cs(); var pts=cells.map(function(c){ return [c[1]*s+s/2, c[0]*s+s/2]; }); var m=polyCum(pts); sweeps.push({pts:pts,cum:m.cum,total:m.total,t0:nowMs()+(delay||0),dur:dur||520,color:color}); }
+function paintedSet(){ var set={}; ems.forEach(function(E){ set[E.r+","+E.c]=1; E.legs.forEach(function(Lg){ Lg.cells.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); }); junctions.forEach(function(J){ J.leg.forEach(function(c){ set[c[0]+","+c[1]]=1; }); }); tgts.forEach(function(T){ set[T.r+","+T.c]=1; }); return set; }
+function roundRect(cx,x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function spawnConfetti(){ var W=board.clientWidth,H=board.clientHeight,cols=[HEX.O,HEX.G,HEX.P,HEX.R,HEX.Y,HEX.B],sz=Math.min(W,H)/N*0.17; for(var i=0;i<52;i++){ confetti.push({ x:W*(0.15+Math.random()*0.7), y:H*0.4+Math.random()*30, vx:(Math.random()-0.5)*260, vy:-120-Math.random()*220, rot:Math.random()*6.28, vr:(Math.random()-0.5)*12, color:cols[(Math.random()*cols.length)|0], t0:nowMs(), life:1500+Math.random()*1100, sz:sz }); } }
+function playWinCascade(){
+  var legList=[]; ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.cells.length>1) legList.push(Lg.cells); }); }); junctions.forEach(function(J){ if(J.leg.length>1) legList.push(J.leg); });
+  legList.forEach(function(cells,i){ addSweep(cells,"#fff", i*100, 560); });
+  dotL.querySelectorAll(".dot.sq").forEach(function(d){ d.classList.add("winspin"); });   // the ✦ objectives (now squares) do the victory spin
+  spawnConfetti();
+}
+
+/* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
+   thickness (~half an emitter), round-capped strokes bridge consecutive circles — opaque overlap =
+   smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Living paint
+   glosses travel the pipes; a junction blooms on merge; delivery pulses; the win sweeps the whole
+   tree. Passes: shadow, ink, colour, living gloss + sweeps (clipped), blooms, shimmer, confetti. */
+function renderPaths(){
+  var s=cs(); if(!s) return;
+  var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
+  if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
+  var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
+  function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
+  // ADD a fixed bump at a junction (same for ink + colour) so the T bulges rounder & thicker
+  // but the outline WIDTH stays constant (a multiplier would fatten the border too)
+  function rad(cell, w){ var b=junSet[cell[0]+","+cell[1]]?JUNC_BUMP:0; return w*0.5 + b + jbump(cell[0],cell[1])*jR; }
+
+  // portal jumps make a leg's cell list non-contiguous — draw it as separate runs
+  function splitRuns(cells){
+    var runs=[], cur=[cells[0]];
+    for(var i=1;i<cells.length;i++){ var a=cells[i-1], b=cells[i];
+      if(Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])===1) cur.push(b);
+      else { runs.push(cur); cur=[b]; } }
+    runs.push(cur); return runs;
+  }
+  var legs=[];
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){
+    if(!Lg.cells.length) return;
+    var bl=(Lg.jun>=0&&junctions[Lg.jun])?HEX[junctions[Lg.jun].sec]:null;
+    var runs=splitRuns(Lg.cells);
+    runs.forEach(function(rn,ri){ legs.push({cells:rn, color:HEX[E.col], blend:(ri===runs.length-1)?bl:null}); });
+  }); });
+  junctions.forEach(function(J){ if(!J.leg.length) return;
+    // a blend that feeds a CHAIN junction (secondary -> brown) washes into the child's colour,
+    // exactly like a primary feeder washes into its junction's blend
+    var jbl=(J.jun!=null && J.jun>=0 && junctions[J.jun]) ? HEX[junctions[J.jun].sec] : null;
+    var jruns=splitRuns(J.leg);
+    jruns.forEach(function(rn,ri){ legs.push({cells:rn, color:HEX[J.sec], blend:(ri===jruns.length-1)?jbl:null}); }); });
+
+  function line(pts,a,b){ ctx.beginPath(); ctx.moveTo(pts[a][0],pts[a][1]); for(var i=a+1;i<=b;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
+  function dab(cells,pts,i,w){ ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1], rad(cells[i],w),0,6.2832); ctx.fill(); }
+
+  function silhouette(cx,width){          // one flat silhouette for ALL legs -> overlaps merge into one shape
+    cx.lineWidth=width; cx.lineJoin="round"; cx.lineCap="round";
+    legs.forEach(function(L){ var pts=L.cells.map(P);
+      if(pts.length>1){ cx.beginPath(); cx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) cx.lineTo(pts[i][0],pts[i][1]); cx.stroke(); }
+      for(var k=0;k<pts.length;k++){ cx.beginPath(); cx.arc(pts[k][0],pts[k][1], rad(L.cells[k],width),0,6.2832); cx.fill(); } });
+  }
+  // 1 — shadow: render the silhouette OPAQUE offscreen, then stamp ONCE with alpha at an offset,
+  //     so overlapping strokes/dabs never stack into dark circles at cell centres
+  if(shadowCanvas.width!==canvas.width){ shadowCanvas.width=canvas.width; shadowCanvas.height=canvas.height; }
+  sctx.setTransform(dpr,0,0,dpr,0,0); sctx.clearRect(0,0,W,H);
+  sctx.strokeStyle=sctx.fillStyle=INK; silhouette(sctx, pipeInk);
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=0.24;
+  ctx.drawImage(shadowCanvas, Math.round(s*0.03*dpr), Math.round(s*0.05*dpr)); ctx.restore();
+  // 2 — ink silhouette (opaque: overlaps are fine)
+  ctx.strokeStyle=INK; ctx.fillStyle=INK; silhouette(ctx, pipeInk);
+  // 3 — colour (gradient into the blend on a feeder's final segment)
+  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+  legs.forEach(function(L){
+    var pts=L.cells.map(P), last=pts.length-1;
+    if(L.blend && pts.length>=2){
+      ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
+      if(last-1>=1) line(pts,0,last-1);
+      for(var k=0;k<last;k++) dab(L.cells,pts,k,pipeW);
+      var a=pts[last-1], b=pts[last], g=ctx.createLinearGradient(a[0],a[1],b[0],b[1]);
+      // reach FULL blend before the solid junction dab's edge (~0.18 cell => t~0.82) so there's
+      // no colour step at the dab rim — a smooth wash into the junction instead of a circular seam
+      g.addColorStop(0,L.color); g.addColorStop(0.72,L.blend);
+      ctx.strokeStyle=g; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+      ctx.fillStyle=L.blend; dab(L.cells,pts,last,pipeW);
+    } else {
+      ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
+      if(pts.length>1) line(pts,0,last);
+      for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
+    }
+  });
+  // 3b — OVERPASS: at a bridge, the later-drawn line crosses OVER. Redraw its
+  //      straight segment with its own outline plus a shadow band, so the under
+  //      line visibly dips beneath (a gap on each side of the deck).
+  if(bridges.length){
+    ctx.save(); ctx.lineCap="butt";
+    bridges.forEach(function(bc){
+      var ps=pathsAt(bc[0],bc[1]); if(ps.length<2) return;   // nothing to layer until two lines share it
+      var top=ps[ps.length-1], cl=top.cells, i=top.idx;
+      if(i<=0 || i>=cl.length-1) return;
+      var dy=cl[i+1][0]-cl[i][0], dx=cl[i+1][1]-cl[i][1];    // over-line axis (screen: x=dx, y=dy)
+      var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
+      ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
+      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+      ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
+      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+      ctx.strokeStyle=HEX[top.col]||"#fff"; ctx.lineWidth=pipeW;
+      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  // 4 — living paint: FIZZ. A stream of near-pinpoint sparkles racing inside each
+  //     pipe like bubbles up a bottle of cola — dense, tiny, twinkling. Clipped to
+  //     the pipes (source-atop) so they only show inside the band.
+  ctx.save(); ctx.globalCompositeOperation="source-atop";
+  legs.forEach(function(L,idx){
+    var pts=L.cells.map(P); if(pts.length<1) return; var m=polyCum(pts); if(m.total<=0) return;
+    var lite=lighten(L.color,0.62), t=animT/1000;
+    var count=Math.max(4, Math.round(m.total/(s*0.30)));    // ~3 fizz specks per cell
+    for(var k=0;k<count;k++){
+      var ph=frac(idx*0.3197+k*0.61803);                    // stable per-speck phase
+      var sp=s*(0.7+0.9*frac(ph*7.13));                     // wide speed spread — some race, some drift
+      var rad=pipeW*(0.035+0.04*frac(ph*3.71));             // near-pinpoint
+      var pos=frac((t*sp)/m.total + ph)*m.total;
+      var pt=ptAtLen(pts,m.cum,pos);
+      var wob=pipeW*0.24, wx=Math.sin(ph*41.3+t*2.1)*wob, wy=Math.cos(ph*27.7+t*1.7)*wob;   // lateral jiggle inside the band
+      var a=0.22+0.38*(0.5+0.5*Math.sin(t*4.6+ph*6.283));   // quick twinkle
+      ctx.globalAlpha=a; ctx.fillStyle=lite;
+      ctx.beginPath(); ctx.arc(pt[0]+wx,pt[1]+wy,rad,0,6.2832); ctx.fill();
+    }
+  });
+  ctx.globalAlpha=1;
+  sweeps=sweeps.filter(function(sw){ return nowMs()-sw.t0<sw.dur; });
+  sweeps.forEach(function(sw){ var age=(nowMs()-sw.t0)/sw.dur; if(age<0||age>1) return; var pt=ptAtLen(sw.pts,sw.cum,age*sw.total);
+    var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.95); rg.addColorStop(0,"rgba(255,255,255,0.9)"); rg.addColorStop(0.55,"rgba(255,255,255,0.45)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.95,0,6.2832); ctx.fill(); });
+  ctx.restore();
+  // 5 — junction / delivery blooms (expanding ring + flash, on top)
+  blooms=blooms.filter(function(b){ return nowMs()-b.t0<b.dur; });
+  blooms.forEach(function(b){ var age=(nowMs()-b.t0)/b.dur, pt=P([b.r,b.c]), radius=pipeW*0.45+age*s*0.85;
+    ctx.save(); ctx.globalAlpha=(1-age)*0.75; ctx.strokeStyle=b.color; ctx.lineWidth=Math.max(1.5,(1-age)*s*0.13); ctx.beginPath(); ctx.arc(pt[0],pt[1],radius,0,6.2832); ctx.stroke();
+    if(age<0.4){ ctx.globalAlpha=(0.4-age)/0.4*0.6; ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.55*(1-age),0,6.2832); ctx.fill(); } ctx.restore(); });
+  // 5b — illegal-mix red X: a pop-in cross on the contested cell (that colour can't go there).
+  // White backing disc + dark-outlined red X so it reads on ANY pipe colour (incl. red).
+  var REJ_MS=700; rejects=rejects.filter(function(x){ return nowMs()-x.t0<REJ_MS; });
+  rejects.forEach(function(x){ var age=(nowMs()-x.t0)/REJ_MS, pt=P([x.r,x.c]);
+    var pop=age<0.22? age/0.22 : 1-Math.max(0,(age-0.75)/0.25)*0.12, arm=s*0.17*(0.5+0.5*pop), a=age<0.7?1:(1-(age-0.7)/0.3);
+    ctx.save(); ctx.globalAlpha=Math.max(0,a);
+    ctx.fillStyle="rgba(253,248,236,0.92)"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.028;
+    ctx.beginPath(); ctx.arc(pt[0],pt[1],s*0.27,0,6.2832); ctx.fill(); ctx.stroke();
+    ctx.lineCap="round"; ctx.lineJoin="round";
+    ctx.strokeStyle=INK; ctx.lineWidth=s*0.14;   // dark halo behind the cross
+    ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
+    ctx.strokeStyle="#e23b45"; ctx.lineWidth=s*0.085;
+    ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
+    ctx.restore(); });
+  // 6 — coverage shimmer: all blends delivered but board not full -> unpainted cells breathe
+  if(!solved && tgts.length && tgts.every(function(t){ return t.done; })){
+    var ps=paintedSet(), pulse=0.5+0.5*Math.sin(animT/330);
+    ctx.save(); ctx.fillStyle="#b7a883";
+    for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]||wallSet[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
+    ctx.restore();
+  }
+  // 6b' — ice tiles: frosted squares a line must cross in a straight line (over the pipe)
+  if(ices.length){
+    ctx.save(); ctx.lineJoin="round";
+    ices.forEach(function(icell){
+      var cx0=icell[1]*s+s/2, cy0=icell[0]*s+s/2, gs2=s*0.78, x0=cx0-gs2/2, y0=cy0-gs2/2, rr2=s*0.17;
+      ctx.globalAlpha=0.30; ctx.fillStyle="#cdeaff"; roundRect(ctx,x0,y0,gs2,gs2,rr2); ctx.fill();
+      ctx.globalAlpha=0.9; ctx.lineWidth=s*0.05; ctx.strokeStyle="#8fd0f0"; roundRect(ctx,x0,y0,gs2,gs2,rr2); ctx.stroke();
+      // a true six-armed snowflake with branch ticks
+      ctx.lineCap="round";
+      [[s*0.055,INK],[s*0.028,"#eef9ff"]].forEach(function(st){
+        ctx.globalAlpha=st[1]===INK?0.55:0.95; ctx.lineWidth=st[0]; ctx.strokeStyle=st[1];
+        for(var ai=0;ai<6;ai++){ var an=ai*Math.PI/3, ca=Math.cos(an), sa=Math.sin(an);
+          ctx.beginPath(); ctx.moveTo(cx0,cy0); ctx.lineTo(cx0+ca*s*0.235, cy0+sa*s*0.235); ctx.stroke();
+          [s*0.13, s*0.19].forEach(function(d){
+            var bx=cx0+ca*d, by=cy0+sa*d, bl=s*0.058;
+            [an+Math.PI/3, an-Math.PI/3].forEach(function(ba){
+              ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx+Math.cos(ba)*bl, by+Math.sin(ba)*bl); ctx.stroke();
+            });
+          });
+        }
+      });
+    });
+    ctx.restore();
+  }
+  // 6b''' — bridges: OVERPASS deck rails along the over-line's axis (a neutral
+  //         crossing hash while the cell is still empty)
+  if(bridges.length){
+    ctx.save(); ctx.lineCap="round";
+    bridges.forEach(function(bc){
+      var cx2=bc[1]*s+s/2, cy2=bc[0]*s+s/2;
+      var ps=pathsAt(bc[0],bc[1]);
+      var axis=null;   // [dx,dy] of the over line
+      if(ps.length){ var tp=ps[ps.length-1], cl=tp.cells, i=tp.idx;
+        var v = i<cl.length-1 ? [cl[i+1][0]-cl[i][0], cl[i+1][1]-cl[i][1]] : [cl[i][0]-cl[i-1][0], cl[i][1]-cl[i-1][1]];
+        axis=[v[1],v[0]];
+      }
+      var po=pipeInk/2+s*0.045, ln=s*0.29;
+      function rails(dx,dy,alpha){   // two rails offset perpendicular to (dx,dy)
+        var pxo=-dy*po, pyo=dx*po;
+        [[s*0.075,INK],[s*0.036,"#e8e2f2"]].forEach(function(st){
+          ctx.lineWidth=st[0]; ctx.strokeStyle=st[1]; ctx.globalAlpha=alpha;
+          [[pxo,pyo],[-pxo,-pyo]].forEach(function(off){
+            ctx.beginPath(); ctx.moveTo(cx2+off[0]-dx*ln, cy2+off[1]-dy*ln); ctx.lineTo(cx2+off[0]+dx*ln, cy2+off[1]+dy*ln); ctx.stroke();
+          });
+        });
+      }
+      if(axis) rails(axis[0],axis[1],1);
+      else { rails(1,0,0.55); rails(0,1,0.55); }   // unused bridge: a soft ⌗
+      ctx.globalAlpha=1;
+    });
+    ctx.restore();
+  }
+  // 6b'' — portals: paired SPIRAL GALAXIES; a line entering one comes out of its
+  //         twin. The spiral winds out from the centre and lands ON the ring,
+  //         carrying on along it briefly so the join is seamless. Slowly spins.
+  if(portals.length){
+    // PINK — the one hue no pipe uses, so portals never read as a paint colour.
+    // Multi-pair boards get distinct pink shades so twins stay matchable.
+    var PCOLS=["#f45fa8","#ff9ed2","#c9377f","#ffc7e3"];
+    ctx.save(); ctx.lineCap="round"; ctx.lineJoin="round";
+    portals.forEach(function(p,pi){
+      var pcol=PCOLS[pi%PCOLS.length];
+      [[p[0],p[1]],[p[2],p[3]]].forEach(function(pc,side){
+        var cx1=pc[1]*s+s/2, cy1=pc[0]*s+s/2, R=s*0.33;
+        ctx.globalAlpha=1; ctx.lineWidth=s*0.10; ctx.strokeStyle=INK;
+        ctx.beginPath(); ctx.arc(cx1,cy1,R,0,6.2832); ctx.stroke();
+        ctx.lineWidth=s*0.05; ctx.strokeStyle=pcol;
+        ctx.beginPath(); ctx.arc(cx1,cy1,R,0,6.2832); ctx.stroke();
+        var rot=animT/900*(side?-1:1) + pi*1.7;   // twins counter-rotate
+        var TURNS=2.1, amax=TURNS*6.2832;
+        ctx.lineWidth=s*0.042;
+        ctx.beginPath();
+        for(var a=0;a<=amax;a+=0.14){
+          var rr2=R*(0.07+0.93*a/amax);
+          var px=cx1+Math.cos(a+rot)*rr2, py=cy1+Math.sin(a+rot)*rr2;
+          if(a===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+        }
+        ctx.arc(cx1,cy1,R,amax+rot,amax+rot+1.1);   // run the tail along the ring — a smooth merge
+        ctx.stroke();
+      });
+    });
+    ctx.restore();
+  }
+  // 6c — colour gates: a small ring the pipe through it must match (and, for arrow
+  //      gates, must be crossed the arrow's way). Pops the moment it's satisfied.
+  if(gates.length){
+    var gp=0.5+0.5*Math.sin(animT/300), GPOP=380;
+    var gs0=s*0.56, rr0=s*0.14;
+    gates.forEach(function(G){
+      var col=HEX[G.col], ok=gateOK(G);
+      if(ok && !G.sat){ G.sat=true; G.satAt=nowMs(); if(soundOn) voice(880,0.13,{type:"sine",g:0.03,lp:3200,atk:0.003}); }
+      else if(!ok) G.sat=false;
+      var pop=1, age=(nowMs()-(G.satAt||-9999))/GPOP;
+      if(G.sat && age<1) pop = 1 + Math.sin(age*Math.PI)*0.55;   // 1 -> ~1.55 -> 1
+      var gs=gs0*pop, rr=rr0*pop, cx=G.c*s+s/2, cy=G.r*s+s/2, x=cx-gs/2, y=cy-gs/2;
+      ctx.save(); ctx.lineJoin="round";
+      ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
+      ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
+      if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.06; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
+      if(G.dir){   // arrow gate: a double chevron » shows the demanded crossing direction
+        var v=DIRV[G.dir], ang=Math.atan2(v[0],v[1]);
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang); ctx.scale(pop,pop);
+        ctx.lineCap="round"; ctx.lineJoin="round"; ctx.globalAlpha=1;
+        [[s*0.072,INK],[s*0.037,col]].forEach(function(st){
+          ctx.lineWidth=st[0]; ctx.strokeStyle=st[1];
+          [-s*0.062, s*0.062].forEach(function(off){
+            ctx.beginPath(); ctx.moveTo(off-s*0.05,-s*0.095); ctx.lineTo(off+s*0.05,0); ctx.lineTo(off-s*0.05,s*0.095); ctx.stroke();
+          });
+        });
+        ctx.restore();
+      }
+      if(cbOn){ var ty=G.dir? y-s*0.10 : cy;
+        ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(CBGLYPH[G.col]||G.col,cx,ty); ctx.fillText(CBGLYPH[G.col]||G.col,cx,ty); }
+      ctx.restore();
+    });
+  }
+  // 6d — counters: EXACTLY n of the 8 surrounding tiles must wear this colour.
+  //      Live: dim while under, pops when exact, red ring the moment it's over.
+  if(counters.length){
+    var KPOP=380;
+    counters.forEach(function(K){
+      var cur=countAround(K), exact=cur===K.n, over=cur>K.n;
+      if(exact && !K.sat){ K.sat=true; K.satAt=nowMs(); if(soundOn) voice(990,0.12,{type:"sine",g:0.028,lp:3400,atk:0.003}); }
+      else if(!exact) K.sat=false;
+      var pop=1, age=(nowMs()-(K.satAt||-9999))/KPOP;
+      if(K.sat && age<1) pop = 1 + Math.sin(age*Math.PI)*0.45;
+      var cxk=K.c*s+s/2, cyk=K.r*s+s/2, cw=s*0.54*pop, rk=s*0.13*pop;
+      ctx.save(); ctx.lineJoin="round";
+      ctx.globalAlpha=0.94; ctx.fillStyle=INK;
+      roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=s*0.045;
+      ctx.strokeStyle = over ? "#e23b45" : HEX[K.col];
+      roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke();
+      if(over){ ctx.globalAlpha=0.35+0.35*(0.5+0.5*Math.sin(animT/140)); roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke(); ctx.globalAlpha=1; }
+      if(K.sat){ ctx.globalAlpha=0.35+0.35*(0.5+0.5*Math.sin(animT/300)); ctx.lineWidth=s*0.045; roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke(); ctx.globalAlpha=1; }
+      ctx.fillStyle=HEX[K.col]; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 "+(s*0.30*pop)+"px 'Fredoka',sans-serif";
+      ctx.globalAlpha = exact||over ? 1 : 0.8;
+      ctx.fillText(""+K.n, cxk, cyk+s*0.012);
+      if(cbOn){ ctx.font="700 "+(s*0.115)+"px 'Fredoka',sans-serif"; ctx.fillStyle="#fff";
+        ctx.fillText(CBGLYPH[K.col]||K.col, cxk, cyk+cw/2+s*0.075); }
+      ctx.restore();
+    });
+  }
+  // 7 — win confetti (marker chips, on top of everything)
+  confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
+  if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle=INK; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
+  var covN=coverage(), covT=paintTarget();
+  covEl.textContent=covN+"/"+covT;
+  var cf=document.getElementById("covfill"), pct=covT?Math.round(covN/covT*100):0;
+  if(cf && cf._p!==pct){ cf._p=pct; cf.style.width=pct+"%"; }
+  var dots=dotL.querySelectorAll(".dot");
+  tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
+}
+window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
+/* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti */
+function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+
+/* ---------- mechanic tutorials: a pop-up card the first time a mechanic
+   appears, with the ghost hand teaching it on that pack's first board.
+   Rewatchable from the pack's page in the picker; seen-flags persist. ---------- */
+var MECHS={
+  brown:{ name:"Brown", blurb:"Combine all 3 primary colors (a secondary + a primary) to create brown.",
+    caps:["Mix two primaries into a secondary…","…then run the THIRD primary into it: brown!","Brown squares want the full triple mix."] },
+  arrows:{ name:"Arrows", blurb:"Arrows only pass their colour — ridden straight through, the way they point.",
+    caps:["This gate points a direction…","…ride it STRAIGHT through, the way it points.","Wrong colour or wrong way won't do."] },
+  ice:{ name:"Ice", blurb:"Frozen cells can't hold a turn — lines pass straight through.",
+    caps:["Ice is slippery…","…lines cross it in a straight line only.","Plan your turns before the freeze!"] },
+  portals:{ name:"Portals", blurb:"A line entering one spiral pops out of its twin.",
+    caps:["Dive into a spiral…","…and pop out of its twin across the board!","The line carries on from there."] },
+  bridges:{ name:"Overpass", blurb:"Two lines can share a bridge cell — one crosses straight over the other.",
+    caps:["A bridge lets lines CROSS…","…straight over, straight under. No mixing.","Two lines, one cell — only on bridges."] },
+  prisms:{ name:"Prisms", blurb:"Feed a prism its blend and it splits back into the two primaries.",
+    caps:["Feed the prism its secondary colour…","…it splits into the two primaries!","Route BOTH rays home to finish."] },
+  tally:{ name:"Numbers", blurb:"A numbered tile counts its colour in the 3×3 around it, itself included — match it exactly.",
+    caps:["This tile counts its colour around itself…","…the 3×3 block, tile included: EXACTLY that many.","A zero means: keep that colour away!"] }
+};
+function levelMechs(L){
+  var m=[];
+  if((L.ci||[]).some(function(t){ return t[0]==="N"; })) m.push("brown");
+  if((L.gates||[]).some(function(g){ return g[3]; })) m.push("arrows");
+  if(L.ice && L.ice.length) m.push("ice");
+  if(L.portals && L.portals.length) m.push("portals");
+  if(L.bridges && L.bridges.length) m.push("bridges");
+  if(L.prisms && L.prisms.length) m.push("prisms");
+  if(L.counts && L.counts.length) m.push("tally");
+  return m;
+}
+function mechSeen(){ try{ return JSON.parse(localStorage.getItem("hm_flow2_mech")||"{}"); }catch(_e){ return {}; } }
+function markMechSeen(k){ var o=mechSeen(); o[k]=1; localStorage.setItem("hm_flow2_mech", JSON.stringify(o)); }
+var mechQueue=[], mechCur=null, ovMech=null;
+function showMechCard(k, rewatch){
+  mechCur=k; var M=MECHS[k];
+  document.getElementById("mechIcon").innerHTML=packIcon(k,40);
+  document.getElementById("mechTitle").textContent=(rewatch?"":"New mechanic: ")+M.name;
+  document.getElementById("mechBlurb").textContent=M.blurb;
+  ovMech.classList.add("show");
+}
+function showNextMech(){ if(mechQueue.length) showMechCard(mechQueue.shift(), false); }
+function maybeMechIntro(L){
+  if(demoing) return;
+  var seen=mechSeen();
+  var fresh=levelMechs(L).filter(function(k){ return !seen[k]; });
+  if(fresh.length){ mechQueue=fresh; showNextMech(); }
+}
+function watchMech(k){
+  var M=MECHS[k], pi=-1;
+  for(var i=0;i<PACKS.length;i++) if(PACKS[i].id===k) pi=i;
+  var dl = pi>=0 && PACKS[pi].levels[0];
+  if(!dl || !dl.demo){ showNextMech(); return; }
+  // remember where the player was; the ghost teaches on the pack's first board
+  var back = mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
+  demoReturn=function(){
+    if(back.p!=null) loadPackLevel(back.p, back.k);
+    else if(back.d!=null) loadDaily(back.d);
+    else loadLevel(back.l);
+    showNextMech();   // Medley intros can queue two mechanics
+  };
+  isTut=false; mode="campaign"; lvNameEl.textContent=M.name;
+  applyLevel(dl);
+  playDemoOn(dl.demo, M.caps);
+}
+/* ---------- inline SVG icons (no emoji): stroke follows text colour ---------- */
+function icn(name,sz,extra){
+  var W=' width="'+(sz||18)+'" height="'+(sz||18)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.16em"';
+  var I={
+    home:'<path d="M4 10.2 12 3.5l8 6.7V20a1 1 0 0 1-1 1h-4.6v-5.6h-4.8V21H5a1 1 0 0 1-1-1z"/>',
+    cal:'<rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/><circle cx="12" cy="15.5" r="1.6" fill="currentColor" stroke="none"/>',
+    lock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+    flame:'<path d="M12 3.5c.6 3-3.8 5-3.8 9a5.8 5.8 0 0 0 11.6 0c0-2.6-1.4-4.3-2.8-5.8.2 1.6-.4 2.6-1.4 3.1C15.9 7.6 14.6 4.7 12 3.5z" fill="currentColor" stroke="none"/>',
+    noads:'<circle cx="12" cy="12" r="8.6"/><path d="M6 6.2 18 17.8"/>',
+    packs:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+    unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>'
+  };
+  return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
+}
+/* pack badges: little pictures of the mechanic itself, in its colours */
+function packIcon(id,sz){
+  var W='<svg width="'+(sz||22)+'" height="'+(sz||22)+'" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.22em">';
+  var E='</svg>';
+  switch(id){
+    case "brown": return W+'<circle cx="12" cy="12" r="8" fill="#a8703f" stroke="var(--line)" stroke-width="2.2"/>'+E;
+    case "arrows": return W+'<path d="M6 5.5 12.5 12 6 18.5M12 5.5 18.5 12 12 18.5" stroke="#efe7d6" stroke-width="2.8"/>'+E;
+    case "ice": return W+'<g stroke="#9ed2ff" stroke-width="2"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M12 6.4 9.9 4.9M12 6.4l2.1-1.5M12 17.6l-2.1 1.5M12 17.6l2.1 1.5"/></g>'+E;
+    case "portals": return W+'<path d="M12 12m0-1.2a1.2 1.2 0 0 1 1.2 1.2 2.6 2.6 0 0 1-2.6 2.6A4.4 4.4 0 0 1 6.2 10.2 6.4 6.4 0 0 1 12.6 3.8 8 8 0 0 1 20.6 11.8" stroke="#f45fa8" stroke-width="2.6"/>'+E;
+    case "bridges": return W+'<path d="M12 3.5v17" stroke="#f6c445" stroke-width="2.8"/><path d="M4 9.2h16M4 14.8h16" stroke="#efe7d6" stroke-width="2.4"/>'+E;
+    case "prisms": return '<svg width="'+(sz||22)+'" height="'+(sz||22)+'" viewBox="0 0 100 100" style="vertical-align:-0.22em;overflow:visible">'
+      +'<path d="M50 10 L92 86 L8 86 Z" fill="#f2913d" stroke="var(--line)" stroke-width="12" stroke-linejoin="round"/>'
+      +'<path d="M50 10 L8 86 L50 86" fill="none" stroke="#ef4a5a" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>'
+      +'<path d="M50 10 L92 86 L50 86" fill="none" stroke="#f6c445" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>'+E;
+    case "tally": return W+'<rect x="4" y="4" width="16" height="16" rx="4.5" stroke="#3d8bdf" stroke-width="2.4"/><text x="12" y="16.6" text-anchor="middle" font-family="Fredoka,sans-serif" font-size="12" font-weight="700" fill="#3d8bdf">3</text>'+E;
+    case "mix": return W+'<g stroke-width="3.4"><path d="M12 4.5v15" stroke="#57c268"/><path d="M4.5 12h15" stroke="#9b62d6"/></g>'+E;
+  }
+  return icn("packs",sz);
+}
+/* ---------- level picker & controls ----------
+   Two-level picker: the HUB lists Continue/Daily plus one CARD per chapter and
+   per pack; tapping a card opens that set's level grid with a back button. */
+var pickView=null;   // null = hub; {ch:c} = a chapter's grid; {pk:pi} = a pack's grid; {arch:1} = daily archive
+function renderPicker(){
+  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), nd=0;
+  for(var i0=0;i0<LEVELS.length;i0++) if(done[i0]) nd++;
+  var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
+  var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
+  var root=!pickView, h="";
+  var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
+  // hub-only rows
+  var db=document.getElementById("btnDaily"), stk=dailyStreak();
+  db.innerHTML = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
+  db.style.display = root ? "" : "none";
+  document.getElementById("btnHow").style.display = root ? "" : "none";
+  var ab=document.getElementById("btnArch");
+  ab.style.display = root ? "" : "none";
+  ab.innerHTML = icn("cal",17)+" Daily Archive" + (entFull() ? "" : "  "+icn("lock",15));
+  document.getElementById("archArea").style.display = (pickView && pickView.arch) ? "" : "none";
+  // continue: the first unsolved level in an UNLOCKED chapter
+  var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
+  var cb=document.getElementById("btnContinue");
+  cb.style.display = (root && cont>=0) ? "" : "none";
+  if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
+  if(root){
+    document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
+    document.getElementById("archArea").innerHTML="";
+    // one card per chapter (later chapters unlock by solving 2/3 of the one before)
+    for(var c=0;c<CHAPTERS.length;c++){
+      var CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
+      var sub = unl ? CH.n+" levels" : "Solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name;
+      h+='<button class="pickcard'+(unl?"":" lk")+(mode==="campaign"&&chapterOf(li)===c?" cur":"")+'" data-ch="'+c+'">'
+        +'<span class="pcic">'+(unl?(c+1):icn("lock",18))+'</span>'
+        +'<span class="pcmain"><span class="pcname">Chapter '+(c+1)+' · '+CH.name+'</span><span class="pcsub">'+sub+'</span></span>'
+        +'<span class="pcprog">'+sv+"/"+CH.n+'</span></button>';
+    }
+    pg.innerHTML=h;
+    // one card per pack (5 free teaser levels each; the rest come with the full game)
+    var ph='<div class="packtitle">Puzzle Packs</div>';
+    PACKS.forEach(function(pk,pi){
+      var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
+      var psub=pk.desc||"";
+      ph+='<button class="pickcard'+(mode==="pack"&&curPack===pi?" cur":"")+'" data-pack="'+pi+'">'
+        +'<span class="pcic">'+packIcon(pk.id,22)+'</span>'
+        +'<span class="pcmain"><span class="pcname">'+pk.name+'</span><span class="pcsub">'+psub+'</span></span>'
+        +'<span class="pcprog">'+ndp+"/"+pk.levels.length+'</span></button>';
+    });
+    pa.innerHTML=ph;
+  } else if(pickView.arch){
+    // daily ARCHIVE: full-game owners can replay the last 3 weeks
+    document.getElementById("pickTitle").textContent="Daily Archive";
+    var ah='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
+      ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
+    ah+='</div>';
+    document.getElementById("archArea").innerHTML=ah;
+    pg.innerHTML=""; pa.innerHTML="";
+  } else if(pickView.ch!=null){
+    var cc=pickView.ch, CHV=CHAPTERS[cc], s=chapterStart(cc);
+    document.getElementById("pickTitle").textContent="Chapter "+(cc+1)+" · "+CHV.name;
+    h='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    for(var i=s;i<s+CHV.n && i<LEVELS.length;i++)
+      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+    h+='</div>';
+    pg.innerHTML=h; pa.innerHTML="";
+  } else {
+    var pi2=pickView.pk, pk2=PACKS[pi2], d2=pd[pk2.id]||{}, ndp2=0; for(var q2 in d2) if(d2[q2]) ndp2++;
+    document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
+    var ph2='<button class="mk pickback">← All levels</button>';
+    if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
+    if(MECHS[pk2.id] && pk2.levels[0] && pk2.levels[0].demo)
+      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">▶ How '+pk2.name+' works</button>';
+    ph2+='<div class="pkgrid">';
+    for(var k=0;k<pk2.levels.length;k++){
+      var open=packLevelUnlocked(k);
+      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?"✓":(open?"":icn("lock",10)))+'</span></button>';
+    }
+    ph2+='</div>';
+    pg.innerHTML=""; pa.innerHTML=ph2;
+  }
+  // scroll: top of the view, or centre the current level's button in a grid
+  var panel=ovPick.querySelector(".panel");
+  if(panel){
+    panel.scrollTop=0;
+    var curB=panel.querySelector(".pkbtn.cur");
+    if(curB) panel.scrollTop = curB.getBoundingClientRect().top - panel.getBoundingClientRect().top - panel.clientHeight/2;
+  }
+}
+document.getElementById("packsArea").addEventListener("click", function(e){
+  if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
+  var hw=e.target.closest(".mechhow");
+  if(hw){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); showMechCard(hw.dataset.mech, true); return; }
+  var card=e.target.closest(".pickcard");
+  if(card){ ensureAudio(); pickView={pk:+card.dataset.pack}; renderPicker(); return; }
+  var b=e.target.closest(".pkbtn"); if(!b || b.dataset.p==null) return;
+  ensureAudio(); hideMenu(); loadPackLevel(+b.dataset.p, +b.dataset.k);
+});
+document.getElementById("btnContinue").addEventListener("click", function(){ ensureAudio(); hideMenu(); loadLevel(+this.dataset.i||0); });
+document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio();
+  // open where the player is: their pack, their chapter, or the hub
+  pickView = mode==="pack" ? {pk:curPack} : mode==="campaign" ? {ch:chapterOf(li)} : null;
+  renderPicker(); ovPick.classList.add("show"); });
+document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
+/* ---------- main menu: home screen at boot, the home button brings it back ---------- */
+var ovMenu=document.getElementById("ovMenu"), firstRun=false;
+function showMenu(){ ovMenu.classList.add("show"); document.body.classList.add("menuopen"); }
+function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
+document.body.classList.add("menuopen");   // the menu is up when the page opens
+document.getElementById("btnHome").innerHTML=icn("home",17);
+document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
+document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
+  // very first play: show the game with the ghost hand instead of telling it
+  if(firstRun){ firstRun=false;
+    if(LEVELS[0] && LEVELS[0].demo && li===0) setTimeout(playDemo, 400);
+    else document.getElementById("ovHelp").classList.add("show");
+  } });
+document.getElementById("btnMenuDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); loadDaily(0); });
+document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; renderPicker(); ovPick.classList.add("show"); });
+document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
+document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
+document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
+document.getElementById("archArea").addEventListener("click", function(e){
+  if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
+  var b=e.target.closest(".pkbtn"); if(!b || b.dataset.ago==null) return;
+  ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(+b.dataset.ago);
+});
+// archive: owners browse it; everyone else gets the Huemeld Pro pitch
+var ovUp=document.getElementById("ovUp");
+(function(){ var ic=["noads","packs","mix","cal","unlock"], li=document.querySelectorAll("#ovUp .upic");
+  for(var i=0;i<li.length;i++) li[i].innerHTML = ic[i]==="mix" ? packIcon("mix",18) : icn(ic[i],18); })();
+document.getElementById("btnArch").addEventListener("click", function(){ ensureAudio();
+  if(entFull()){ pickView={arch:1}; renderPicker(); }
+  else ovUp.classList.add("show");
+});
+document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
+ovMech=document.getElementById("ovMech");
+document.getElementById("btnMechOk").addEventListener("click", function(){ ensureAudio();
+  if(mechCur) markMechSeen(mechCur); mechCur=null;
+  ovMech.classList.remove("show"); showNextMech(); });
+document.getElementById("btnMechWatch").addEventListener("click", function(){ ensureAudio();
+  var k=mechCur; if(k) markMechSeen(k); mechCur=null;
+  ovMech.classList.remove("show");
+  if(k) watchMech(k); });
+document.getElementById("btnUpBuy").addEventListener("click", function(){
+  var nb=nativeBridge();
+  if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } });
+});
+document.getElementById("pkgrid").addEventListener("click", function(e){
+  if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
+  var card=e.target.closest(".pickcard");
+  if(card){
+    var c=+card.dataset.ch;
+    if(!chapterUnlocked(c)){ toast(CHAPTERS[c].name+" is locked — solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name+" to unlock"); return; }
+    ensureAudio(); pickView={ch:c}; renderPicker(); return;
+  }
+  var b=e.target.closest(".pkbtn"); if(!b) return;
+  ensureAudio(); hideMenu(); loadLevel(+b.dataset.i);
+});
+document.getElementById("btnPrev").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li-1); else if(mode==="pack") loadPackLevel(curPack, packIdx-1); });
+document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li+1); else if(mode==="pack") loadPackLevel(curPack, packIdx+1); });
+document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadDaily(dailyOff); else if(mode==="pack") loadPackLevel(curPack, packIdx); else loadLevel(li); });
+document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio();
+  if(mode==="daily") loadLevel(li);
+  else if(mode==="pack"){
+    if(packIdx+1<PACKS[curPack].levels.length && packLevelUnlocked(packIdx+1)) loadPackLevel(curPack, packIdx+1);
+    else loadLevel(li);
+  }
+  else loadLevel(li+1); });
+
+document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(undoStack.length) restoreState(undoStack.pop()); });
+
+/* ---------- monetization seams ----------
+   Real ads/IAP live in the native (Capacitor) wrapper, which injects
+   window.HuemeldNative = { interstitial(), buyRemoveAds(cb), buyFull(cb) }.
+   On the plain web build there is no bridge, so everything degrades gracefully
+   (no ads shown). See PUBLISHING.md. */
+function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNative) ? window.HuemeldNative : null; }
+var solveCount=+(localStorage.getItem("hm_flow2_solves")||0);
+var AD_HONEYMOON=15;   // the first session is sacred: no interstitials before this many solves
+function maybeInterstitial(){
+  if(entNoAds()){ localStorage.removeItem("hm_flow2_addue"); return; }
+  // the due flag persists: closing the app on an ad slot only defers it
+  if(solveCount>=AD_HONEYMOON && solveCount%4===0) localStorage.setItem("hm_flow2_addue","1");
+  var n=nativeBridge();
+  if(!n || !n.interstitial) return;
+  if(localStorage.getItem("hm_flow2_addue")==="1"){ try{ n.interstitial(); }catch(_e){} }
+}
+window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue"); };
+
+/* ---------- settings ---------- */
+var ovSet=document.getElementById("ovSet");
+(function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds"), fl=document.getElementById("btnFull"), rs=document.getElementById("btnRestore");
+  function applyEnt(e){   // the bridge reports entitlements -> flip flags + refresh UI
+    if(e && e.noads) localStorage.setItem("hm_flow2_ent_noads","1");
+    if(e && e.full) localStorage.setItem("hm_flow2_ent_full","1");
+    rm.style.display = (n && n.buyRemoveAds && !entNoAds()) ? "" : "none";
+    fl.style.display = (n && n.buyFull && !entFull()) ? "" : "none";
+    try{ renderPicker(); }catch(_e){}
+  }
+  window.__applyEnt=applyEnt;   // native bootstrap calls this on launch + after purchases
+  if(n && n.buyRemoveAds && !entNoAds()) rm.style.display="";       // only meaningful in the app
+  if(n && n.buyFull && !entFull()) fl.style.display="";
+  if(n && n.restore) rs.style.display="";
+  rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
+    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } }); });
+  fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
+    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Huemeld Pro unlocked — thank you!"); } }); });
+  rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast("Available in the app"); return; }
+    nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
+})();
+function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
+  document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
+  document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false"); }
+document.getElementById("btnSet").addEventListener("click", function(){ syncToggles(); ovSet.classList.add("show"); });
+document.getElementById("btnSetClose").addEventListener("click", function(){ ovSet.classList.remove("show"); });
+document.getElementById("tglTheme").addEventListener("click", function(){ theme = theme==="dark"?"light":"dark"; localStorage.setItem("hm_flow2_theme",theme); applyTheme(); renderDots(); syncToggles(); });
+document.getElementById("tglSound").addEventListener("click", function(){ soundOn=!soundOn; localStorage.setItem("hm_flow2_sound",soundOn?"1":"0"); if(soundOn)ensureAudio(); syncToggles(); });
+document.getElementById("tglCB").addEventListener("click", function(){ cbOn=!cbOn; localStorage.setItem("hm_flow2_cb",cbOn?"1":"0"); syncToggles(); renderDots(); });
+/* "How to play" in the picker opens the same ? legend */
+document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); document.getElementById("ovHelp").classList.add("show"); });
+/* ? = a quick always-on legend + rules */
+var ovHelp=document.getElementById("ovHelp");
+(function(){ function sw(col,sh){ return '<span class="sw '+sh+'" style="background:'+HEX[col]+'"></span>'; }
+  document.getElementById("helpMix").innerHTML =
+    '<div class="mx">'+sw("R","ci")+"+"+sw("Y","ci")+"="+sw("O","sq")+'</div>'
+   +'<div class="mx">'+sw("Y","ci")+"+"+sw("B","ci")+"="+sw("G","sq")+'</div>'
+   +'<div class="mx">'+sw("B","ci")+"+"+sw("R","ci")+"="+sw("P","sq")+'</div>'; })();
+document.getElementById("btnHelp").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.add("show"); });
+document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
+
+applyTheme();
+if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) — restart safely
+loadLevel(li);
+demoskipEl.addEventListener("click", function(){ ensureAudio(); endDemo(); });
+document.getElementById("btnDemo").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.remove("show"); playDemo(); });
+if(!(LEVELS[0] && LEVELS[0].demo)) document.getElementById("btnDemo").style.display="none";
+if(!localStorage.getItem("hm_flow2_seen")){
+  localStorage.setItem("hm_flow2_seen","1");
+  firstRun=true;   // the ghost-hand demo runs when they tap Play on the menu
+}
+
+/* PWA: installable + offline. Registered from a subpath so scope stays under /huemeld/. */
+/* service worker: web build only */
+
+/* debug hooks for automated testing */
+window.__flow={
+  load:loadLevel,
+  tut:loadTutorial,
+  count:LEVELS.length,
+  state:function(){ return { li:li, n:N, solved:solved, coverage:coverage(), target:paintTarget(), walls:walls.length,
+    tgts:tgts.map(function(t){ return {col:t.col, r:t.r, c:t.c, done:t.done}; }),
+    junctions:junctions.map(function(j){ return {sec:j.sec, cell:j.cell, legLen:j.leg.length}; }),
+    ems:ems.map(function(E){ return {col:E.col, legs:E.legs.map(function(l){ return {len:l.cells.length, jun:l.jun, root:l.cells[0]}; })}; }) }; },
+  cellCenter:function(r,c){ var rect=board.getBoundingClientRect(), s=cs(); return {x:rect.left+c*s+s/2, y:rect.top+r*s+s/2}; },
+  winFx:function(){ playWinCascade(); },
+  fx:function(){ return {rejects:rejects.length, blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
+  render:function(){ renderPaths(); },
+  mode:function(){ return mode; },
+  daily:loadDaily,
+  pack:loadPackLevel,
+  packs:function(){ return PACKS; },
+  chapters:function(){ return CHAPTERS.map(function(C,c){ return {name:C.name, n:C.n, unlocked:chapterUnlocked(c), solved:solvedInChapter(c), need:chapterNeed(c)}; }); },
+  cellColorFull:cellColorFull,
+  entFull:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_full", v?"1":"0"); return entFull(); },
+  entNoAds:function(v){ if(v!=null) localStorage.setItem("hm_flow2_ent_noads", v?"1":"0"); return entNoAds(); },
+  packFree:PACK_FREE,
+  undo:function(){ if(undoStack.length) restoreState(undoStack.pop()); },
+  undoDepth:function(){ return undoStack.length; },
+  data:function(){ return { campaign:LEVELS, daily:DAILY }; },
+  applyObj:function(L){ isTut=false; mode="campaign"; lvNameEl.textContent="Test"; applyLevel(L); }
+};
+})();
+</script>
+</body>
+</html>
