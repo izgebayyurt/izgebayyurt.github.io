@@ -227,6 +227,7 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
         <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)">How to play</button>
+        <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
       </div>
     </div>
     <div class="ov" id="ovMech">
@@ -260,8 +261,8 @@ body.menuopen .helpfab{ display:none; }
     </div>
     <div class="ov" id="ovUp">
       <div class="panel">
-        <h2>✦ Huemeld Pro</h2>
-        <p class="updesc">One purchase, the whole game:</p>
+        <h2 id="upTitle">✦ Huemeld Pro</h2>
+        <p class="updesc" id="upDesc">One purchase, the whole game:</p>
         <ul class="uplist">
           <li><span class="upic"></span>No ads, ever</li>
           <li><span class="upic"></span>All 7 puzzle packs · 350 levels</li>
@@ -270,6 +271,7 @@ body.menuopen .helpfab{ display:none; }
           <li><span class="upic"></span>Every chapter unlocked instantly</li>
         </ul>
         <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
+        <button class="mk" id="btnUpNoAds" style="background:#bfe3ff">Remove Ads · $2.99</button>
         <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
       </div>
     </div>
@@ -559,7 +561,7 @@ function loadDaily(off){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
-  if(!packLevelUnlocked(k)){ toast("The "+pk.name+" teaser ends here — get every pack with Huemeld Pro!"); return; }
+  if(!packLevelUnlocked(k)){ toast("The "+pk.name+" teaser ends here — Huemeld Pro unlocks the rest!"); showUpsell("pro"); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
   lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
@@ -1692,9 +1694,10 @@ document.getElementById("btnPick").addEventListener("click", function(){ ensureA
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 /* ---------- main menu: home screen at boot, the home button brings it back ---------- */
 var ovMenu=document.getElementById("ovMenu"), firstRun=false;
-function showMenu(){ ovMenu.classList.add("show"); document.body.classList.add("menuopen"); }
+function showMenu(){ ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
 function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
 document.body.classList.add("menuopen");   // the menu is up when the page opens
+updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
 document.getElementById("btnHome").innerHTML=icn("home",17);
 document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
 document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
@@ -1719,7 +1722,26 @@ var ovUp=document.getElementById("ovUp");
   for(var i=0;i<li.length;i++) li[i].innerHTML = ic[i]==="mix" ? packIcon("mix",18) : icn(ic[i],18); })();
 document.getElementById("btnArch").addEventListener("click", function(){ ensureAudio();
   if(entFull()){ pickView={arch:1}; renderPicker(); }
-  else ovUp.classList.add("show");
+  else showUpsell("pro");
+});
+/* ---------- the two-tier upsell: Pro $4.99 + Remove Ads $2.99, headline per context ---------- */
+function updateProEntry(){ var b=document.getElementById("btnMenuPro");
+  if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none"; }
+function showUpsell(mode){
+  if(entFull()) return;                                   // nothing left to sell
+  var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
+      na=document.getElementById("btnUpNoAds"), pr=document.getElementById("btnUpBuy");
+  if(mode==="ads"){ t.textContent="Tired of ads?"; d.textContent="Remove them forever — or unlock everything:"; }
+  else { t.textContent="✦ Huemeld Pro"; d.textContent="One purchase, the whole game:"; }
+  na.style.display = entNoAds() ? "none" : "";            // already ad-free -> Pro only
+  pr.style.display = "";
+  ovUp.classList.add("show");
+}
+document.getElementById("btnMenuPro").addEventListener("click", function(){ ensureAudio(); showUpsell("pro"); });
+document.getElementById("btnUpNoAds").addEventListener("click", function(){
+  var nb=nativeBridge();
+  if(!nb || !nb.buyRemoveAds){ toast("Available in the app"); return; }
+  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast("Ads removed — thank you!"); } });
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
 ovMech=document.getElementById("ovMech");
@@ -1733,7 +1755,7 @@ document.getElementById("btnMechWatch").addEventListener("click", function(){ en
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
-  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } });
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); updateProEntry(); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } });
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -1775,7 +1797,11 @@ function maybeInterstitial(){
   if(!n || !n.interstitial) return;
   if(localStorage.getItem("hm_flow2_addue")==="1"){ try{ n.interstitial(); }catch(_e){} }
 }
-window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue"); };
+var adNudge=0;
+window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue");
+  adNudge++;
+  if(!entNoAds() && adNudge%3===0) setTimeout(function(){ showUpsell("ads"); }, 700);
+};
 
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
