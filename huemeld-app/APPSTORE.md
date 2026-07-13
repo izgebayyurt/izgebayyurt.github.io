@@ -79,6 +79,13 @@ npx cap sync ios         # copies www/ into the app + runs pod install
 npx cap open ios         # opens Xcode
 ```
 
+If the build fails with a wall of `UMPRequestParameters` / `UMPConsentInformation`
+"has been renamed" errors, the UMP pod resolved to 3.x. The AdMob plugin (6.x)
+still uses the `UMP`-prefixed consent classes, which 3.0 renamed. The Podfile
+already pins `GoogleUserMessagingPlatform', '~> 2.3'` to prevent this — if you
+hit it anyway (e.g. a stale lockfile), run `pod update GoogleUserMessagingPlatform`
+in `ios/App`, or delete `ios/App/Podfile.lock` and re-run `npx cap sync ios`.
+
 In Xcode:
 
 - [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
