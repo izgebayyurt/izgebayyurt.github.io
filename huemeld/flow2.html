@@ -245,7 +245,7 @@ body.menuopen .helpfab{ display:none; }
     </div>
     <div class="ov" id="ovWin">
       <div class="panel">
-        <h2>Solved! ✦</h2>
+        <h2>Solved!</h2>
         <p id="winMsg">Every cell painted.</p>
         <button class="mk" id="btnWinNext">Next →</button>
       </div>
@@ -265,7 +265,7 @@ body.menuopen .helpfab{ display:none; }
     </div>
     <div class="ov" id="ovUp">
       <div class="panel">
-        <h2 id="upTitle">✦ Huemeld Pro</h2>
+        <h2 id="upTitle">Huemeld Pro</h2>
         <p class="updesc" id="upDesc">One purchase, the whole game:</p>
         <ul class="uplist">
           <li><span class="upic"></span>No ads, ever</li>
@@ -1121,7 +1121,7 @@ function checkWin(){
   if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
   var wn=document.getElementById("btnWinNext");
-  document.querySelector("#ovWin h2").textContent="Solved! ✦";
+  document.querySelector("#ovWin h2").innerHTML="Solved! "+icn("spark",20);
   if(mode==="daily"){
     var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     var stk2=dailyStreak();
@@ -1625,7 +1625,17 @@ function icn(name,sz,extra){
     noads:'<circle cx="12" cy="12" r="8.6"/><path d="M6 6.2 18 17.8"/>',
     packs:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
     unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>',
-    bulb:'<path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.45 1.1 1.2 1.1 2.2h5c0-1 .5-1.75 1.1-2.2A6 6 0 0 0 12 3z"/>'
+    bulb:'<path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.45 1.1 1.2 1.1 2.2h5c0-1 .5-1.75 1.1-2.2A6 6 0 0 0 12 3z"/>',
+    play:'<path d="M8 5.4v13.2l11-6.6z" fill="currentColor" stroke="none"/>',
+    star:'<path d="M12 3.6l2.5 5.1 5.6.8-4.05 3.95.96 5.55L12 16.9 6.98 19.35l.96-5.55L3.9 9.5l5.6-.8z" fill="currentColor" stroke="none"/>',
+    list:'<path d="M4 6.5h16M4 12h16M4 17.5h16"/>',
+    gear:'<circle cx="12" cy="12" r="3.3"/><path d="M12 2.2v3.2M12 18.6v3.2M21.8 12h-3.2M5.4 12H2.2M18.9 5.1l-2.3 2.3M7.4 16.6l-2.3 2.3M18.9 18.9l-2.3-2.3M7.4 7.4 5.1 5.1"/>',
+    spark:'<path d="M12 2 14.2 9.8 22 12 14.2 14.2 12 22 9.8 14.2 2 12 9.8 9.8Z" fill="currentColor" stroke="none"/>',
+    undo:'<path d="M4 8.5h9.5a5.5 5.5 0 0 1 0 11H10"/><path d="M7.5 5 4 8.5 7.5 12"/>',
+    reset:'<path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19.5 4.5v4h-4"/>',
+    arrowL:'<path d="M15 5l-7 7 7 7"/>',
+    arrowR:'<path d="M9 5l7 7-7 7"/>',
+    check:'<path d="M5 12.5l4.5 4.5L19 7"/>'
   };
   return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
 }
@@ -1661,7 +1671,7 @@ function renderPicker(){
   var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
   // hub-only rows
   var db=document.getElementById("btnDaily"), stk=dailyStreak();
-  db.innerHTML = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
+  db.innerHTML = icn("star",16)+" Daily Puzzle"+(dd[todayKey()] ? " "+icn("check",15) : "") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
   db.style.display = root ? "" : "none";
   document.getElementById("btnHow").style.display = root ? "" : "none";
   var ab=document.getElementById("btnArch");
@@ -1672,7 +1682,7 @@ function renderPicker(){
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
   var cb=document.getElementById("btnContinue");
   cb.style.display = (root && cont>=0) ? "" : "none";
-  if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
+  if(cont>=0){ cb.innerHTML=icn("play",16)+" Continue · Level "+(cont+1); cb.dataset.i=cont; }
   if(root){
     document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
     document.getElementById("archArea").innerHTML="";
@@ -1702,7 +1712,7 @@ function renderPicker(){
     document.getElementById("pickTitle").textContent="Daily Archive";
     var ah='<button class="mk pickback">← All levels</button><div class="pkgrid">';
     for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
-      ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
+      ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?icn("check",11):"")+'</span></button>'; }
     ah+='</div>';
     document.getElementById("archArea").innerHTML=ah;
     pg.innerHTML=""; pa.innerHTML="";
@@ -1711,7 +1721,7 @@ function renderPicker(){
     document.getElementById("pickTitle").textContent="Chapter "+(cc+1)+" · "+CHV.name;
     h='<button class="mk pickback">← All levels</button><div class="pkgrid">';
     for(var i=s;i<s+CHV.n && i<LEVELS.length;i++)
-      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?icn("check",11):"")+'</span></button>';
     h+='</div>';
     pg.innerHTML=h; pa.innerHTML="";
   } else {
@@ -1720,11 +1730,11 @@ function renderPicker(){
     var ph2='<button class="mk pickback">← All levels</button>';
     if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
     if(MECHS[pk2.id] && pk2.levels[0] && pk2.levels[0].demo)
-      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">▶ How '+pk2.name+' works</button>';
+      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">'+icn("play",15)+' How '+pk2.name+' works</button>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
       var open=packLevelUnlocked(k);
-      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?"✓":(open?"":icn("lock",10)))+'</span></button>';
+      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?icn("check",11):(open?"":icn("lock",10)))+'</span></button>';
     }
     ph2+='</div>';
     pg.innerHTML=""; pa.innerHTML=ph2;
@@ -1759,6 +1769,18 @@ function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.re
 document.body.classList.add("menuopen");   // the menu is up when the page opens
 updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
 document.getElementById("btnHome").innerHTML=icn("home",17);
+/* swap the glyph "icons" on buttons for real SVG icons (label text kept) */
+(function(){
+  var MAP={
+    btnPick:["list"," levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
+    btnMenuPlay:["play"," Play"], btnMenuDaily:["star"," Daily Puzzle"], btnMenuLevels:["list"," Levels"],
+    btnMenuSet:["gear"," Settings"], btnMenuPro:["spark"," Go Pro · Remove Ads"],
+    btnContinue:["play"," Continue"], btnDaily:["star"," Daily Puzzle"], btnMechWatch:["play"," Watch how it works"],
+    btnUpBuy:["spark"," Huemeld Pro · $4.99"], btnFull:["spark"," Huemeld Pro · $4.99"], btnDemo:["play"," Show me"],
+    btnUndo:["undo"," Undo"], btnReset:["reset"," Reset"]
+  };
+  for(var id in MAP){ var el=document.getElementById(id); if(el) el.innerHTML=icn(MAP[id][0],16)+MAP[id][1]; }
+})();
 document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
 document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
   // very first play: show the game with the ghost hand instead of telling it
@@ -1792,7 +1814,7 @@ function showUpsell(mode){
   var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
       na=document.getElementById("btnUpNoAds"), pr=document.getElementById("btnUpBuy");
   if(mode==="ads"){ t.textContent="Tired of ads?"; d.textContent="Remove them forever — or unlock everything:"; }
-  else { t.textContent="✦ Huemeld Pro"; d.textContent="One purchase, the whole game:"; }
+  else { t.innerHTML=icn("spark",20)+" Huemeld Pro"; d.textContent="One purchase, the whole game:"; }
   na.style.display = entNoAds() ? "none" : "";            // already ad-free -> Pro only
   pr.style.display = "";
   ovUp.classList.add("show");
