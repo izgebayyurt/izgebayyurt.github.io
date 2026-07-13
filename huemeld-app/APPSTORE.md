@@ -9,7 +9,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 |---|---|
 | Capacitor wrapper (AdMob + RevenueCat wired) | `huemeld-app/` |
 | Native bridge with placeholders to fill | `huemeld-app/native.js` |
-| 8 App Store screenshots, 6.9" (1320×2868, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
+| 10 App Store screenshots, 6.9" (1320×2868, JPEG) | `huemeld-app/store-assets/screen-*.jpg` |
 | IAP promo images (1024×1024) | `huemeld-app/store-assets/iap-*.png` |
 | App icon, App Store size (1024×1024) | `huemeld-app/store-assets/appicon-1024.png` |
 | Privacy policy (live once pushed) | https://izgebayyurt.github.io/huemeld/privacy.html |
@@ -32,7 +32,7 @@ Work top to bottom; each step tells you exactly what to paste where.
 ## 3. RevenueCat (10 minutes)
 
 - [ ] New project "Huemeld" → **Add app** → App Store → bundle ID `com.izge.huemeld`.
-- [ ] Copy the **public Apple API key** (starts `appl_`) → paste into `RC_IOS_API_KEY` in `huemeld-app/native.js`.
+- [ ] Copy the **public Apple API key** (starts `appl_`) → paste into `RC_IOS_API_KEY` in `huemeld-app/native.js`. **NOTE:** the file currently holds a `test_` sandbox key for development — replace it with the `appl_` production key before the App Store release build.
 - [ ] Products → add both (identifiers must match ASC exactly, step 5):
   - `com.izge.huemeld.noads`
   - `com.izge.huemeld.everything`
@@ -109,7 +109,7 @@ Notes:
 ## 8. Store listing (paste-ready)
 
 **Name** (30 max): `Huemeld`
-**Subtitle** (30 max): `Melt colors. Fill the board.`
+**Subtitle** (30 max): `Mix colors. Fill the board.`
 
 **Promotional text** (170 max, editable without review):
 > A color-mixing puzzle with 250 free levels, a daily puzzle, and seven mechanic packs — portals, prisms, bridges, counters and more.
@@ -117,10 +117,10 @@ Notes:
 **Description**:
 
 ```
-Draw pipes of light. Where they meet, colors melt.
+Draw pipes of light. Where they meet, colors mix.
 
 Huemeld is a color-mixing puzzle: every board has glowing sources and
-empty squares that need exactly the right hue. Red and yellow melt into
+empty squares that need exactly the right hue. Red and yellow mix into
 orange. Blue and yellow make green. All three primaries? That's brown —
 if you can route them together.
 
@@ -128,7 +128,7 @@ Fill the whole board. Leave nothing dark.
 
 EASY TO LEARN
 • Draw a line from each glowing circle
-• Lines that meet in a junction melt into a new color
+• Lines that meet in a junction mix into a new color
 • Light every square and cover the board to win
 
 HARD TO PUT DOWN
@@ -170,7 +170,7 @@ more ways than one — but never as many as you'd hope.
 **Marketing URL** (optional): same.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
-**Screenshots** — upload the eight from `store-assets/` in this order (the 6.9" slot: 1320×2868 is the canonical size, and Apple auto-scales for every smaller iPhone; JPEG because ASC rejects PNGs with an alpha channel):
+**Screenshots** — upload from `store-assets/` in this order (the 6.9" slot: 1320×2868 is the canonical size, and Apple auto-scales for every smaller iPhone; JPEG because ASC rejects PNGs with an alpha channel; Apple allows up to 10):
 1. `screen-01-hero.jpg` — Mix colors and drag the lines to their matching square!
 2. `screen-02-levels.jpg` — 250+ levels with different board sizes
 3. `screen-03-packs.jpg` — Try custom packs with 8+ unique mechanics: bridges, portals, prisms and more!
@@ -179,6 +179,8 @@ more ways than one — but never as many as you'd hope.
 6. `screen-06-prisms.jpg` — Split light with prisms
 7. `screen-07-numbers.jpg` — Crack the number clues
 8. `screen-08-daily.jpg` — A new puzzle every day!
+9. `screen-09-noads.jpg` — Remove ads forever — just $2.99 (the $2.99 Remove Ads tier)
+10. `screen-10-premium.jpg` — No ads. Every pack. One purchase. (the $4.99 Huemeld Pro value screen)
 
 ## 9. App Privacy questionnaire (ASC → App Privacy)
 

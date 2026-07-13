@@ -134,6 +134,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
 .mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
 #ovMech{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovSet{ position:fixed; border-radius:0; background:rgba(10,7,16,.92); }   /* full-screen fade: cover the top bar + nav, not just the board */
 #ovMech .panel{ max-width:320px; }
 #ovMech .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
 .mechicon{ margin:2px 0 6px; }
@@ -280,7 +281,7 @@ body.menuopen .helpfab{ display:none; }
         <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnRestore" style="display:none;background:var(--card);margin-top:6px;font-size:13px">Restore Purchases</button>
+        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px">Restore Purchases</button>
         <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
         <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
         <button class="mk" id="btnSetClose">Done</button>
@@ -588,18 +589,24 @@ function stopDemo(){   // clear timers + chrome; does NOT touch the board
 }
 var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
 function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast("Your turn!"); }
-function playDemoOn(demo, caps){   // the board is already loaded; the ghost replays `demo` with `caps`
-  if(!demo || demoing) return false;
-  demoing=true;
+function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
+  if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
+  demoing=true;                                             // specific cell to change the caption
   ghostEl.style.display="block"; ghostEl.style.transition="left .27s linear, top .27s linear";
   demoskipEl.classList.add("show");
+  marks=marks||{};
   var t=800, STEP=290;
   demo.forEach(function(cells,gi){
-    demoAt(t,function(){ demobanEl.textContent=caps[Math.min(gi,caps.length-1)]; demobanEl.classList.add("show"); });
-    demoAt(t,function(){ fireDemo("pointerdown",cells[0]); });
-    cells.forEach(function(c,i){ if(i===0) return; demoAt(t+i*STEP,function(){ fireDemo("pointermove",c); }); });
-    t+=cells.length*STEP+450;
-    demoAt(t,function(){ fireDemo("pointerup",cells[cells.length-1]); });
+    (function(cap){ demoAt(t,function(){ demobanEl.textContent=cap; demobanEl.classList.add("show"); }); })(caps[Math.min(gi,caps.length-1)]);
+    (function(c0){ demoAt(t,function(){ fireDemo("pointerdown",c0); }); })(cells[0]);
+    for(var i=1;i<cells.length;i++){
+      t+=STEP;
+      (function(c){ demoAt(t,function(){ fireDemo("pointermove",c); }); })(cells[i]);
+      var mk=marks[gi+":"+i];
+      if(mk){ (function(cap){ demoAt(t+150,function(){ demobanEl.textContent=cap; }); })(mk.cap); t+=mk.hold; }
+    }
+    t+=450;
+    (function(cl){ demoAt(t,function(){ fireDemo("pointerup",cl); }); })(cells[cells.length-1]);
     t+=1300;
   });
   demoAt(t+1400,endDemo);
@@ -610,7 +617,12 @@ function playDemo(){
   if(!demo || demoing) return false;
   loadLevel(0);
   demoReturn=null;   // hand back to campaign level 1
-  return playDemoOn(demo, ["Drag a line out of a circle…","…meet the other colour: they MIX! Ride it to the ✦","Cover the board. Light the ✦. That's the game."]);
+  // pause on the mix cell and the gate cell of level 1's baked solution
+  return playDemoOn(demo,
+    ["Drag a line out of a circle…","Now bring in the other colour…","Fill the board and light every square to win!"],
+    { "1:7":  { cap:"Where colours meet, they MIX — red + blue makes purple!", hold:1700 },
+      "1:10": { cap:"A gate passes only its own colour. Purple flows right through.", hold:1900 },
+      "1:18": { cap:"Cover every cell and light each square to win!", hold:1100 } });
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
 function cs(){ return board.clientWidth/N; }
@@ -1481,7 +1493,7 @@ requestAnimationFrame(frame);
    appears, with the ghost hand teaching it on that pack's first board.
    Rewatchable from the pack's page in the picker; seen-flags persist. ---------- */
 var MECHS={
-  brown:{ name:"Brown", blurb:"Run the THIRD primary into a mixed line: it melts into brown.",
+  brown:{ name:"Brown", blurb:"Combine all 3 primary colors (a secondary + a primary) to create brown.",
     caps:["Mix two primaries into a secondary…","…then run the THIRD primary into it: brown!","Brown squares want the full triple mix."] },
   arrows:{ name:"Arrows", blurb:"Arrows only pass their colour — ridden straight through, the way they point.",
     caps:["This gate points a direction…","…ride it STRAIGHT through, the way it points.","Wrong colour or wrong way won't do."] },
