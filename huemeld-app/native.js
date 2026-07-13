@@ -54,35 +54,18 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     });
   }
 
-  /* ATT: iOS only PRESENTS the tracking dialog while the app is in the *active*
-     state. At a cold launch the webview loads while the app is still 'inactive'
-     (splash/launch), so a request made then is silently ignored — status stays
-     'notDetermined', no dialog. So we request only once the page is visible, and
-     if it still didn't take (status came back notDetermined), we leave attAsked
-     false so a later attempt (a staggered timer, an app-foreground, or the first
-     interstitial) tries again. requestTrackingAuthorization is a no-op once the
-     status is decided, so retrying is harmless. */
+  /* ATT is presented natively at launch, from AppDelegate.applicationDidBecomeActive
+     (iOS only shows the dialog while the app is active, which the webview can't
+     guarantee at page-load). This is only a BACKSTOP: if the status is somehow still
+     undetermined by the time the first interstitial is due, ask then. Harmless if the
+     native prompt already ran — requestTrackingAuthorization no-ops once decided. */
   function ensureATT() {
     if (attAsked || attInFlight || !AdMob) return Promise.resolve();
     attInFlight = true;
     return AdMob.trackingAuthorizationStatus().then(function (res) {
       if (res && res.status && res.status !== "notDetermined") { attAsked = true; return; } // already decided
-      return AdMob.requestTrackingAuthorization().then(function () {
-        return AdMob.trackingAuthorizationStatus().then(function (r2) {
-          if (r2 && r2.status && r2.status !== "notDetermined") attAsked = true; // prompt shown + answered
-        });
-      });
+      return AdMob.requestTrackingAuthorization();
     }).catch(function () {}).then(function () { attInFlight = false; });
-  }
-  /* Fire ensureATT once the app is genuinely active: a few staggered attempts on
-     cold launch (each waits for the app to settle into 'active'), plus retries on
-     the next foreground. The in-flight + attAsked guards keep it to one dialog. */
-  function scheduleATT() {
-    if (!AdMob) return;
-    var fire = function () { if (!attAsked && document.visibilityState === "visible") ensureATT(); };
-    [400, 1200, 2500].forEach(function (ms) { setTimeout(fire, ms); });
-    document.addEventListener("visibilitychange", fire);
-    window.addEventListener("focus", fire);
   }
 
   function entsOf(info) {
@@ -177,12 +160,11 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
 
   // boot: ads engine + purchases SDK + entitlement sync (covers reinstalls)
   document.addEventListener("DOMContentLoaded", function () {
-    // ATT at launch: initialize AdMob, then present the tracking prompt as soon as
-    // the app is active (scheduleATT handles the timing). Ads are prepared right
-    // away; the 15-solve honeymoon means the first real ad is minutes away, long
-    // after the tracking decision has resolved.
+    // ATT is requested natively at launch (AppDelegate). Here we just spin up the
+    // ads engine + rewarded video; by the time the first ad is due (post-honeymoon)
+    // the tracking decision has long since resolved.
     if (AdMob) AdMob.initialize({}).then(function () {
-      scheduleATT(); wireReward(); prepareAd(); prepareReward();
+      wireReward(); prepareAd(); prepareReward();
     }).catch(function () {});
     if (Purchases) {
       Purchases.configure({ apiKey: RC_IOS_API_KEY })

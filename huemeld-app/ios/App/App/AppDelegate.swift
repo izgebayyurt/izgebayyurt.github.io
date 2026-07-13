@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import AppTrackingTransparency
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -26,7 +27,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // Present the App Tracking Transparency prompt from the native app lifecycle.
+        // iOS only shows the dialog while the app is in the *active* state, which this
+        // callback guarantees — requesting from the webview at page-load is too early
+        // (the app is still 'inactive') and the prompt is silently skipped. A short
+        // delay lets the launch UI settle; the .notDetermined guard means it only ever
+        // asks once (iOS also enforces once-per-install).
+        if #available(iOS 14, *) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                if ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
+                    ATTrackingManager.requestTrackingAuthorization { _ in }
+                }
+            }
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
