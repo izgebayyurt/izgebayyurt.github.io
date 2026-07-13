@@ -5,7 +5,7 @@
    ┌─────────────────────────────────────────────────────────────────────┐
    │ FILL THESE IN before shipping (see ../APPSTORE.md, steps 2–4):      │
    └─────────────────────────────────────────────────────────────────────┘ */
-var RC_IOS_API_KEY = "test_VjGLGGyGQQEsDWOgAZKpBcOjjMh";       // RevenueCat key (TEST/sandbox — swap for the appl_ production key before App Store release)
+var RC_IOS_API_KEY = "appl_EORtDZXyCAbQuULpxKCowUMwcGG";       // RevenueCat public Apple API key (production)
 var IOS_INTERSTITIAL_ID = "ca-app-pub-1320023287922220/7689139513"; // AdMob → your interstitial ad unit
 var IOS_REWARDED_ID = "ca-app-pub-1320023287922220/1175702057";    // AdMob → your rewarded ad unit (hint videos)
 var ADMOB_TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/4411468910"; // Google's official iOS test id
