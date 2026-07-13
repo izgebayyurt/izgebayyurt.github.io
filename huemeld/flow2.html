@@ -230,8 +230,9 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
         <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
-        <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)">How to play</button>
+        <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)" data-t="How to play">How to play</button>
         <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
+        <button class="mk" id="btnMenuLang" style="background:var(--card);color:var(--ink)">Türkçe</button>
       </div>
     </div>
     <div class="ov" id="ovMech">
@@ -240,7 +241,7 @@ body.menuopen .helpfab{ display:none; }
         <h2 id="mechTitle">New mechanic</h2>
         <p id="mechBlurb" class="mechblurb"></p>
         <button class="mk" id="btnMechWatch">▶ Watch how it works</button>
-        <button class="mk" id="btnMechOk" style="background:var(--card);color:var(--ink)">Got it</button>
+        <button class="mk" id="btnMechOk" style="background:var(--card);color:var(--ink)" data-t="Got it">Got it</button>
       </div>
     </div>
     <div class="ov" id="ovWin">
@@ -255,12 +256,12 @@ body.menuopen .helpfab{ display:none; }
         <h2 id="pickTitle">Levels</h2>
         <button class="mk" id="btnContinue" style="background:#ffd15c">▶ Continue</button>
         <button class="mk" id="btnDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
-        <button class="mk" id="btnArch" style="background:#e8d5ff">Daily Archive</button>
+        <button class="mk" id="btnArch" style="background:#e8d5ff" data-t="Daily Archive">Daily Archive</button>
         <div id="archArea"></div>
-        <button class="mk" id="btnHow" style="background:#bfe3ff">How to play</button>
+        <button class="mk" id="btnHow" style="background:#bfe3ff" data-t="How to play">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
         <div id="packsArea"></div>
-        <button class="mk" id="btnPickClose">Close</button>
+        <button class="mk" id="btnPickClose" data-t="Close">Close</button>
       </div>
     </div>
     <div class="ov" id="ovUp">
@@ -268,44 +269,44 @@ body.menuopen .helpfab{ display:none; }
         <h2 id="upTitle">Huemeld Pro</h2>
         <p class="updesc" id="upDesc">One purchase, the whole game:</p>
         <ul class="uplist">
-          <li><span class="upic"></span>No ads, ever</li>
-          <li><span class="upic"></span>All 7 puzzle packs · 350 levels</li>
-          <li><span class="upic"></span>Plus the 150 level medley for extra challenges!</li>
-          <li><span class="upic"></span>Daily archive — replay the last 3 weeks</li>
-          <li><span class="upic"></span>Every chapter unlocked instantly</li>
+          <li><span class="upic"></span><span data-t="No ads, ever">No ads, ever</span></li>
+          <li><span class="upic"></span><span data-t="All 7 puzzle packs · 350 levels">All 7 puzzle packs · 350 levels</span></li>
+          <li><span class="upic"></span><span data-t="Plus the 150 level medley for extra challenges!">Plus the 150 level medley for extra challenges!</span></li>
+          <li><span class="upic"></span><span data-t="Daily archive — replay the last 3 weeks">Daily archive — replay the last 3 weeks</span></li>
+          <li><span class="upic"></span><span data-t="Every chapter unlocked instantly">Every chapter unlocked instantly</span></li>
         </ul>
         <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnUpNoAds" style="background:#bfe3ff">Remove Ads · $2.99</button>
-        <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
+        <button class="mk" id="btnUpNoAds" style="background:#bfe3ff" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
+        <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)" data-t="Not now">Not now</button>
       </div>
     </div>
     <div class="ov" id="ovSet">
       <div class="panel">
-        <h2>Settings</h2>
-        <div class="setrow"><span>Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
-        <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
-        <div class="setrow"><span>Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
-        <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
-        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
+        <h2 data-t="Settings">Settings</h2>
+        <div class="setrow"><span data-t="Dark theme">Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span data-t="Sound">Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span data-t="Volume">Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
+        <div class="setrow"><span data-t="Colour-blind labels">Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
+        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px">Restore Purchases</button>
-        <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
-        <button class="mk" id="btnSetClose">Done</button>
+        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Restore Purchases">Restore Purchases</button>
+        <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px" data-t="Privacy Policy">Privacy Policy</a></p>
+        <button class="mk" id="btnSetClose" data-t="Done">Done</button>
       </div>
     </div>
     <div class="ov" id="ovHelp">
       <div class="panel">
-        <h2>How to play</h2>
+        <h2 data-t="How to play">How to play</h2>
         <div class="coachmix" id="helpMix"></div>
         <div class="rules">
-          <p><b>Drag</b> from a circle to draw a line.</p>
-          <p>When two lines <b>meet</b>, their colours <b>mix</b>.</p>
-          <p>Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
-          <p>A <b>gate</b> only lets its own colour pass.</p>
-          <p>Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
+          <p data-th="<b>Drag</b> from a circle to draw a line."><b>Drag</b> from a circle to draw a line.</p>
+          <p data-th="When two lines <b>meet</b>, their colours <b>mix</b>.">When two lines <b>meet</b>, their colours <b>mix</b>.</p>
+          <p data-th="Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.">Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
+          <p data-th="A <b>gate</b> only lets its own colour pass.">A <b>gate</b> only lets its own colour pass.</p>
+          <p data-th="Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.">Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
         </div>
         <button class="mk" id="btnDemo" style="background:#e6d9ff">▶ Show me</button>
-        <button class="mk" id="btnHelpClose">Got it</button>
+        <button class="mk" id="btnHelpClose" data-t="Got it">Got it</button>
       </div>
     </div>
     <div class="ghost" id="ghost"></div>
@@ -322,6 +323,181 @@ body.menuopen .helpfab{ display:none; }
 (function(){
 "use strict";
 var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6",N:"#a8703f"};
+
+/* ---------- i18n: T() looks up the English string in the current language ---------- */
+var LANG = localStorage.getItem("hm_flow2_lang") || "en";
+var TR = {
+  // — menu & navigation —
+  "Play":"Oyna",                                                    /* 1 */
+  "Daily Puzzle":"Günlük Bulmaca",                                  /* 2 */
+  "Levels":"Bölümler",                                              /* 3 */
+  "levels":"bölümler",                                              /* 4 */
+  "Settings":"Ayarlar",                                             /* 5 */
+  "How to play":"Nasıl oynanır",                                    /* 6 */
+  "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
+  "Menu":"Menü",                                                    /* 8 */
+  "Language":"Dil",                                                 /* 9 */
+  // — level chrome —
+  "Level":"Bölüm",                                                  /* 10 */
+  "Chapter":"Kısım",                                                /* 11 */
+  "Undo":"Geri Al",                                                 /* 12 */
+  "Hint":"İpucu",                                                   /* 13 */
+  "Reset":"Sıfırla",                                                /* 14 */
+  "Skip tutorial":"Eğitimi atla",                                  /* 15 */
+  // — win / continue —
+  "Solved!":"Çözüldü!",                                             /* 16 */
+  "Every cell painted.":"Her hücre boyandı.",                       /* 17 */
+  "Next":"İleri",                                                   /* 18 */
+  "Continue":"Devam et",                                            /* 19 */
+  "Back to levels":"Bölümlere dön",                                 /* 20 */
+  // — picker —
+  "Daily Archive":"Günlük Arşiv",                                   /* 21 */
+  "Close":"Kapat",                                                  /* 22 */
+  "All levels":"Tüm bölümler",                                      /* 23 */
+  "pack complete!":"paket tamamlandı!",                             /* 24 */
+  // — mechanic intro card —
+  "New mechanic":"Yeni mekanik",                                    /* 25 */
+  "Got it":"Anladım",                                               /* 26 */
+  "Watch how it works":"Nasıl olduğunu izle",                       /* 27 */
+  "Show me":"Bana göster",                                          /* 28 */
+  // — settings —
+  "Dark theme":"Koyu tema",                                         /* 29 */
+  "Sound":"Ses",                                                    /* 30 */
+  "Volume":"Ses düzeyi",                                            /* 31 */
+  "Colour-blind labels":"Renk körü etiketleri",                     /* 32 */
+  "Restore Purchases":"Satın Alımları Geri Yükle",                  /* 33 */
+  "Privacy Policy":"Gizlilik Politikası",                           /* 34 */
+  "Done":"Tamam",                                                   /* 35 */
+  // — upsell (Pro) —
+  "Huemeld Pro":"Huemeld Pro",                                      /* 36 */
+  "One purchase, the whole game:":"Tek satın alma, tüm oyun:",      /* 37 */
+  "No ads, ever":"Sonsuza dek reklamsız",                           /* 38 */
+  "All 7 puzzle packs · 350 levels":"7 bulmaca paketi · 350 bölüm", /* 39 */
+  "Plus the 150 level medley for extra challenges!":"Ekstra zorluk için 150 bölümlük karma!", /* 40 */
+  "Daily archive — replay the last 3 weeks":"Günlük arşiv — son 3 haftayı tekrar oyna", /* 41 */
+  "Every chapter unlocked instantly":"Tüm bölümler anında açılır", /* 42 */
+  "Remove Ads · $2.99":"Reklamları Kaldır · $2.99",                 /* 43 */
+  "Huemeld Pro · $4.99":"Huemeld Pro · $4.99",                      /* 44 */
+  "Not now":"Şimdi değil",                                          /* 45 */
+  "Tired of ads?":"Reklamlardan bıktın mı?",                        /* 46 */
+  "Remove them forever — or unlock everything:":"Onları sonsuza dek kaldır — ya da her şeyi aç:", /* 47 */
+  // — how-to-play card (bold kept) —
+  "<b>Drag</b> from a circle to draw a line.":"Çizgi çizmek için bir daireden <b>sürükle</b>.", /* 48 */
+  "When two lines <b>meet</b>, their colours <b>mix</b>.":"İki çizgi <b>buluştuğunda</b> renkleri <b>karışır</b>.", /* 49 */
+  "Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.":"Her <b>✦ kareyi</b> eşleşen renkle <b>aydınlatmak</b> için içine bir çizgi çek. Doğru rengi elde etmek için çizgileri karıştırman gerekebilir.", /* 50 */
+  "A <b>gate</b> only lets its own colour pass.":"Bir <b>kapı</b> yalnızca kendi rengini geçirir.", /* 51 */
+  "Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.":"Her ✦ kareyi aydınlat ve <b>kazanmak</b> için tüm tahtayı kapla! Bağlanmamış çizgi bırakma.", /* 52 */
+  // — toasts —
+  "New: one circle can FORK — draw a second line from it!":"Yeni: bir daire ÇATALLANABİLİR — ondan ikinci bir çizgi çek!", /* 53 */
+  "Your turn!":"Sıra sende!",                                       /* 54 */
+  "Feed the prism its colour first!":"Önce prizmaya rengini ver!",  /* 55 */
+  "Cover the whole board to finish!":"Bitirmek için tüm tahtayı kapla!", /* 56 */
+  "A pipe has a loose end!":"Bir borunun ucu açıkta!",              /* 57 */
+  "A gate needs the right colour!":"Bir kapı doğru rengi istiyor!", /* 58 */
+  "Ride arrows straight through, the way they point!":"Okları gösterdikleri yönde dümdüz geç!", /* 59 */
+  "Lines must pass straight through ice!":"Çizgiler buzun içinden dümdüz geçmeli!", /* 60 */
+  "Bridges must be crossed straight!":"Köprüler dümdüz geçilmeli!", /* 61 */
+  "A number tile needs its EXACT count!":"Sayı karosu TAM sayısını istiyor!", /* 62 */
+  "Available in the app":"Uygulamada mevcut",                       /* 63 */
+  "Ads removed — thank you!":"Reklamlar kaldırıldı — teşekkürler!", /* 64 */
+  "Purchase not completed":"Satın alma tamamlanmadı",               /* 65 */
+  "✦ Huemeld Pro unlocked — thank you!":"✦ Huemeld Pro açıldı — teşekkürler!", /* 66 */
+  "Every pipe is already showing":"Tüm borular zaten gösteriliyor", /* 67 */
+  "No hint for this puzzle":"Bu bulmaca için ipucu yok",            /* 68 */
+  "Loading a video for your hint…":"İpucun için video yükleniyor…", /* 69 */
+  "No hint yet — the video didn't finish":"Henüz ipucu yok — video bitmedi", /* 70 */
+  "A pipe revealed — trace the dotted line":"Bir boru gösterildi — noktalı çizgiyi takip et", /* 71 */
+  "Last pipe revealed — trace the dotted line":"Son boru gösterildi — noktalı çizgiyi takip et", /* 72 */
+  // — tutorial (ghost-hand) captions —
+  "Drag a line out of a circle…":"Bir daireden çizgi çek…",         /* 73 */
+  "Now bring in the other colour…":"Şimdi diğer rengi getir…",      /* 74 */
+  "Fill the board and light every square to win!":"Kazanmak için tahtayı doldur ve her kareyi aydınlat!", /* 75 */
+  "Where colours meet, they MIX — red + blue makes purple!":"Renkler buluştuğu yerde KARIŞIR — kırmızı + mavi mor yapar!", /* 76 */
+  "A gate passes only its own colour. Purple flows right through.":"Bir kapı yalnızca kendi rengini geçirir. Mor dümdüz akar.", /* 77 */
+  "Cover every cell and light each square to win!":"Kazanmak için her hücreyi kapla ve her kareyi aydınlat!", /* 78 */
+  // — mechanic names —
+  "Brown":"Kahverengi",                                             /* 79 */
+  "Arrows":"Oklar",                                                 /* 80 */
+  "Ice":"Buz",                                                      /* 81 */
+  "Portals":"Portallar",                                            /* 82 */
+  "Overpass":"Üstgeçit",                                            /* 83 */
+  "Prisms":"Prizmalar",                                             /* 84 */
+  "Numbers":"Sayılar",                                              /* 85 */
+  "Medley":"Karma",                                                 /* 86 */
+  // — mechanic blurbs (intro card) —
+  "Combine all 3 primary colors (a secondary + a primary) to create brown.":"Kahverengi oluşturmak için 3 ana rengi birleştir (bir ara renk + bir ana renk).", /* 87 */
+  "Arrows only pass their colour — ridden straight through, the way they point.":"Oklar yalnızca rengini geçirir — gösterdikleri yönde dümdüz geçilir.", /* 88 */
+  "Frozen cells can't hold a turn — lines pass straight through.":"Donmuş hücreler dönüşü tutamaz — çizgiler dümdüz geçer.", /* 89 */
+  "A line entering one spiral pops out of its twin.":"Bir sarmala giren çizgi ikizinden çıkar.", /* 90 */
+  "Two lines can share a bridge cell — one crosses straight over the other.":"İki çizgi bir köprü hücresini paylaşabilir — biri diğerinin üstünden dümdüz geçer.", /* 91 */
+  "Feed a prism its blend and it splits back into the two primaries.":"Bir prizmaya karışımını ver, iki ana renge geri ayrılsın.", /* 92 */
+  "A numbered tile counts its colour in the 3×3 around it, itself included — match it exactly.":"Sayılı bir karo, kendisi dahil çevresindeki 3×3'te kendi rengini sayar — tam olarak eşleştir.", /* 93 */
+  // — pack descriptions (picker) —
+  "Mix three primary colors":"Üç ana rengi karıştır",               /* 94 */
+  "Lines must follow the direction on the sign":"Çizgiler tabeladaki yönü izlemeli", /* 95 */
+  "Prevents turning inside":"İçinde dönmeyi engeller",              /* 96 */
+  "Who knew lines could be teleported? Well now they do":"Çizgiler ışınlanabilir miymiş? İşte artık ışınlanıyor", /* 97 */
+  "Cross two lines over each other":"İki çizgiyi üst üste geçir",   /* 98 */
+  "Split a mixed line back to its components":"Karışık bir çizgiyi bileşenlerine ayır", /* 99 */
+  "Match the color count around the numbered tile":"Sayılı karonun çevresindeki renk sayısını eşleştir", /* 100 */
+  "Little bit of everything!":"Her şeyden biraz!",                  /* 101 */
+  // — chapter names —
+  "Mix":"Karışım",                                                  /* 102 */
+  "Fork":"Çatal",                                                   /* 103 */
+  "Pressure":"Baskı",                                               /* 104 */
+  "Big Boards":"Büyük Tahtalar",                                    /* 105 */
+  "Mastery":"Ustalık",                                              /* 106 */
+  // — composed strings ({0},{1}… are filled in at runtime) —
+  "Daily":"Günlük",                                                 /* 107 */
+  "{0} is locked — solve {1} more in {2} to unlock":"{0} kilitli — açmak için {2} bölümünde {1} tane daha çöz", /* 108 */
+  "The {0} teaser ends here — Huemeld Pro unlocks the rest!":"{0} tanıtımı burada bitiyor — gerisini Huemeld Pro açar!", /* 109 */
+  "pack complete!":"paket tamamlandı!",                             /* 110 */
+  "{0} teaser done — {1} more levels in the full game!":"{0} tanıtımı bitti — tam oyunda {1} bölüm daha var!", /* 111 */
+  "Continue · Level {0}":"Devam · Bölüm {0}",                       /* 112 */
+  "How {0} works":"{0} nasıl çalışır",                              /* 113 */
+  "Chapter {0} · {1}":"Kısım {0} · {1}",                            /* 114 */
+  // — win messages —
+  "Whole board covered.":"Tüm tahta kaplandı.",                     /* 115 */
+  "Daily solved":"Günlük çözüldü",                                  /* 116 */
+  "Archive daily solved!":"Arşiv günlüğü çözüldü!",                 /* 117 */
+  "{0}-day streak!":"{0} günlük seri!",                             /* 118 */
+  "see you tomorrow!":"yarın görüşürüz!",                           /* 119 */
+  "Chapter unlocked: {0}!":"Kısım açıldı: {0}!",                    /* 120 */
+  "That's the last level — more coming!":"Bu son bölüm — yakında daha fazlası!", /* 121 */
+  "{0} — pack complete!":"{0} — paket tamamlandı!",                 /* 122 */
+  "New mechanic: {0}":"Yeni mekanik: {0}",                          /* 123 */
+  // — picker —
+  "Levels · {0}/{1}":"Bölümler · {0}/{1}",                          /* 124 */
+  "{0} levels":"{0} bölüm",                                         /* 125 */
+  "Solve {0} more in {1}":"{1} kısmında {0} tane daha çöz",         /* 126 */
+  "Puzzle Packs":"Bulmaca Paketleri",                              /* 127 */
+  "All levels":"Tüm bölümler",                                      /* 128 */
+  // — mechanic tutorial captions (3 per pack) —
+  "Mix two primaries into a secondary…":"İki ana rengi bir ara renge karıştır…", /* 129 */
+  "…then run the THIRD primary into it: brown!":"…sonra ÜÇÜNCÜ ana rengi de içine ver: kahverengi!", /* 130 */
+  "Brown squares want the full triple mix.":"Kahverengi kareler tam üçlü karışımı ister.", /* 131 */
+  "This gate points a direction…":"Bu kapı bir yön gösterir…",      /* 132 */
+  "…ride it STRAIGHT through, the way it points.":"…gösterdiği yönde DÜMDÜZ geç.", /* 133 */
+  "Wrong colour or wrong way won't do.":"Yanlış renk ya da yanlış yön olmaz.", /* 134 */
+  "Ice is slippery…":"Buz kaygandır…",                             /* 135 */
+  "…lines cross it in a straight line only.":"…çizgiler onu yalnızca dümdüz geçer.", /* 136 */
+  "Plan your turns before the freeze!":"Dönüşlerini buzdan önce planla!", /* 137 */
+  "Dive into a spiral…":"Bir sarmala dal…",                        /* 138 */
+  "…and pop out of its twin across the board!":"…ve tahtanın öbür ucundaki ikizinden çık!", /* 139 */
+  "The line carries on from there.":"Çizgi oradan devam eder.",     /* 140 */
+  "A bridge lets lines CROSS…":"Bir köprü çizgilerin ÇAPRAZLAMASINA izin verir…", /* 141 */
+  "…straight over, straight under. No mixing.":"…dümdüz üstten, dümdüz alttan. Karışım yok.", /* 142 */
+  "Two lines, one cell — only on bridges.":"İki çizgi, bir hücre — yalnızca köprülerde.", /* 143 */
+  "Feed the prism its secondary colour…":"Prizmaya ara rengini ver…", /* 144 */
+  "…it splits into the two primaries!":"…iki ana renge ayrılır!",   /* 145 */
+  "Route BOTH rays home to finish.":"Bitirmek için HER İKİ ışını da yerine ulaştır.", /* 146 */
+  "This tile counts its colour around itself…":"Bu karo çevresindeki kendi rengini sayar…", /* 147 */
+  "…the 3×3 block, tile included: EXACTLY that many.":"…3×3 blok, karo dahil: TAM olarak o kadar.", /* 148 */
+  "A zero means: keep that colour away!":"Sıfır demek: o rengi uzak tut!"  /* 149 */
+};
+function T(s){ if(LANG!=="tr" || s==null) return s; var v=TR[s]; return v!=null ? v : s; }
+function Tf(s){ var a=arguments, r=T(s); for(var i=1;i<a.length;i++) r=r.split("{"+(i-1)+"}").join(a[i]); return r; }
+function setLang(l){ LANG=l; localStorage.setItem("hm_flow2_lang",l); applyLang(); }
 /* primaries pair into secondaries; a secondary + its MISSING primary makes browN
    (O+B, G+R, P+Y) — that's how "mix all three" levels chain two junctions. */
 var MIXMAP={RY:"O",BR:"P",BY:"G",BO:"N",GR:"N",PY:"N"};
@@ -546,18 +722,25 @@ function applyLevel(L){
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
   buildGrid(); renderDots(); renderPaths(); updateUndoUI(); updateHintUI();
 }
+// set the level-name label for the current mode (also used when switching language)
+function relabel(){
+  if(!lvNameEl) return;
+  if(mode==="pack" && PACKS[curPack]) lvNameEl.textContent=T(PACKS[curPack].name)+" · "+(packIdx+1)+"/"+PACKS[curPack].levels.length;
+  else if(mode==="daily" && DAILY.length){ var d=dateAgo(dailyOff), mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]; lvNameEl.textContent=T("Daily")+" · "+mo+" "+d.getDate(); }
+  else { var ch=chapterOf(li); lvNameEl.textContent=T("Level")+" "+(li+1)+(CHAPTERS.length>1 ? " · "+T(CHAPTERS[ch].name) : ""); }
+}
 function loadLevel(i){
   var want=Math.max(0, Math.min(LEVELS.length-1, i));
   var ch=chapterOf(want);
   if(!chapterUnlocked(ch)){
     var prev=CHAPTERS[ch-1];
-    toast(CHAPTERS[ch].name+" is locked — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
+    toast(Tf("{0} is locked — solve {1} more in {2} to unlock", T(CHAPTERS[ch].name), (chapterNeed(ch-1)-solvedInChapter(ch-1)), T(prev.name)));
     return;
   }
   isTut=false; mode="campaign";
   li=want;
   localStorage.setItem("hm_flow2_i",""+li);
-  lvNameEl.textContent="Level "+(li+1)+(CHAPTERS.length>1 ? " · "+CHAPTERS[ch].name : "");
+  relabel();
   document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = li<LEVELS.length-1 ? "" : "hidden";
   applyLevel(LEVELS[li]);
@@ -569,7 +752,7 @@ function loadLevel(i){
     var need={}; L.ci.forEach(function(t){ (COMPS[t[0]]||[]).forEach(function(p){ need[p]=(need[p]||0)+1; }); });
     var forkCol=null; for(var pc in need) if(need[pc]>1) forkCol=pc;
     var fe=null; ems.forEach(function(E){ if(E.col===forkCol) fe=E; });
-    toast("New: one circle can FORK — draw a second line from it!");
+    toast(T("New: one circle can FORK — draw a second line from it!"));
     if(fe){ var k=0, iv=setInterval(function(){ if(li>=0) bounceDot(fe.r,fe.c); if(++k>=5) clearInterval(iv); }, 850); }
   }
 }
@@ -578,8 +761,7 @@ function loadDaily(off){
   isTut=false; mode="daily"; dailyOff=off||0;
   var d=dateAgo(dailyOff);
   var L = DAILY.length ? DAILY[dailyIndexFor(d)] : LEVELS[li];
-  var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
-  lvNameEl.textContent = DAILY.length ? ("Daily · "+mo+" "+d.getDate()) : ("Level "+(li+1));
+  relabel();
   document.getElementById("btnPrev").style.visibility="hidden";
   document.getElementById("btnNext").style.visibility="hidden";
   applyLevel(L);
@@ -587,13 +769,13 @@ function loadDaily(off){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
-  if(!packLevelUnlocked(k)){ toast("The "+pk.name+" teaser ends here — Huemeld Pro unlocks the rest!"); showUpsell("pro"); return; }
+  if(!packLevelUnlocked(k)){ toast(Tf("The {0} teaser ends here — Huemeld Pro unlocks the rest!", T(pk.name))); showUpsell("pro"); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
-  lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
+  relabel();
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
   applyLevel(pk.levels[k]);
-  if(k===0 && pk.desc) toast(pk.name+": "+pk.desc.toLowerCase());
+  if(k===0 && pk.desc) toast(T(pk.name)+": "+T(pk.desc));
   maybeMechIntro(pk.levels[k]);
 }
 /* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
@@ -616,7 +798,7 @@ function stopDemo(){   // clear timers + chrome; does NOT touch the board
   ghostEl.style.display="none"; demobanEl.classList.remove("show"); demoskipEl.classList.remove("show");
 }
 var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
-function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast("Your turn!"); }
+function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast(T("Your turn!")); }
 function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
   if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
   demoing=true;                                             // specific cell to change the caption
@@ -647,10 +829,10 @@ function playDemo(){
   demoReturn=null;   // hand back to campaign level 1
   // pause on the mix cell and the gate cell of level 1's baked solution
   return playDemoOn(demo,
-    ["Drag a line out of a circle…","Now bring in the other colour…","Fill the board and light every square to win!"],
-    { "1:7":  { cap:"Where colours meet, they MIX — red + blue makes purple!", hold:1700 },
-      "1:10": { cap:"A gate passes only its own colour. Purple flows right through.", hold:1900 },
-      "1:18": { cap:"Cover every cell and light each square to win!", hold:1100 } });
+    [T("Drag a line out of a circle…"),T("Now bring in the other colour…"),T("Fill the board and light every square to win!")],
+    { "1:7":  { cap:T("Where colours meet, they MIX — red + blue makes purple!"), hold:1700 },
+      "1:10": { cap:T("A gate passes only its own colour. Purple flows right through."), hold:1900 },
+      "1:18": { cap:T("Cover every cell and light each square to win!"), hold:1100 } });
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
 function cs(){ return board.clientWidth/N; }
@@ -877,7 +1059,7 @@ board.addEventListener("pointerdown", function(e){
   preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
   drawSteps=0; melodyReset();
   var pri=prismStartAt(cell[0],cell[1]);
-  if(pri===-2){ toast("Feed the prism its colour first!"); drag=null; }
+  if(pri===-2){ toast(T("Feed the prism its colour first!")); drag=null; }
   else if(pri===-3){ drag=null; }       // fully-drawn prism: retreat rays by their tips (or Undo)
   else if(pri>=0){
     var PE=ems[pri];
@@ -1107,46 +1289,49 @@ function noDangling(){
 }
 function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
-  if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
-  if(!noDangling()){ toast("A pipe has a loose end!"); return; }
+  if(coverage()<paintTarget()){ toast(T("Cover the whole board to finish!")); return; }
+  if(!noDangling()){ toast(T("A pipe has a loose end!")); return; }
   for(var gi=0;gi<gates.length;gi++){ var GG=gates[gi];
-    if(colorAt(GG.r,GG.c)!==GG.col){ toast("A gate needs the right colour!"); return; }
-    if(!dirOK(GG)){ toast("Ride arrows straight through, the way they point!"); return; }
+    if(colorAt(GG.r,GG.c)!==GG.col){ toast(T("A gate needs the right colour!")); return; }
+    if(!dirOK(GG)){ toast(T("Ride arrows straight through, the way they point!")); return; }
   }
-  if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
-  if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
-  if(!countersOK()){ toast("A number tile needs its EXACT count!"); return; }
+  if(!iceOK()){ toast(T("Lines must pass straight through ice!")); return; }
+  if(!bridgesOK()){ toast(T("Bridges must be crossed straight!")); return; }
+  if(!countersOK()){ toast(T("A number tile needs its EXACT count!")); return; }
   solved=true; preGesture=null; sfxWin(); playWinCascade();
   updateUndoUI(); updateHintUI();
   if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
   var wn=document.getElementById("btnWinNext");
   document.querySelector("#ovWin h2").innerHTML="Solved! "+icn("spark",20);
+  var nextBtn = function(){ wn.innerHTML=T("Next")+" "+icn("arrowR",15); };
+  var backBtn = function(){ wn.textContent=T("Back to levels"); };
   if(mode==="daily"){
     var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     var stk2=dailyStreak();
-    document.getElementById("winMsg").textContent=(dailyOff?"Archive daily solved!":"Daily solved")+(stk2>1 ? " — "+stk2+"-day streak!" : (dailyOff?"":" — see you tomorrow!"));
-    wn.style.display=""; wn.textContent="Back to levels";
+    var suf = stk2>1 ? " — "+Tf("{0}-day streak!", stk2) : (dailyOff?"":" — "+T("see you tomorrow!"));
+    document.getElementById("winMsg").textContent=(dailyOff?T("Archive daily solved!"):T("Daily solved"))+suf;
+    wn.style.display=""; backBtn();
   } else if(mode==="pack"){
     var pk=PACKS[curPack];
     var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
     (pd[pk.id]=pd[pk.id]||{})[packIdx]=1; localStorage.setItem("hm_flow2_packdone", JSON.stringify(pd));
     var lastOne = packIdx+1>=pk.levels.length;
     var teaserEnd = !lastOne && !packLevelUnlocked(packIdx+1);
-    var wm = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length;
-    if(lastOne) wm = pk.name+" — pack complete!";
-    else if(teaserEnd) wm = pk.name+" teaser done — "+(pk.levels.length-PACK_FREE)+" more levels in the full game!";
+    var wm = T(pk.name)+" · "+(packIdx+1)+"/"+pk.levels.length;
+    if(lastOne) wm = Tf("{0} — pack complete!", T(pk.name));
+    else if(teaserEnd) wm = Tf("{0} teaser done — {1} more levels in the full game!", T(pk.name), (pk.levels.length-PACK_FREE));
     document.getElementById("winMsg").textContent = wm;
-    wn.style.display=""; wn.textContent = (lastOne||teaserEnd) ? "Back to levels" : "Next →";
+    wn.style.display=""; if(lastOne||teaserEnd) backBtn(); else nextBtn();
   } else {
     var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
     var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
-    var msg="Whole board covered.";
+    var msg=T("Whole board covered.");
     var myCh=chapterOf(li);
     if(newly && myCh+1<CHAPTERS.length && solvedInChapter(myCh)===chapterNeed(myCh))
-      msg="🎉 Chapter unlocked: "+CHAPTERS[myCh+1].name+"!";
-    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
-    wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
+      msg=Tf("Chapter unlocked: {0}!", T(CHAPTERS[myCh+1].name));
+    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " "+T("That's the last level — more coming!"));
+    wn.style.display = li+1<LEVELS.length ? "" : "none"; nextBtn();
   }
   setTimeout(function(){ if(solved) ovWin.classList.add("show"); }, 1250);   // a reset in the window cancels it
 }
@@ -1580,8 +1765,9 @@ var mechQueue=[], mechCur=null, mechRewatch=false, ovMech=null;
 function showMechCard(k, rewatch){
   mechCur=k; mechRewatch=!!rewatch; var M=MECHS[k];
   document.getElementById("mechIcon").innerHTML=packIcon(k,40);
-  document.getElementById("mechTitle").textContent=(rewatch?"":"New mechanic: ")+M.name;
-  document.getElementById("mechBlurb").textContent=M.blurb;
+  var nm=T(M.name);
+  document.getElementById("mechTitle").textContent=rewatch ? nm : Tf("New mechanic: {0}", nm);
+  document.getElementById("mechBlurb").textContent=T(M.blurb);
   ovMech.classList.add("show");
 }
 function showNextMech(){ if(mechQueue.length) showMechCard(mechQueue.shift(), false); }
@@ -1610,9 +1796,9 @@ function watchMech(k, rewatch){
     else loadLevel(back.l);
     showNextMech();   // Medley intros can queue two mechanics
   };
-  isTut=false; mode="campaign"; lvNameEl.textContent=M.name;
+  isTut=false; mode="campaign"; lvNameEl.textContent=T(M.name);
   applyLevel(dl);
-  playDemoOn(dl.demo, M.caps);
+  playDemoOn(dl.demo, M.caps.map(function(c){ return T(c); }));
 }
 /* ---------- inline SVG icons (no emoji): stroke follows text colour ---------- */
 function icn(name,sz,extra){
@@ -1635,7 +1821,8 @@ function icn(name,sz,extra){
     reset:'<path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19.5 4.5v4h-4"/>',
     arrowL:'<path d="M15 5l-7 7 7 7"/>',
     arrowR:'<path d="M9 5l7 7-7 7"/>',
-    check:'<path d="M5 12.5l4.5 4.5L19 7"/>'
+    check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18M4.5 7h15M4.5 17h15"/>'
   };
   return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
 }
@@ -1671,7 +1858,7 @@ function renderPicker(){
   var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
   // hub-only rows
   var db=document.getElementById("btnDaily"), stk=dailyStreak();
-  db.innerHTML = icn("star",16)+" Daily Puzzle"+(dd[todayKey()] ? " "+icn("check",15) : "") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
+  db.innerHTML = icn("star",16)+" "+T("Daily Puzzle")+(dd[todayKey()] ? " "+icn("check",15) : "") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
   db.style.display = root ? "" : "none";
   document.getElementById("btnHow").style.display = root ? "" : "none";
   var ab=document.getElementById("btnArch");
@@ -1682,35 +1869,35 @@ function renderPicker(){
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
   var cb=document.getElementById("btnContinue");
   cb.style.display = (root && cont>=0) ? "" : "none";
-  if(cont>=0){ cb.innerHTML=icn("play",16)+" Continue · Level "+(cont+1); cb.dataset.i=cont; }
+  if(cont>=0){ cb.innerHTML=icn("play",16)+" "+Tf("Continue · Level {0}", (cont+1)); cb.dataset.i=cont; }
   if(root){
-    document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
+    document.getElementById("pickTitle").textContent=Tf("Levels · {0}/{1}", nd, LEVELS.length);
     document.getElementById("archArea").innerHTML="";
     // one card per chapter (later chapters unlock by solving 2/3 of the one before)
     for(var c=0;c<CHAPTERS.length;c++){
       var CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
-      var sub = unl ? CH.n+" levels" : "Solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name;
+      var sub = unl ? Tf("{0} levels", CH.n) : Tf("Solve {0} more in {1}", (chapterNeed(c-1)-solvedInChapter(c-1)), T(CHAPTERS[c-1].name));
       h+='<button class="pickcard'+(unl?"":" lk")+(mode==="campaign"&&chapterOf(li)===c?" cur":"")+'" data-ch="'+c+'">'
         +'<span class="pcic">'+(unl?(c+1):icn("lock",18))+'</span>'
-        +'<span class="pcmain"><span class="pcname">Chapter '+(c+1)+' · '+CH.name+'</span><span class="pcsub">'+sub+'</span></span>'
+        +'<span class="pcmain"><span class="pcname">'+Tf("Chapter {0} · {1}", (c+1), T(CH.name))+'</span><span class="pcsub">'+sub+'</span></span>'
         +'<span class="pcprog">'+sv+"/"+CH.n+'</span></button>';
     }
     pg.innerHTML=h;
     // one card per pack (5 free teaser levels each; the rest come with the full game)
-    var ph='<div class="packtitle">Puzzle Packs</div>';
+    var ph='<div class="packtitle">'+T("Puzzle Packs")+'</div>';
     PACKS.forEach(function(pk,pi){
       var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
-      var psub=pk.desc||"";
+      var psub=pk.desc?T(pk.desc):"";
       ph+='<button class="pickcard'+(mode==="pack"&&curPack===pi?" cur":"")+'" data-pack="'+pi+'">'
         +'<span class="pcic">'+packIcon(pk.id,22)+'</span>'
-        +'<span class="pcmain"><span class="pcname">'+pk.name+'</span><span class="pcsub">'+psub+'</span></span>'
+        +'<span class="pcmain"><span class="pcname">'+T(pk.name)+'</span><span class="pcsub">'+psub+'</span></span>'
         +'<span class="pcprog">'+ndp+"/"+pk.levels.length+'</span></button>';
     });
     pa.innerHTML=ph;
   } else if(pickView.arch){
     // daily ARCHIVE: full-game owners can replay the last 3 weeks
-    document.getElementById("pickTitle").textContent="Daily Archive";
-    var ah='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    document.getElementById("pickTitle").textContent=T("Daily Archive");
+    var ah='<button class="mk pickback">'+icn("arrowL",14)+' '+T("All levels")+'</button><div class="pkgrid">';
     for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
       ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?icn("check",11):"")+'</span></button>'; }
     ah+='</div>';
@@ -1718,19 +1905,19 @@ function renderPicker(){
     pg.innerHTML=""; pa.innerHTML="";
   } else if(pickView.ch!=null){
     var cc=pickView.ch, CHV=CHAPTERS[cc], s=chapterStart(cc);
-    document.getElementById("pickTitle").textContent="Chapter "+(cc+1)+" · "+CHV.name;
-    h='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    document.getElementById("pickTitle").textContent=Tf("Chapter {0} · {1}", (cc+1), T(CHV.name));
+    h='<button class="mk pickback">'+icn("arrowL",14)+' '+T("All levels")+'</button><div class="pkgrid">';
     for(var i=s;i<s+CHV.n && i<LEVELS.length;i++)
       h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?icn("check",11):"")+'</span></button>';
     h+='</div>';
     pg.innerHTML=h; pa.innerHTML="";
   } else {
     var pi2=pickView.pk, pk2=PACKS[pi2], d2=pd[pk2.id]||{}, ndp2=0; for(var q2 in d2) if(d2[q2]) ndp2++;
-    document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
-    var ph2='<button class="mk pickback">← All levels</button>';
-    if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
+    document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+T(pk2.name)+" · "+ndp2+"/"+pk2.levels.length;
+    var ph2='<button class="mk pickback">'+icn("arrowL",14)+' '+T("All levels")+'</button>';
+    if(pk2.desc) ph2+='<div class="packdesc">'+T(pk2.desc)+'</div>';
     if(MECHS[pk2.id] && pk2.levels[0] && pk2.levels[0].demo)
-      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">'+icn("play",15)+' How '+pk2.name+' works</button>';
+      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">'+icn("play",15)+' '+Tf("How {0} works", T(pk2.name))+'</button>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
       var open=packLevelUnlocked(k);
@@ -1769,18 +1956,32 @@ function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.re
 document.body.classList.add("menuopen");   // the menu is up when the page opens
 updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
 document.getElementById("btnHome").innerHTML=icn("home",17);
-/* swap the glyph "icons" on buttons for real SVG icons (label text kept) */
-(function(){
-  var MAP={
-    btnPick:["list"," levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
-    btnMenuPlay:["play"," Play"], btnMenuDaily:["star"," Daily Puzzle"], btnMenuLevels:["list"," Levels"],
-    btnMenuSet:["gear"," Settings"], btnMenuPro:["spark"," Go Pro · Remove Ads"],
-    btnContinue:["play"," Continue"], btnDaily:["star"," Daily Puzzle"], btnMechWatch:["play"," Watch how it works"],
-    btnUpBuy:["spark"," Huemeld Pro · $4.99"], btnFull:["spark"," Huemeld Pro · $4.99"], btnDemo:["play"," Show me"],
-    btnUndo:["undo"," Undo"], btnReset:["reset"," Reset"]
-  };
-  for(var id in MAP){ var el=document.getElementById(id); if(el) el.innerHTML=icn(MAP[id][0],16)+MAP[id][1]; }
-})();
+/* icon buttons: real SVG icon + translated label (label "" = icon only) */
+var ICONBTN={
+  btnPick:["list","levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
+  btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
+  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"],
+  btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
+  btnUpBuy:["spark","Huemeld Pro · $4.99"], btnFull:["spark","Huemeld Pro · $4.99"], btnDemo:["play","Show me"],
+  btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
+};
+function applyIconButtons(){
+  for(var id in ICONBTN){ var el=document.getElementById(id); if(!el) continue;
+    var lbl=ICONBTN[id][1]; el.innerHTML=icn(ICONBTN[id][0],16)+(lbl?" "+T(lbl):""); }
+}
+/* re-skin the whole UI into the current language (static text + icon buttons + live views) */
+function applyLang(){
+  document.querySelectorAll("[data-t]").forEach(function(el){ el.textContent=T(el.getAttribute("data-t")); });
+  document.querySelectorAll("[data-th]").forEach(function(el){ el.innerHTML=T(el.getAttribute("data-th")); });
+  applyIconButtons();
+  var wn=document.getElementById("btnWinNext"); if(wn) wn.innerHTML=T("Next")+" "+icn("arrowR",15);
+  var sk=document.getElementById("demoskip"); if(sk) sk.innerHTML=T("Skip tutorial")+" "+icn("arrowR",13);
+  var lb=document.getElementById("btnMenuLang"); if(lb) lb.innerHTML=icn("globe",16)+" "+(LANG==="tr"?"English":"Türkçe");
+  try{ relabel(); }catch(e){}
+  try{ syncToggles(); }catch(e){}
+  try{ if(document.getElementById("ovPick").classList.contains("show")) renderPicker(); }catch(e){}
+  document.documentElement.lang = LANG;
+}
 document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
 document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
   // very first play: show the game with the ghost hand instead of telling it
@@ -1792,6 +1993,7 @@ document.getElementById("btnMenuDaily").addEventListener("click", function(){ en
 document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; hideToast(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
 document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
+document.getElementById("btnMenuLang").addEventListener("click", function(){ ensureAudio(); setLang(LANG==="tr"?"en":"tr"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -1813,8 +2015,8 @@ function showUpsell(mode){
   if(entFull()) return;                                   // nothing left to sell
   var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
       na=document.getElementById("btnUpNoAds"), pr=document.getElementById("btnUpBuy");
-  if(mode==="ads"){ t.textContent="Tired of ads?"; d.textContent="Remove them forever — or unlock everything:"; }
-  else { t.innerHTML=icn("spark",20)+" Huemeld Pro"; d.textContent="One purchase, the whole game:"; }
+  if(mode==="ads"){ t.textContent=T("Tired of ads?"); d.textContent=T("Remove them forever — or unlock everything:"); }
+  else { t.innerHTML=icn("spark",20)+" "+T("Huemeld Pro"); d.textContent=T("One purchase, the whole game:"); }
   na.style.display = entNoAds() ? "none" : "";            // already ad-free -> Pro only
   pr.style.display = "";
   ovUp.classList.add("show");
@@ -1822,8 +2024,8 @@ function showUpsell(mode){
 document.getElementById("btnMenuPro").addEventListener("click", function(){ ensureAudio(); showUpsell("pro"); });
 document.getElementById("btnUpNoAds").addEventListener("click", function(){
   var nb=nativeBridge();
-  if(!nb || !nb.buyRemoveAds){ toast("Available in the app"); return; }
-  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast("Ads removed — thank you!"); } else toast("Purchase not completed"); });
+  if(!nb || !nb.buyRemoveAds){ toast(T("Available in the app")); return; }
+  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast(T("Ads removed — thank you!")); } else toast(T("Purchase not completed")); });
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
 ovMech=document.getElementById("ovMech");
@@ -1836,15 +2038,15 @@ document.getElementById("btnMechWatch").addEventListener("click", function(){ en
   if(k) watchMech(k, rw); });
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
-  if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
-  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); updateProEntry(); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } else toast("Purchase not completed"); });
+  if(!nb || !nb.buyFull){ toast(T("Available in the app")); return; }
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); updateProEntry(); toast(T("✦ Huemeld Pro unlocked — thank you!")); renderPicker(); } else toast(T("Purchase not completed")); });
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
   var card=e.target.closest(".pickcard");
   if(card){
     var c=+card.dataset.ch;
-    if(!chapterUnlocked(c)){ toast(CHAPTERS[c].name+" is locked — solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name+" to unlock"); return; }
+    if(!chapterUnlocked(c)){ toast(Tf("{0} is locked — solve {1} more in {2} to unlock", T(CHAPTERS[c].name), (chapterNeed(c-1)-solvedInChapter(c-1)), T(CHAPTERS[c-1].name))); return; }
     ensureAudio(); pickView={ch:c}; renderPicker(); return;
   }
   var b=e.target.closest(".pkbtn"); if(!b) return;
@@ -1902,11 +2104,11 @@ function ghostColorFor(cells){
 }
 function grantHint(){
   ensureHintOrder();
-  if(hintN>=hintOrder.length){ toast("Every pipe is already showing"); return; }
+  if(hintN>=hintOrder.length){ toast(T("Every pipe is already showing")); return; }
   var st=hintOrder[hintN++];
   ghostStrokes.push({cells:st, color:ghostColorFor(st)});
   renderPaths(); updateHintUI();
-  toast(hintN>=hintOrder.length ? "Last pipe revealed — trace the dotted line" : "A pipe revealed — trace the dotted line");
+  toast(hintN>=hintOrder.length ? T("Last pipe revealed — trace the dotted line") : T("A pipe revealed — trace the dotted line"));
 }
 function updateHintUI(){
   var b=document.getElementById("btnHint"); if(!b) return;
@@ -1918,14 +2120,13 @@ document.getElementById("btnHint").addEventListener("click", function(){
   ensureAudio();
   if(demoing || solved) return;
   ensureHintOrder();
-  if(!hintOrder.length){ toast("No hint for this puzzle"); return; }
-  if(hintN>=hintOrder.length){ toast("Every pipe is already showing"); return; }
+  if(!hintOrder.length){ toast(T("No hint for this puzzle")); return; }
+  if(hintN>=hintOrder.length){ toast(T("Every pipe is already showing")); return; }
   var nb=nativeBridge();
   if(entNoAds() || !nb || !nb.rewarded){ grantHint(); return; }   // paid players + web: free hints
-  toast("Loading a video for your hint…");
-  nb.rewarded(function(ok){ if(ok) grantHint(); else toast("No hint yet — the video didn't finish"); });
+  toast(T("Loading a video for your hint…"));
+  nb.rewarded(function(ok){ if(ok) grantHint(); else toast(T("No hint yet — the video didn't finish")); });
 });
-document.getElementById("btnHint").innerHTML = icn("bulb",16)+" Hint";
 
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
@@ -1941,11 +2142,11 @@ var ovSet=document.getElementById("ovSet");
   if(n && n.buyRemoveAds && !entNoAds()) rm.style.display="";       // only meaningful in the app
   if(n && n.buyFull && !entFull()) fl.style.display="";
   if(n && n.restore) rs.style.display="";
-  rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
-    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } else toast("Purchase not completed"); }); });
-  fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
-    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Huemeld Pro unlocked — thank you!"); } else toast("Purchase not completed"); }); });
-  rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast("Available in the app"); return; }
+  rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast(T("Available in the app")); return; }
+    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast(T("Ads removed — thank you!")); } else toast(T("Purchase not completed")); }); });
+  fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast(T("Available in the app")); return; }
+    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast(T("✦ Huemeld Pro unlocked — thank you!")); } else toast(T("Purchase not completed")); }); });
+  rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast(T("Available in the app")); return; }
     nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
@@ -1977,6 +2178,7 @@ document.getElementById("btnHelpClose").addEventListener("click", function(){ ov
 applyTheme();
 if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) — restart safely
 loadLevel(li);
+applyLang();   // paint icons + translate the whole UI into the saved language
 demoskipEl.addEventListener("click", function(){ ensureAudio(); endDemo(); });
 document.getElementById("btnDemo").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.remove("show"); playDemo(); });
 if(!(LEVELS[0] && LEVELS[0].demo)) document.getElementById("btnDemo").style.display="none";
