@@ -178,7 +178,7 @@ more ways than one — but never as many as you'd hope.
 **Category**: Primary **Games › Puzzle**, secondary **Games › Board** (or Entertainment).
 **Age rating** questionnaire: everything "No" → **4+**. (Set "Unrestricted Web Access: No".)
 **Copyright**: `© 2026 Izge Bayyurt`
-**Support URL**: `https://izgebayyurt.github.io/huemeld/`
+**Support URL**: `https://izgebayyurt.github.io/huemeld/support`
 **Marketing URL** (optional): same.
 **Privacy Policy URL**: `https://izgebayyurt.github.io/huemeld/privacy.html`
 
