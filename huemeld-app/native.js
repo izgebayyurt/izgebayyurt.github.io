@@ -5,15 +5,15 @@
    ┌─────────────────────────────────────────────────────────────────────┐
    │ FILL THESE IN before shipping (see ../APPSTORE.md, steps 2–4):      │
    └─────────────────────────────────────────────────────────────────────┘ */
-var RC_IOS_API_KEY = "test_VjGLGGyGQQEsDWOgAZKpBcOjjMh";       // RevenueCat key (TEST/sandbox — swap for the appl_ production key before App Store release)
-var IOS_INTERSTITIAL_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN"; // AdMob → your interstitial ad unit
-var IOS_REWARDED_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN";     // AdMob → your rewarded ad unit (hint videos)
+var RC_IOS_API_KEY = "appl_EORtDZXyCAbQuULpxKCowUMwcGG";       // RevenueCat public Apple API key (production)
+var IOS_INTERSTITIAL_ID = "ca-app-pub-1320023287922220/7689139513"; // AdMob → your interstitial ad unit
+var IOS_REWARDED_ID = "ca-app-pub-1320023287922220/1175702057";    // AdMob → your rewarded ad unit (hint videos)
 var ADMOB_TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/4411468910"; // Google's official iOS test id
 var ADMOB_TEST_REWARDED = "ca-app-pub-3940256099942544/1712485313";     // Google's official iOS rewarded test id
 var USE_TEST_ADS = true;                                        // flip to false for release
-var PRODUCT_NOADS = "com.izge.huemeld.noads";                   // $2.99 non-consumable
-var PRODUCT_FULL = "com.izge.huemeld.everything";               // $4.99 non-consumable
-var ENT_NOADS = "noads", ENT_FULL = "everything";               // RevenueCat entitlement ids
+var PRODUCT_NOADS = "huemeld_no_ads";                          // $2.99 non-consumable (App Store product ID)
+var PRODUCT_FULL = "huemeld_pro";                              // $4.99 non-consumable (App Store product ID)
+var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat entitlement ids
 
 (function () {
   var cap = window.Capacitor;

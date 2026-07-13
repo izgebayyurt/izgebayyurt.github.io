@@ -32,21 +32,21 @@ Work top to bottom; each step tells you exactly what to paste where.
 
 ## 3. RevenueCat (10 minutes)
 
-- [ ] New project "Huemeld" → **Add app** → App Store → bundle ID `com.izge.huemeld`.
-- [ ] Copy the **public Apple API key** (starts `appl_`) → paste into `RC_IOS_API_KEY` in `huemeld-app/native.js`. **NOTE:** the file currently holds a `test_` sandbox key for development — replace it with the `appl_` production key before the App Store release build.
-- [ ] Products → add both (identifiers must match ASC exactly, step 5):
-  - `com.izge.huemeld.noads`
-  - `com.izge.huemeld.everything`
-- [ ] Entitlements → create **`noads`** and attach `com.izge.huemeld.noads`.
-- [ ] Entitlements → create **`everything`** and attach `com.izge.huemeld.everything`.
-  (The bridge treats `everything` as implying no-ads, so you don't need to double-attach.)
-- [ ] Later (step 5 makes this possible): paste the **App-Specific Shared Secret** from ASC into RevenueCat's App Store app settings so receipts validate.
+- [x] New project "Huemeld" → **Add app** → App Store → bundle ID `com.griezwahlm.huemeld`.
+- [x] **public Apple API key** (`appl_…`) is already set in `RC_IOS_API_KEY` (`huemeld-app/native.js`).
+- [x] Products → add both (identifiers must match ASC exactly, step 5):
+  - `huemeld_no_ads`
+  - `huemeld_pro`
+- [x] Entitlements → **`no_ads`** grants `huemeld_no_ads`.
+- [x] Entitlements → **`huemeld_pro`** grants `huemeld_pro` (and `huemeld_no_ads`).
+  (These entitlement ids are what the bridge checks: `ENT_NOADS="no_ads"`, `ENT_FULL="huemeld_pro"`.)
+- [ ] Paste the **App-Specific Shared Secret** from ASC into RevenueCat's App Store app settings so receipts validate (needs step 5 done first).
 
 ## 4. App Store Connect — app record
 
-- [ ] developer.apple.com → Certificates, IDs & Profiles → **Identifiers → +** → App ID `com.izge.huemeld` (capabilities: none needed; In-App Purchase is on by default).
+- [ ] developer.apple.com → Certificates, IDs & Profiles → **Identifiers → +** → App ID `com.griezwahlm.huemeld` (capabilities: none needed; In-App Purchase is on by default).
 - [ ] appstoreconnect.apple.com → My Apps → **+ New App**:
-  - Platform iOS · Name **Huemeld** · Primary language English · Bundle ID `com.izge.huemeld` · SKU `huemeld-001`.
+  - Platform iOS · Name **Huemeld** · Primary language English · Bundle ID `com.griezwahlm.huemeld` · SKU `huemeld-001`.
 
 ## 5. App Store Connect — the two IAPs
 
@@ -55,7 +55,7 @@ Monetization → In-App Purchases → **+** (both are **Non-Consumable**):
 | Field | No Ads | Huemeld Pro |
 |---|---|---|
 | Reference name | Remove Ads | Huemeld Pro |
-| Product ID | `com.izge.huemeld.noads` | `com.izge.huemeld.everything` |
+| Product ID | `huemeld_no_ads` | `huemeld_pro` |
 | Price | $2.99 (Tier 3) | $4.99 (Tier 5) |
 | Display name | Remove Ads | Huemeld Pro |
 | Description | No more ad breaks — ever. | All 7 packs, the 150-level Medley, daily archive, and every chapter unlocked. No ads. |
@@ -91,9 +91,9 @@ this. If you hit it anyway (e.g. a stale lockfile), run
 
 In Xcode:
 
-- [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.izge.huemeld`.
+- [ ] Target → Signing & Capabilities → pick your team; bundle ID should read `com.griezwahlm.huemeld`.
 - [ ] Same tab: **+ Capability → iCloud → check "Key-value storage"** (the entitlements file `App/App.entitlements` is already wired in — this just registers the service on your App ID). It powers the save mirror: delete + reinstall restores progress from iCloud.
-- [ ] `ios/App/App/Info.plist`: `GADApplicationIdentifier` currently holds Google's SAMPLE app id (`…3940256099942544~1458002511`) so dev builds run with test ads out of the box — replace it with your real AdMob **App ID** from step 2 (the one with `~`) before the release build.
+- [x] `ios/App/App/Info.plist`: `GADApplicationIdentifier` is set to your real AdMob **App ID** (`…1320023287922220~7150083467`). Dev builds still show test ads because `USE_TEST_ADS = true` gates the ad *unit* IDs, not the app ID.
 - [ ] Same file: SKAdNetworkItems currently has Google's own entry (`cstr6suwn9.skadnetwork`) — paste the rest of [Google's current list](https://developers.google.com/admob/ios/quick-start#update_your_infoplist) (~50 entries) for better ad attribution. Optional but recommended.
 
 Notes:
