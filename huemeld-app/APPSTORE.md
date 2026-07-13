@@ -96,7 +96,7 @@ In Xcode:
 - [ ] Same file: SKAdNetworkItems currently has Google's own entry (`cstr6suwn9.skadnetwork`) — paste the rest of [Google's current list](https://developers.google.com/admob/ios/quick-start#update_your_infoplist) (~50 entries) for better ad attribution. Optional but recommended.
 
 Notes:
-- The ATT prompt fires **in-app, lazily** — `native.js` requests tracking authorization right before the *first* interstitial (after the 15-solve honeymoon), so reviewers see it in a sensible context. Nothing else to wire.
+- The ATT prompt fires **at launch** — `native.js` initializes AdMob, requests tracking authorization, then prepares the first ad (so that ad request already carries the decision). If iOS reports the app wasn't foregrounded yet (status stays `notDetermined`, prompt didn't show), it retries before the first interstitial. Nothing else to wire.
 - If iOS 18+ Xcode warns about a missing `PrivacyInfo.xcprivacy`, the AdMob & RevenueCat pods ship their own; the app itself only uses localStorage (User Defaults-equivalent, exempt reason `CA92.1`) — add the manifest only if App Store Connect flags it at upload.
 
 ## 7. TestFlight pass (sandbox everything)
@@ -105,7 +105,7 @@ Notes:
 - [ ] ASC → TestFlight → add yourself as internal tester, install via TestFlight app.
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, no service-worker weirdness (the wrapper strips it).
-  - [ ] Solve 15 levels → next 4th solve shows the **ATT prompt** then a **test interstitial** (test ads are on).
+  - [ ] Fresh install → the **ATT prompt** shows at launch. Then solve 15 levels → the next 4th solve shows a **test interstitial** (test ads are on).
   - [ ] Settings shows **Remove Ads · $2.99**, **✦ Huemeld Pro · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
@@ -209,7 +209,7 @@ Because AdMob serves ads (and may use the IDFA when the user allows tracking):
 - [ ] Version page → attach the release build from step 7's second upload.
 - [ ] Attach both IAPs to the version.
 - [ ] **App Review notes**, paste:
-  > Free puzzle game with two one-time purchases. To reach ads quickly: ads only start after 15 solved levels (then every 4th solve; the ATT prompt appears right before the first ad). Purchases: Settings (gear icon) → "Remove Ads" / "Huemeld Pro" / "Restore Purchases". No account or login required.
+  > Free puzzle game with two one-time purchases. The App Tracking Transparency prompt appears at launch. To reach ads quickly: ads only start after 15 solved levels (then every 4th solve). Purchases: Settings (gear icon) → "Remove Ads" / "Huemeld Pro" / "Restore Purchases". No account or login required.
 - [ ] Release option: "Automatically release after approval" (or manual if you want to coordinate).
 - [ ] Submit for review. First reviews typically take 1–3 days.
 

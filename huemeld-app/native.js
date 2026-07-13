@@ -27,12 +27,20 @@ var ENT_NOADS = "noads", ENT_FULL = "everything";               // RevenueCat en
       .catch(function () { adReady = false; });
   }
 
-  /* ATT: ask in context — right before the FIRST ad would show (post-honeymoon),
-     not at cold start. Reviewers like the prompt to make sense. */
+  /* ATT: ask at launch (see the boot handler). We only prompt while the app is
+     foregrounded — if iOS returns "notDetermined" the prompt didn't actually
+     show (app not active yet), so we leave attAsked false and retry later
+     (e.g. before the first interstitial), instead of burning the one shot. */
   function ensureATT() {
     if (attAsked || !AdMob) return Promise.resolve();
-    attAsked = true;
-    return AdMob.requestTrackingAuthorization().catch(function () {});
+    return AdMob.trackingAuthorizationStatus().then(function (res) {
+      if (res && res.status && res.status !== "notDetermined") { attAsked = true; return; } // already decided
+      return AdMob.requestTrackingAuthorization().then(function () {
+        return AdMob.trackingAuthorizationStatus().then(function (r2) {
+          if (r2 && r2.status && r2.status !== "notDetermined") attAsked = true; // prompt shown + answered
+        });
+      });
+    }).catch(function () {});
   }
 
   function entsOf(info) {
@@ -119,7 +127,9 @@ var ENT_NOADS = "noads", ENT_FULL = "everything";               // RevenueCat en
 
   // boot: ads engine + purchases SDK + entitlement sync (covers reinstalls)
   document.addEventListener("DOMContentLoaded", function () {
-    if (AdMob) AdMob.initialize({}).then(prepareAd).catch(function () {});
+    // ATT at launch: initialize AdMob, ask for tracking, THEN prepare the first
+    // ad — so that first ad request already carries the user's tracking decision.
+    if (AdMob) AdMob.initialize({}).then(ensureATT).then(prepareAd).catch(function () {});
     if (Purchases) {
       Purchases.configure({ apiKey: RC_IOS_API_KEY })
         .then(function () { return Purchases.getCustomerInfo(); })
