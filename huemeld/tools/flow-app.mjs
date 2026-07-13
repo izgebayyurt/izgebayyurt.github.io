@@ -102,6 +102,17 @@ SOL.packs = pk.sols;
 pk.packs.forEach((p) => { if (p.id !== "mix" && pk.sols[p.id][0]) p.levels[0].demo = pk.sols[p.id][0].gest; });
 pk.packs.forEach((p) => process.stderr.write(`pack ${p.id}: ${p.levels.length} levels\n`));
 
+// hint data: every level carries its solution strokes as `sol` so the shell can
+// reveal a ghost of one pipe (rewarded-ad hints). Skip levels that already ship the
+// same strokes as `demo` (tutorial/pack level 1) — the shell falls back to `demo`.
+campaign.forEach((lv, i) => { if (!lv.demo && SOL.campaign[i]) lv.sol = SOL.campaign[i].gest; });
+daily.forEach((lv, i) => { if (!lv.demo && SOL.daily[i]) lv.sol = SOL.daily[i].gest; });
+pk.packs.forEach((p) => p.levels.forEach((lv, k) => {
+  if (lv.demo) return;
+  const s = pk.sols[p.id] && pk.sols[p.id][k];
+  if (s) lv.sol = s.gest;
+}));
+
 // levels are solvable by construction; end-to-end winnability is verified
 // separately by replaying each through the real engine.
 void countSolutions; void findOneSolution;
