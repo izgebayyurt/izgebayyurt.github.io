@@ -13,16 +13,19 @@ def capacitor_pods
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCommunityAdmob', :path => '../../node_modules/@capacitor-community/admob'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../node_modules/@revenuecat/purchases-capacitor'
+end
+
+target 'App' do
+  capacitor_pods
+  # Add your Pods here.
+  # NOTE: this pin MUST live here, not inside capacitor_pods — `npx cap sync`
+  # regenerates the whole `def capacitor_pods` body and would wipe it.
+  #
   # The admob plugin (6.x) still uses the UMP-prefixed consent classes
   # (UMPConsentInformation, UMPRequestParameters, …). GoogleUserMessagingPlatform
   # 3.0 dropped the "UMP" prefix, which breaks the plugin's Swift. Pin to the
   # 2.x line the plugin was written against so those symbols still resolve.
   pod 'GoogleUserMessagingPlatform', '~> 2.3'
-end
-
-target 'App' do
-  capacitor_pods
-  # Add your Pods here
 end
 
 post_install do |installer|
