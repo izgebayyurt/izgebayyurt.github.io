@@ -372,7 +372,7 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
 function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
-var UNLOCK_ALL=true;   // DEV: every chapter + pack level open. Set false before release (APPSTORE.md step 7).
+var UNLOCK_ALL=false;   // RELEASE: teasers + entitlements gate content (was DEV-open).
 function packLevelUnlocked(k){ return UNLOCK_ALL || entFull() || k<PACK_FREE; }
 function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
 function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
