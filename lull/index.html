@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>lull — generative soundtrack maker</title>
+<style>
+  :root{
+    --bg:#efe7d6; --panel:#fbf6ea; --ink:#2a2622; --mut:#8a8170;
+    --acc:#d1743f; --acc2:#3f8be6; --sel:#ffce5c;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+    font:15px/1.45 ui-rounded,"Segoe UI",system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;}
+  body{padding:22px 16px 60px;}
+  .wrap{max-width:720px;margin:0 auto;}
+  h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:0 0 2px;}
+  h1 .dot{color:var(--acc);}
+  .sub{color:var(--mut);font-size:14px;margin:0 0 20px;}
+
+  .card{background:var(--panel);border:2.5px solid var(--ink);border-radius:16px;
+    box-shadow:3px 4px 0 var(--ink);padding:16px;margin-bottom:16px;}
+  .lbl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--mut);margin:0 0 9px;}
+
+  /* mood chips */
+  .moods{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  .mood{background:var(--bg);border:2.5px solid var(--ink);border-radius:12px;
+    box-shadow:2px 3px 0 var(--ink);padding:10px 6px;cursor:pointer;text-align:center;
+    transition:transform .06s,box-shadow .06s;user-select:none;}
+  .mood:active{transform:translate(1px,2px);box-shadow:1px 1px 0 var(--ink);}
+  .mood.sel{background:var(--sel);box-shadow:2px 3px 0 var(--ink),0 0 0 3px var(--acc) inset;}
+  .mood .emo{font-size:22px;line-height:1;}
+  .mood .nm{font-size:12.5px;font-weight:800;margin-top:5px;}
+
+  /* transport */
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .btn{background:var(--panel);border:2.5px solid var(--ink);border-radius:13px;
+    box-shadow:2px 3px 0 var(--ink);font:800 14px ui-rounded,system-ui;color:var(--ink);
+    cursor:pointer;padding:11px 16px;transition:transform .06s,box-shadow .06s;user-select:none;}
+  .btn:active{transform:translate(1px,2px);box-shadow:1px 1px 0 var(--ink);}
+  .btn.play{flex:1;font-size:16px;background:var(--acc);color:#fff;min-width:130px;}
+  .btn.play.on{background:var(--ink);}
+  .btn.ghost{background:var(--bg);}
+  .btn[disabled]{opacity:.5;cursor:default;}
+
+  canvas#viz{width:100%;height:60px;display:block;margin-top:12px;
+    border:2.5px solid var(--ink);border-radius:11px;background:var(--bg);}
+
+  /* sliders */
+  .knob{margin:13px 0;}
+  .knob .top{display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:5px;}
+  .knob .top span:last-child{color:var(--acc);font-variant-numeric:tabular-nums;}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:10px;
+    background:var(--bg);border:2.5px solid var(--ink);border-radius:20px;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;
+    background:var(--acc);border:2.5px solid var(--ink);border-radius:50%;cursor:pointer;
+    box-shadow:1px 2px 0 var(--ink);}
+  input[type=range]::-moz-range-thumb{width:22px;height:22px;background:var(--acc);
+    border:2.5px solid var(--ink);border-radius:50%;cursor:pointer;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr;}.moods{grid-template-columns:repeat(2,1fr);}}
+
+  select{font:700 14px ui-rounded,system-ui;color:var(--ink);background:var(--bg);
+    border:2.5px solid var(--ink);border-radius:11px;padding:9px 10px;box-shadow:2px 3px 0 var(--ink);
+    cursor:pointer;}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;cursor:pointer;user-select:none;}
+  .toggle .sw{width:44px;height:26px;border:2.5px solid var(--ink);border-radius:20px;background:var(--bg);
+    position:relative;box-shadow:2px 3px 0 var(--ink);transition:background .12s;}
+  .toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:var(--ink);transition:left .12s;}
+  .toggle.on .sw{background:var(--sel);}
+  .toggle.on .sw::after{left:20px;background:var(--acc);}
+
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field .lbl{margin:0;}
+
+  .foot{color:var(--mut);font-size:12.5px;text-align:center;margin-top:8px;}
+  .foot a{color:var(--acc);}
+  .seedline{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut);}
+  .seedline code{background:var(--bg);border:2px solid var(--ink);border-radius:7px;padding:1px 7px;
+    font-weight:700;color:var(--ink);font-family:ui-monospace,monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>lull<span class="dot">.</span></h1>
+  <p class="sub">A little generative maker for chill game soundtracks. Pick a mood, tune it, then export a seamless looping WAV.</p>
+
+  <!-- moods -->
+  <div class="card">
+    <p class="lbl">Mood</p>
+    <div class="moods" id="moods"></div>
+  </div>
+
+  <!-- transport -->
+  <div class="card">
+    <div class="row">
+      <button class="btn play" id="play">▶ Play</button>
+      <button class="btn ghost" id="regen" title="New random variation">🎲 Shuffle</button>
+    </div>
+    <canvas id="viz" width="700" height="60"></canvas>
+    <div class="seedline" style="margin-top:10px;">
+      <span>variation</span><code id="seed">—</code>
+      <span style="margin-left:auto">key</span>
+      <select id="key"></select>
+    </div>
+  </div>
+
+  <!-- shape -->
+  <div class="card">
+    <p class="lbl">Shape the sound</p>
+    <div class="grid2">
+      <div class="knob"><div class="top"><span>Tempo</span><span id="vTempo">—</span></div>
+        <input type="range" id="tempo" min="52" max="110" step="1"></div>
+      <div class="knob"><div class="top"><span>Density</span><span id="vDensity">—</span></div>
+        <input type="range" id="density" min="0" max="100" step="1"></div>
+      <div class="knob"><div class="top"><span>Warmth</span><span id="vWarmth">—</span></div>
+        <input type="range" id="warmth" min="0" max="100" step="1"></div>
+      <div class="knob"><div class="top"><span>Space</span><span id="vSpace">—</span></div>
+        <input type="range" id="space" min="0" max="100" step="1"></div>
+      <div class="knob"><div class="top"><span>Volume</span><span id="vVol">—</span></div>
+        <input type="range" id="vol" min="0" max="100" step="1"></div>
+      <div class="knob" style="display:flex;align-items:flex-end;padding-bottom:6px;">
+        <label class="toggle" id="drums"><span class="sw"></span><span>Soft drums</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- export -->
+  <div class="card">
+    <p class="lbl">Export loop</p>
+    <div class="row">
+      <div class="field">
+        <span class="lbl">Length</span>
+        <select id="bars">
+          <option value="4">4 bars</option>
+          <option value="8" selected>8 bars</option>
+          <option value="16">16 bars</option>
+        </select>
+      </div>
+      <button class="btn" id="export" style="flex:1;min-width:150px;">⬇ Download .wav</button>
+    </div>
+    <p class="foot" style="text-align:left;margin-top:12px;">
+      Exports a seamless loop (the reverb tail is folded back to the start) at 44.1kHz —
+      set it to loop in your engine and it repeats forever with no seam.
+    </p>
+  </div>
+
+  <p class="foot">Runs entirely in your browser · no accounts, no uploads · <a href="/">izgebayyurt.github.io</a></p>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   lull — a tiny generative soundtrack engine (Web Audio API)
+   Everything a loop needs is derived deterministically from a
+   seed so the live preview and the exported WAV match exactly.
+   ============================================================ */
+
+// ---------- seeded RNG (mulberry32) ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+// ---------- music theory ----------
+const SCALES={
+  major:[0,2,4,5,7,9,11], lydian:[0,2,4,6,7,9,11], dorian:[0,2,3,5,7,9,10],
+  aeolian:[0,2,3,5,7,8,10], majorPent:[0,2,4,7,9], minorPent:[0,3,5,7,10],
+};
+const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+
+// stack scale-thirds to voice a chord starting at scale degree `deg`
+function chordAt(scale,rootMidi,deg,size){
+  const n=[];
+  for(let k=0;k<size;k++){
+    const si=deg+2*k, len=scale.length;
+    const oct=Math.floor(si/len), d=((si%len)+len)%len;
+    n.push(rootMidi+scale[d]+12*oct);
+  }
+  return n;
+}
+
+// ---------- moods ----------
+const MOODS={
+  dream:  {emo:'☁️',name:'Dreaming', scale:'lydian',   bpm:70,size:4,drums:false,warmth:.52,space:.86,density:.42,
+           progs:[[0,3,4,3],[0,5,3,4],[3,4,0,5]], mix:{pad:1,bell:.9,pluck:.35,bass:.8}},
+  lofi:   {emo:'🌧️',name:'Rainy Lofi',scale:'dorian',   bpm:78,size:4,drums:true, warmth:.34,space:.5, density:.56,
+           progs:[[1,4,0,5],[0,5,1,4],[5,4,0,3]], mix:{pad:.8,bell:.2,pluck:.75,bass:1}},
+  forest: {emo:'🌿',name:'Forest',    scale:'majorPent',bpm:90,size:3,drums:false,warmth:.6, space:.6, density:.62,
+           progs:[[0,3,4,2],[0,2,4,3],[2,4,0,3]], mix:{pad:.6,bell:.5,pluck:1,bass:.8}},
+  star:   {emo:'✨',name:'Starlight', scale:'minorPent',bpm:64,size:3,drums:false,warmth:.55,space:.95,density:.36,
+           progs:[[0,4,2,3],[0,3,2,4],[4,2,3,0]], mix:{pad:.8,bell:1,pluck:.3,bass:.6}},
+  cozy:   {emo:'🍵',name:'Cozy Menu', scale:'major',    bpm:84,size:4,drums:false,warmth:.5, space:.6, density:.5,
+           progs:[[0,5,3,4],[0,3,5,4],[5,3,0,4]], mix:{pad:.9,bell:.4,pluck:.7,bass:.9}},
+  sun:    {emo:'🌅',name:'Sunrise',   scale:'major',    bpm:96,size:4,drums:true, warmth:.7, space:.55,density:.6,
+           progs:[[0,4,5,3],[3,4,0,5],[0,5,4,3]], mix:{pad:.8,bell:.6,pluck:.8,bass:1}},
+};
+
+// ---------- app state ----------
+const S={
+  mood:'dream', key:0, seed:1234, bars:8,
+  bpm:70, density:.42, warmth:.52, space:.86, vol:.8, drums:false,
+  events:null, loopLen:0,
+};
+
+// Build the deterministic note-event list for one loop.
+// tempo/warmth/space/volume are realtime; everything here is set by
+// seed+mood+key+bars+density+drums so preview == export.
+function rebuild(){
+  const m=MOODS[S.mood];
+  const scale=SCALES[m.scale];
+  const rng=mulberry32(S.seed);
+  const chordRoot=48+S.key;                 // pads around C3
+  const bassOff=-12, melBase=chordRoot+12;  // bass below, melody above
+
+  // progression: choose one 4-chord pattern, tile to bar count
+  const pat=m.progs[Math.floor(rng()*m.progs.length)];
+  const prog=[];
+  for(let b=0;b<S.bars;b++) prog.push(pat[b%pat.length]);
+
+  const ev=[];
+  const dens=S.density;
+  let walk=0;                               // melodic random walk over scale index
+
+  for(let b=0;b<S.bars;b++){
+    const chord=chordAt(scale,chordRoot,prog[b],m.size);
+    const base=b*16;
+
+    // pad: whole-bar chord
+    ev.push({t:base,dur:16,v:'pad',notes:chord,g:m.mix.pad});
+    // bass: root on beat 1, fifth-ish lift on beat 3
+    ev.push({t:base,dur:8,v:'bass',n:chord[0]+bassOff,g:m.mix.bass});
+    if(rng()<.5) ev.push({t:base+8,dur:6,v:'bass',n:chord[Math.min(2,chord.length-1)]+bassOff,g:m.mix.bass*.85});
+
+    // melody / bells: candidate on every 16th, thinned by density
+    for(let i=0;i<16;i++){
+      const strong=(i%4===0), veryStrong=(i%8===0);
+      const pr=rng();                       // stable priority for this step
+      const w1=rng(), w2=rng();             // stable choices (drawn regardless)
+      let thr=dens*(strong?1.15:.5)*(veryStrong?1.25:1);
+      if(i%2===1) thr*=.55;                 // fewer offbeat 16ths
+      if(pr>thr) continue;
+
+      // pick pitch: snap to a chord tone on strong beats, else walk
+      let deg;
+      if(strong){
+        deg=Math.floor(w1*chord.length)*2;  // chord tones live on even scale steps here
+        walk=deg;
+      }else{
+        walk+=w1<.5?-1:1; if(w2<.25)walk+=w1<.5?-1:1;
+        walk=Math.max(0,Math.min(scale.length*2-1,walk));
+        deg=walk;
+      }
+      const oct=Math.floor(deg/scale.length), d=deg%scale.length;
+      const note=melBase+scale[d]+12*oct;
+
+      const useBell=w2<m.mix.bell*0.8;
+      ev.push({t:base+i,dur:strong?4:2,v:useBell?'bell':'pluck',n:note,
+               g:(useBell?m.mix.bell:m.mix.pluck)*(strong?1:.8)});
+    }
+
+    // drums (soft lofi): kick 1&3, rim 2&4, hats on offbeats
+    if(S.drums){
+      ev.push({t:base,v:'kick',g:1}); ev.push({t:base+8,v:'kick',g:.9});
+      ev.push({t:base+4,v:'rim',g:.7}); ev.push({t:base+12,v:'rim',g:.7});
+      for(let i=2;i<16;i+=2) if(rng()<.7) ev.push({t:base+i,v:'hat',g:.5});
+    }
+  }
+  S.events=ev;
+  updateLoopLen();
+}
+
+function updateLoopLen(){
+  const stepDur=(60/S.bpm)/4;
+  S.loopLen=S.bars*16*stepDur;
+}
+
+// ============================================================
+//  audio graph + synthesis (shared by live ctx & offline render)
+// ============================================================
+function makeIR(ctx,seconds,decay){
+  const rate=ctx.sampleRate, len=Math.floor(rate*seconds);
+  const buf=ctx.createBuffer(2,len,rate);
+  for(let c=0;c<2;c++){const d=buf.getChannelData(c);
+    for(let i=0;i<len;i++){const t=i/len; d[i]=(Math.random()*2-1)*Math.pow(1-t,decay);}}
+  return buf;
+}
+let _noise=new WeakMap();
+function noiseBuf(ctx){
+  if(_noise.has(ctx))return _noise.get(ctx);
+  const len=ctx.sampleRate*1, b=ctx.createBuffer(1,len,ctx.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+  _noise.set(ctx,b); return b;
+}
+
+// build the mixing graph; returns bus nodes voices connect to
+function makeGraph(ctx){
+  const master=ctx.createGain(); master.gain.value=S.vol;
+  const warm=ctx.createBiquadFilter(); warm.type='lowpass';
+  warm.frequency.value=warmHz(S.warmth); warm.Q.value=.3;
+  warm.connect(master); master.connect(ctx.destination);
+
+  const dry=ctx.createGain(); dry.connect(warm);
+
+  const rev=ctx.createConvolver(); rev.buffer=makeIR(ctx,2.6,2.2);
+  const revWet=ctx.createGain(); revWet.gain.value=S.space; rev.connect(revWet); revWet.connect(warm);
+
+  const delay=ctx.createDelay(1.0); delay.delayTime.value=(60/S.bpm)*0.75;
+  const fb=ctx.createGain(); fb.gain.value=.32; delay.connect(fb); fb.connect(delay);
+  const delWet=ctx.createGain(); delWet.gain.value=.28; delay.connect(delWet); delWet.connect(warm);
+
+  return {ctx,master,warm,dry,rev,revWet,delay};
+}
+const warmHz=x=>320*Math.pow(46,x);        // ~320Hz..~14.7kHz, log
+
+// ---- individual voices ----
+function vPad(B,notes,t,dur,g){
+  const {ctx}=B, env=ctx.createGain(); env.gain.value=0;
+  env.connect(B.dry); env.connect(B.rev);
+  const per=g*0.11/Math.max(1,notes.length);
+  const A=1.1, R=1.6, sus=Math.max(.4,dur-A);
+  env.gain.setValueAtTime(0,t);
+  env.gain.linearRampToValueAtTime(per,t+A);
+  env.gain.setValueAtTime(per,t+A+sus);
+  env.gain.linearRampToValueAtTime(0,t+A+sus+R);
+  notes.forEach((mi,k)=>{
+    [['triangle',0],['sine',-.08]].forEach(([type,dt])=>{
+      const o=ctx.createOscillator(); o.type=type;
+      o.frequency.value=mtof(mi); o.detune.value=(k-1)*4+dt*100;
+      o.connect(env); o.start(t); o.stop(t+A+sus+R+.05);
+    });
+  });
+}
+function vBass(B,mi,t,dur,g){
+  const {ctx}=B, o=ctx.createOscillator(), sub=ctx.createOscillator(), lp=ctx.createBiquadFilter(), env=ctx.createGain();
+  o.type='triangle'; sub.type='sine';
+  o.frequency.value=mtof(mi); sub.frequency.value=mtof(mi-12);
+  lp.type='lowpass'; lp.frequency.value=520;
+  const len=dur*(60/S.bpm)/4;
+  env.gain.setValueAtTime(0,t); env.gain.linearRampToValueAtTime(g*.16,t+.04);
+  env.gain.setTargetAtTime(g*.10,t+.05,.2);
+  env.gain.setTargetAtTime(0,t+len,.12);
+  o.connect(lp); sub.connect(lp); lp.connect(env); env.connect(B.dry);
+  o.start(t); sub.start(t); o.stop(t+len+.6); sub.stop(t+len+.6);
+}
+function vPluck(B,mi,t,g){
+  const {ctx}=B, env=ctx.createGain();
+  env.connect(B.dry); env.connect(B.delay); env.connect(B.rev);
+  env.gain.setValueAtTime(0,t); env.gain.linearRampToValueAtTime(g*.14,t+.006);
+  env.gain.exponentialRampToValueAtTime(.0001,t+.9);
+  [['triangle',0],['sine',7]].forEach(([type,dt])=>{
+    const o=ctx.createOscillator(); o.type=type; o.frequency.value=mtof(mi); o.detune.value=dt;
+    o.connect(env); o.start(t); o.stop(t+.95);
+  });
+}
+function vBell(B,mi,t,g){
+  const {ctx}=B, env=ctx.createGain();
+  env.connect(B.rev); env.connect(B.delay); env.connect(B.dry);
+  env.gain.setValueAtTime(0,t); env.gain.linearRampToValueAtTime(g*.12,t+.004);
+  env.gain.exponentialRampToValueAtTime(.0001,t+1.9);
+  const f=mtof(mi);
+  [[1,1],[2.01,.5],[3.0,.25]].forEach(([r,a])=>{
+    const o=ctx.createOscillator(), gg=ctx.createGain();
+    o.type='sine'; o.frequency.value=f*r; gg.gain.value=a;
+    o.connect(gg); gg.connect(env); o.start(t); o.stop(t+2.0);
+  });
+}
+function vKick(B,t,g){
+  const {ctx}=B, o=ctx.createOscillator(), env=ctx.createGain();
+  o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(48,t+.12);
+  env.gain.setValueAtTime(g*.5,t); env.gain.exponentialRampToValueAtTime(.0001,t+.25);
+  o.connect(env); env.connect(B.dry); o.start(t); o.stop(t+.3);
+}
+function vHat(B,t,g){
+  const {ctx}=B, s=ctx.createBufferSource(), hp=ctx.createBiquadFilter(), env=ctx.createGain();
+  s.buffer=noiseBuf(ctx); hp.type='highpass'; hp.frequency.value=7000;
+  env.gain.setValueAtTime(g*.12,t); env.gain.exponentialRampToValueAtTime(.0001,t+.045);
+  s.connect(hp); hp.connect(env); env.connect(B.dry); s.start(t); s.stop(t+.06);
+}
+function vRim(B,t,g){
+  const {ctx}=B, s=ctx.createBufferSource(), bp=ctx.createBiquadFilter(), env=ctx.createGain();
+  s.buffer=noiseBuf(ctx); bp.type='bandpass'; bp.frequency.value=1900; bp.Q.value=3;
+  env.gain.setValueAtTime(g*.16,t); env.gain.exponentialRampToValueAtTime(.0001,t+.08);
+  s.connect(bp); bp.connect(env); env.connect(B.dry); s.start(t); s.stop(t+.1);
+}
+
+// schedule one loop of events at absolute time t0
+function scheduleLoop(B,t0){
+  const stepDur=(60/S.bpm)/4, swing=.06*stepDur;
+  for(const e of S.events){
+    let t=t0+e.t*stepDur; if(e.t%2===1)t+=swing;
+    switch(e.v){
+      case 'pad':  vPad(B,e.notes,t,e.dur,e.g); break;
+      case 'bass': vBass(B,e.n,t,e.dur,e.g); break;
+      case 'pluck':vPluck(B,e.n,t,e.g); break;
+      case 'bell': vBell(B,e.n,t,e.g); break;
+      case 'kick': vKick(B,t,e.g); break;
+      case 'hat':  vHat(B,t,e.g); break;
+      case 'rim':  vRim(B,t,e.g); break;
+    }
+  }
+}
+
+// ============================================================
+//  live playback (look-ahead scheduler)
+// ============================================================
+let live=null, playing=false, timer=null, nextLoop=0, analyser=null, loopStartT=0;
+
+function startAudio(){
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  const B=makeGraph(ctx);
+  analyser=ctx.createAnalyser(); analyser.fftSize=1024;
+  B.master.connect(analyser);
+  live=B;
+  nextLoop=ctx.currentTime+.12; loopStartT=nextLoop;
+  timer=setInterval(pump,60); pump();
+  drawViz();
+}
+function pump(){
+  if(!live)return; const now=live.ctx.currentTime;
+  while(nextLoop<now+.4){ scheduleLoop(live,nextLoop); loopStartT=nextLoop; nextLoop+=S.loopLen; }
+}
+function stopAudio(){
+  if(timer)clearInterval(timer); timer=null;
+  if(live){live.ctx.close();live=null;} analyser=null; playing=false;
+}
+
+// ============================================================
+//  offline render -> seamless WAV
+// ============================================================
+async function renderWav(){
+  const sr=44100, tail=2.4, total=S.loopLen+tail;
+  const oac=new OfflineAudioContext(2,Math.ceil(total*sr),sr);
+  const B=makeGraph(oac); // uses current warmth/space/vol
+  scheduleLoop(B,0);
+  const rendered=await oac.startRendering();
+  const loopN=Math.round(S.loopLen*sr), tailN=Math.min(Math.round(tail*sr),rendered.length-loopN);
+  const out=[];
+  for(let c=0;c<2;c++){
+    const src=rendered.getChannelData(c), ch=new Float32Array(loopN);
+    ch.set(src.subarray(0,loopN));
+    for(let i=0;i<tailN;i++) ch[i]+=src[loopN+i];   // fold reverb tail -> seamless loop
+    out.push(ch);
+  }
+  return encodeWav(out,sr);
+}
+function encodeWav(chs,sr){
+  const n=chs.length, len=chs[0].length, bytes=len*n*2, buf=new ArrayBuffer(44+bytes), dv=new DataView(buf);
+  const wr=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i));};
+  wr(0,'RIFF'); dv.setUint32(4,36+bytes,true); wr(8,'WAVE'); wr(12,'fmt ');
+  dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,n,true);
+  dv.setUint32(24,sr,true); dv.setUint32(28,sr*n*2,true); dv.setUint16(32,n*2,true); dv.setUint16(34,16,true);
+  wr(36,'data'); dv.setUint32(40,bytes,true);
+  let o=44;
+  for(let i=0;i<len;i++)for(let c=0;c<n;c++){
+    let s=Math.max(-1,Math.min(1,chs[c][i])); dv.setInt16(o,s<0?s*0x8000:s*0x7FFF,true); o+=2;
+  }
+  return new Blob([buf],{type:'audio/wav'});
+}
+
+// ============================================================
+//  visualization
+// ============================================================
+const viz=document.getElementById('viz'), vctx=viz.getContext('2d');
+function drawViz(){
+  if(!analyser){vctx.clearRect(0,0,viz.width,viz.height);return;}
+  requestAnimationFrame(drawViz);
+  const W=viz.width,H=viz.height, buf=new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(buf);
+  vctx.clearRect(0,0,W,H);
+  // loop playhead
+  if(live&&S.loopLen>0){
+    const p=((live.ctx.currentTime-loopStartT)%S.loopLen)/S.loopLen;
+    vctx.fillStyle='rgba(209,116,63,.14)'; vctx.fillRect(0,0,p*W,H);
+    vctx.strokeStyle='#d1743f'; vctx.lineWidth=2;
+    vctx.beginPath(); vctx.moveTo(p*W,0); vctx.lineTo(p*W,H); vctx.stroke();
+  }
+  // waveform
+  vctx.strokeStyle='#2a2622'; vctx.lineWidth=2; vctx.beginPath();
+  for(let i=0;i<buf.length;i++){const x=i/buf.length*W, y=(buf[i]/255)*H;
+    i?vctx.lineTo(x,y):vctx.moveTo(x,y);}
+  vctx.stroke();
+}
+
+// ============================================================
+//  UI wiring
+// ============================================================
+const $=id=>document.getElementById(id);
+
+// mood chips
+const moodsEl=$('moods');
+Object.entries(MOODS).forEach(([k,m])=>{
+  const el=document.createElement('div'); el.className='mood'; el.dataset.k=k;
+  el.innerHTML=`<div class="emo">${m.emo}</div><div class="nm">${m.name}</div>`;
+  el.onclick=()=>selectMood(k); moodsEl.appendChild(el);
+});
+// key select
+KEYS.forEach((k,i)=>{const o=document.createElement('option');o.value=i;o.textContent=k;$('key').appendChild(o);});
+
+function selectMood(k){
+  S.mood=k; const m=MOODS[k];
+  S.bpm=m.bpm; S.density=m.density; S.warmth=m.warmth; S.space=m.space; S.drums=m.drums;
+  syncControls(); reseed();      // fresh variation per mood pick
+}
+function syncControls(){
+  document.querySelectorAll('.mood').forEach(e=>e.classList.toggle('sel',e.dataset.k===S.mood));
+  $('key').value=S.key;
+  $('tempo').value=S.bpm;   $('vTempo').textContent=S.bpm+' bpm';
+  $('density').value=S.density*100; $('vDensity').textContent=Math.round(S.density*100)+'%';
+  $('warmth').value=S.warmth*100;   $('vWarmth').textContent=Math.round(S.warmth*100)+'%';
+  $('space').value=S.space*100;     $('vSpace').textContent=Math.round(S.space*100)+'%';
+  $('vol').value=S.vol*100;         $('vVol').textContent=Math.round(S.vol*100)+'%';
+  $('drums').classList.toggle('on',S.drums);
+  $('seed').textContent='#'+S.seed;
+}
+function reseed(){ S.seed=(Math.floor(Math.random()*1e6))>>>0; rebuild(); $('seed').textContent='#'+S.seed; }
+
+// transport
+$('play').onclick=()=>{
+  if(playing){stopAudio(); $('play').textContent='▶ Play'; $('play').classList.remove('on');}
+  else{ if(!S.events)rebuild(); startAudio(); playing=true; $('play').textContent='⏸ Stop'; $('play').classList.add('on'); }
+};
+$('regen').onclick=()=>{ reseed(); };
+
+// realtime params (no rebuild)
+$('tempo').oninput=e=>{S.bpm=+e.target.value;$('vTempo').textContent=S.bpm+' bpm';updateLoopLen();
+  if(live)live.delay.delayTime.setTargetAtTime((60/S.bpm)*.75,live.ctx.currentTime,.05);};
+$('warmth').oninput=e=>{S.warmth=e.target.value/100;$('vWarmth').textContent=Math.round(S.warmth*100)+'%';
+  if(live)live.warm.frequency.setTargetAtTime(warmHz(S.warmth),live.ctx.currentTime,.05);};
+$('space').oninput=e=>{S.space=e.target.value/100;$('vSpace').textContent=Math.round(S.space*100)+'%';
+  if(live&&live.revWet)live.revWet.gain.setTargetAtTime(S.space,live.ctx.currentTime,.05);};
+$('vol').oninput=e=>{S.vol=e.target.value/100;$('vVol').textContent=Math.round(S.vol*100)+'%';
+  if(live)live.master.gain.setTargetAtTime(S.vol,live.ctx.currentTime,.03);};
+
+// structural params (rebuild; take effect next loop)
+$('density').oninput=e=>{S.density=e.target.value/100;$('vDensity').textContent=Math.round(S.density*100)+'%';rebuild();};
+$('key').onchange=e=>{S.key=+e.target.value;rebuild();};
+$('drums').onclick=()=>{S.drums=!S.drums;$('drums').classList.toggle('on',S.drums);rebuild();};
+$('bars').onchange=e=>{S.bars=+e.target.value;rebuild();};
+
+// export
+$('export').onclick=async()=>{
+  const btn=$('export'), old=btn.textContent; btn.disabled=true; btn.textContent='Rendering…';
+  try{
+    if(!S.events)rebuild();
+    const blob=await renderWav();
+    const url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download=`lull-${S.mood}-${KEYS[S.key].replace('#','s')}-${S.bars}bar-${S.seed}.wav`;
+    a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(err){alert('Export failed: '+err.message);}
+  btn.disabled=false; btn.textContent=old;
+};
+
+
+// boot
+selectMood('dream');
+</script>
+</body>
+</html>
