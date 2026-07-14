@@ -53,7 +53,7 @@
   .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--good));transition:width .25s}
 
   /* Controls */
-  #ctl{bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:10px 12px}
+  #ctl{bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;align-items:center;padding:10px 12px}
   .btn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);border-radius:10px;
     padding:8px 11px;font-size:12px;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .12s,border-color .12s}
   .btn:hover{background:rgba(255,255,255,.1)}
@@ -62,6 +62,8 @@
   .grp{display:flex;gap:5px;align-items:center;padding:0 8px;border-right:1px solid var(--line)}
   .grp:last-child{border-right:none}
   .grp .lab{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-right:2px}
+  .rotgrid{display:grid;grid-template-columns:repeat(3,auto);gap:4px}
+  .rotgrid .btn.k{min-width:30px;padding:5px 0;font-size:13px}
 
   /* Help */
   #help{bottom:16px;left:16px;max-width:230px;font-size:11px;color:var(--dim);line-height:1.5}
@@ -82,7 +84,8 @@
   #sid{width:100%;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:8px;color:var(--ink);
     font-family:var(--mono);font-size:11px;padding:6px 8px;margin-top:2px}
   .hint{font-size:10px;color:var(--dim);margin-top:6px;line-height:1.4}
-  @media (max-width:820px){#help{display:none}#tray{width:150px}#chal{min-width:0}}
+  @media (max-width:1180px){#help{display:none}}
+  @media (max-width:820px){#tray{width:150px}#chal{min-width:0}}
 </style>
 <script type="importmap">
 {"imports":{
@@ -123,9 +126,14 @@
 <div id="ctl" class="panel">
   <div class="grp">
     <span class="lab">Rotate</span>
-    <button class="btn k" data-act="rx" title="Flip (X axis) — F">F</button>
-    <button class="btn k" data-act="ry" title="Turn (Y axis) — R">R</button>
-    <button class="btn k" data-act="rz" title="Roll (Z axis) — T">T</button>
+    <div class="rotgrid">
+      <button class="btn k" data-act="yaw-" title="Spin left — ←">←</button>
+      <button class="btn k" data-act="pitch-" title="Tilt up — ↑">↑</button>
+      <button class="btn k" data-act="roll-" title="Roll left — Q">⟲</button>
+      <button class="btn k" data-act="yaw+" title="Spin right — →">→</button>
+      <button class="btn k" data-act="pitch+" title="Tilt down — ↓">↓</button>
+      <button class="btn k" data-act="roll+" title="Roll right — E">⟳</button>
+    </div>
   </div>
   <div class="grp">
     <span class="lab">Layer</span>
@@ -145,7 +153,7 @@
 
 <div id="help" class="panel">
   <b>Hold</b> a piece and move the mouse to aim on the glowing layer.<br/>
-  <kbd>F</kbd><kbd>R</kbd><kbd>T</kbd> rotate · <kbd>[</kbd><kbd>]</kbd> layer · <kbd>1</kbd>–<kbd>7</kbd> pick<br/>
+  <kbd>←</kbd><kbd>→</kbd> spin · <kbd>↑</kbd><kbd>↓</kbd> tilt · <kbd>Q</kbd><kbd>E</kbd> roll · <kbd>[</kbd><kbd>]</kbd> layer · <kbd>1</kbd>–<kbd>7</kbd> pick<br/>
   <kbd>click</kbd> drop · click a placed piece to lift it · <kbd>Esc</kbd> cancel · <kbd>drag</kbd> orbit
 </div>
 
@@ -513,9 +521,27 @@ function hold(pid){
   markTray(pid,'held'); rebuildGhost(); rec('pick',{piece:pid});
 }
 function cancelHold(){ if(held!==null){ markTray(held,false); rec('cancel',{piece:held}); held=null; ghost.clear(); } }
-function rotate(axis){ if(held===null) return;
-  heldM=mul(axis==='x'?Rx:axis==='y'?Ry:Rz,heldM); rotations++;
-  rec('rotate',{piece:held,axis,orient:orientIndex(heldM)}); rebuildGhost(); updateHUD(); }
+// View-relative rotation: figure out which world axis the requested screen rotation maps to
+// (given where the camera currently is), then apply a 90° step about it — still snapping to the
+// 24 discrete orientations. This is why ← always spins left and ↑ always tilts back, from any angle.
+const transp=m=>[[m[0][0],m[1][0],m[2][0]],[m[0][1],m[1][1],m[2][1]],[m[0][2],m[1][2],m[2][2]]];
+function snapAxis(v){ const ax=Math.abs(v.x),ay=Math.abs(v.y),az=Math.abs(v.z);
+  if(ax>=ay&&ax>=az) return {g:Rx,s:Math.sign(v.x)||1};
+  if(ay>=az)         return {g:Ry,s:Math.sign(v.y)||1};
+  return {g:Rz,s:Math.sign(v.z)||1}; }
+const _fwd=new THREE.Vector3(), _right=new THREE.Vector3();
+function rotateView(kind,dir){
+  if(held===null) return;
+  camera.getWorldDirection(_fwd);                    // into the scene
+  _right.setFromMatrixColumn(camera.matrixWorld,0);  // camera's right
+  const axisVec = kind==='yaw'? {x:0,y:1,z:0} : kind==='pitch'? _right : _fwd;
+  const {g,s}=snapAxis(axisVec);
+  const conv = kind==='pitch'? -1 : 1;               // sign tuned so arrows match what you see
+  const d = dir*s*conv;
+  heldM = d>0 ? mul(g,heldM) : mul(transp(g),heldM);
+  rotations++; rec('rotate',{piece:held,kind,dir,orient:orientIndex(heldM)});
+  rebuildGhost(); updateHUD();
+}
 function setLayer(v){ layer=Math.min(Math.max(v,0),Y-1);
   const wy=worldPos(0,layer,0).y-.46;
   if(layerPlane) layerPlane.position.y=wy; if(layerGrid) layerGrid.position.y=wy;
@@ -572,9 +598,12 @@ addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k>='1'&&k<='7'){ hold(PIECES[+k-1].id); return; }
   switch(k){
-    case 'f': rotate('x'); break;
-    case 'r': rotate('y'); break;
-    case 't': rotate('z'); break;
+    case 'arrowleft':  rotateView('yaw',-1);   e.preventDefault(); break;
+    case 'arrowright': rotateView('yaw', 1);   e.preventDefault(); break;
+    case 'arrowup':    rotateView('pitch',-1); e.preventDefault(); break;
+    case 'arrowdown':  rotateView('pitch', 1); e.preventDefault(); break;
+    case 'q': rotateView('roll',-1); break;
+    case 'e': rotateView('roll', 1); break;
     case '[': setLayer(layer-1); break;
     case ']': setLayer(layer+1); break;
     case 'escape': cancelHold(); break;
@@ -662,7 +691,9 @@ function confetti(){
 /* ---------- control bar + challenge picker ---------- */
 document.getElementById('ctl').addEventListener('click',e=>{
   const a=e.target.closest('[data-act]')?.dataset.act; if(!a) return;
-  ({rx:()=>rotate('x'),ry:()=>rotate('y'),rz:()=>rotate('z'),
+  ({'yaw-':()=>rotateView('yaw',-1),'yaw+':()=>rotateView('yaw',1),
+    'pitch-':()=>rotateView('pitch',-1),'pitch+':()=>rotateView('pitch',1),
+    'roll-':()=>rotateView('roll',-1),'roll+':()=>rotateView('roll',1),
     lup:()=>setLayer(layer+1),ldn:()=>setLayer(layer-1),
     undo,reset,solve,log:downloadLog})[a]?.();
 });
