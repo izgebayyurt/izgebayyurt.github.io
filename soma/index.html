@@ -289,11 +289,12 @@ ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 const boxGeo=new RoundedBoxGeometry(.92,.92,.92,4,.12);
 const pieceMaterial=(color)=>new THREE.MeshStandardMaterial({color,roughness:.34,metalness:.12,
   emissive:new THREE.Color(color).multiplyScalar(.05)});
-// shared, clean cube outline for empty target sockets — EdgesGeometry draws the 12 box edges only,
-// not the triangulated mesh (wireframe on a BoxGeometry adds a diagonal across every face).
-const socketEdgesGeo=new THREE.EdgesGeometry(new THREE.BoxGeometry(.9,.9,.9));
-const socketLineMat=new THREE.LineBasicMaterial({color:0x44507a,transparent:true,opacity:.5});
 const shadowPlaneGeo=new THREE.PlaneGeometry(.92,.92);
+// Cubism-style fill target: ONE silhouette border for the whole goal shape + a small dot per cell,
+// instead of a busy per-cell wireframe lattice. Dots vanish as their cell gets filled.
+const targetBorderMat=new THREE.LineBasicMaterial({color:0xaab8dc,transparent:true,opacity:.62});
+const dotGeo=new THREE.SphereGeometry(.052,10,10);
+const dotMat=new THREE.MeshBasicMaterial({color:0x8a9cc4,transparent:true,opacity:.7});
 // ghost depth cues: solid outlined cubes + a floor footprint + vertical "leg" lines to the ground.
 // Materials are shared and recoloured per rebuild (rebuildGhost runs on every pointer move).
 const ghostEdgesGeo=new THREE.EdgesGeometry(new THREE.BoxGeometry(.92,.92,.92));
@@ -317,6 +318,7 @@ let targetCells=[];                   // fill: list of target cells
 let shadowTargets={};                 // shadow: plane -> Set('a,b')
 let shadowMeshes={};                  // shadow: plane -> Map('a,b'->mesh)
 let shadowExtra=new THREE.Group();    // shadow: red "outside the silhouette" markers
+let socketDots=new Map();             // fill: cell idx -> dot mesh (hidden once the cell is filled)
 let layerPlane, layerGrid;
 
 const placed={};                      // id -> {group, cells, m}
@@ -346,26 +348,52 @@ function shadowSquare(plane,a,b,color){
   else { m.rotation.y=Math.PI/2; m.position.set(X/2-0.015, b-offY, a-offZ); }   // 'zy'
   return m;
 }
+// Outer silhouette of the target polycube: emit only exterior faces (skip faces shared by two
+// filled cells), then EdgesGeometry with a small threshold keeps just the border/step edges —
+// coplanar interior grid lines merge away. This is the clean "one outline" look, not 27 cubes.
+const FACES=[
+  {n:[ 1,0,0],v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
+  {n:[-1,0,0],v:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]]},
+  {n:[0, 1,0],v:[[0,1,0],[0,1,1],[1,1,1],[1,1,0]]},
+  {n:[0,-1,0],v:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]]},
+  {n:[0,0, 1],v:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]]},
+  {n:[0,0,-1],v:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]]},
+];
+function buildShellEdges(cells){
+  const set=new Set(cells.map(c=>c.join(','))), pos=[];
+  const has=(x,y,z)=>set.has(x+','+y+','+z);
+  for(const [x,y,z] of cells) for(const f of FACES){
+    if(has(x+f.n[0],y+f.n[1],z+f.n[2])) continue;                 // interior face → skip
+    const q=f.v.map(([dx,dy,dz])=>[x+dx-0.5-offX, y+dy-0.5-offY, z+dz-0.5-offZ]);
+    pos.push(...q[0],...q[1],...q[2], ...q[0],...q[2],...q[3]);    // quad → 2 triangles
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.computeVertexNormals();
+  const edges=new THREE.EdgesGeometry(geo,1); geo.dispose(); return edges;
+}
 function loadChallenge(ch){
   CH=ch;
   // clear old objects
   for(const k of Object.keys(placed)) delete placed[k];
   board.clear(); pieceLayer.clear(); ghost.clear(); shadowExtra.clear();
-  shadowMeshes={}; shadowTargets={};
+  shadowMeshes={}; shadowTargets={}; socketDots.clear();
   const f=FIGURES[ch.fig];
   [X,Y,Z]=f.dims; offX=(X-1)/2; offY=(Y-1)/2; offZ=(Z-1)/2;
   occ=new Int8Array(X*Y*Z).fill(-1);
   ground.position.y=-Y/2-0.001;
 
-  // bounding cage
-  const cage=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(X,Y,Z)),
-    new THREE.LineBasicMaterial({color:0x3a4560,transparent:true,opacity:.9}));
-  board.add(cage);
-
   if(ch.kind==='fill'){
     targetCells=f.cells.map(c=>[...c]); targetSet=new Set(targetCells.map(c=>id3(...c)));
-    for(const [x,y,z] of targetCells){ const s=new THREE.LineSegments(socketEdgesGeo,socketLineMat); s.position.copy(worldPos(x,y,z)); board.add(s); }
+    board.add(new THREE.LineSegments(buildShellEdges(targetCells),targetBorderMat)); // one border
+    for(const [x,y,z] of targetCells){                                               // one dot per cell
+      const dot=new THREE.Mesh(dotGeo,dotMat); dot.position.copy(worldPos(x,y,z));
+      board.add(dot); socketDots.set(id3(x,y,z),dot);
+    }
   } else { // shadow
+    // bounding cage defines the free build volume
+    board.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(X,Y,Z)),
+      new THREE.LineBasicMaterial({color:0x3a4560,transparent:true,opacity:.9})));
     targetCells=[]; targetSet=new Set();
     for(const plane of ch.planes){
       shadowTargets[plane]=projectCells(f.cells,plane);
@@ -389,16 +417,16 @@ function loadChallenge(ch){
   held=null; heldM=ROT[0]; layer=0; moves=0; rotations=0; startT=0; solved=false; log.length=0;
   PIECES.forEach(p=>markTray(p.id,false));
   document.getElementById('win').style.display='none';
-  frameCamera(); setLayer(0); updateHUD(); if(ch.kind==='shadow') updateShadows();
+  frameCamera(); setLayer(0); updateHUD(); refreshTargets();
   rec('challenge',{id:ch.id,kind:ch.kind,fig:ch.fig,dims:[X,Y,Z]});
   // UI text
   document.getElementById('chalKind').textContent=ch.kind.toUpperCase();
   document.getElementById('s-cellsLbl').textContent = ch.kind==='fill'?'Cells filled':'Cells used';
   document.getElementById('chalGoal').innerHTML = ch.kind==='fill'
-    ? `Fill the <b>${f.name}</b> — every socket, all 7 pieces.`
+    ? `Fill the <b>${f.name}</b> — cover every dot, all 7 pieces.`
     : `Build <b>any</b> solid whose ${ch.planes.length===3?'three ':''}shadows match the glowing silhouettes.`;
   document.getElementById('trayHint').textContent = ch.kind==='fill'
-    ? 'Drop pieces only inside the target sockets.'
+    ? 'Drop pieces on the dots, inside the outline.'
     : 'Build freely; match the wall & floor shadows.';
 }
 function frameCamera(){
@@ -463,7 +491,7 @@ function place(){
   ensureTimer(); moves++;
   rec('place',{piece:held,layer,anchor:{...anchor},cells,orient:orientIndex(heldM)});
   const done=held; held=null; ghost.clear();
-  markTray(done,true); updateHUD(); if(CH.kind==='shadow') updateShadows(); checkWin();
+  markTray(done,true); updateHUD(); refreshTargets(); checkWin();
   return true;
 }
 function remove(pid,silent){
@@ -471,7 +499,7 @@ function remove(pid,silent){
   for(const [x,y,z] of p.cells) occ[id3(x,y,z)]=-1;
   pieceLayer.remove(p.group); disposeGroup(p.group); delete placed[pid];
   markTray(pid,false); if(!silent){ moves++; rec('remove',{piece:pid}); }
-  updateHUD(); if(CH.kind==='shadow') updateShadows();
+  updateHUD(); refreshTargets();
 }
 function disposeGroup(g){ g.traverse(o=>{ if(o.isMesh&&o.material.dispose) o.material.dispose(); }); }
 
@@ -506,6 +534,8 @@ function updateShadows(){
     }
   }
 }
+function updateSockets(){ for(const [i,dot] of socketDots) dot.visible=occ[i]===-1; }  // hide filled cells' dots
+function refreshTargets(){ if(CH.kind==='shadow') updateShadows(); else updateSockets(); }
 
 /* ---------- raycast cursor -> cell on active layer ---------- */
 const ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
@@ -564,7 +594,7 @@ function reset(){
   held=null; ghost.clear(); PIECES.forEach(p=>markTray(p.id,false));
   moves=0; rotations=0; startT=0; solved=false; log.length=0;
   document.getElementById('win').style.display='none';
-  updateHUD(); if(CH.kind==='shadow') updateShadows(); rec('reset');
+  updateHUD(); refreshTargets(); rec('reset');
 }
 function solve(){
   reset();
@@ -576,7 +606,7 @@ function solve(){
       m.castShadow=m.receiveShadow=true; m.position.copy(worldPos(x,y,z)); m.userData.pid=pid; g.add(m); }
     pieceLayer.add(g); placed[pid]={group:g,cells:abs,m:null}; markTray(pid,true);
   }
-  ensureTimer(); rec('solve'); updateHUD(); if(CH.kind==='shadow') updateShadows(); checkWin();
+  ensureTimer(); rec('solve'); updateHUD(); refreshTargets(); checkWin();
 }
 
 /* ---------- HUD / tray ---------- */
