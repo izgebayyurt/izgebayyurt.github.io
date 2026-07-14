@@ -567,6 +567,10 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
    signal). So off-app, entFull is always true -> every pack, the Medley, the
    archive and all chapters open, and entNoAds() (below) silences any ad path. */
 function isNativeApp(){ try{ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }catch(e){ return false; } }
+/* The free web build carries a Ko-fi tip link instead of the store; it shows
+   ONLY off-app, and only once a real handle replaces the placeholder. Declared
+   here (early) because updateProEntry() reads it at boot. */
+var KOFI_URL="https://ko-fi.com/YOUR_HANDLE";
 function entFull(){ return !isNativeApp() || localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
@@ -2135,9 +2139,6 @@ document.getElementById("btnArch").addEventListener("click", function(){ ensureA
   if(entFull()){ pickView={arch:1}; renderPicker(); }
   else showUpsell("pro");
 });
-/* The free web build carries a Ko-fi tip link instead of the store. It shows
-   ONLY off-app (external donation links don't belong in the native store build). */
-var KOFI_URL="https://ko-fi.com/YOUR_HANDLE";
 /* ---------- the two-tier upsell: Pro $4.99 + Remove Ads $2.99, headline per context ---------- */
 function updateProEntry(){
   var b=document.getElementById("btnMenuPro");
