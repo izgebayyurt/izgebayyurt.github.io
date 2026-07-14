@@ -829,8 +829,7 @@ function loadPackLevel(pi, k){
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
   applyLevel(pk.levels[k]);
-  if(k===0 && pk.desc) toast(T(pk.name)+": "+T(pk.desc));
-  maybeMechIntro(pk.levels[k]);
+  maybeMechIntro(pk.levels[k]);   // the pack's flavour line lives in the picker; the mechanic card + demo do the intro
 }
 /* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
    Synthetic pointer events run through the REAL input handlers (demoFiring lets them
