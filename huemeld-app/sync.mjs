@@ -4,7 +4,7 @@
    - the service worker is NOT copied (Capacitor serves from the app bundle;
      updates ship as app updates)
    Run: node sync.mjs */
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -28,4 +28,8 @@ for (const f of ["flow-data.js", "icon-192.png", "icon-512.png", "icon-180.png"]
 }
 // native.js lives in this folder (source of truth), copied into www
 copyFileSync(join(__dir, "native.js"), join(WWW, "native.js"));
+// background music (bundled into the app)
+const MUSIC = join(WWW, "music");
+mkdirSync(MUSIC, { recursive: true });
+for (const f of readdirSync(join(SRC, "music"))) if (f.endsWith(".mp3")) copyFileSync(join(SRC, "music", f), join(MUSIC, f));
 console.log("www/ built from ../huemeld");
