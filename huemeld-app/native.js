@@ -76,21 +76,28 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
 
   function buy(productId, entKey, cb) {
     if (!Purchases) { cb(false); return; }
-    // purchaseStoreProduct needs a REAL StoreProduct from the store — a synthesized
-    // {identifier} is rejected and no purchase sheet ever appears. Fetch it first,
-    // then purchase that object. If the product can't be fetched (not configured in
-    // App Store Connect, not yet "Ready to Submit", or no sandbox account signed in),
-    // getProducts returns an empty list -> report failure instead of hanging.
+    // Always report the TRUE entitlement state read back from RevenueCat after the
+    // attempt — the source of truth. This handles every case correctly:
+    //   • fresh purchase      -> entitlement now active  -> unlock
+    //   • already-owned IAP   -> StoreKit completes without a new transaction, or
+    //                            purchaseStoreProduct rejects "already purchased";
+    //                            getCustomerInfo still shows it owned -> unlock
+    //   • user cancelled      -> no entitlement -> false
+    // It also pushes entitlements so the UI updates even if the callback is missed.
+    function reconcile() {
+      Purchases.getCustomerInfo()
+        .then(function (res) { var e = entsOf(res); pushEnts(e); cb(entKey === "full" ? e.full : e.noads); })
+        .catch(function () { cb(false); });
+    }
+    // purchaseStoreProduct needs a REAL StoreProduct from the store (a synthesized
+    // {identifier} is rejected). Fetch it first, then purchase that object.
     Purchases.getProducts({ productIdentifiers: [productId] })
       .then(function (res) {
         var product = res && res.products && res.products[0];
-        if (!product) { cb(false); return; }               // product unavailable
-        return Purchases.purchaseStoreProduct({ product: product }).then(function (pr) {
-          var e = entsOf(pr);
-          cb(entKey === "full" ? e.full : e.noads);
-        });
+        if (!product) { reconcile(); return; }               // fetch odd? still check existing entitlements
+        return Purchases.purchaseStoreProduct({ product: product }).then(reconcile, reconcile);
       })
-      .catch(function () { cb(false); });                  // user cancelled or purchase failed
+      .catch(reconcile);
   }
 
   window.HuemeldNative = {
@@ -181,6 +188,13 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
       wireReward(); prepareAd(); prepareReward();
     }).catch(function () {});
     if (Purchases) {
+      // any entitlement change (purchase, restore, renewal, cross-device sync) pushes
+      // to the game immediately — so the UI unlocks even if a buy() callback is missed.
+      try {
+        Purchases.addCustomerInfoUpdateListener(function (info) {
+          pushEnts(entsOf({ customerInfo: info && info.customerInfo ? info.customerInfo : info }));
+        });
+      } catch (e) {}
       Purchases.configure({ apiKey: RC_IOS_API_KEY })
         .then(function () { return Purchases.getCustomerInfo(); })
         .then(function (res) { pushEnts(entsOf(res)); })
