@@ -83,7 +83,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .toast{
   position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
   background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
-  padding:7px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s; white-space:nowrap;
+  padding:8px 18px; border-radius:16px; opacity:0; pointer-events:none; transition:opacity .2s;
+  white-space:normal; max-width:calc(var(--bw) - 28px); text-align:center; line-height:1.35;
 }
 .toast.show{ opacity:1; }
 .ov{
@@ -1358,7 +1359,9 @@ function coverage(){
   tgts.forEach(function(T){ set[T.r+","+T.c]=1; });
   return Object.keys(set).length;
 }
-function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
+function toast(msg, ms){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid);
+  var dur=ms||Math.max(1800, Math.min(5200, Math.round((""+msg).length*52)));   // longer messages linger longer
+  toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },dur); }
 function hideToast(){ if(toastTid) clearTimeout(toastTid); toastEl.classList.remove("show"); }
 /* every DRAWN ray must end at a junction (merged) or a delivered circle - no loose ends */
 function noDangling(){
