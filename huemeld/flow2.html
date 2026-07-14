@@ -235,6 +235,7 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
         <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)" data-t="How to play">How to play</button>
         <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
+        <button class="mk" id="btnMenuKofi" style="display:none;background:#ffd6e0">♥ Support Huemeld</button>
         <button class="mk" id="btnMenuLang" style="background:var(--card);color:var(--ink)">Türkçe</button>
       </div>
     </div>
@@ -343,6 +344,7 @@ var TR = {
   "Settings":"Ayarlar",                                             /* 5 */
   "How to play":"Nasıl oynanır",                                    /* 6 */
   "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
+  "Support Huemeld":"Huemeld'e Destek Ol",
   "Menu":"Menü",                                                    /* 8 */
   "Language":"Dil",                                                 /* 9 */
   // - level chrome -
@@ -559,7 +561,13 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
    of every pack - with interstitials after a honeymoon. $2.99 (noads) silences
    ads. $4.99 (full) = no ads + every pack + the Medley + the daily archive, and
    as a bonus opens all chapters instantly. Store purchases flip these flags. */
-function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
+/* The web build (GitHub Pages / PWA) is the FREE version: everything unlocked,
+   no ads. Ads and purchases live only inside the native iOS/Android app, which
+   is detected by the Capacitor runtime (native.js gates itself on the very same
+   signal). So off-app, entFull is always true -> every pack, the Medley, the
+   archive and all chapters open, and entNoAds() (below) silences any ad path. */
+function isNativeApp(){ try{ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }catch(e){ return false; } }
+function entFull(){ return !isNativeApp() || localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
 var UNLOCK_ALL=false;   // RELEASE: teasers + entitlements gate content (was DEV-open).
@@ -1939,7 +1947,8 @@ function icn(name,sz,extra){
     arrowL:'<path d="M15 5l-7 7 7 7"/>',
     arrowR:'<path d="M9 5l7 7-7 7"/>',
     check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
-    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18M4.5 7h15M4.5 17h15"/>'
+    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18M4.5 7h15M4.5 17h15"/>',
+    coffee:'<path d="M4 8.5h12v5.5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M16 9.5h2.4a2.4 2.4 0 0 1 0 4.8H16"/><path d="M7 2.6c-.5.9.5 1.6 0 2.8M11 2.6c-.5.9.5 1.6 0 2.8"/>'
   };
   return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
 }
@@ -2077,7 +2086,7 @@ document.getElementById("btnHome").innerHTML=icn("home",17);
 var ICONBTN={
   btnPick:["list","levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
   btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
-  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"],
+  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"], btnMenuKofi:["coffee","Support Huemeld"],
   btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
   btnUpBuy:["spark","Huemeld Pro · $4.99"], btnFull:["spark","Huemeld Pro · $4.99"], btnDemo:["play","Show me"],
   btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
@@ -2111,6 +2120,7 @@ document.getElementById("btnMenuLevels").addEventListener("click", function(){ e
 document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
 document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
 document.getElementById("btnMenuLang").addEventListener("click", function(){ ensureAudio(); setLang(LANG==="tr"?"en":"tr"); });
+document.getElementById("btnMenuKofi").addEventListener("click", function(){ ensureAudio(); try{ window.open(KOFI_URL,"_blank","noopener"); }catch(e){ location.href=KOFI_URL; } });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -2125,9 +2135,16 @@ document.getElementById("btnArch").addEventListener("click", function(){ ensureA
   if(entFull()){ pickView={arch:1}; renderPicker(); }
   else showUpsell("pro");
 });
+/* The free web build carries a Ko-fi tip link instead of the store. It shows
+   ONLY off-app (external donation links don't belong in the native store build). */
+var KOFI_URL="https://ko-fi.com/YOUR_HANDLE";
 /* ---------- the two-tier upsell: Pro $4.99 + Remove Ads $2.99, headline per context ---------- */
-function updateProEntry(){ var b=document.getElementById("btnMenuPro");
-  if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none"; }
+function updateProEntry(){
+  var b=document.getElementById("btnMenuPro");
+  if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none";
+  var k=document.getElementById("btnMenuKofi");   // web/PWA only, and only once a real handle is set
+  if(k) k.style.display = (!isNativeApp() && KOFI_URL.indexOf("YOUR_HANDLE")<0) ? "" : "none";
+}
 function showUpsell(mode){
   if(entFull()) return;                                   // nothing left to sell
   var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
