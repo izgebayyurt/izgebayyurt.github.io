@@ -19,7 +19,7 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   var cap = window.Capacitor;
   if (!cap || !cap.isNativePlatform || !cap.isNativePlatform()) return;   // web build: no bridge
   var P = cap.Plugins || {};
-  var AdMob = P.AdMob, Purchases = P.Purchases;
+  var AdMob = P.AdMob, Purchases = P.Purchases, Haptics = P.Haptics;
   var adUnit = USE_TEST_ADS ? ADMOB_TEST_INTERSTITIAL : IOS_INTERSTITIAL_ID;
   var rewardUnit = USE_TEST_ADS ? ADMOB_TEST_REWARDED : IOS_REWARDED_ID;
   var adReady = false, attAsked = false, attInFlight = false;
@@ -111,6 +111,15 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
         rewardGot = false; rewardCb = cb; rewardReady = false;
         AdMob.showRewardVideoAd().catch(function () { var c = rewardCb; rewardCb = null; prepareReward(); if (c) c(false); });
       });
+    },
+    haptic: function (kind) {
+      if (!Haptics) return;
+      try {
+        if (kind === "success") Haptics.notification({ type: "SUCCESS" });
+        else if (kind === "error") Haptics.notification({ type: "ERROR" });
+        else if (kind === "medium") Haptics.impact({ style: "MEDIUM" });
+        else Haptics.impact({ style: "LIGHT" });
+      } catch (e) {}
     },
     buyRemoveAds: function (cb) { buy(PRODUCT_NOADS, "noads", cb); },
     buyFull: function (cb) { buy(PRODUCT_FULL, "full", cb); },
