@@ -294,6 +294,14 @@ const pieceMaterial=(color)=>new THREE.MeshStandardMaterial({color,roughness:.34
 const socketEdgesGeo=new THREE.EdgesGeometry(new THREE.BoxGeometry(.9,.9,.9));
 const socketLineMat=new THREE.LineBasicMaterial({color:0x44507a,transparent:true,opacity:.5});
 const shadowPlaneGeo=new THREE.PlaneGeometry(.92,.92);
+// ghost depth cues: solid outlined cubes + a floor footprint + vertical "leg" lines to the ground.
+// Materials are shared and recoloured per rebuild (rebuildGhost runs on every pointer move).
+const ghostEdgesGeo=new THREE.EdgesGeometry(new THREE.BoxGeometry(.92,.92,.92));
+const ghostMat=new THREE.MeshStandardMaterial({transparent:true,opacity:.9,roughness:.32,metalness:0});
+const ghostEdgeMat=new THREE.LineBasicMaterial({color:0xf3f7ff,transparent:true,opacity:.95,depthTest:false});
+const ghostFootMat=new THREE.MeshBasicMaterial({transparent:true,opacity:.3,side:THREE.DoubleSide});
+const ghostLegMat=new THREE.LineBasicMaterial({transparent:true,opacity:.55});
+let ghostLegs=null;               // per-rebuild BufferGeometry for the leg lines (disposed on next rebuild)
 
 /* ---------- per-challenge board state ---------- */
 let CH=null;                          // current challenge
@@ -416,12 +424,32 @@ function clampAnchor(){
   anchor.z=Math.min(Math.max(anchor.z,0),Z-1-sz);
 }
 function rebuildGhost(){
-  ghost.clear(); if(held===null) return;
+  ghost.clear();
+  if(ghostLegs){ ghostLegs.geometry.dispose(); ghostLegs=null; }
+  if(held===null) return;
   clampAnchor();
   const cells=footprint(), ok=valid(cells), col=ok?0x59e089:0xff6b7a;
-  const mat=new THREE.MeshStandardMaterial({color:col,transparent:true,opacity:.55,
-    roughness:.3,metalness:0,emissive:new THREE.Color(col).multiplyScalar(.25)});
-  for(const [x,y,z] of cells){ const m=new THREE.Mesh(boxGeo,mat); m.position.copy(worldPos(x,y,z)); ghost.add(m); }
+  ghostMat.color.setHex(col); ghostMat.emissive.setHex(col); ghostMat.emissiveIntensity=.28;
+  ghostFootMat.color.setHex(col); ghostLegMat.color.setHex(col);
+  // solid cube + bright edge outline (reads as an object, not translucent haze)
+  for(const [x,y,z] of cells){
+    const m=new THREE.Mesh(boxGeo,ghostMat); m.position.copy(worldPos(x,y,z)); ghost.add(m);
+    const e=new THREE.LineSegments(ghostEdgesGeo,ghostEdgeMat); e.position.copy(worldPos(x,y,z)); ghost.add(e);
+  }
+  // floor footprint (XZ position) + leg lines from the ground up to each column's lowest cube (height)
+  const groundY=-Y/2, colMinY=new Map();
+  for(const [x,y,z] of cells){ const k=x+','+z; if(!colMinY.has(k)||y<colMinY.get(k)) colMinY.set(k,y); }
+  const legPts=[];
+  for(const [k,minY] of colMinY){
+    const [x,z]=k.split(',').map(Number);
+    const sq=new THREE.Mesh(shadowPlaneGeo,ghostFootMat); sq.rotation.x=-Math.PI/2;
+    sq.position.set(x-offX, groundY+0.02, z-offZ); ghost.add(sq);
+    const baseY=(minY-offY)-0.46;                          // bottom face of the lowest cube in this column
+    if(baseY>groundY+0.05){ legPts.push(new THREE.Vector3(x-offX,groundY+0.02,z-offZ),
+                                        new THREE.Vector3(x-offX,baseY,z-offZ)); }
+  }
+  if(legPts.length){ ghostLegs=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(legPts),ghostLegMat);
+    ghost.add(ghostLegs); }
 }
 
 function place(){
