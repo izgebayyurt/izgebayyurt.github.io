@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#17131f" />
 <title>Huemeld</title>
-<meta name="description" content="Huemeld — the colour-mixing pipe puzzle. Draw lines, meld the primaries, light every ✦." />
+<meta name="description" content="Huemeld - the colour-mixing pipe puzzle. Draw lines, meld the primaries, light every ✦." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Huemeld" />
@@ -77,6 +77,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 @keyframes starSpin{ to{ transform:rotate(360deg) } }
 .dot.winspin .st{ display:inline-block; animation:starSpin .7s linear infinite; }
 @keyframes dotWin{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+.discpop{ position:absolute; z-index:8; transform:translate(-50%,-50%); font-family:var(--font-d); font-weight:800; font-size:26px; white-space:nowrap; pointer-events:none; text-shadow:0 2px 9px rgba(0,0,0,.55),0 0 2px rgba(0,0,0,.6); animation:discPop 1.2s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes discPop{ 0%{ opacity:0; transform:translate(-50%,-50%) scale(.4) } 16%{ opacity:1; transform:translate(-50%,-90%) scale(1.18) } 42%{ transform:translate(-50%,-112%) scale(1) } 100%{ opacity:0; transform:translate(-50%,-178%) scale(1) } }
 .dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
 .toast{
   position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
@@ -189,9 +191,13 @@ body.menuopen .helpfab{ display:none; }
 .tgl i{ position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--line); transition:left .16s; }
 .tgl[aria-pressed="true"]{ background:#8fd39b; }
 .tgl[aria-pressed="true"] i{ left:23px; }
+.vol{ -webkit-appearance:none; appearance:none; width:150px; height:8px; flex:0 0 auto; border-radius:999px; background:var(--paper); border:2.5px solid var(--line); box-shadow:inset 0 1px 2px rgba(0,0,0,.25); cursor:pointer; }
+.vol::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid var(--line); box-shadow:0 2px 3px rgba(0,0,0,.3); cursor:pointer; }
+.vol::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid var(--line); box-shadow:0 2px 3px rgba(0,0,0,.3); cursor:pointer; }
+.vol:disabled{ opacity:.4; }
 /* colour-blind glyph on dots */
 .dot .cb{ position:absolute; z-index:3; font-family:var(--font-d); font-weight:700; font-size:12px; color:#fff; -webkit-text-stroke:.8px var(--line); left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
-.dot.sq .cb{ top:31%; }   /* the ✦ objectives are squares — lift the colour-blind glyph clear of the star */
+.dot.sq .cb{ top:31%; }   /* the ✦ objectives are squares - lift the colour-blind glyph clear of the star */
 </style>
 </head>
 <body>
@@ -226,7 +232,9 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
         <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
-        <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)">How to play</button>
+        <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)" data-t="How to play">How to play</button>
+        <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
+        <button class="mk" id="btnMenuLang" style="background:var(--card);color:var(--ink)">Türkçe</button>
       </div>
     </div>
     <div class="ov" id="ovMech">
@@ -235,12 +243,12 @@ body.menuopen .helpfab{ display:none; }
         <h2 id="mechTitle">New mechanic</h2>
         <p id="mechBlurb" class="mechblurb"></p>
         <button class="mk" id="btnMechWatch">▶ Watch how it works</button>
-        <button class="mk" id="btnMechOk" style="background:var(--card);color:var(--ink)">Got it</button>
+        <button class="mk" id="btnMechOk" style="background:var(--card);color:var(--ink)" data-t="Got it">Got it</button>
       </div>
     </div>
     <div class="ov" id="ovWin">
       <div class="panel">
-        <h2>Solved! ✦</h2>
+        <h2>Solved!</h2>
         <p id="winMsg">Every cell painted.</p>
         <button class="mk" id="btnWinNext">Next →</button>
       </div>
@@ -250,62 +258,64 @@ body.menuopen .helpfab{ display:none; }
         <h2 id="pickTitle">Levels</h2>
         <button class="mk" id="btnContinue" style="background:#ffd15c">▶ Continue</button>
         <button class="mk" id="btnDaily" style="background:#c9f0c0">★ Daily Puzzle</button>
-        <button class="mk" id="btnArch" style="background:#e8d5ff">Daily Archive</button>
+        <button class="mk" id="btnArch" style="background:#e8d5ff" data-t="Daily Archive">Daily Archive</button>
         <div id="archArea"></div>
-        <button class="mk" id="btnHow" style="background:#bfe3ff">How to play</button>
+        <button class="mk" id="btnHow" style="background:#bfe3ff" data-t="How to play">How to play</button>
         <div class="pkgrid" id="pkgrid"></div>
         <div id="packsArea"></div>
-        <button class="mk" id="btnPickClose">Close</button>
+        <button class="mk" id="btnPickClose" data-t="Close">Close</button>
       </div>
     </div>
     <div class="ov" id="ovUp">
       <div class="panel">
-        <h2>✦ Huemeld Pro</h2>
-        <p class="updesc">One purchase, the whole game:</p>
+        <h2 id="upTitle">Huemeld Pro</h2>
+        <p class="updesc" id="upDesc">One purchase, the whole game:</p>
         <ul class="uplist">
-          <li><span class="upic"></span>No ads, ever</li>
-          <li><span class="upic"></span>All 7 puzzle packs · 350 levels</li>
-          <li><span class="upic"></span>Plus the 150 level medley for extra challenges!</li>
-          <li><span class="upic"></span>Daily archive — replay the last 3 weeks</li>
-          <li><span class="upic"></span>Every chapter unlocked instantly</li>
+          <li><span class="upic"></span><span data-t="No ads, ever">No ads, ever</span></li>
+          <li><span class="upic"></span><span data-t="All 7 puzzle packs · 350 levels">All 7 puzzle packs · 350 levels</span></li>
+          <li><span class="upic"></span><span data-t="Plus the 150 level medley for extra challenges!">Plus the 150 level medley for extra challenges!</span></li>
+          <li><span class="upic"></span><span data-t="Daily archive - replay the last 3 weeks">Daily archive - replay the last 3 weeks</span></li>
+          <li><span class="upic"></span><span data-t="Every chapter unlocked instantly">Every chapter unlocked instantly</span></li>
         </ul>
         <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)">Not now</button>
+        <button class="mk" id="btnUpNoAds" style="background:#bfe3ff" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
+        <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)" data-t="Not now">Not now</button>
       </div>
     </div>
     <div class="ov" id="ovSet">
       <div class="panel">
-        <h2>Settings</h2>
-        <div class="setrow"><span>Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
-        <div class="setrow"><span>Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
-        <div class="setrow"><span>Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
-        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px">Remove Ads · $2.99</button>
+        <h2 data-t="Settings">Settings</h2>
+        <div class="setrow"><span data-t="Dark theme">Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span data-t="Sound">Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span data-t="Volume">Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
+        <div class="setrow"><span data-t="Colour-blind labels">Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
+        <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px">Restore Purchases</button>
-        <p style="margin-top:10px">Mix the primaries, fill the board, and run each gate's colour through it.</p>
-        <p style="margin-top:6px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px">Privacy Policy</a></p>
-        <button class="mk" id="btnSetClose">Done</button>
+        <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Restore Purchases">Restore Purchases</button>
+        <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px" data-t="Privacy Policy">Privacy Policy</a></p>
+        <button class="mk" id="btnSetClose" data-t="Done">Done</button>
       </div>
     </div>
     <div class="ov" id="ovHelp">
       <div class="panel">
-        <h2>How to play</h2>
+        <h2 data-t="How to play">How to play</h2>
         <div class="coachmix" id="helpMix"></div>
         <div class="rules">
-          <p><b>Drag</b> from a circle to draw a line.</p>
-          <p>When two lines <b>meet</b>, their colours <b>mix</b>.</p>
-          <p>Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
-          <p>A <b>gate</b> only lets its own colour pass.</p>
-          <p>Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
+          <p data-th="<b>Drag</b> from a circle to draw a line."><b>Drag</b> from a circle to draw a line.</p>
+          <p data-th="When two lines <b>meet</b>, their colours <b>mix</b>.">When two lines <b>meet</b>, their colours <b>mix</b>.</p>
+          <p data-th="Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.">Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
+          <p data-th="A <b>gate</b> only lets its own colour pass.">A <b>gate</b> only lets its own colour pass.</p>
+          <p data-th="Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.">Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
         </div>
         <button class="mk" id="btnDemo" style="background:#e6d9ff">▶ Show me</button>
-        <button class="mk" id="btnHelpClose">Got it</button>
+        <button class="mk" id="btnHelpClose" data-t="Got it">Got it</button>
       </div>
     </div>
     <div class="ghost" id="ghost"></div>
   </div>
   <div class="actionbar">
     <button class="mkk" id="btnUndo" title="Undo last move">↶ Undo</button>
+    <button class="mkk" id="btnHint" title="Reveal a pipe">Hint</button>
     <button class="mkk" id="btnReset" title="Reset level">↻ Reset</button>
   </div>
   <button class="mkk demoskip" id="demoskip">Skip tutorial ▸</button>
@@ -316,8 +326,188 @@ body.menuopen .helpfab{ display:none; }
 (function(){
 "use strict";
 var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6",N:"#a8703f"};
+
+/* ---------- i18n: T() looks up the English string in the current language ---------- */
+var LANG = localStorage.getItem("hm_flow2_lang") || (((navigator.language||navigator.userLanguage||"en").toLowerCase().slice(0,2)==="tr") ? "tr" : "en");
+var TR = {
+  // - menu & navigation -
+  "Play":"Oyna",                                                    /* 1 */
+  "Daily Puzzle":"Günlük Bulmaca",                                  /* 2 */
+  "Levels":"Bölümler",                                              /* 3 */
+  "levels":"bölümler",                                              /* 4 */
+  "Settings":"Ayarlar",                                             /* 5 */
+  "How to play":"Nasıl oynanır",                                    /* 6 */
+  "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
+  "Menu":"Menü",                                                    /* 8 */
+  "Language":"Dil",                                                 /* 9 */
+  // - level chrome -
+  "Level":"Seviye",                                                  /* 10 */
+  "Chapter":"Bölüm",                                                /* 11 */
+  "Undo":"Geri Al",                                                 /* 12 */
+  "Hint":"İpucu",                                                   /* 13 */
+  "Reset":"Sıfırla",                                                /* 14 */
+  "Skip tutorial":"Eğitimi atla",                                  /* 15 */
+  // - win / continue -
+  "Solved!":"Çözüldü!",                                             /* 16 */
+  "Every cell painted.":"Bütün noktalar boyandı",                       /* 17 */
+  "Next":"İleri",                                                   /* 18 */
+  "Continue":"Devam et",                                            /* 19 */
+  "Back to levels":"Seviyelere dön",                                 /* 20 */
+  // - picker -
+  "Daily Archive":"Günlük Arşiv",                                   /* 21 */
+  "Close":"Kapat",                                                  /* 22 */
+  "All levels":"Tüm bölümler",                                      /* 23 */
+  "pack complete!":"Bütün bölümler tamamlandı!",                             /* 24 */
+  // - mechanic intro card -
+  "New mechanic":"Yeni mekanik",                                    /* 25 */
+  "Got it":"Anladım",                                               /* 26 */
+  "Watch how it works":"Nasıl oynandığını izle",                       /* 27 */
+  "Show me":"Göster",                                          /* 28 */
+  // - settings -
+  "Dark theme":"Koyu tema",                                         /* 29 */
+  "Sound":"Ses",                                                    /* 30 */
+  "Volume":"Ses düzeyi",                                            /* 31 */
+  "Colour-blind labels":"Renk körü etiketleri",                     /* 32 */
+  "Restore Purchases":"Satın Alımları Geri Yükle",                  /* 33 */
+  "Privacy Policy":"Gizlilik Politikası",                           /* 34 */
+  "Done":"Tamam",                                                   /* 35 */
+  // - upsell (Pro) -
+  "Huemeld Pro":"Huemeld Pro",                                      /* 36 */
+  "One purchase, the whole game:":"Tek fiyatla bütün bölümleri aç",      /* 37 */
+  "No ads, ever":"Sonsuza dek reklamsız",                           /* 38 */
+  "All 7 puzzle packs · 350 levels":"7 bulmaca paketi · 350 bölüm", /* 39 */
+  "Plus the 150 level medley for extra challenges!":"Ekstra zorluk için 150 karma mekanikli bölüm!", /* 40 */
+  "Daily archive - replay the last 3 weeks":"Günlük arşiv - son 3 haftayı tekrar oyna", /* 41 */
+  "Every chapter unlocked instantly":"Tüm bölümler anında açılır", /* 42 */
+  "Remove Ads · $2.99":"Reklamları Kaldır · $2.99",                 /* 43 */
+  "Huemeld Pro · $4.99":"Huemeld Pro · $4.99",                      /* 44 */
+  "Not now":"Şimdi değil",                                          /* 45 */
+  "Tired of ads?":"Reklamlardan bıktın mı?",                        /* 46 */
+  "Remove them forever - or unlock everything:":"Reklamlardan sonsuza dek kurtul, ya da pro sahibi ol:", /* 47 */
+  // - how-to-play card (bold kept) -
+  "<b>Drag</b> from a circle to draw a line.":"Çizgi çekmek için bir daireye dokun ve parmağını kaydır.", /* 48 */
+  "When two lines <b>meet</b>, their colours <b>mix</b>.":"İki farklı renkteki çizgiler aynı noktada buluşunca karışırlar.", /* 49 */
+  "Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.":"Her ✦ kareyi aydınlatmak için aynı renkteki bir çizgiyi içine çek. İhtiyacın olan rengi elde etmek için renkleri karıştırman gerekebilir.", /* 50 */
+  "A <b>gate</b> only lets its own colour pass.":"Geçitlerden (küçük kareler) aynı renkteki çizgiler geçmelidir.", /* 51 */
+  "Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.":"Her ✦ kareyi aydınlat ve <b>kazanmak</b> için tüm tahtayı kapla! Bağlanmamış çizgi bırakma.", /* 52 */
+  // - toasts -
+  "New: one circle can FORK - draw a second line from it!":"Yeni mekanik: Bir daire ÇATALLANABİLİR, ondan ikinci bir çizgi çekebilirsin.", /* 53 */
+  "Your turn!":"Sıra sende!",                                       /* 54 */
+  "Feed the prism its colour first!":"Prizmaya onun rengini bağlamalısın!",  /* 55 */
+  "Cover the whole board to finish!":"Bitirmek için tüm tahtayı kapla!", /* 56 */
+  "A pipe has a loose end!":"Bir borunun ucu açıkta!",              /* 57 */
+  "A gate needs the right colour!":"Bir geçit doğru renkte değil!", /* 58 */
+  "Ride arrows straight through, the way they point!":"Okların gösterdiği yönde ve renkte dümdüz ilerlemelisin", /* 59 */
+  "Lines must pass straight through ice!":"Çizgiler buzun içinden dümdüz geçmeli!", /* 60 */
+  "Bridges must be crossed straight!":"Köprülerden dümdüz geçilmeli", /* 61 */
+  "A number tile needs its EXACT count!":"Sayılardan birinin etrafında doğru sayıda renk yok!", /* 62 */
+  "Available in the app":"Uygulamada mevcut",                       /* 63 */
+  "Ads removed - thank you!":"Reklamlar kaldırıldı - teşekkürler!", /* 64 */
+  "Purchase not completed":"Satın alma tamamlanmadı",               /* 65 */
+  "✦ Huemeld Pro unlocked - thank you!":"✦ Huemeld Pro açıldı - teşekkürler!", /* 66 */
+  "Every pipe is already showing":"Tüm borular zaten gösteriliyor", /* 67 */
+  "No hint for this puzzle":"Bu bulmaca için ipucu yok",            /* 68 */
+  "Loading a video for your hint…":"İpucun için video yükleniyor…", /* 69 */
+  "No hint yet - the video didn't finish":"Henüz ipucu yok - video bitmedi", /* 70 */
+  "A pipe revealed - trace the dotted line":"Bir boru gösterildi - noktalı çizgiyi takip et", /* 71 */
+  "Last pipe revealed - trace the dotted line":"Son boru gösterildi - noktalı çizgiyi takip et", /* 72 */
+  // - tutorial (ghost-hand) captions -
+  "Drag a line out of a circle…":"Bir daireden çizgi çek…",         /* 73 */
+  "Now bring in the other colour…":"Şimdi diğer rengi getir…",      /* 74 */
+  "Fill the board and light every square to win!":"Kazanmak için tahtayı doldur ve her kareyi aydınlat!", /* 75 */
+  "Where colours meet, they MIX - red + blue makes purple!":"Renkler buluştuğu yerde KARIŞIR - kırmızı + mavi mor yapar!", /* 76 */
+  "A gate passes only its own colour. Purple flows right through.":"Bir geçit yalnızca kendi rengini geçirir. Mor buradan ilerleyebilir.", /* 77 */
+  "Cover every cell and light each square to win!":"Kazanmak için her noktayı kapla ve her kareyi aydınlat!", /* 78 */
+  // - mechanic names -
+  "Brown":"Kahverengi",                                             /* 79 */
+  "Arrows":"Oklar",                                                 /* 80 */
+  "Ice":"Buz",                                                      /* 81 */
+  "Portals":"Portallar",                                            /* 82 */
+  "Overpass":"Köprü",                                            /* 83 */
+  "Prisms":"Prizmalar",                                             /* 84 */
+  "Numbers":"Sayılar",                                              /* 85 */
+  "Medley":"Karma",                                                 /* 86 */
+  // - mechanic blurbs (intro card) -
+  "Combine all 3 primary colors (a secondary + a primary) to create brown.":"Kahverengi oluşturmak için 3 ana rengi birleştir (bir ara renk + bir ana renk).", /* 87 */
+  "Arrows only pass their colour - ridden straight through, the way they point.":"Oklar yalnızca rengini geçirir - gösterdikleri yönde dümdüz geçilir.", /* 88 */
+  "Frozen cells can't hold a turn - lines pass straight through.":"Donmuş hücrelerde dönüş yapılmaz", /* 89 */
+  "A line entering one spiral pops out of its twin.":"Portala giren çizgi ışınlanır", /* 90 */
+  "Two lines can share a bridge cell - one crosses straight over the other.":"İki çizgi bir köprü hücresini paylaşabilir. biri diğerinin üstünden karışmadan geçer.", /* 91 */
+  "Feed a prism its blend and it splits back into the two primaries.":"Bir prizmaya karışımını ver, iki ana renge geri ayrılsın.", /* 92 */
+  "A numbered tile counts its colour in the 3×3 around it, itself included - match it exactly.":"Sayılar kendisi dahil çevresindeki 3x3'lük alandaki kendi rengini tam olarak ister.", /* 93 */
+  // - pack descriptions (picker) -
+  "Mix three primary colors":"Üç ana rengi karıştır",               /* 94 */
+  "Lines must follow the direction on the sign":"Çizgiler tabeladaki yönü izlemeli", /* 95 */
+  "Prevents turning inside":"İçinde dönmeyi engeller",              /* 96 */
+  "Who knew lines could be teleported? Well now they do":"Hooop burdayım. Tamam de niye ordasın?", /* 97 */
+  "Cross two lines over each other":"İki çizgiyi üst üste geçir",   /* 98 */
+  "Split a mixed line back to its components":"Karışık bir çizgiyi bileşenlerine ayır", /* 99 */
+  "Match the color count around the numbered tile":"Sayının çevresindeki renkleri sayı ile eşleştir", /* 100 */
+  "Little bit of everything!":"Ortaya karışık",                  /* 101 */
+  // - chapter names -
+  "Mix":"Karışım",                                                  /* 102 */
+  "Fork":"Çatal",                                                   /* 103 */
+  "Pressure":"Baskı",                                               /* 104 */
+  "Big Boards":"Büyük Tahtalar",                                    /* 105 */
+  "Mastery":"Ustalık",                                              /* 106 */
+  // - composed strings ({0},{1}… are filled in at runtime) -
+  "Daily":"Günlük",                                                 /* 107 */
+  "{0} is locked - solve {1} more in {2} to unlock":"{0} kilitli - açmak için {2} bölümünde {1} tane daha çöz", /* 108 */
+  "The {0} teaser ends here - Huemeld Pro unlocks the rest!":"{0} tanıtımı burada bitiyor - gerisini Huemeld Pro açar!", /* 109 */
+  "pack complete!":"Bütün bölümler tamamlandı!",                             /* 110 */
+  "{0} teaser done - {1} more levels in the full game!":"{0} tanıtımı bitti - tam oyunda {1} bölüm daha var!", /* 111 */
+  "Continue · Level {0}":"Devam · Seviye {0}",                       /* 112 */
+  "How {0} works":"{0} nasıl çalışır",                              /* 113 */
+  "Chapter {0} · {1}":"Bölüm {0} · {1}",                            /* 114 */
+  // - win messages -
+  "Whole board covered.":"Tüm tahta kaplandı.",                     /* 115 */
+  "Daily solved":"Günlük çözüldü",                                  /* 116 */
+  "Archive daily solved!":"Arşiv günlüğü çözüldü!",                 /* 117 */
+  "{0}-day streak!":"{0} günlük seri!",                             /* 118 */
+  "see you tomorrow!":"yarın görüşürüz!",                           /* 119 */
+  "Chapter unlocked: {0}!":"Bölüm açıldı: {0}!",                    /* 120 */
+  "That's the last level - more coming!":"Bu son bölüm, dahası geliyor!", /* 121 */
+  "{0} - pack complete!":"Bütün bölümler tamamlandı!",                 /* 122 */
+  "New mechanic: {0}":"Yeni mekanik: {0}",                          /* 123 */
+  // - picker -
+  "Levels · {0}/{1}":"Bölümler · {0}/{1}",                          /* 124 */
+  "{0} levels":"{0} bölüm",                                         /* 125 */
+  "Solve {0} more in {1}":"{1} bölümünde {0} tane daha çöz",         /* 126 */
+  "Puzzle Packs":"Bulmaca Paketleri",                              /* 127 */
+  "All levels":"Tüm bölümler",                                      /* 128 */
+  // - mechanic tutorial captions (3 per pack) -
+  "Mix two primaries into a secondary…":"Önce iki ana rengi karıştır", /* 129 */
+  "…then run the THIRD primary into it: brown!":"sonra üçüncü ana rengi de kat ve kahverengi elde et!", /* 130 */
+  "Brown squares want the full triple mix.":"Kahverengi kareler üç ana rengi de ister", /* 131 */
+  "This gate points a direction…":"Bu geçit bir yön de istiyor",      /* 132 */
+  "…ride it STRAIGHT through, the way it points.":"gösterdiği yönde dümdüz ilerle", /* 133 */
+  "Wrong colour or wrong way won't do.":"Geçidin rengine dikkat et!", /* 134 */
+  "Ice is slippery…":"Buz kaygandır",                             /* 135 */
+  "…lines cross it in a straight line only.":"çizgiler buzdan sadece dümdüz geçebilir", /* 136 */
+  "Plan your turns before the freeze!":"Dönüşlerini buzdan önce planla!", /* 137 */
+  "Dive into a spiral…":"Bir portalın içine gir",                        /* 138 */
+  "…and pop out of its twin across the board!":"ve tahtanın öbür ucundaki diğer portaldan çık!", /* 139 */
+  "The line carries on from there.":"Çizgi oradan devam eder",     /* 140 */
+  "A bridge lets lines CROSS…":"Köprüler çizgilerin karışmadan üst üste geçmesini sağlar.", /* 141 */
+  "…straight over, straight under. No mixing.":"Üstten ve alttan dümdüz ilerle", /* 142 */
+  "Two lines, one cell - only on bridges.":"İki çizgi yalnız köprülerde karışmadan geçebilir", /* 143 */
+  "Feed the prism its secondary colour…":"Prizmaya ara rengini ver…", /* 144 */
+  "…it splits into the two primaries!":"…iki ana renge ayrılır!",   /* 145 */
+  "Route BOTH rays home to finish.":"Bitirmek için HER İKİ ışını da yerine ulaştır.", /* 146 */
+  "This tile counts its colour around itself…":"Sayılı kareler çevresindeki kendi renginin sayısını belirtir.", /* 147 */
+  "…the 3×3 block, tile included: EXACTLY that many.":"3x3'lük blok içerisindeki karenin kendisi dahil bütün doğru renkli kareler sayılır", /* 148 */
+  "A zero means: keep that colour away!":"Eğer bir karenin içinde 0 varsa etrafında o renk yok demektir!",  /* 149 */
+  // — colour-discovery pops —
+  "Orange!":"Turuncu!",                                            /* 150 */
+  "Green!":"Yeşil!",                                               /* 151 */
+  "Purple!":"Mor!",                                                /* 152 */
+  "Brown!":"Kahverengi!"                                           /* 153 */
+};
+function T(s){ if(LANG!=="tr" || s==null) return s; var v=TR[s]; return v!=null ? v : s; }
+function Tf(s){ var a=arguments, r=T(s); for(var i=1;i<a.length;i++) r=r.split("{"+(i-1)+"}").join(a[i]); return r; }
+function setLang(l){ LANG=l; localStorage.setItem("hm_flow2_lang",l); applyLang(); }
 /* primaries pair into secondaries; a secondary + its MISSING primary makes browN
-   (O+B, G+R, P+Y) — that's how "mix all three" levels chain two junctions. */
+   (O+B, G+R, P+Y) - that's how "mix all three" levels chain two junctions. */
 var MIXMAP={RY:"O",BR:"P",BY:"G",BO:"N",GR:"N",PY:"N"};
 var COMPS={O:["R","Y"],G:["B","Y"],P:["B","R"]};   // what a PRISM splits a secondary back into
 function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
@@ -330,7 +520,7 @@ document.addEventListener("touchmove", function(e){ if(e.touches.length>1) e.pre
 var lastTE=0;
 document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-lastTE<300 && !e.target.closest("button")) e.preventDefault(); lastTE=now; }, {passive:false});
 
-/* ---------- levels — OFFLINE FALLBACK ONLY. The live campaign + daily pool load
+/* ---------- levels - OFFLINE FALLBACK ONLY. The live campaign + daily pool load
    from flow-data.js (window.HUEMELD_FLOW); this inline set is used only if that
    file is missing. Single-emitter style: one R/Y/B square each (free to fork),
    secondary circles (O/G/P) as the objective, plus COLOUR GATES for challenge.
@@ -359,13 +549,13 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
 /* ---------- chapters & entitlements ----------
    THE MENU: free gets the whole 250-level campaign (gated by progress: solve 2/3
    of a chapter to open the next), today's daily, and the first PACK_FREE levels
-   of every pack — with interstitials after a honeymoon. $2.99 (noads) silences
+   of every pack - with interstitials after a honeymoon. $2.99 (noads) silences
    ads. $4.99 (full) = no ads + every pack + the Medley + the daily archive, and
    as a bonus opens all chapters instantly. Store purchases flip these flags. */
 function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
-var UNLOCK_ALL=true;   // DEV: every chapter + pack level open. Set false before release (APPSTORE.md step 7).
+var UNLOCK_ALL=false;   // RELEASE: teasers + entitlements gate content (was DEV-open).
 function packLevelUnlocked(k){ return UNLOCK_ALL || entFull() || k<PACK_FREE; }
 function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
 function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
@@ -397,7 +587,7 @@ var counters=[];                         // pack mechanic: EXACTLY n of my 8 nei
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
 var DBL_MS=340;
 var isTut=false;
-/* undo — snapshot the board before each gesture, restore on demand */
+/* undo - snapshot the board before each gesture, restore on demand */
 var undoStack=[], preGesture=null, UNDO_CAP=60;
 function snapState(){ return JSON.stringify({
   ems:ems.map(function(E){ return E.legs.map(function(l){ return {c:l.cells.map(function(x){return [x[0],x[1]];}), j:l.jun}; }); }),
@@ -417,7 +607,11 @@ function updateUndoUI(){ var b=document.getElementById("btnUndo"); if(b) b.disab
 var mode="campaign";           // "campaign" | "daily"
 var soundOn = localStorage.getItem("hm_flow2_sound")!=="0";
 var cbOn = localStorage.getItem("hm_flow2_cb")==="1";
-/* theme — dark by default. INK is the canvas outline colour, kept in sync. */
+// volume 0..1; a soft-knee compressor lets the top of the range push genuinely
+// LOUDER (perceived) without harsh clipping. Default 0.7 sits well above the old fixed 0.85.
+var volume = (function(){ var v=parseFloat(localStorage.getItem("hm_flow2_vol")); return isNaN(v)?0.7:Math.max(0,Math.min(1,v)); })();
+function volGain(v){ return v*2.1; }   // 0..2.1 master gain (old fixed level was 0.85; the limiter below keeps loud peaks clean)
+/* theme - dark by default. INK is the canvas outline colour, kept in sync. */
 var theme = localStorage.getItem("hm_flow2_theme")==="light" ? "light" : "dark";
 var INK = theme==="light" ? "#2c2733" : "#141019";
 function applyTheme(){
@@ -442,8 +636,21 @@ function dailyIndexFor(d){ if(!DAILY.length) return 0; var n=Math.floor(Date.UTC
 /* ---------- audio: a warm, liquid palette (filtered sines, not thin beeps) ---------- */
 var actx=null, master=null;
 function ensureAudio(){
-  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); master=actx.createGain(); master.gain.value=0.85; master.connect(actx.destination); }catch(e){ actx=null; } }
+  if(!actx){ try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    master=actx.createGain(); master.gain.value=volGain(volume);
+    // brick-wall-ish limiter: stacked sounds (the win cascade especially) would
+    // otherwise clip and distort once the master gain is pushed up. Fast attack +
+    // high ratio + low threshold catch the peaks while everyday sounds pass clean.
+    var comp=actx.createDynamicsCompressor();
+    comp.threshold.value=-6; comp.knee.value=4; comp.ratio.value=18; comp.attack.value=0.002; comp.release.value=0.18;
+    master.connect(comp); comp.connect(actx.destination);
+  }catch(e){ actx=null; } }
   if(actx&&actx.state==="suspended") actx.resume();
+}
+function setVolume(v){
+  volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
+  if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
 }
 /* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
 function voice(freq,dur,o){
@@ -489,11 +696,15 @@ function sfxJun(){
 /* blend reaches its target: a bright two-note bell */
 function sfxDone(){ bell(659.25,0.5,0.06); setTimeout(function(){ bell(987.77,0.62,0.05); },95); }   // E5 -> B5
 /* win: a rising bell arpeggio */
-function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.055); }, i*115); }); }
+function sfxWin(){ [523.25,659.25,783.99,1046.5,1318.5].forEach(function(f,i){ setTimeout(function(){ bell(f,0.62,0.038); }, i*128); }); }
 
 /* ---------- level state ---------- */
+var curLevelObj=null, ghostStrokes=[], hintOrder=null, hintN=0;   // rewarded-ad hints
 function applyLevel(L){
   if(demoing) stopDemo();   // navigating anywhere cancels a running ghost demo
+  // reset revealed hints only when the LEVEL actually changes - a Reset reloads the
+  // same object, so a hint the player watched an ad for survives the reset.
+  if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; }
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
   undoStack=[]; preGesture=null;
@@ -517,24 +728,31 @@ function applyLevel(L){
     comp.forEach(function(pc){ ems.push({col:pc, r:p[1], c:p[2], legs:[], lock:ti, max:1}); });
   });
   ovWin.classList.remove("show"); ovPick.classList.remove("show");
-  buildGrid(); renderDots(); renderPaths(); updateUndoUI();
+  buildGrid(); renderDots(); renderPaths(); updateUndoUI(); updateHintUI();
+}
+// set the level-name label for the current mode (also used when switching language)
+function relabel(){
+  if(!lvNameEl) return;
+  if(mode==="pack" && PACKS[curPack]) lvNameEl.textContent=T(PACKS[curPack].name)+" · "+(packIdx+1)+"/"+PACKS[curPack].levels.length;
+  else if(mode==="daily" && DAILY.length){ var d=dateAgo(dailyOff), mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]; lvNameEl.textContent=T("Daily")+" · "+mo+" "+d.getDate(); }
+  else { var ch=chapterOf(li); lvNameEl.textContent=T("Level")+" "+(li+1)+(CHAPTERS.length>1 ? " · "+T(CHAPTERS[ch].name) : ""); }
 }
 function loadLevel(i){
   var want=Math.max(0, Math.min(LEVELS.length-1, i));
   var ch=chapterOf(want);
   if(!chapterUnlocked(ch)){
     var prev=CHAPTERS[ch-1];
-    toast(CHAPTERS[ch].name+" is locked — solve "+(chapterNeed(ch-1)-solvedInChapter(ch-1))+" more in "+prev.name+" to unlock");
+    toast(Tf("{0} is locked - solve {1} more in {2} to unlock", T(CHAPTERS[ch].name), (chapterNeed(ch-1)-solvedInChapter(ch-1)), T(prev.name)));
     return;
   }
   isTut=false; mode="campaign";
   li=want;
   localStorage.setItem("hm_flow2_i",""+li);
-  lvNameEl.textContent="Level "+(li+1)+(CHAPTERS.length>1 ? " · "+CHAPTERS[ch].name : "");
+  relabel();
   document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = li<LEVELS.length-1 ? "" : "hidden";
   applyLevel(LEVELS[li]);
-  // first FORK level: teach the one move nobody discovers alone — a circle can
+  // first FORK level: teach the one move nobody discovers alone - a circle can
   // feed TWO lines. Pulse the square that has to do it.
   var L=LEVELS[li];
   if(L.sq.length>=3 && !localStorage.getItem("hm_flow2_forktip")){
@@ -542,7 +760,7 @@ function loadLevel(i){
     var need={}; L.ci.forEach(function(t){ (COMPS[t[0]]||[]).forEach(function(p){ need[p]=(need[p]||0)+1; }); });
     var forkCol=null; for(var pc in need) if(need[pc]>1) forkCol=pc;
     var fe=null; ems.forEach(function(E){ if(E.col===forkCol) fe=E; });
-    toast("New: one circle can FORK — draw a second line from it!");
+    toast(T("New: one circle can FORK - draw a second line from it!"));
     if(fe){ var k=0, iv=setInterval(function(){ if(li>=0) bounceDot(fe.r,fe.c); if(++k>=5) clearInterval(iv); }, 850); }
   }
 }
@@ -551,8 +769,7 @@ function loadDaily(off){
   isTut=false; mode="daily"; dailyOff=off||0;
   var d=dateAgo(dailyOff);
   var L = DAILY.length ? DAILY[dailyIndexFor(d)] : LEVELS[li];
-  var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
-  lvNameEl.textContent = DAILY.length ? ("Daily · "+mo+" "+d.getDate()) : ("Level "+(li+1));
+  relabel();
   document.getElementById("btnPrev").style.visibility="hidden";
   document.getElementById("btnNext").style.visibility="hidden";
   applyLevel(L);
@@ -560,13 +777,13 @@ function loadDaily(off){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
-  if(!packLevelUnlocked(k)){ toast("The "+pk.name+" teaser ends here — get every pack with Huemeld Pro!"); return; }
+  if(!packLevelUnlocked(k)){ toast(Tf("The {0} teaser ends here - Huemeld Pro unlocks the rest!", T(pk.name))); showUpsell("pro"); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
-  lvNameEl.textContent=pk.name+" · "+(k+1)+"/"+pk.levels.length;
+  relabel();
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
   applyLevel(pk.levels[k]);
-  if(k===0 && pk.desc) toast(pk.name+": "+pk.desc.toLowerCase());
+  if(k===0 && pk.desc) toast(T(pk.name)+": "+T(pk.desc));
   maybeMechIntro(pk.levels[k]);
 }
 /* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
@@ -589,7 +806,7 @@ function stopDemo(){   // clear timers + chrome; does NOT touch the board
   ghostEl.style.display="none"; demobanEl.classList.remove("show"); demoskipEl.classList.remove("show");
 }
 var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
-function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast("Your turn!"); }
+function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast(T("Your turn!")); }
 function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
   if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
   demoing=true;                                             // specific cell to change the caption
@@ -620,10 +837,10 @@ function playDemo(){
   demoReturn=null;   // hand back to campaign level 1
   // pause on the mix cell and the gate cell of level 1's baked solution
   return playDemoOn(demo,
-    ["Drag a line out of a circle…","Now bring in the other colour…","Fill the board and light every square to win!"],
-    { "1:7":  { cap:"Where colours meet, they MIX — red + blue makes purple!", hold:1700 },
-      "1:10": { cap:"A gate passes only its own colour. Purple flows right through.", hold:1900 },
-      "1:18": { cap:"Cover every cell and light each square to win!", hold:1100 } });
+    [T("Drag a line out of a circle…"),T("Now bring in the other colour…"),T("Fill the board and light every square to win!")],
+    { "1:7":  { cap:T("Where colours meet, they MIX - red + blue makes purple!"), hold:1700 },
+      "1:10": { cap:T("A gate passes only its own colour. Purple flows right through."), hold:1900 },
+      "1:18": { cap:T("Cover every cell and light each square to win!"), hold:1100 } });
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
 function cs(){ return board.clientWidth/N; }
@@ -646,7 +863,7 @@ function isIce(r,c){ return !!iceSet[r+","+c]; }
 function portTwin(r,c){ for(var i=0;i<portals.length;i++){ var p=portals[i];
   if(p[0]===r&&p[1]===c) return [p[2],p[3]];
   if(p[2]===r&&p[3]===c) return [p[0],p[1]]; } return null; }
-/* the pipe (junction blend or emitter ray) whose cells include (r,c) — {cells,idx} */
+/* the pipe (junction blend or emitter ray) whose cells include (r,c) - {cells,idx} */
 function pathAt(r,c){
   for(var j=0;j<junctions.length;j++){ var jd=indexIn(junctions[j].leg,r,c); if(jd>=0) return {cells:junctions[j].leg, idx:jd}; }
   for(var e=0;e<ems.length;e++) for(var l=0;l<ems[e].legs.length;l++){ var id=indexIn(ems[e].legs[l].cells,r,c); if(id>=0) return {cells:ems[e].legs[l].cells, idx:id}; }
@@ -664,7 +881,7 @@ function dirOK(G){
     cl[i+1][0]-cl[i][0]===v[0] && cl[i+1][1]-cl[i][1]===v[1];
 }
 function gateOK(G){ return colorAt(G.r,G.c)===G.col && dirOK(G); }
-/* every ice cell must be crossed in a straight line — enter one side, leave the opposite */
+/* every ice cell must be crossed in a straight line - enter one side, leave the opposite */
 function iceOK(){
   for(var i=0;i<ices.length;i++){ var p=pathAt(ices[i][0],ices[i][1]); if(!p) return false;
     var cl=p.cells, k=p.idx;
@@ -674,7 +891,7 @@ function iceOK(){
   return true;
 }
 function isBridge(r,c){ return !!bridgeSet[r+","+c]; }
-/* ALL pipes whose cells include (r,c) — a bridge cell can carry two */
+/* ALL pipes whose cells include (r,c) - a bridge cell can carry two */
 function pathsAt(r,c){
   var out=[];
   junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd, col:J.sec}); });
@@ -687,7 +904,7 @@ function cellColorFull(r,c){
   var T=tgtAt(r,c); if(T) return T.col;
   for(var e=0;e<ems.length;e++) if(ems[e].r===r && ems[e].c===c) return ems[e].col;
   /* a junction's mixing cell wears its OUTPUT colour (a chain cell counts as
-     brown, not as the secondary flowing in) — keeps counters consistent */
+     brown, not as the secondary flowing in) - keeps counters consistent */
   for(var j=0;j<junctions.length;j++){ var J=junctions[j]; if(J.cell && J.cell[0]===r && J.cell[1]===c) return J.sec; }
   return colorAt(r,c);
 }
@@ -723,7 +940,7 @@ function buildGrid(){
     h+='<div class="gcell'+(wallSet[r+","+c]?" wall":"")+'" style="left:'+(c*s)+'%;top:'+(r*s)+'%;width:'+s+'%;height:'+s+'%"></div>';
   gridL.innerHTML=h;
 }
-/* seeded per-cell wobble — stable within a level, different each level (echoes the tiles' random tilt) */
+/* seeded per-cell wobble - stable within a level, different each level (echoes the tiles' random tilt) */
 function jhash(a,b,salt){ var h=Math.imul(((a+11)*374761397) ^ ((b+7)*668265263) ^ ((salt+3)*2246822519), 2654435761)>>>0; h^=h>>>15; h=Math.imul(h,2246822519)>>>0; h^=h>>>13; return (h>>>0)/4294967295; }
 function jvec(r,c){ return [ (jhash(r,c,li*13+1)-0.5)*2, (jhash(r,c,li*13+2)-0.5)*2 ]; }
 function jbump(r,c){ return (jhash(r,c,li*13+3)-0.5)*2; }
@@ -765,7 +982,7 @@ function prismStartAt(r,c){
   if(locked) return -2;
   return anyPrism ? -3 : -1;
 }
-/* the single source of consistency — run after ANY structural change (retreat, truncate, etc.).
+/* the single source of consistency - run after ANY structural change (retreat, truncate, etc.).
    Deterministic: derives the valid set of legs/junctions from the raw cell paths. */
 function reconcile(){
   // A) drop orphaned branch legs: a leg's root must be the emitter cell OR sit on a sibling leg.
@@ -802,7 +1019,7 @@ function reconcile(){
     for(var k=E.legs.length-1;k>=0;k--){ destroyJunctionOf(E.legs[k]); E.legs.splice(k,1); pdrop=true; } });
   if(pdrop) recomputeTargets();
 }
-/* Derive each circle's done-state from the CURRENT pipe heads — the single truth.
+/* Derive each circle's done-state from the CURRENT pipe heads - the single truth.
    Fixes the stuck-terminal bug: delivering set done=true, but retreating a pipe off
    a circle used to leave it "done" forever (looked fed, refused new connections). */
 function recomputeTargets(){
@@ -819,7 +1036,7 @@ function recomputeTargets(){
   });
 }
 /* drop STRAY emitter legs (just the emitter cell, no pipe) left behind when a fork/branch
-   was started but not drawn — otherwise the phantom leg fills the 2-leg slot and locks the
+   was started but not drawn - otherwise the phantom leg fills the 2-leg slot and locks the
    square out of any new line until a double-tap reset. */
 function pruneStrayLegs(){
   var changed=false;
@@ -850,7 +1067,7 @@ board.addEventListener("pointerdown", function(e){
   preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
   drawSteps=0; melodyReset();
   var pri=prismStartAt(cell[0],cell[1]);
-  if(pri===-2){ toast("Feed the prism its colour first!"); drag=null; }
+  if(pri===-2){ toast(T("Feed the prism its colour first!")); drag=null; }
   else if(pri===-3){ drag=null; }       // fully-drawn prism: retreat rays by their tips (or Undo)
   else if(pri>=0){
     var PE=ems[pri];
@@ -881,12 +1098,12 @@ board.addEventListener("pointerdown", function(e){
       var strayIdx=-1; for(var li=0;li<E.legs.length;li++) if(E.legs[li].cells.length<=1){ strayIdx=li; break; }
       if(strayIdx>=0){ E.legs[strayIdx]={cells:[[E.r,E.c]], jun:-1}; drag={t:"em", e:o.e, l:strayIdx}; }
       else if(E.legs.length<4){ E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:E.legs.length-1}; }
-      else { drag=null; }   // all 4 rays out — a single tap does nothing (double-tap resets)
+      else { drag=null; }   // all 4 rays out - a single tap does nothing (double-tap resets)
     }
   } else if(o.t==="em"){
     var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
     if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
-    else { drag=null; }   // a mid-pipe click does nothing — both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
+    else { drag=null; }   // a mid-pipe click does nothing - both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
   renderPaths();
@@ -908,7 +1125,7 @@ function step(cell){
   if(same(cell,head)) return;
   if(leg.length>1 && same(cell, leg[leg.length-2])){
     // if head and the previous cell aren't adjacent, the last step was a PORTAL WARP:
-    // the finger still hovering on the entry cell is NOT a retreat — ignore it,
+    // the finger still hovering on the entry cell is NOT a retreat - ignore it,
     // or the twin pops the instant it appears (the "portals don't teleport" bug).
     var pv2=leg[leg.length-2];
     if(Math.abs(head[0]-pv2[0])+Math.abs(head[1]-pv2[1])!==1) return;
@@ -923,7 +1140,7 @@ function step(cell){
   }
   if(Math.abs(cell[0]-head[0])+Math.abs(cell[1]-head[1])!==1) return;
   if(isWall(cell[0],cell[1])) return;   // pipes can't enter a wall
-  if(leg.length>1 && tgtAt(head[0],head[1])) return;   // a terminal is an endpoint — no dragging THROUGH it (a prism RAY's root sits on one, hence length>1)
+  if(leg.length>1 && tgtAt(head[0],head[1])) return;   // a terminal is an endpoint - no dragging THROUGH it (a prism RAY's root sits on one, hence length>1)
   if((isIce(head[0],head[1])||isBridge(head[0],head[1])) && leg.length>1){   // no turning on ice or mid-bridge
     var pv=leg[leg.length-2];
     if(cell[0]-head[0]!==head[0]-pv[0] || cell[1]-head[1]!==head[1]-pv[1]) return;
@@ -939,7 +1156,7 @@ function step(cell){
     }
     renderPaths(); return;
   }
-  // BRIDGE: a second line may cross an occupied bridge cell — perpendicular only
+  // BRIDGE: a second line may cross an occupied bridge cell - perpendicular only
   if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg") && indexIn(leg,cell[0],cell[1])<0){
     var d0=[cell[0]-head[0], cell[1]-head[1]];
     var ps0=pathsAt(cell[0],cell[1]);
@@ -981,7 +1198,7 @@ function step(cell){
         oleg2.cells=oleg2.cells.slice(0, o.idx+1);
         junctions.push(NJ2);
         MJ.jun=junctions.length-1; oleg2.jun=junctions.length-1;
-        addBloom(cell[0],cell[1], HEX[ns], 660); drawSteps=0; sfxJun();
+        addBloom(cell[0],cell[1], HEX[ns], 660); drawSteps=0; sfxJun(); hap("medium"); discover(ns,cell[0],cell[1]);
         drag = exc2.length ? null : {t:"jun", i:junctions.length-1};
         renderPaths(); return;
       }
@@ -993,7 +1210,7 @@ function step(cell){
     var sec=mixOf(me.col, other.col);
     var myLeg=me.legs[drag.l];
     var oHead=oleg.cells[oleg.cells.length-1];
-    var oDelivered=!!tgtAt(oHead[0],oHead[1]);   // the other pipe already delivers to a circle — it isn't free to hijack
+    var oDelivered=!!tgtAt(oHead[0],oHead[1]);   // the other pipe already delivers to a circle - it isn't free to hijack
     // the blend is wanted if its own circle needs it, OR it's a stepping stone to a browN circle
     var secWanted=(tgtFor(sec) && !tgtFor(sec).done) || (tgtFor("N") && !tgtFor("N").done);
     if(sec && myLeg.jun<0 && oleg.jun<0 && !oDelivered && secWanted
@@ -1006,8 +1223,8 @@ function step(cell){
       oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
       junctions.push(J);
       myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
-      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun();
-      // tip merge (no excess): keep drawing the blend. Mid merge: the excess IS the blend leg — end
+      addBloom(cell[0],cell[1], HEX[sec], 660); drawSteps=0; sfxJun(); hap("medium"); discover(sec,cell[0],cell[1]);
+      // tip merge (no excess): keep drawing the blend. Mid merge: the excess IS the blend leg - end
       // the drag so the finger doesn't fight the far-away head; grab the junction to reroute.
       drag = excess.length ? null : {t:"jun", i:junctions.length-1};
       renderPaths(); return;
@@ -1019,7 +1236,7 @@ function step(cell){
     var PJ=junctions[o.i], myL2=ems[drag.e].legs[drag.l];
     var ns2=mixOf(ems[drag.e].col, PJ.sec);
     var ph=PJ.leg[PJ.leg.length-1], pT=tgtAt(ph[0],ph[1]);
-    var pDel=!!(pT && pT.col===PJ.sec);   // that blend already feeds its circle — don't hijack it
+    var pDel=!!(pT && pT.col===PJ.sec);   // that blend already feeds its circle - don't hijack it
     if(ns2 && !pDel && myL2.jun<0 && (PJ.jun==null||PJ.jun<0) && tgtFor(ns2) && !tgtFor(ns2).done
        && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
       myL2.cells.push(cell);
@@ -1028,7 +1245,7 @@ function step(cell){
       PJ.leg=PJ.leg.slice(0, o.idx+1);   // the parent blend now ends at the new junction (a feeder)
       junctions.push(NJ3);
       myL2.jun=junctions.length-1; PJ.jun=junctions.length-1;
-      addBloom(cell[0],cell[1], HEX[ns2], 660); drawSteps=0; sfxJun();
+      addBloom(cell[0],cell[1], HEX[ns2], 660); drawSteps=0; sfxJun(); hap("medium"); discover(ns2,cell[0],cell[1]);
       drag = exc3.length ? null : {t:"jun", i:junctions.length-1};
       renderPaths(); return;
     }
@@ -1043,7 +1260,7 @@ function step(cell){
       bounceDot(TD.r,TD.c); sfxDone(); renderPaths(); checkWin(); return;
     }
   }
-  // BLEND delivery: a junction's blend reaches its matching secondary circle — or a
+  // BLEND delivery: a junction's blend reaches its matching secondary circle - or a
   // PRISM's core (whose co-located ray emitters shadow the target in occAt, so look
   // the target up by cell, not by occupant type)
   if(drag.t==="jun" && (o.t==="tgt" || tgtAt(cell[0],cell[1]))){
@@ -1066,7 +1283,8 @@ function coverage(){
   return Object.keys(set).length;
 }
 function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
-/* every DRAWN ray must end at a junction (merged) or a delivered circle — no loose ends */
+function hideToast(){ if(toastTid) clearTimeout(toastTid); toastEl.classList.remove("show"); }
+/* every DRAWN ray must end at a junction (merged) or a delivered circle - no loose ends */
 function noDangling(){
   for(var e=0;e<ems.length;e++){ var L=ems[e].legs;
     for(var l=0;l<L.length;l++){ var lg=L[l]; if(lg.cells.length<=1) continue;
@@ -1079,46 +1297,49 @@ function noDangling(){
 }
 function checkWin(){
   if(!tgts.every(function(t){ return t.done; })) return;
-  if(coverage()<paintTarget()){ toast("Cover the whole board to finish!"); return; }
-  if(!noDangling()){ toast("A pipe has a loose end!"); return; }
+  if(coverage()<paintTarget()){ toast(T("Cover the whole board to finish!")); return; }
+  if(!noDangling()){ toast(T("A pipe has a loose end!")); return; }
   for(var gi=0;gi<gates.length;gi++){ var GG=gates[gi];
-    if(colorAt(GG.r,GG.c)!==GG.col){ toast("A gate needs the right colour!"); return; }
-    if(!dirOK(GG)){ toast("Ride arrows straight through, the way they point!"); return; }
+    if(colorAt(GG.r,GG.c)!==GG.col){ toast(T("A gate needs the right colour!")); return; }
+    if(!dirOK(GG)){ toast(T("Ride arrows straight through, the way they point!")); return; }
   }
-  if(!iceOK()){ toast("Lines must pass straight through ice!"); return; }
-  if(!bridgesOK()){ toast("Bridges must be crossed straight!"); return; }
-  if(!countersOK()){ toast("A number tile needs its EXACT count!"); return; }
-  solved=true; preGesture=null; sfxWin(); playWinCascade();
-  updateUndoUI();
-  if(demoing) return;   // the ghost demo celebrates but earns nothing — no progress, no overlay
+  if(!iceOK()){ toast(T("Lines must pass straight through ice!")); return; }
+  if(!bridgesOK()){ toast(T("Bridges must be crossed straight!")); return; }
+  if(!countersOK()){ toast(T("A number tile needs its EXACT count!")); return; }
+  solved=true; preGesture=null; sfxWin(); playWinCascade(); hap("success");
+  updateUndoUI(); updateHintUI();
+  if(demoing) return;   // the ghost demo celebrates but earns nothing - no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
   var wn=document.getElementById("btnWinNext");
-  document.querySelector("#ovWin h2").textContent="Solved! ✦";
+  document.querySelector("#ovWin h2").innerHTML="Solved! "+icn("spark",20);
+  var nextBtn = function(){ wn.innerHTML=T("Next")+" "+icn("arrowR",15); };
+  var backBtn = function(){ wn.textContent=T("Back to levels"); };
   if(mode==="daily"){
     var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     var stk2=dailyStreak();
-    document.getElementById("winMsg").textContent=(dailyOff?"Archive daily solved!":"Daily solved")+(stk2>1 ? " — "+stk2+"-day streak!" : (dailyOff?"":" — see you tomorrow!"));
-    wn.style.display=""; wn.textContent="Back to levels";
+    var suf = stk2>1 ? " - "+Tf("{0}-day streak!", stk2) : (dailyOff?"":" - "+T("see you tomorrow!"));
+    document.getElementById("winMsg").textContent=(dailyOff?T("Archive daily solved!"):T("Daily solved"))+suf;
+    wn.style.display=""; backBtn();
   } else if(mode==="pack"){
     var pk=PACKS[curPack];
     var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
     (pd[pk.id]=pd[pk.id]||{})[packIdx]=1; localStorage.setItem("hm_flow2_packdone", JSON.stringify(pd));
     var lastOne = packIdx+1>=pk.levels.length;
     var teaserEnd = !lastOne && !packLevelUnlocked(packIdx+1);
-    var wm = pk.name+" · "+(packIdx+1)+"/"+pk.levels.length;
-    if(lastOne) wm = pk.name+" — pack complete!";
-    else if(teaserEnd) wm = pk.name+" teaser done — "+(pk.levels.length-PACK_FREE)+" more levels in the full game!";
+    var wm = T(pk.name)+" · "+(packIdx+1)+"/"+pk.levels.length;
+    if(lastOne) wm = Tf("{0} - pack complete!", T(pk.name));
+    else if(teaserEnd) wm = Tf("{0} teaser done - {1} more levels in the full game!", T(pk.name), (pk.levels.length-PACK_FREE));
     document.getElementById("winMsg").textContent = wm;
-    wn.style.display=""; wn.textContent = (lastOne||teaserEnd) ? "Back to levels" : "Next →";
+    wn.style.display=""; if(lastOne||teaserEnd) backBtn(); else nextBtn();
   } else {
     var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
     var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
-    var msg="Whole board covered.";
+    var msg=T("Whole board covered.");
     var myCh=chapterOf(li);
     if(newly && myCh+1<CHAPTERS.length && solvedInChapter(myCh)===chapterNeed(myCh))
-      msg="🎉 Chapter unlocked: "+CHAPTERS[myCh+1].name+"!";
-    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " That's the last level — more coming!");
-    wn.style.display = li+1<LEVELS.length ? "" : "none"; wn.textContent="Next →";
+      msg=Tf("Chapter unlocked: {0}!", T(CHAPTERS[myCh+1].name));
+    document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " "+T("That's the last level - more coming!"));
+    wn.style.display = li+1<LEVELS.length ? "" : "none"; nextBtn();
   }
   setTimeout(function(){ if(solved) ovWin.classList.add("show"); }, 1250);   // a reset in the window cancels it
 }
@@ -1150,15 +1371,36 @@ function renderDots(){
 }
 /* ---------- juice: living paint, junction blooms, delivery sweeps, win cascade, shimmer ---------- */
 function nowMs(){ return (window.performance&&performance.now)?performance.now():Date.now(); }
+/* colour discovery: the FIRST time the player ever mixes a new secondary (or brown),
+   the junction bursts bigger and the colour names itself — teaching + rewarding the
+   core "lines meet, colours mix" hook. Persisted, so it only celebrates once per colour. */
+var discovered=null, DISC_NAME={O:"Orange!",G:"Green!",P:"Purple!",N:"Brown!"};
+function discoveredSet(){ if(!discovered){ try{ discovered=JSON.parse(localStorage.getItem("hm_flow2_discovered")||"{}"); }catch(e){ discovered={}; } } return discovered; }
+function discover(col,r,c){
+  if(demoing || "OGPN".indexOf(col)<0) return;      // only the mixed colours, and not during the ghost demo
+  var D=discoveredSet(); if(D[col]) return;
+  D[col]=1; localStorage.setItem("hm_flow2_discovered", JSON.stringify(D));
+  addBloom(r,c, HEX[col], 1200);                    // an extra-big celebratory bloom on top of the normal one
+  var s=cs(), el=document.createElement("div");
+  el.className="discpop"; el.textContent=T(DISC_NAME[col]||""); el.style.color=HEX[col];
+  el.style.left=(c*s+s/2)+"px"; el.style.top=(r*s+s/2)+"px";
+  dotL.appendChild(el); setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 1300);
+  if(soundOn){ bell(660,0.5,0.05); setTimeout(function(){ bell(990,0.6,0.05); },130); }   // bright rising chime
+  if(nativeBridge() && nativeBridge().haptic) try{ nativeBridge().haptic("success"); }catch(e){}
+}
 var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
 var drawSteps=0;
-function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
+/* native haptics (no-op on web / if the plugin isn't present): a light tick per drawn
+   cell, a medium thump on a colour mix, success on win, error on an illegal move. */
+function hap(kind){ var n=nativeBridge(); if(n && n.haptic){ try{ n.haptic(kind); }catch(e){} } }
+function penTick(up){ if(up){ sfxDraw(drawSteps,true); drawSteps++; hap("light"); } else { drawSteps=Math.max(0,drawSteps-1); sfxDraw(drawSteps,false); } }
 /* illegal-mix feedback: a haptic buzz + a red X on the contested cell (debounced so a
    held finger doesn't machine-gun it). "the blue can't mix into a delivered red line." */
 function rejectMix(cell){
   var key=cell[0]+","+cell[1], now=nowMs();
   if(key===lastReject.key && now-lastReject.t<600) return;
   lastReject={key:key, t:now};
+  hap("error");
   rejects.push({r:cell[0], c:cell[1], t0:now});
   try{ if(navigator.vibrate) navigator.vibrate(60); }catch(_e){}
   try{ voice(180,0.16,{type:"triangle", to:120, gl:0.12, lp:900, g:0.05, atk:0.004}); }catch(_e){}  // a soft "nope" thud
@@ -1183,15 +1425,33 @@ function playWinCascade(){
 }
 
 /* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
-   thickness (~half an emitter), round-capped strokes bridge consecutive circles — opaque overlap =
+   thickness (~half an emitter), round-capped strokes bridge consecutive circles - opaque overlap =
    smoothmax union, so corners fillet and a 3-pipe cell becomes a clean T with no disc. Living paint
    glosses travel the pipes; a junction blooms on merge; delivery pulses; the win sweeps the whole
    tree. Passes: shadow, ink, colour, living gloss + sweeps (clipped), blooms, shimmer, confetti. */
+// a revealed hint pipe: a soft dashed guide in the emitter's colour, drawn UNDER
+// the real pipes so the player's own line paints right over it as they trace it.
+function drawGhostHints(s){
+  ctx.save(); ctx.lineJoin="round"; ctx.lineCap="round";
+  function path(pts){ ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
+  ghostStrokes.forEach(function(G){
+    var pts=G.cells.map(function(c){ return [c[1]*s+s/2, c[0]*s+s/2]; });
+    if(!pts.length) return;
+    ctx.setLineDash([]);                                   // wide soft halo
+    ctx.globalAlpha=0.14; ctx.strokeStyle=G.color; ctx.lineWidth=s*0.40; if(pts.length>1) path(pts);
+    ctx.setLineDash([s*0.16, s*0.14]);                     // dashed core reads as a guide, not a real pipe
+    ctx.globalAlpha=0.62; ctx.lineWidth=s*0.14; if(pts.length>1) path(pts);
+    ctx.setLineDash([]); ctx.globalAlpha=0.7; ctx.fillStyle=G.color;  // dot marks where the pipe begins
+    ctx.beginPath(); ctx.arc(pts[0][0],pts[0][1], s*0.1,0,6.2832); ctx.fill();
+  });
+  ctx.restore();
+}
 function renderPaths(){
   var s=cs(); if(!s) return;
   var dpr=Math.min(window.devicePixelRatio||1, 2.5), W=board.clientWidth, H=board.clientHeight;
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  if(ghostStrokes.length) drawGhostHints(s);
   var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
   var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
@@ -1199,7 +1459,7 @@ function renderPaths(){
   // but the outline WIDTH stays constant (a multiplier would fatten the border too)
   function rad(cell, w){ var b=junSet[cell[0]+","+cell[1]]?JUNC_BUMP:0; return w*0.5 + b + jbump(cell[0],cell[1])*jR; }
 
-  // portal jumps make a leg's cell list non-contiguous — draw it as separate runs
+  // portal jumps make a leg's cell list non-contiguous - draw it as separate runs
   function splitRuns(cells){
     var runs=[], cur=[cells[0]];
     for(var i=1;i<cells.length;i++){ var a=cells[i-1], b=cells[i];
@@ -1230,18 +1490,17 @@ function renderPaths(){
       if(pts.length>1){ cx.beginPath(); cx.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) cx.lineTo(pts[i][0],pts[i][1]); cx.stroke(); }
       for(var k=0;k<pts.length;k++){ cx.beginPath(); cx.arc(pts[k][0],pts[k][1], rad(L.cells[k],width),0,6.2832); cx.fill(); } });
   }
-  // 1 — shadow: render the silhouette OPAQUE offscreen, then stamp ONCE with alpha at an offset,
+  // 1 - shadow: render the silhouette OPAQUE offscreen, then stamp ONCE with alpha at an offset,
   //     so overlapping strokes/dabs never stack into dark circles at cell centres
   if(shadowCanvas.width!==canvas.width){ shadowCanvas.width=canvas.width; shadowCanvas.height=canvas.height; }
   sctx.setTransform(dpr,0,0,dpr,0,0); sctx.clearRect(0,0,W,H);
   sctx.strokeStyle=sctx.fillStyle=INK; silhouette(sctx, pipeInk);
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha=0.24;
   ctx.drawImage(shadowCanvas, Math.round(s*0.03*dpr), Math.round(s*0.05*dpr)); ctx.restore();
-  // 2 — ink silhouette (opaque: overlaps are fine)
+  // 2 - ink silhouette (opaque: overlaps are fine)
   ctx.strokeStyle=INK; ctx.fillStyle=INK; silhouette(ctx, pipeInk);
-  // 3 — colour (gradient into the blend on a feeder's final segment)
-  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
-  legs.forEach(function(L){
+  // 3 - colour (gradient into the blend on a feeder's final segment)
+  function paintLegColour(L){
     var pts=L.cells.map(P), last=pts.length-1;
     if(L.blend && pts.length>=2){
       ctx.strokeStyle=L.color; ctx.fillStyle=L.color;
@@ -1249,7 +1508,7 @@ function renderPaths(){
       for(var k=0;k<last;k++) dab(L.cells,pts,k,pipeW);
       var a=pts[last-1], b=pts[last], g=ctx.createLinearGradient(a[0],a[1],b[0],b[1]);
       // reach FULL blend before the solid junction dab's edge (~0.18 cell => t~0.82) so there's
-      // no colour step at the dab rim — a smooth wash into the junction instead of a circular seam
+      // no colour step at the dab rim - a smooth wash into the junction instead of a circular seam
       g.addColorStop(0,L.color); g.addColorStop(0.72,L.blend);
       ctx.strokeStyle=g; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
       ctx.fillStyle=L.blend; dab(L.cells,pts,last,pipeW);
@@ -1258,29 +1517,38 @@ function renderPaths(){
       if(pts.length>1) line(pts,0,last);
       for(var m=0;m<pts.length;m++) dab(L.cells,pts,m,pipeW);
     }
-  });
-  // 3b — OVERPASS: at a bridge, the later-drawn line crosses OVER. Redraw its
-  //      straight segment with its own outline plus a shadow band, so the under
-  //      line visibly dips beneath (a gap on each side of the deck).
+  }
+  ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+  legs.forEach(paintLegColour);
+  // 3b - OVERPASS: at a bridge, the line drawn LAST is on top. Cut the under line
+  //      with a shadow band + ink gap along the over-line's axis (so it visibly
+  //      dips beneath), then redraw the OVER leg's REAL colour - gradient, metaball
+  //      and all - clipped to the deck, so the crossing matches the rest of that
+  //      line instead of showing a flat mismatched patch.
   if(bridges.length){
-    ctx.save(); ctx.lineCap="butt";
+    ctx.save();
     bridges.forEach(function(bc){
-      var ps=pathsAt(bc[0],bc[1]); if(ps.length<2) return;   // nothing to layer until two lines share it
-      var top=ps[ps.length-1], cl=top.cells, i=top.idx;
-      if(i<=0 || i>=cl.length-1) return;
-      var dy=cl[i+1][0]-cl[i][0], dx=cl[i+1][1]-cl[i][1];    // over-line axis (screen: x=dx, y=dy)
+      var through=legs.filter(function(L){ return indexIn(L.cells,bc[0],bc[1])>=0; });
+      if(through.length<2) return;                          // needs two lines sharing the tile
+      var over=through[through.length-1], oi=indexIn(over.cells,bc[0],bc[1]);
+      if(oi<=0 || oi>=over.cells.length-1) return;          // over-line must pass straight through
+      var dy=over.cells[oi+1][0]-over.cells[oi][0], dx=over.cells[oi+1][1]-over.cells[oi][1];  // over-line axis
       var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
+      ctx.lineCap="butt";
       ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
       ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
-      ctx.strokeStyle=HEX[top.col]||"#fff"; ctx.lineWidth=pipeW;
-      ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
+      ctx.save();                                           // repaint the over leg's colour, clipped to the deck
+      ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();
+      ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
+      paintLegColour(over);
+      ctx.restore();
     });
     ctx.restore();
   }
-  // 4 — living paint: FIZZ. A stream of near-pinpoint sparkles racing inside each
-  //     pipe like bubbles up a bottle of cola — dense, tiny, twinkling. Clipped to
+  // 4 - living paint: FIZZ. A stream of near-pinpoint sparkles racing inside each
+  //     pipe like bubbles up a bottle of cola - dense, tiny, twinkling. Clipped to
   //     the pipes (source-atop) so they only show inside the band.
   ctx.save(); ctx.globalCompositeOperation="source-atop";
   legs.forEach(function(L,idx){
@@ -1289,7 +1557,7 @@ function renderPaths(){
     var count=Math.max(4, Math.round(m.total/(s*0.30)));    // ~3 fizz specks per cell
     for(var k=0;k<count;k++){
       var ph=frac(idx*0.3197+k*0.61803);                    // stable per-speck phase
-      var sp=s*(0.7+0.9*frac(ph*7.13));                     // wide speed spread — some race, some drift
+      var sp=s*(0.7+0.9*frac(ph*7.13));                     // wide speed spread - some race, some drift
       var rad=pipeW*(0.035+0.04*frac(ph*3.71));             // near-pinpoint
       var pos=frac((t*sp)/m.total + ph)*m.total;
       var pt=ptAtLen(pts,m.cum,pos);
@@ -1304,12 +1572,12 @@ function renderPaths(){
   sweeps.forEach(function(sw){ var age=(nowMs()-sw.t0)/sw.dur; if(age<0||age>1) return; var pt=ptAtLen(sw.pts,sw.cum,age*sw.total);
     var rg=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],pipeW*0.95); rg.addColorStop(0,"rgba(255,255,255,0.9)"); rg.addColorStop(0.55,"rgba(255,255,255,0.45)"); rg.addColorStop(1,"rgba(255,255,255,0)"); ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.95,0,6.2832); ctx.fill(); });
   ctx.restore();
-  // 5 — junction / delivery blooms (expanding ring + flash, on top)
+  // 5 - junction / delivery blooms (expanding ring + flash, on top)
   blooms=blooms.filter(function(b){ return nowMs()-b.t0<b.dur; });
   blooms.forEach(function(b){ var age=(nowMs()-b.t0)/b.dur, pt=P([b.r,b.c]), radius=pipeW*0.45+age*s*0.85;
     ctx.save(); ctx.globalAlpha=(1-age)*0.75; ctx.strokeStyle=b.color; ctx.lineWidth=Math.max(1.5,(1-age)*s*0.13); ctx.beginPath(); ctx.arc(pt[0],pt[1],radius,0,6.2832); ctx.stroke();
     if(age<0.4){ ctx.globalAlpha=(0.4-age)/0.4*0.6; ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(pt[0],pt[1],pipeW*0.55*(1-age),0,6.2832); ctx.fill(); } ctx.restore(); });
-  // 5b — illegal-mix red X: a pop-in cross on the contested cell (that colour can't go there).
+  // 5b - illegal-mix red X: a pop-in cross on the contested cell (that colour can't go there).
   // White backing disc + dark-outlined red X so it reads on ANY pipe colour (incl. red).
   var REJ_MS=700; rejects=rejects.filter(function(x){ return nowMs()-x.t0<REJ_MS; });
   rejects.forEach(function(x){ var age=(nowMs()-x.t0)/REJ_MS, pt=P([x.r,x.c]);
@@ -1323,14 +1591,14 @@ function renderPaths(){
     ctx.strokeStyle="#e23b45"; ctx.lineWidth=s*0.085;
     ctx.beginPath(); ctx.moveTo(pt[0]-arm,pt[1]-arm); ctx.lineTo(pt[0]+arm,pt[1]+arm); ctx.moveTo(pt[0]+arm,pt[1]-arm); ctx.lineTo(pt[0]-arm,pt[1]+arm); ctx.stroke();
     ctx.restore(); });
-  // 6 — coverage shimmer: all blends delivered but board not full -> unpainted cells breathe
+  // 6 - coverage shimmer: all blends delivered but board not full -> unpainted cells breathe
   if(!solved && tgts.length && tgts.every(function(t){ return t.done; })){
     var ps=paintedSet(), pulse=0.5+0.5*Math.sin(animT/330);
     ctx.save(); ctx.fillStyle="#b7a883";
     for(var rr=0;rr<N;rr++) for(var cc2=0;cc2<N;cc2++){ if(ps[rr+","+cc2]||wallSet[rr+","+cc2]) continue; ctx.globalAlpha=0.10+0.18*pulse; ctx.beginPath(); ctx.arc(cc2*s+s/2, rr*s+s/2, s*0.12*(0.85+0.35*pulse),0,6.2832); ctx.fill(); }
     ctx.restore();
   }
-  // 6b' — ice tiles: frosted squares a line must cross in a straight line (over the pipe)
+  // 6b' - ice tiles: frosted squares a line must cross in a straight line (over the pipe)
   if(ices.length){
     ctx.save(); ctx.lineJoin="round";
     ices.forEach(function(icell){
@@ -1354,7 +1622,7 @@ function renderPaths(){
     });
     ctx.restore();
   }
-  // 6b''' — bridges: OVERPASS deck rails along the over-line's axis (a neutral
+  // 6b''' - bridges: OVERPASS deck rails along the over-line's axis (a neutral
   //         crossing hash while the cell is still empty)
   if(bridges.length){
     ctx.save(); ctx.lineCap="round";
@@ -1382,11 +1650,11 @@ function renderPaths(){
     });
     ctx.restore();
   }
-  // 6b'' — portals: paired SPIRAL GALAXIES; a line entering one comes out of its
+  // 6b'' - portals: paired SPIRAL GALAXIES; a line entering one comes out of its
   //         twin. The spiral winds out from the centre and lands ON the ring,
   //         carrying on along it briefly so the join is seamless. Slowly spins.
   if(portals.length){
-    // PINK — the one hue no pipe uses, so portals never read as a paint colour.
+    // PINK - the one hue no pipe uses, so portals never read as a paint colour.
     // Multi-pair boards get distinct pink shades so twins stay matchable.
     var PCOLS=["#f45fa8","#ff9ed2","#c9377f","#ffc7e3"];
     ctx.save(); ctx.lineCap="round"; ctx.lineJoin="round";
@@ -1407,13 +1675,13 @@ function renderPaths(){
           var px=cx1+Math.cos(a+rot)*rr2, py=cy1+Math.sin(a+rot)*rr2;
           if(a===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
         }
-        ctx.arc(cx1,cy1,R,amax+rot,amax+rot+1.1);   // run the tail along the ring — a smooth merge
+        ctx.arc(cx1,cy1,R,amax+rot,amax+rot+1.1);   // run the tail along the ring - a smooth merge
         ctx.stroke();
       });
     });
     ctx.restore();
   }
-  // 6c — colour gates: a small ring the pipe through it must match (and, for arrow
+  // 6c - colour gates: a small ring the pipe through it must match (and, for arrow
   //      gates, must be crossed the arrow's way). Pops the moment it's satisfied.
   if(gates.length){
     var gp=0.5+0.5*Math.sin(animT/300), GPOP=380;
@@ -1446,7 +1714,7 @@ function renderPaths(){
       ctx.restore();
     });
   }
-  // 6d — counters: EXACTLY n of the 8 surrounding tiles must wear this colour.
+  // 6d - counters: EXACTLY n of the 8 surrounding tiles must wear this colour.
   //      Live: dim while under, pops when exact, red ring the moment it's over.
   if(counters.length){
     var KPOP=380;
@@ -1474,7 +1742,7 @@ function renderPaths(){
       ctx.restore();
     });
   }
-  // 7 — win confetti (marker chips, on top of everything)
+  // 7 - win confetti (marker chips, on top of everything)
   confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
   if(confetti.length){ ctx.save(); ctx.lineWidth=2; confetti.forEach(function(p){ var t=(nowMs()-p.t0)/1000, x=p.x+p.vx*t, y=p.y+p.vy*t+240*t*t, rot=p.rot+p.vr*t, a=1-(nowMs()-p.t0)/p.life;
     ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.globalAlpha=Math.max(0,a); ctx.fillStyle=p.color; ctx.strokeStyle=INK; roundRect(ctx,-p.sz/2,-p.sz/2,p.sz,p.sz,p.sz*0.3); ctx.fill(); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
@@ -1496,17 +1764,17 @@ requestAnimationFrame(frame);
 var MECHS={
   brown:{ name:"Brown", blurb:"Combine all 3 primary colors (a secondary + a primary) to create brown.",
     caps:["Mix two primaries into a secondary…","…then run the THIRD primary into it: brown!","Brown squares want the full triple mix."] },
-  arrows:{ name:"Arrows", blurb:"Arrows only pass their colour — ridden straight through, the way they point.",
+  arrows:{ name:"Arrows", blurb:"Arrows only pass their colour - ridden straight through, the way they point.",
     caps:["This gate points a direction…","…ride it STRAIGHT through, the way it points.","Wrong colour or wrong way won't do."] },
-  ice:{ name:"Ice", blurb:"Frozen cells can't hold a turn — lines pass straight through.",
+  ice:{ name:"Ice", blurb:"Frozen cells can't hold a turn - lines pass straight through.",
     caps:["Ice is slippery…","…lines cross it in a straight line only.","Plan your turns before the freeze!"] },
   portals:{ name:"Portals", blurb:"A line entering one spiral pops out of its twin.",
     caps:["Dive into a spiral…","…and pop out of its twin across the board!","The line carries on from there."] },
-  bridges:{ name:"Overpass", blurb:"Two lines can share a bridge cell — one crosses straight over the other.",
-    caps:["A bridge lets lines CROSS…","…straight over, straight under. No mixing.","Two lines, one cell — only on bridges."] },
+  bridges:{ name:"Overpass", blurb:"Two lines can share a bridge cell - one crosses straight over the other.",
+    caps:["A bridge lets lines CROSS…","…straight over, straight under. No mixing.","Two lines, one cell - only on bridges."] },
   prisms:{ name:"Prisms", blurb:"Feed a prism its blend and it splits back into the two primaries.",
     caps:["Feed the prism its secondary colour…","…it splits into the two primaries!","Route BOTH rays home to finish."] },
-  tally:{ name:"Numbers", blurb:"A numbered tile counts its colour in the 3×3 around it, itself included — match it exactly.",
+  tally:{ name:"Numbers", blurb:"A numbered tile counts its colour in the 3×3 around it, itself included - match it exactly.",
     caps:["This tile counts its colour around itself…","…the 3×3 block, tile included: EXACTLY that many.","A zero means: keep that colour away!"] }
 };
 function levelMechs(L){
@@ -1522,12 +1790,13 @@ function levelMechs(L){
 }
 function mechSeen(){ try{ return JSON.parse(localStorage.getItem("hm_flow2_mech")||"{}"); }catch(_e){ return {}; } }
 function markMechSeen(k){ var o=mechSeen(); o[k]=1; localStorage.setItem("hm_flow2_mech", JSON.stringify(o)); }
-var mechQueue=[], mechCur=null, ovMech=null;
+var mechQueue=[], mechCur=null, mechRewatch=false, ovMech=null;
 function showMechCard(k, rewatch){
-  mechCur=k; var M=MECHS[k];
+  mechCur=k; mechRewatch=!!rewatch; var M=MECHS[k];
   document.getElementById("mechIcon").innerHTML=packIcon(k,40);
-  document.getElementById("mechTitle").textContent=(rewatch?"":"New mechanic: ")+M.name;
-  document.getElementById("mechBlurb").textContent=M.blurb;
+  var nm=T(M.name);
+  document.getElementById("mechTitle").textContent=rewatch ? nm : Tf("New mechanic: {0}", nm);
+  document.getElementById("mechBlurb").textContent=T(M.blurb);
   ovMech.classList.add("show");
 }
 function showNextMech(){ if(mechQueue.length) showMechCard(mechQueue.shift(), false); }
@@ -1537,22 +1806,28 @@ function maybeMechIntro(L){
   var fresh=levelMechs(L).filter(function(k){ return !seen[k]; });
   if(fresh.length){ mechQueue=fresh; showNextMech(); }
 }
-function watchMech(k){
+function watchMech(k, rewatch){
   var M=MECHS[k], pi=-1;
   for(var i=0;i<PACKS.length;i++) if(PACKS[i].id===k) pi=i;
   var dl = pi>=0 && PACKS[pi].levels[0];
   if(!dl || !dl.demo){ showNextMech(); return; }
-  // remember where the player was; the ghost teaches on the pack's first board
-  var back = mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
+  // where to hand the board back after "now you try":
+  //  - a rewatch launched from the picker: that mechanic's OWN pack, level 1
+  //    (there's no in-pack position to return to - otherwise it falls through to
+  //     campaign level 1, which is the teleport bug)
+  //  - an in-game intro (incl. Medley, which introduces a mechanic from another
+  //    pack): exactly the level the player was on
+  var back = (rewatch && pi>=0) ? {p:pi,k:0}
+    : mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
   demoReturn=function(){
     if(back.p!=null) loadPackLevel(back.p, back.k);
     else if(back.d!=null) loadDaily(back.d);
     else loadLevel(back.l);
     showNextMech();   // Medley intros can queue two mechanics
   };
-  isTut=false; mode="campaign"; lvNameEl.textContent=M.name;
+  isTut=false; mode="campaign"; lvNameEl.textContent=T(M.name);
   applyLevel(dl);
-  playDemoOn(dl.demo, M.caps);
+  playDemoOn(dl.demo, M.caps.map(function(c){ return T(c); }));
 }
 /* ---------- inline SVG icons (no emoji): stroke follows text colour ---------- */
 function icn(name,sz,extra){
@@ -1564,7 +1839,19 @@ function icn(name,sz,extra){
     flame:'<path d="M12 3.5c.6 3-3.8 5-3.8 9a5.8 5.8 0 0 0 11.6 0c0-2.6-1.4-4.3-2.8-5.8.2 1.6-.4 2.6-1.4 3.1C15.9 7.6 14.6 4.7 12 3.5z" fill="currentColor" stroke="none"/>',
     noads:'<circle cx="12" cy="12" r="8.6"/><path d="M6 6.2 18 17.8"/>',
     packs:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
-    unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>'
+    unlock:'<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>',
+    bulb:'<path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.45 1.1 1.2 1.1 2.2h5c0-1 .5-1.75 1.1-2.2A6 6 0 0 0 12 3z"/>',
+    play:'<path d="M8 5.4v13.2l11-6.6z" fill="currentColor" stroke="none"/>',
+    star:'<path d="M12 3.6l2.5 5.1 5.6.8-4.05 3.95.96 5.55L12 16.9 6.98 19.35l.96-5.55L3.9 9.5l5.6-.8z" fill="currentColor" stroke="none"/>',
+    list:'<path d="M4 6.5h16M4 12h16M4 17.5h16"/>',
+    gear:'<circle cx="12" cy="12" r="3.3"/><path d="M12 2.2v3.2M12 18.6v3.2M21.8 12h-3.2M5.4 12H2.2M18.9 5.1l-2.3 2.3M7.4 16.6l-2.3 2.3M18.9 18.9l-2.3-2.3M7.4 7.4 5.1 5.1"/>',
+    spark:'<path d="M12 2 14.2 9.8 22 12 14.2 14.2 12 22 9.8 14.2 2 12 9.8 9.8Z" fill="currentColor" stroke="none"/>',
+    undo:'<path d="M4 8.5h9.5a5.5 5.5 0 0 1 0 11H10"/><path d="M7.5 5 4 8.5 7.5 12"/>',
+    reset:'<path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19.5 4.5v4h-4"/>',
+    arrowL:'<path d="M15 5l-7 7 7 7"/>',
+    arrowR:'<path d="M9 5l7 7-7 7"/>',
+    check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18M4.5 7h15M4.5 17h15"/>'
   };
   return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
 }
@@ -1600,7 +1887,7 @@ function renderPicker(){
   var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
   // hub-only rows
   var db=document.getElementById("btnDaily"), stk=dailyStreak();
-  db.innerHTML = (dd[todayKey()] ? "★ Daily Puzzle ✓" : "★ Daily Puzzle") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
+  db.innerHTML = icn("star",16)+" "+T("Daily Puzzle")+(dd[todayKey()] ? " "+icn("check",15) : "") + (stk>1 ? '  <span style="color:#e2603f">'+icn("flame",16)+stk+"</span>" : "");
   db.style.display = root ? "" : "none";
   document.getElementById("btnHow").style.display = root ? "" : "none";
   var ab=document.getElementById("btnArch");
@@ -1611,59 +1898,59 @@ function renderPicker(){
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
   var cb=document.getElementById("btnContinue");
   cb.style.display = (root && cont>=0) ? "" : "none";
-  if(cont>=0){ cb.textContent="▶ Continue · Level "+(cont+1); cb.dataset.i=cont; }
+  if(cont>=0){ cb.innerHTML=icn("play",16)+" "+Tf("Continue · Level {0}", (cont+1)); cb.dataset.i=cont; }
   if(root){
-    document.getElementById("pickTitle").textContent="Levels · "+nd+"/"+LEVELS.length;
+    document.getElementById("pickTitle").textContent=Tf("Levels · {0}/{1}", nd, LEVELS.length);
     document.getElementById("archArea").innerHTML="";
     // one card per chapter (later chapters unlock by solving 2/3 of the one before)
     for(var c=0;c<CHAPTERS.length;c++){
       var CH=CHAPTERS[c], unl=chapterUnlocked(c), sv=solvedInChapter(c);
-      var sub = unl ? CH.n+" levels" : "Solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name;
+      var sub = unl ? Tf("{0} levels", CH.n) : Tf("Solve {0} more in {1}", (chapterNeed(c-1)-solvedInChapter(c-1)), T(CHAPTERS[c-1].name));
       h+='<button class="pickcard'+(unl?"":" lk")+(mode==="campaign"&&chapterOf(li)===c?" cur":"")+'" data-ch="'+c+'">'
         +'<span class="pcic">'+(unl?(c+1):icn("lock",18))+'</span>'
-        +'<span class="pcmain"><span class="pcname">Chapter '+(c+1)+' · '+CH.name+'</span><span class="pcsub">'+sub+'</span></span>'
+        +'<span class="pcmain"><span class="pcname">'+Tf("Chapter {0} · {1}", (c+1), T(CH.name))+'</span><span class="pcsub">'+sub+'</span></span>'
         +'<span class="pcprog">'+sv+"/"+CH.n+'</span></button>';
     }
     pg.innerHTML=h;
     // one card per pack (5 free teaser levels each; the rest come with the full game)
-    var ph='<div class="packtitle">Puzzle Packs</div>';
+    var ph='<div class="packtitle">'+T("Puzzle Packs")+'</div>';
     PACKS.forEach(function(pk,pi){
       var d=pd[pk.id]||{}, ndp=0; for(var q in d) if(d[q]) ndp++;
-      var psub=pk.desc||"";
+      var psub=pk.desc?T(pk.desc):"";
       ph+='<button class="pickcard'+(mode==="pack"&&curPack===pi?" cur":"")+'" data-pack="'+pi+'">'
         +'<span class="pcic">'+packIcon(pk.id,22)+'</span>'
-        +'<span class="pcmain"><span class="pcname">'+pk.name+'</span><span class="pcsub">'+psub+'</span></span>'
+        +'<span class="pcmain"><span class="pcname">'+T(pk.name)+'</span><span class="pcsub">'+psub+'</span></span>'
         +'<span class="pcprog">'+ndp+"/"+pk.levels.length+'</span></button>';
     });
     pa.innerHTML=ph;
   } else if(pickView.arch){
     // daily ARCHIVE: full-game owners can replay the last 3 weeks
-    document.getElementById("pickTitle").textContent="Daily Archive";
-    var ah='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    document.getElementById("pickTitle").textContent=T("Daily Archive");
+    var ah='<button class="mk pickback">'+icn("arrowL",14)+' '+T("All levels")+'</button><div class="pkgrid">';
     for(var ao=1;ao<=21;ao++){ var ad=dateAgo(ao);
-      ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?"✓":"")+'</span></button>'; }
+      ah+='<button class="pkbtn" data-ago="'+ao+'"><span>'+ad.getDate()+'</span><span class="pkd">'+(dd[keyOf(ad)]?icn("check",11):"")+'</span></button>'; }
     ah+='</div>';
     document.getElementById("archArea").innerHTML=ah;
     pg.innerHTML=""; pa.innerHTML="";
   } else if(pickView.ch!=null){
     var cc=pickView.ch, CHV=CHAPTERS[cc], s=chapterStart(cc);
-    document.getElementById("pickTitle").textContent="Chapter "+(cc+1)+" · "+CHV.name;
-    h='<button class="mk pickback">← All levels</button><div class="pkgrid">';
+    document.getElementById("pickTitle").textContent=Tf("Chapter {0} · {1}", (cc+1), T(CHV.name));
+    h='<button class="mk pickback">'+icn("arrowL",14)+' '+T("All levels")+'</button><div class="pkgrid">';
     for(var i=s;i<s+CHV.n && i<LEVELS.length;i++)
-      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?"✓":"")+'</span></button>';
+      h+='<button class="pkbtn'+(i===li&&mode==="campaign"?" cur":"")+'" data-i="'+i+'"><span>'+(i+1)+'</span><span class="pkd">'+(done[i]?icn("check",11):"")+'</span></button>';
     h+='</div>';
     pg.innerHTML=h; pa.innerHTML="";
   } else {
     var pi2=pickView.pk, pk2=PACKS[pi2], d2=pd[pk2.id]||{}, ndp2=0; for(var q2 in d2) if(d2[q2]) ndp2++;
-    document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+pk2.name+" · "+ndp2+"/"+pk2.levels.length;
-    var ph2='<button class="mk pickback">← All levels</button>';
-    if(pk2.desc) ph2+='<div class="packdesc">'+pk2.desc+'</div>';
+    document.getElementById("pickTitle").innerHTML=packIcon(pk2.id,22)+" "+T(pk2.name)+" · "+ndp2+"/"+pk2.levels.length;
+    var ph2='<button class="mk pickback">'+icn("arrowL",14)+' '+T("All levels")+'</button>';
+    if(pk2.desc) ph2+='<div class="packdesc">'+T(pk2.desc)+'</div>';
     if(MECHS[pk2.id] && pk2.levels[0] && pk2.levels[0].demo)
-      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">▶ How '+pk2.name+' works</button>';
+      ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">'+icn("play",15)+' '+Tf("How {0} works", T(pk2.name))+'</button>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
       var open=packLevelUnlocked(k);
-      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?"✓":(open?"":icn("lock",10)))+'</span></button>';
+      ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?icn("check",11):(open?"":icn("lock",10)))+'</span></button>';
     }
     ph2+='</div>';
     pg.innerHTML=""; pa.innerHTML=ph2;
@@ -1689,14 +1976,41 @@ document.getElementById("btnContinue").addEventListener("click", function(){ ens
 document.getElementById("btnPick").addEventListener("click", function(){ ensureAudio();
   // open where the player is: their pack, their chapter, or the hub
   pickView = mode==="pack" ? {pk:curPack} : mode==="campaign" ? {ch:chapterOf(li)} : null;
-  renderPicker(); ovPick.classList.add("show"); });
+  hideToast(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 /* ---------- main menu: home screen at boot, the home button brings it back ---------- */
 var ovMenu=document.getElementById("ovMenu"), firstRun=false;
-function showMenu(){ ovMenu.classList.add("show"); document.body.classList.add("menuopen"); }
+function showMenu(){ hideToast(); ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
 function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
 document.body.classList.add("menuopen");   // the menu is up when the page opens
+updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
 document.getElementById("btnHome").innerHTML=icn("home",17);
+/* icon buttons: real SVG icon + translated label (label "" = icon only) */
+var ICONBTN={
+  btnPick:["list","levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
+  btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
+  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"],
+  btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
+  btnUpBuy:["spark","Huemeld Pro · $4.99"], btnFull:["spark","Huemeld Pro · $4.99"], btnDemo:["play","Show me"],
+  btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
+};
+function applyIconButtons(){
+  for(var id in ICONBTN){ var el=document.getElementById(id); if(!el) continue;
+    var lbl=ICONBTN[id][1]; el.innerHTML=icn(ICONBTN[id][0],16)+(lbl?" "+T(lbl):""); }
+}
+/* re-skin the whole UI into the current language (static text + icon buttons + live views) */
+function applyLang(){
+  document.querySelectorAll("[data-t]").forEach(function(el){ el.textContent=T(el.getAttribute("data-t")); });
+  document.querySelectorAll("[data-th]").forEach(function(el){ el.innerHTML=T(el.getAttribute("data-th")); });
+  applyIconButtons();
+  var wn=document.getElementById("btnWinNext"); if(wn) wn.innerHTML=T("Next")+" "+icn("arrowR",15);
+  var sk=document.getElementById("demoskip"); if(sk) sk.innerHTML=T("Skip tutorial")+" "+icn("arrowR",13);
+  var lb=document.getElementById("btnMenuLang"); if(lb) lb.innerHTML=icn("globe",16)+" "+(LANG==="tr"?"English":"Türkçe");
+  try{ relabel(); }catch(e){}
+  try{ syncToggles(); }catch(e){}
+  try{ if(document.getElementById("ovPick").classList.contains("show")) renderPicker(); }catch(e){}
+  document.documentElement.lang = LANG;
+}
 document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
 document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
   // very first play: show the game with the ghost hand instead of telling it
@@ -1705,9 +2019,10 @@ document.getElementById("btnMenuPlay").addEventListener("click", function(){ ens
     else document.getElementById("ovHelp").classList.add("show");
   } });
 document.getElementById("btnMenuDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); loadDaily(0); });
-document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; renderPicker(); ovPick.classList.add("show"); });
+document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; hideToast(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
 document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
+document.getElementById("btnMenuLang").addEventListener("click", function(){ ensureAudio(); setLang(LANG==="tr"?"en":"tr"); });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -1720,7 +2035,26 @@ var ovUp=document.getElementById("ovUp");
   for(var i=0;i<li.length;i++) li[i].innerHTML = ic[i]==="mix" ? packIcon("mix",18) : icn(ic[i],18); })();
 document.getElementById("btnArch").addEventListener("click", function(){ ensureAudio();
   if(entFull()){ pickView={arch:1}; renderPicker(); }
-  else ovUp.classList.add("show");
+  else showUpsell("pro");
+});
+/* ---------- the two-tier upsell: Pro $4.99 + Remove Ads $2.99, headline per context ---------- */
+function updateProEntry(){ var b=document.getElementById("btnMenuPro");
+  if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none"; }
+function showUpsell(mode){
+  if(entFull()) return;                                   // nothing left to sell
+  var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
+      na=document.getElementById("btnUpNoAds"), pr=document.getElementById("btnUpBuy");
+  if(mode==="ads"){ t.textContent=T("Tired of ads?"); d.textContent=T("Remove them forever - or unlock everything:"); }
+  else { t.innerHTML=icn("spark",20)+" "+T("Huemeld Pro"); d.textContent=T("One purchase, the whole game:"); }
+  na.style.display = entNoAds() ? "none" : "";            // already ad-free -> Pro only
+  pr.style.display = "";
+  ovUp.classList.add("show");
+}
+document.getElementById("btnMenuPro").addEventListener("click", function(){ ensureAudio(); showUpsell("pro"); });
+document.getElementById("btnUpNoAds").addEventListener("click", function(){
+  var nb=nativeBridge();
+  if(!nb || !nb.buyRemoveAds){ toast(T("Available in the app")); return; }
+  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast(T("Ads removed - thank you!")); } else toast(T("Purchase not completed")); });
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
 ovMech=document.getElementById("ovMech");
@@ -1728,20 +2062,20 @@ document.getElementById("btnMechOk").addEventListener("click", function(){ ensur
   if(mechCur) markMechSeen(mechCur); mechCur=null;
   ovMech.classList.remove("show"); showNextMech(); });
 document.getElementById("btnMechWatch").addEventListener("click", function(){ ensureAudio();
-  var k=mechCur; if(k) markMechSeen(k); mechCur=null;
+  var k=mechCur, rw=mechRewatch; if(k) markMechSeen(k); mechCur=null;
   ovMech.classList.remove("show");
-  if(k) watchMech(k); });
+  if(k) watchMech(k, rw); });
 document.getElementById("btnUpBuy").addEventListener("click", function(){
   var nb=nativeBridge();
-  if(!nb || !nb.buyFull){ toast("Available in the app"); return; }
-  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); toast("✦ Huemeld Pro unlocked — thank you!"); renderPicker(); } });
+  if(!nb || !nb.buyFull){ toast(T("Available in the app")); return; }
+  nb.buyFull(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({full:1}); ovUp.classList.remove("show"); updateProEntry(); toast(T("✦ Huemeld Pro unlocked - thank you!")); renderPicker(); } else toast(T("Purchase not completed")); });
 });
 document.getElementById("pkgrid").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
   var card=e.target.closest(".pickcard");
   if(card){
     var c=+card.dataset.ch;
-    if(!chapterUnlocked(c)){ toast(CHAPTERS[c].name+" is locked — solve "+(chapterNeed(c-1)-solvedInChapter(c-1))+" more in "+CHAPTERS[c-1].name+" to unlock"); return; }
+    if(!chapterUnlocked(c)){ toast(Tf("{0} is locked - solve {1} more in {2} to unlock", T(CHAPTERS[c].name), (chapterNeed(c-1)-solvedInChapter(c-1)), T(CHAPTERS[c-1].name))); return; }
     ensureAudio(); pickView={ch:c}; renderPicker(); return;
   }
   var b=e.target.closest(".pkbtn"); if(!b) return;
@@ -1776,7 +2110,52 @@ function maybeInterstitial(){
   if(!n || !n.interstitial) return;
   if(localStorage.getItem("hm_flow2_addue")==="1"){ try{ n.interstitial(); }catch(_e){} }
 }
-window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue"); };
+var adNudge=0;
+window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue");
+  adNudge++;
+  if(!entNoAds() && adNudge%3===0) setTimeout(function(){ showUpsell("ads"); }, 700);
+};
+
+/* ---------- rewarded-ad hints: watch a video, reveal a ghost of one pipe ----------
+   Solution strokes ship as L.sol (or L.demo on tutorial/pack-1 boards). Longest
+   pipe first - the most informative. Premium/no-ads players and the plain web
+   build get hints for free; free-tier native players watch a rewarded video. */
+function levelSol(){ return curLevelObj && (curLevelObj.sol || curLevelObj.demo) || null; }
+function ensureHintOrder(){
+  if(hintOrder) return;
+  var sol=levelSol();
+  hintOrder = sol ? sol.slice().sort(function(a,b){ return b.length-a.length; }) : [];
+}
+function ghostColorFor(cells){
+  var h=cells[0], sq=(curLevelObj&&curLevelObj.sq)||[];
+  for(var i=0;i<sq.length;i++) if(sq[i][1]===h[0] && sq[i][2]===h[1]) return HEX[sq[i][0]]||"#dfe8f7";
+  return "#dfe8f7";   // prism rays / feeds don't start on a source square - neutral ghost
+}
+function grantHint(){
+  ensureHintOrder();
+  if(hintN>=hintOrder.length){ toast(T("Every pipe is already showing")); return; }
+  var st=hintOrder[hintN++];
+  ghostStrokes.push({cells:st, color:ghostColorFor(st)});
+  renderPaths(); updateHintUI();
+  toast(hintN>=hintOrder.length ? T("Last pipe revealed - trace the dotted line") : T("A pipe revealed - trace the dotted line"));
+}
+function updateHintUI(){
+  var b=document.getElementById("btnHint"); if(!b) return;
+  ensureHintOrder();
+  if(!hintOrder.length){ b.style.display="none"; return; }   // no solution shipped for this board
+  b.style.display=""; b.disabled = solved || hintN>=hintOrder.length;
+}
+document.getElementById("btnHint").addEventListener("click", function(){
+  ensureAudio();
+  if(demoing || solved) return;
+  ensureHintOrder();
+  if(!hintOrder.length){ toast(T("No hint for this puzzle")); return; }
+  if(hintN>=hintOrder.length){ toast(T("Every pipe is already showing")); return; }
+  var nb=nativeBridge();
+  if(entNoAds() || !nb || !nb.rewarded){ grantHint(); return; }   // paid players + web: free hints
+  toast(T("Loading a video for your hint…"));
+  nb.rewarded(function(ok){ if(ok) grantHint(); else toast(T("No hint yet - the video didn't finish")); });
+});
 
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
@@ -1792,20 +2171,26 @@ var ovSet=document.getElementById("ovSet");
   if(n && n.buyRemoveAds && !entNoAds()) rm.style.display="";       // only meaningful in the app
   if(n && n.buyFull && !entFull()) fl.style.display="";
   if(n && n.restore) rs.style.display="";
-  rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast("Available in the app"); return; }
-    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast("Ads removed — thank you!"); } }); });
-  fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast("Available in the app"); return; }
-    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast("✦ Huemeld Pro unlocked — thank you!"); } }); });
-  rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast("Available in the app"); return; }
+  rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast(T("Available in the app")); return; }
+    nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast(T("Ads removed - thank you!")); } else toast(T("Purchase not completed")); }); });
+  fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast(T("Available in the app")); return; }
+    nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast(T("✦ Huemeld Pro unlocked - thank you!")); } else toast(T("Purchase not completed")); }); });
+  rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast(T("Available in the app")); return; }
     nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
   document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
-  document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false"); }
+  document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false");
+  var vs=document.getElementById("volSlide"); if(vs){ vs.value=Math.round(volume*100); vs.disabled=!soundOn; } }
 document.getElementById("btnSet").addEventListener("click", function(){ syncToggles(); ovSet.classList.add("show"); });
 document.getElementById("btnSetClose").addEventListener("click", function(){ ovSet.classList.remove("show"); });
 document.getElementById("tglTheme").addEventListener("click", function(){ theme = theme==="dark"?"light":"dark"; localStorage.setItem("hm_flow2_theme",theme); applyTheme(); renderDots(); syncToggles(); });
 document.getElementById("tglSound").addEventListener("click", function(){ soundOn=!soundOn; localStorage.setItem("hm_flow2_sound",soundOn?"1":"0"); if(soundOn)ensureAudio(); syncToggles(); });
+(function(){ var vs=document.getElementById("volSlide"); if(!vs) return;
+  vs.addEventListener("input", function(){ ensureAudio(); setVolume((+vs.value||0)/100);
+    // a quick blip so the player HEARS the level they're setting
+    if(soundOn) bell(660,0.16,0.06); });
+})();
 document.getElementById("tglCB").addEventListener("click", function(){ cbOn=!cbOn; localStorage.setItem("hm_flow2_cb",cbOn?"1":"0"); syncToggles(); renderDots(); });
 /* "How to play" in the picker opens the same ? legend */
 document.getElementById("btnHow").addEventListener("click", function(){ ensureAudio(); ovPick.classList.remove("show"); document.getElementById("ovHelp").classList.add("show"); });
@@ -1820,8 +2205,9 @@ document.getElementById("btnHelp").addEventListener("click", function(){ ensureA
 document.getElementById("btnHelpClose").addEventListener("click", function(){ ovHelp.classList.remove("show"); });
 
 applyTheme();
-if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) — restart safely
+if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) - restart safely
 loadLevel(li);
+applyLang();   // paint icons + translate the whole UI into the saved language
 demoskipEl.addEventListener("click", function(){ ensureAudio(); endDemo(); });
 document.getElementById("btnDemo").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.remove("show"); playDemo(); });
 if(!(LEVELS[0] && LEVELS[0].demo)) document.getElementById("btnDemo").style.display="none";
@@ -1846,6 +2232,7 @@ window.__flow={
   winFx:function(){ playWinCascade(); },
   fx:function(){ return {rejects:rejects.length, blooms:blooms.length, sweeps:sweeps.length, confetti:confetti.length}; },
   render:function(){ renderPaths(); },
+  hints:function(){ return {shown:ghostStrokes.length, order:(hintOrder?hintOrder.length:null), has:!!levelSol()}; },
   mode:function(){ return mode; },
   daily:loadDaily,
   pack:loadPackLevel,
