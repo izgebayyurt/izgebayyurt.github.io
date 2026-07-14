@@ -83,7 +83,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .toast{
   position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
   background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
-  padding:7px 16px; border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s; white-space:nowrap;
+  padding:8px 18px; border-radius:16px; opacity:0; pointer-events:none; transition:opacity .2s;
+  white-space:normal; max-width:calc(var(--bw) - 28px); text-align:center; line-height:1.35;
 }
 .toast.show{ opacity:1; }
 .ov{
@@ -234,6 +235,7 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
         <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)" data-t="How to play">How to play</button>
         <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
+        <button class="mk" id="btnMenuKofi" style="display:none;background:#ffd6e0">♥ Support Huemeld</button>
         <button class="mk" id="btnMenuLang" style="background:var(--card);color:var(--ink)">Türkçe</button>
       </div>
     </div>
@@ -287,12 +289,17 @@ body.menuopen .helpfab{ display:none; }
         <h2 data-t="Settings">Settings</h2>
         <div class="setrow"><span data-t="Dark theme">Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span data-t="Sound">Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
+        <div class="setrow"><span data-t="Music">Music</span><button class="tgl" id="tglMusic" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span data-t="Volume">Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
         <div class="setrow"><span data-t="Colour-blind labels">Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
         <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Restore Purchases">Restore Purchases</button>
         <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px" data-t="Privacy Policy">Privacy Policy</a></p>
+        <p style="margin-top:8px;font-size:11px;color:var(--sub);line-height:1.6"><span data-t="Music from">Music from</span> <a href="https://uppbeat.io" target="_blank" rel="noopener" style="color:var(--sub)">Uppbeat</a>, by lloom:<br>
+        <a href="https://uppbeat.io/t/lloom/vashon" target="_blank" rel="noopener" style="color:var(--sub)">Vashon</a> (KYJAA1R4DOJI4ZUD)<br>
+        <a href="https://uppbeat.io/t/lloom/childhood-afternoons" target="_blank" rel="noopener" style="color:var(--sub)">Childhood Afternoons</a> (MFOIFJIBG4G6UGID)<br>
+        <a href="https://uppbeat.io/t/lloom/simple-mornings" target="_blank" rel="noopener" style="color:var(--sub)">Simple Mornings</a> (N3EC9GR0Q6R6GGHG)</p>
         <button class="mk" id="btnSetClose" data-t="Done">Done</button>
       </div>
     </div>
@@ -337,6 +344,7 @@ var TR = {
   "Settings":"Ayarlar",                                             /* 5 */
   "How to play":"Nasıl oynanır",                                    /* 6 */
   "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
+  "Support Huemeld":"Huemeld'e Destek Ol",
   "Menu":"Menü",                                                    /* 8 */
   "Language":"Dil",                                                 /* 9 */
   // - level chrome -
@@ -353,7 +361,7 @@ var TR = {
   "Continue":"Devam et",                                            /* 19 */
   "Back to levels":"Seviyelere dön",                                 /* 20 */
   // - picker -
-  "Daily Archive":"Günlük Arşiv",                                   /* 21 */
+  "Daily Archive":"Günlük Bulmaca Arşivi",                          /* 21 */
   "Close":"Kapat",                                                  /* 22 */
   "All levels":"Tüm bölümler",                                      /* 23 */
   "pack complete!":"Bütün bölümler tamamlandı!",                             /* 24 */
@@ -500,7 +508,9 @@ var TR = {
   "Orange!":"Turuncu!",                                            /* 150 */
   "Green!":"Yeşil!",                                               /* 151 */
   "Purple!":"Mor!",                                                /* 152 */
-  "Brown!":"Kahverengi!"                                           /* 153 */
+  "Brown!":"Kahverengi!",                                          /* 153 */
+  "Music from":"Müzik:",                                           /* 154 */
+  "Music":"Müzik"                                                  /* 155 */
 };
 function T(s){ if(LANG!=="tr" || s==null) return s; var v=TR[s]; return v!=null ? v : s; }
 function Tf(s){ var a=arguments, r=T(s); for(var i=1;i<a.length;i++) r=r.split("{"+(i-1)+"}").join(a[i]); return r; }
@@ -551,7 +561,13 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
    of every pack - with interstitials after a honeymoon. $2.99 (noads) silences
    ads. $4.99 (full) = no ads + every pack + the Medley + the daily archive, and
    as a bonus opens all chapters instantly. Store purchases flip these flags. */
-function entFull(){ return localStorage.getItem("hm_flow2_ent_full")==="1"; }
+/* The web build (GitHub Pages / PWA) is the FREE version: everything unlocked,
+   no ads. Ads and purchases live only inside the native iOS/Android app, which
+   is detected by the Capacitor runtime (native.js gates itself on the very same
+   signal). So off-app, entFull is always true -> every pack, the Medley, the
+   archive and all chapters open, and entNoAds() (below) silences any ad path. */
+function isNativeApp(){ try{ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }catch(e){ return false; } }
+function entFull(){ return !isNativeApp() || localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
 var UNLOCK_ALL=false;   // RELEASE: teasers + entitlements gate content (was DEV-open).
@@ -646,11 +662,50 @@ function ensureAudio(){
     master.connect(comp); comp.connect(actx.destination);
   }catch(e){ actx=null; } }
   if(actx&&actx.state==="suspended") actx.resume();
+  startMusic();   // first user gesture also unlocks + starts the background music
 }
+// on background, FADE the music down (don't hard-pause) so it never cuts out abruptly;
+// fade it back up on return. (On native iOS the webview may still suspend media while
+// backgrounded, but there's no jarring stop, and it eases back in on foreground.)
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden){ fadeMusic(0, 600); }
+  else if(musicOn && musicStarted){ if(musicEl){ var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } fadeMusic(musicTargetVol(), 800); }
+});
 function setVolume(v){
   volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
   if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
+  applyMusicVol();
 }
+/* ---------- background music: lloom tracks from Uppbeat, looped + shuffled ----------
+   Lazy (preload=none) so it never blocks startup. Its own on/off toggle, but the
+   Volume slider drives it too (kept quieter than the SFX so it stays in the back). */
+var MUSIC_TRACKS=["music/vashon.mp3","music/childhood-afternoons.mp3","music/simple-mornings.mp3"];
+var MUSIC_VOL=0.6;
+var musicOn = localStorage.getItem("hm_flow2_music")!=="0";
+var musicEl=null, musicOrder=[0,1,2], musicIdx=0, musicStarted=false;
+var musicFade=null;
+function musicTargetVol(){ return Math.max(0,Math.min(1, volume*MUSIC_VOL)); }
+function applyMusicVol(){ if(musicFade){ clearInterval(musicFade); musicFade=null; } if(musicEl) musicEl.volume=musicTargetVol(); }
+function fadeMusic(to, ms){
+  if(!musicEl) return;
+  if(musicFade){ clearInterval(musicFade); musicFade=null; }
+  var from=musicEl.volume, t0=nowMs(), dur=ms||500;
+  musicFade=setInterval(function(){
+    var k=dur>0 ? Math.min(1,(nowMs()-t0)/dur) : 1;
+    musicEl.volume=Math.max(0,Math.min(1, from+(to-from)*k));
+    if(k>=1){ clearInterval(musicFade); musicFade=null; }
+  }, 40);
+}
+function ensureMusic(){
+  if(musicEl) return;
+  musicEl=document.createElement("audio"); musicEl.preload="none"; musicEl.setAttribute("aria-hidden","true"); musicEl.style.display="none";
+  document.body.appendChild(musicEl);
+  musicEl.addEventListener("ended", function(){ musicIdx=(musicIdx+1)%MUSIC_TRACKS.length; musicPlayCurrent(); });
+  for(var i=musicOrder.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=musicOrder[i]; musicOrder[i]=musicOrder[j]; musicOrder[j]=t; }  // shuffle the order
+}
+function musicPlayCurrent(){ if(!musicEl) return; musicEl.src=MUSIC_TRACKS[musicOrder[musicIdx]]; applyMusicVol(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); }
+function startMusic(){ if(!musicOn) return; ensureMusic(); if(!musicStarted){ musicStarted=true; musicPlayCurrent(); } else { var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } }
+function stopMusic(){ if(musicEl) musicEl.pause(); }
 /* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
 function voice(freq,dur,o){
   if(!actx || !soundOn) return; o=o||{};
@@ -782,8 +837,7 @@ function loadPackLevel(pi, k){
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = k<pk.levels.length-1 ? "" : "hidden";
   applyLevel(pk.levels[k]);
-  if(k===0 && pk.desc) toast(T(pk.name)+": "+T(pk.desc));
-  maybeMechIntro(pk.levels[k]);
+  maybeMechIntro(pk.levels[k]);   // the pack's flavour line lives in the picker; the mechanic card + demo do the intro
 }
 /* ---------- ghost-hand demo: a translucent finger plays level 1's baked solution ----------
    Synthetic pointer events run through the REAL input handlers (demoFiring lets them
@@ -963,6 +1017,24 @@ function dropJunction(j){
   junctions.splice(j,1);
 }
 function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
+/* Pull ONE feeder out of its junction WITHOUT wrecking the other. The blend leg
+   was the surviving feeder's own tail before the mix, so hand it back: the other
+   line is restored whole (e.g. retreat the red you mixed in, the blue is untouched).
+   Detaches both feeders and collapses the blend so the next reconcile() drops the
+   now-orphaned junction cleanly. No-op across a chained blend (too fragile). */
+function separateFeeder(feederLeg){
+  if(!feederLeg || feederLeg.jun<0) return;
+  var ji=feederLeg.jun, J=junctions[ji]; if(!J) return;
+  if(J.jun!=null && J.jun>=0){ destroyJunctionOf(feederLeg); return; }   // feeds a deeper mix downstream
+  var survivorEm=null, survivorJn=null;
+  ems.forEach(function(E){ E.legs.forEach(function(lg){ if(lg!==feederLeg && lg.jun===ji) survivorEm=lg; }); });
+  if(!survivorEm) junctions.forEach(function(K){ if(K!==J && K.jun===ji) survivorJn=K; });
+  var tail=(J.leg && J.leg.length>1) ? J.leg.slice(1).map(function(c){ return c.slice(); }) : [];
+  if(survivorEm){ survivorEm.cells=survivorEm.cells.concat(tail); survivorEm.jun=-1; }
+  else if(survivorJn){ survivorJn.leg=survivorJn.leg.concat(tail); survivorJn.jun=-1; }
+  feederLeg.jun=-1;
+  J.leg=[J.cell.slice()];   // 0 feeders now end on the junction cell -> reconcile() removes it
+}
 /* re-grabbing a junction/blend severs any chained child it was feeding; returns the (possibly shifted) index */
 function dropChildOf(ji){ var J=junctions[ji];
   if(J && J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<ji) ji--; }
@@ -1101,8 +1173,21 @@ board.addEventListener("pointerdown", function(e){
     }
   } else if(o.t==="em"){
     var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
-    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
-    else { drag=null; }   // a mid-pipe click does nothing - both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
+    if(leg.jun>=0){
+      // this line was mixed into another - it feeds a junction. Tap ANYWHERE on it
+      // to pull it back to that cell; the line it merged into is handed its blend
+      // tail back and left whole. Grab-drag from here to redraw.
+      separateFeeder(leg);
+      leg.cells=leg.cells.slice(0, o.idx+1);
+      drag={t:"em", e:o.e, l:o.l};
+      reconcileAndFixDrag();
+    } else if(isHead){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
+    else {
+      // tap partway along your own line -> retreat it to the tapped cell (then drag to redraw)
+      leg.cells=leg.cells.slice(0, o.idx+1);
+      drag={t:"em", e:o.e, l:o.l};
+      reconcileAndFixDrag();
+    }
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
   renderPaths();
@@ -1281,7 +1366,9 @@ function coverage(){
   tgts.forEach(function(T){ set[T.r+","+T.c]=1; });
   return Object.keys(set).length;
 }
-function toast(msg){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid); toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },1800); }
+function toast(msg, ms){ toastEl.textContent=msg; toastEl.classList.add("show"); if(toastTid) clearTimeout(toastTid);
+  var dur=ms||Math.max(1800, Math.min(5200, Math.round((""+msg).length*52)));   // longer messages linger longer
+  toastTid=setTimeout(function(){ toastEl.classList.remove("show"); },dur); }
 function hideToast(){ if(toastTid) clearTimeout(toastTid); toastEl.classList.remove("show"); }
 /* every DRAWN ray must end at a junction (merged) or a delivered circle - no loose ends */
 function noDangling(){
@@ -1730,8 +1817,18 @@ function renderPaths(){
       ctx.globalAlpha=1; ctx.lineWidth=s*0.045;
       ctx.strokeStyle = over ? "#e23b45" : HEX[K.col];
       roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke();
-      if(over){ ctx.globalAlpha=0.35+0.35*(0.5+0.5*Math.sin(animT/140)); roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke(); ctx.globalAlpha=1; }
-      if(K.sat){ ctx.globalAlpha=0.35+0.35*(0.5+0.5*Math.sin(animT/300)); ctx.lineWidth=s*0.045; roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke(); ctx.globalAlpha=1; }
+      if(over){
+        // over the limit: blink the red ring as a warning
+        ctx.globalAlpha=0.30+0.40*(0.5+0.5*Math.sin(animT/140));
+        roundRect(ctx,cxk-cw/2,cyk-cw/2,cw,cw,rk); ctx.stroke();
+        ctx.globalAlpha=1;
+      } else if(K.sat){
+        // solved: add a steady second (outer) ring - a clear "locked in" double ring
+        var kgap=s*0.05, okw=cw+kgap*2, okr=rk+kgap;
+        ctx.lineWidth=s*0.032; ctx.globalAlpha=0.92;
+        roundRect(ctx,cxk-okw/2,cyk-okw/2,okw,okw,okr); ctx.stroke();
+        ctx.globalAlpha=1;
+      }
       ctx.fillStyle=HEX[K.col]; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.font="700 "+(s*0.30*pop)+"px 'Fredoka',sans-serif";
       ctx.globalAlpha = exact||over ? 1 : 0.8;
@@ -1850,7 +1947,8 @@ function icn(name,sz,extra){
     arrowL:'<path d="M15 5l-7 7 7 7"/>',
     arrowR:'<path d="M9 5l7 7-7 7"/>',
     check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
-    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18M4.5 7h15M4.5 17h15"/>'
+    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18M4.5 7h15M4.5 17h15"/>',
+    coffee:'<path d="M4 8.5h12v5.5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M16 9.5h2.4a2.4 2.4 0 0 1 0 4.8H16"/><path d="M7 2.6c-.5.9.5 1.6 0 2.8M11 2.6c-.5.9.5 1.6 0 2.8"/>'
   };
   return '<svg'+W+(extra||'')+'>'+(I[name]||'')+'</svg>';
 }
@@ -1988,7 +2086,7 @@ document.getElementById("btnHome").innerHTML=icn("home",17);
 var ICONBTN={
   btnPick:["list","levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
   btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
-  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"],
+  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"], btnMenuKofi:["coffee","Support Huemeld"],
   btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
   btnUpBuy:["spark","Huemeld Pro · $4.99"], btnFull:["spark","Huemeld Pro · $4.99"], btnDemo:["play","Show me"],
   btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
@@ -2022,6 +2120,7 @@ document.getElementById("btnMenuLevels").addEventListener("click", function(){ e
 document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
 document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
 document.getElementById("btnMenuLang").addEventListener("click", function(){ ensureAudio(); setLang(LANG==="tr"?"en":"tr"); });
+document.getElementById("btnMenuKofi").addEventListener("click", function(){ ensureAudio(); try{ window.open(KOFI_URL,"_blank","noopener"); }catch(e){ location.href=KOFI_URL; } });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
   if(e.target.closest(".pickback")){ pickView=null; renderPicker(); return; }
@@ -2036,9 +2135,16 @@ document.getElementById("btnArch").addEventListener("click", function(){ ensureA
   if(entFull()){ pickView={arch:1}; renderPicker(); }
   else showUpsell("pro");
 });
+/* The free web build carries a Ko-fi tip link instead of the store. It shows
+   ONLY off-app (external donation links don't belong in the native store build). */
+var KOFI_URL="https://ko-fi.com/YOUR_HANDLE";
 /* ---------- the two-tier upsell: Pro $4.99 + Remove Ads $2.99, headline per context ---------- */
-function updateProEntry(){ var b=document.getElementById("btnMenuPro");
-  if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none"; }
+function updateProEntry(){
+  var b=document.getElementById("btnMenuPro");
+  if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none";
+  var k=document.getElementById("btnMenuKofi");   // web/PWA only, and only once a real handle is set
+  if(k) k.style.display = (!isNativeApp() && KOFI_URL.indexOf("YOUR_HANDLE")<0) ? "" : "none";
+}
 function showUpsell(mode){
   if(entFull()) return;                                   // nothing left to sell
   var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
@@ -2178,13 +2284,15 @@ var ovSet=document.getElementById("ovSet");
     nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
+  var tm=document.getElementById("tglMusic"); if(tm) tm.setAttribute("aria-pressed",musicOn?"true":"false");
   document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
   document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false");
-  var vs=document.getElementById("volSlide"); if(vs){ vs.value=Math.round(volume*100); vs.disabled=!soundOn; } }
+  var vs=document.getElementById("volSlide"); if(vs){ vs.value=Math.round(volume*100); vs.disabled=!soundOn&&!musicOn; } }
 document.getElementById("btnSet").addEventListener("click", function(){ syncToggles(); ovSet.classList.add("show"); });
 document.getElementById("btnSetClose").addEventListener("click", function(){ ovSet.classList.remove("show"); });
 document.getElementById("tglTheme").addEventListener("click", function(){ theme = theme==="dark"?"light":"dark"; localStorage.setItem("hm_flow2_theme",theme); applyTheme(); renderDots(); syncToggles(); });
 document.getElementById("tglSound").addEventListener("click", function(){ soundOn=!soundOn; localStorage.setItem("hm_flow2_sound",soundOn?"1":"0"); if(soundOn)ensureAudio(); syncToggles(); });
+document.getElementById("tglMusic").addEventListener("click", function(){ musicOn=!musicOn; localStorage.setItem("hm_flow2_music",musicOn?"1":"0"); if(musicOn){ ensureAudio(); startMusic(); } else stopMusic(); syncToggles(); });
 (function(){ var vs=document.getElementById("volSlide"); if(!vs) return;
   vs.addEventListener("input", function(){ ensureAudio(); setVolume((+vs.value||0)/100);
     // a quick blip so the player HEARS the level they're setting

@@ -5,13 +5,15 @@
   "description": "Huemeld — native (Capacitor) wrapper with AdMob + StoreKit purchases via RevenueCat",
   "scripts": {
     "sync-www": "node sync.mjs",
-    "ios": "npm run sync-www && npx cap sync ios && npx cap open ios"
+    "ios": "npm run sync-www && npx cap sync ios && npx cap open ios",
+    "android": "npm run sync-www && npx cap sync android && npx cap open android"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^6.0.0",
+    "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.1.0",
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/ios": "^6.1.0",
-    "@capacitor-community/admob": "^6.0.0",
     "@revenuecat/purchases-capacitor": "^9.0.0"
   },
   "devDependencies": {

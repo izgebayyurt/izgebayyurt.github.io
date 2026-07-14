@@ -171,7 +171,15 @@ instant chapter unlocks. No subscriptions, no energy, no coins.
 
 Every one of the 840 levels is verified solvable. Usually in
 more ways than one — but never as many as you'd hope.
+
+Music by lloom, from Uppbeat.
 ```
+
+**Attribution (required by the Uppbeat free licence — keep this visible):** the
+credit is shown in-app under **Settings**. Full credits (3 looping tracks by lloom):
+- `Music from #Uppbeat: https://uppbeat.io/t/lloom/vashon — License code: KYJAA1R4DOJI4ZUD`
+- `Music from #Uppbeat: https://uppbeat.io/t/lloom/childhood-afternoons — License code: MFOIFJIBG4G6UGID`
+- `Music from #Uppbeat: https://uppbeat.io/t/lloom/simple-mornings — License code: N3EC9GR0Q6R6GGHG`
 
 **Keywords** (100 max, no spaces after commas):
 `color,colour,mix,pipe,flow,connect,logic,puzzle,zen,brain,daily,relax,line,paint,blend`
