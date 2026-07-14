@@ -1009,6 +1009,24 @@ function dropJunction(j){
   junctions.splice(j,1);
 }
 function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
+/* Pull ONE feeder out of its junction WITHOUT wrecking the other. The blend leg
+   was the surviving feeder's own tail before the mix, so hand it back: the other
+   line is restored whole (e.g. retreat the red you mixed in, the blue is untouched).
+   Detaches both feeders and collapses the blend so the next reconcile() drops the
+   now-orphaned junction cleanly. No-op across a chained blend (too fragile). */
+function separateFeeder(feederLeg){
+  if(!feederLeg || feederLeg.jun<0) return;
+  var ji=feederLeg.jun, J=junctions[ji]; if(!J) return;
+  if(J.jun!=null && J.jun>=0){ destroyJunctionOf(feederLeg); return; }   // feeds a deeper mix downstream
+  var survivorEm=null, survivorJn=null;
+  ems.forEach(function(E){ E.legs.forEach(function(lg){ if(lg!==feederLeg && lg.jun===ji) survivorEm=lg; }); });
+  if(!survivorEm) junctions.forEach(function(K){ if(K!==J && K.jun===ji) survivorJn=K; });
+  var tail=(J.leg && J.leg.length>1) ? J.leg.slice(1).map(function(c){ return c.slice(); }) : [];
+  if(survivorEm){ survivorEm.cells=survivorEm.cells.concat(tail); survivorEm.jun=-1; }
+  else if(survivorJn){ survivorJn.leg=survivorJn.leg.concat(tail); survivorJn.jun=-1; }
+  feederLeg.jun=-1;
+  J.leg=[J.cell.slice()];   // 0 feeders now end on the junction cell -> reconcile() removes it
+}
 /* re-grabbing a junction/blend severs any chained child it was feeding; returns the (possibly shifted) index */
 function dropChildOf(ji){ var J=junctions[ji];
   if(J && J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<ji) ji--; }
@@ -1147,8 +1165,21 @@ board.addEventListener("pointerdown", function(e){
     }
   } else if(o.t==="em"){
     var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
-    if(isHead && leg.jun<0){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
-    else { drag=null; }   // a mid-pipe click does nothing - both of a colour's lines come from its SQUARE (fork), and you retreat by dragging a tip back or double-tapping the square
+    if(leg.jun>=0){
+      // this line was mixed into another - it feeds a junction. Tap ANYWHERE on it
+      // to pull it back to that cell; the line it merged into is handed its blend
+      // tail back and left whole. Grab-drag from here to redraw.
+      separateFeeder(leg);
+      leg.cells=leg.cells.slice(0, o.idx+1);
+      drag={t:"em", e:o.e, l:o.l};
+      reconcileAndFixDrag();
+    } else if(isHead){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
+    else {
+      // tap partway along your own line -> retreat it to the tapped cell (then drag to redraw)
+      leg.cells=leg.cells.slice(0, o.idx+1);
+      drag={t:"em", e:o.e, l:o.l};
+      reconcileAndFixDrag();
+    }
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
   renderPaths();
