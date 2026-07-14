@@ -655,8 +655,13 @@ function ensureAudio(){
   if(actx&&actx.state==="suspended") actx.resume();
   startMusic();   // first user gesture also unlocks + starts the background music
 }
-// pause music when the app/tab is backgrounded; resume on return (if still enabled)
-document.addEventListener("visibilitychange", function(){ if(document.hidden) stopMusic(); else if(musicOn && musicStarted) startMusic(); });
+// on background, FADE the music down (don't hard-pause) so it never cuts out abruptly;
+// fade it back up on return. (On native iOS the webview may still suspend media while
+// backgrounded, but there's no jarring stop, and it eases back in on foreground.)
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden){ fadeMusic(0, 600); }
+  else if(musicOn && musicStarted){ if(musicEl){ var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } fadeMusic(musicTargetVol(), 800); }
+});
 function setVolume(v){
   volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
   if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
@@ -669,7 +674,19 @@ var MUSIC_TRACKS=["music/vashon.mp3","music/childhood-afternoons.mp3","music/sim
 var MUSIC_VOL=0.6;
 var musicOn = localStorage.getItem("hm_flow2_music")!=="0";
 var musicEl=null, musicOrder=[0,1,2], musicIdx=0, musicStarted=false;
-function applyMusicVol(){ if(musicEl) musicEl.volume=Math.max(0,Math.min(1, volume*MUSIC_VOL)); }
+var musicFade=null;
+function musicTargetVol(){ return Math.max(0,Math.min(1, volume*MUSIC_VOL)); }
+function applyMusicVol(){ if(musicFade){ clearInterval(musicFade); musicFade=null; } if(musicEl) musicEl.volume=musicTargetVol(); }
+function fadeMusic(to, ms){
+  if(!musicEl) return;
+  if(musicFade){ clearInterval(musicFade); musicFade=null; }
+  var from=musicEl.volume, t0=nowMs(), dur=ms||500;
+  musicFade=setInterval(function(){
+    var k=dur>0 ? Math.min(1,(nowMs()-t0)/dur) : 1;
+    musicEl.volume=Math.max(0,Math.min(1, from+(to-from)*k));
+    if(k>=1){ clearInterval(musicFade); musicFade=null; }
+  }, 40);
+}
 function ensureMusic(){
   if(musicEl) return;
   musicEl=document.createElement("audio"); musicEl.preload="none"; musicEl.setAttribute("aria-hidden","true"); musicEl.style.display="none";
