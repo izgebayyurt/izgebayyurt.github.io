@@ -209,6 +209,8 @@ const cellX=new Array(NC).fill(0), cellY=new Array(NC).fill(0), cellRad=new Arra
 const ringCells={1:[],2:[],3:[],4:[]};
 for(let i=0;i<NC;i++){ const k=cellRing[i]; if(k>=1&&k<=4) ringCells[k].push(i); }
 for(const k of [1,2,3,4]) ringCells[k].sort((a,b)=>cellAng[a]-cellAng[b]);   // ascending angle == clockwise (screen y-down)
+const ringPos=new Array(NC).fill(-1);   // index of each cell within its ring bucket (for wrap detection)
+for(const k of [1,2,3,4]) ringCells[k].forEach((c,i)=>ringPos[c]=i);
 function nearestInRing(k,ang){ let best=ringCells[k][0],bd=1e9;
   for(const c of ringCells[k]){ const d=Math.abs(angDelta(cellAng[c],ang)); if(d<bd){bd=d;best=c;} } return best; }
 // firing lanes (unchanged): 12 lanes anchored on ring-2 cells; mid/outer = nearest ring3/ring4 by angle
@@ -249,6 +251,31 @@ let aimSnap=true;
 let fireMult=1.0, cascMult=1.0;
 let timerLen=90, endlessRamp=1.0;
 const DEPTH_CAP=40;       // safety bound on a single chain (natural chains rarely exceed ~25); prevents pathological loops
+// ---------- cascade scoring (Puzzle-Bobble pop-vs-drop asymmetry: pay the spiral-swept cascade far more) ----------
+// Measured chain-depth distribution (realistic random play): median 0, p90=3, p95=5, p99=10, max ~16; hard cap 40.
+// All levers are BOUNDED so a depth-40 whole-board resolve tops out near ~5M — never overflows Number (safe <9e15).
+const BASE=10;            // points per matched ball (direct base)
+const ROUND_K=0.75, ROUND_CAP=12;   // roundMult(r)=1+0.75(r-1), capped 12: round5 clearly > round2, depth stays sane
+const GAP_K=0.5;          // gap shot: +50% per EXTRA ring a straight lattice line crosses (2-ring ×1.5, 3-ring ×2)
+const WRAP_BASE=1.5, WRAP_WRAP=1.75;// ring arc = ×1.5 over a straight match; a true seam-wrapping "bank shot" = ×1.75
+const COMBO_K=0.3, COMBO_CAP=6;     // whole-resolve combo multiplier by depth: 1+0.3(D-1), capped 6
+function roundMult(r){ return Math.min(ROUND_CAP, 1+ROUND_K*(r-1)); }
+function comboMult(D){ return Math.min(COMBO_CAP, 1+COMBO_K*(D-1)); }
+// pure scorer (single source of truth, mirrored by the live resolver). rounds[i] = array of groups for round i+1:
+//   { g:size, type:'arc'|'radial', spanned:(radial rings crossed), wrap:(arc crosses seam) }
+function scoreResolve(rounds){
+  const acc={ base:0, cascade:0, gap:0, wrap:0 };
+  rounds.forEach((groups,ri)=>{ const rm=roundMult(ri+1);
+    for(const grp of groups){ const b=BASE*grp.g;
+      const gm = grp.type==='radial' ? 1+GAP_K*((grp.spanned||1)-1) : 1;
+      const wm = grp.type==='arc' ? (grp.wrap?WRAP_WRAP:WRAP_BASE) : 1;
+      acc.base+=b; acc.cascade+=b*(rm-1); acc.gap+=b*rm*(gm-1); acc.wrap+=b*rm*gm*(wm-1); } });
+  const D=rounds.length||1, pre=acc.base+acc.cascade+acc.gap+acc.wrap, cm=comboMult(D);
+  const combo=pre*(cm-1), total=pre+combo;
+  return { base:acc.base, cascade:acc.cascade, gap:acc.gap, wrap:acc.wrap, combo, total, gain:Math.round(total), depth:D, comboMult:cm };
+}
+function labelSpec(depth){ const d=Math.max(2,depth); const t=Math.min(1,(d-2)/10);
+  return { size:Math.min(58,18+d*3), hue:Math.round(198+(8-198)*t), life:Math.min(2.2,0.9+d*0.09), shake:d>=6?Math.min(6,(d-5)*0.85):0 }; }
 let palette=ORDER.slice(0,COLORS);
 function fireDur(){ return 0.18/fireMult; }
 function slideDur(){ return 0.5/cascMult; }
@@ -319,10 +346,12 @@ window.addEventListener('orientationchange', ()=>{ layout(); wake(); });
 let grid=new Array(NC).fill(null);
 let current=null, next=[];
 let resolver=null;
-let popList=[], goo=[], puffs=[], flyers=[];
+let popList=[], goo=[], puffs=[], flyers=[], scorePops=[];
 let aim={ active:false, rawAngle:-Math.PI/2, angle:-Math.PI/2, target:0 };
 let chainLabel=null;
-let score=0, best=+lsGet('gyre_best','0')||0;
+let score=0, scoreShown=0, best=+lsGet('gyre_best','0')||0;
+let lastResolve=null;                // exposed score breakdown of the most recent scoring resolve
+let shakeMag=0, shakeT=0;            // small, bounded chain shake (never obscures the board)
 let stats={ shots:0, matches:0, arcs:0, radials:0, maxChain:0, ejected:0, slides:0 };
 let collect={};
 // modes
@@ -350,7 +379,8 @@ function fillRandom(){
     for(const m of ms) for(const c of m.cells){ if(grid[c]) grid[c].c=randColor(); } }
 }
 function resetRun(){ fillRandom(); current=randColor(); next=[randColor(),randColor()];
-  score=0; refillSeed=[]; resolver=null; popList=[]; goo=[]; puffs=[]; flyers=[]; chainLabel=null;
+  score=0; scoreShown=0; lastResolve=null; refillSeed=[]; resolver=null; popList=[]; goo=[]; puffs=[]; flyers=[]; scorePops=[];
+  chainLabel=null; shakeMag=0; shakeT=0;
   collect={}; stats={ shots:0, matches:0, arcs:0, radials:0, maxChain:0, ejected:0, slides:0 }; }
 
 // ================= matching =================
@@ -403,24 +433,40 @@ function stepResolver(dt){
   if(R.phase==='sliding'){ if(allSettled()){ R.phase='detect'; R.t=0; } return; }
 }
 function beginPops(ms,R){
-  R.depth=(R.depth||0)+1; const mult=R.depth;
-  const seen=new Set(), cells=[]; let arcs=0, radials=0, sc=0;
-  for(const m of ms){ if(m.type==='arc') arcs++; else radials++;
-    sc+=Math.round(m.len*10*(m.type==='arc'?1.5:1)*mult);
-    for(const c of m.cells){ if(seen.has(c)) continue; seen.add(c); cells.push(c); } }
+  R.depth=(R.depth||0)+1; const r=R.depth, rm=roundMult(r);
+  if(!R.acc) R.acc={ base:0, cascade:0, gap:0, wrap:0 };
+  const seen=new Set(), cells=[], cellVal={}; let arcs=0, radials=0;
+  for(const m of ms){
+    const g=m.len, b=BASE*g; let gm=1, wm=1;
+    if(m.type==='arc'){ arcs++;
+      const M=ringCells[cellRing[m.cells[0]]].length, pos=m.cells.map(c=>ringPos[c]);
+      const wrap=pos.includes(0)&&pos.includes(M-1);            // arc crosses the ring seam = a "bank shot"
+      wm=wrap?WRAP_WRAP:WRAP_BASE; m._wrap=wrap;
+    } else { radials++;
+      const spanned=new Set(m.cells.map(c=>cellRing[c])).size;  // rings a straight line crosses: gap shot
+      gm=1+GAP_K*(spanned-1); m._spanned=spanned;
+    }
+    // additive decomposition (base + cascade + gap + wrap telescopes to base·rm·gm·wm)
+    R.acc.base+=b; R.acc.cascade+=b*(rm-1); R.acc.gap+=b*rm*(gm-1); R.acc.wrap+=b*rm*gm*(wm-1);
+    const per=(b*rm*gm*wm)/g;                                    // pre-combo value per cell (for the +N popups)
+    for(const c of m.cells){ cellVal[c]=Math.max(cellVal[c]||0, per);
+      if(!seen.has(c)){ seen.add(c); cells.push(c); } }
+  }
   stats.matches+=ms.length; stats.arcs+=arcs; stats.radials+=radials;
-  score+=sc; if(score>best){ best=score; saveBest(); }
-  stats.maxChain=Math.max(stats.maxChain,R.depth);
-  if(R.depth>=2){ chainLabel={ n:R.depth, life:1.1 }; SFX.chain(R.depth); }
-  if(mode==='endless') addEndlessTime(cells.length, R.depth);   // pressure/relief: matches feed the bar
+  stats.maxChain=Math.max(stats.maxChain,r);
+  if(r>=2){ setChainLabel(r); SFX.chain(r); }
+  if(mode==='endless') addEndlessTime(cells.length, r);
   cells.sort((a,b)=> Sindex[b]-Sindex[a]);                       // pop from tail outward (ripple)
   cells.forEach((c,i)=>{ const b=grid[c]; if(!b) return; b.popping=true;
-    popList.push({ ball:b, cell:c, delay:i*0.045, step:i, done:false }); });
+    popList.push({ ball:b, cell:c, delay:i*0.045, step:i, done:false, value:Math.round(cellVal[c]||0) }); });
   updateHUD();
 }
+function setChainLabel(depth){ const sp=labelSpec(depth); chainLabel={ n:depth, life:sp.life, maxLife:sp.life, spec:sp, born:performance.now() };
+  if(sp.shake>0){ shakeMag=Math.max(shakeMag,sp.shake); shakeT=0.32; } }
 function firePop(p){ p.done=true; const b=p.ball;
   goo.push({ x:b.vx, y:b.vy, r:ballRad*0.85, col:colOf(b.c), rgb:hexToRgb(colOf(b.c)), t:0, dur:0.28 });
   for(let k=0;k<5;k++) puffs.push(mkPuff(b.vx,b.vy,colOf(b.c)));
+  if(p.value>0) scorePops.push({ x:b.vx, y:b.vy, v:p.value, life:0.85, max:0.85, col:colOf(b.c) });
   collect[b.c]=(collect[b.c]||0)+1;
   SFX.pop(p.step);
   if(grid[p.cell]===b) grid[p.cell]=null;
@@ -438,7 +484,16 @@ function doSlide(){
   for(let j=0;j<survivors.length;j++){ const { b, oldS }=survivors[j]; const newS=P+j; const cell=Sseq[newS];
     grid[cell]=b; b.cell=cell; setAnimSlide(b, oldS, newS, slideDur()); }
 }
-function finishResolve(){ resolver=null; if(score>best){ best=score; saveBest(); } updateHUD(); }
+function finishResolve(){
+  const R=resolver;
+  if(R && R.acc){                                               // apply the whole-resolve combo multiplier, then bank the score
+    const D=R.depth||1, pre=R.acc.base+R.acc.cascade+R.acc.gap+R.acc.wrap;
+    const cm=comboMult(D), combo=pre*(cm-1), total=pre+combo, gain=Math.round(total);
+    score+=gain; if(score>best){ best=score; saveBest(); }
+    lastResolve={ base:R.acc.base, cascade:R.acc.cascade, gap:R.acc.gap, wrap:R.acc.wrap, combo, total, gain, depth:D, comboMult:cm };
+  }
+  resolver=null; updateHUD();
+}
 
 // ================= modes =================
 function startTimed(opts){ opts=opts||{};
@@ -446,10 +501,12 @@ function startTimed(opts){ opts=opts||{};
   COLORS=opts.colors||COLORS; palette=ORDER.slice(0,COLORS);
   resetRun();
   clock=opts.sec||timerLen;
+  // targets rescaled to the cascade-scoring magnitudes (a solid 90s run banks tens of thousands; a good
+  // chain is a few thousand). First-pass values — high score variance means these want a real playtest.
   const gt = opts.goalType || (Math.random()<0.5?'score':'color');
   if(gt==='color'){ const col=opts.color || palette[(Math.random()*palette.length)|0];
-    goal={ type:'color', target:opts.target||20, color:col }; }
-  else goal={ type:'score', target:opts.target||1200 };
+    goal={ type:'color', target:opts.target||30, color:col }; }
+  else goal={ type:'score', target:opts.target||40000 };
   showScreen(null); updateHUD(); wake();
 }
 function startEndless(opts){ opts=opts||{};
@@ -485,8 +542,9 @@ let last=performance.now(), idleDrawn=false;
 function wake(){ idleDrawn=false; }
 function isAnimating(){
   if(phase==='play') return true;                             // keep the clock/bar draining while playing
-  if(resolver||popList.length||goo.length||puffs.length||flyers.length) return true;
+  if(resolver||popList.length||goo.length||puffs.length||flyers.length||scorePops.length) return true;
   if(aim.active||chainLabel) return true;
+  if(scoreShown!==score || (shakeMag>0&&shakeT>0)) return true;   // count-up tween / chain shake still going
   for(const b of allBalls()) if(b.anim||(b.land&&performance.now()-b.land<160)) return true;
   return false;
 }
@@ -505,7 +563,13 @@ function update(dt,now){
   puffs=puffs.filter(p=>p.life>0);
   for(const f of flyers){ f.t+=dt; f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=520*dt; f.spin+=f.vspin*dt; }
   flyers=flyers.filter(f=>f.t<f.life);
+  for(const s of scorePops){ s.life-=dt; s.y-=dt*46; }
+  scorePops=scorePops.filter(s=>s.life>0);
   if(chainLabel){ chainLabel.life-=dt; if(chainLabel.life<=0) chainLabel=null; }
+  // score count-up tween — races the number toward its target over ~0.6s (readable surge), landing exactly
+  if(scoreShown!==score){ const diff=score-scoreShown, stepAmt=Math.max(1, Math.abs(diff)*Math.min(1,dt*2.2));
+    scoreShown = (stepAmt>=Math.abs(diff)) ? score : scoreShown+Math.sign(diff)*stepAmt; }
+  if(shakeT>0){ shakeT-=dt; if(shakeT<=0){ shakeT=0; shakeMag=0; } }
   // ---- mode clocks (drain while actively playing; resolve conditions once the board settles) ----
   if(phase==='play'){
     if(mode==='timed') clock=Math.max(0,clock-dt);
@@ -580,17 +644,26 @@ function drawQueue(){ const y=H-46, r=13, gap=34;
   ctx.save(); ctx.textAlign='center'; ctx.font='800 9px Nunito, sans-serif'; ctx.fillStyle=INK_SOFT; ctx.fillText('NEXT', cx, y-21);
   for(let i=0;i<Math.min(2,next.length);i++){ const x=cx-gap*0.5+i*gap, rr=i===0?r:r*0.82;
     stickerCircle(x,y,rr,colOf(next[i]),INK,2.4); } ctx.restore(); }
-function drawChain(){ if(!chainLabel) return; const a=Math.max(0,chainLabel.life/1.1);
-  const depth=Math.max(2,chainLabel.n); const sz=Math.min(46,18+depth*5);
-  const t=Math.min(1,(depth-2)/3), fill='hsl(43,'+Math.round(72+t*28)+'%,'+Math.round(60-t*8)+'%)';
+function drawScorePops(){ for(const s of scorePops){ const a=Math.max(0,s.life/s.max);
+  const sz=Math.min(30,11+Math.sqrt(s.v)*1.1);   // bigger +N for a bigger pop
   ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
-  const y=Math.max(58, cy-cellRad[ringCells[4][0]]-16);
-  ctx.lineWidth=4+sz*0.06; ctx.strokeStyle=PAPER; ctx.strokeText('chain x'+depth,cx,y);
+  ctx.lineWidth=3.5; ctx.strokeStyle=PAPER; ctx.strokeText('+'+s.v,s.x,s.y);
+  ctx.fillStyle=s.col; ctx.fillText('+'+s.v,s.x,s.y); ctx.restore(); } ctx.globalAlpha=1; }
+function drawChain(){ if(!chainLabel) return; const sp=chainLabel.spec||labelSpec(chainLabel.n);
+  const a=Math.max(0,chainLabel.life/(chainLabel.maxLife||sp.life)); const depth=Math.max(2,chainLabel.n);
+  const pop=1+0.18*Math.max(0,Math.min(1,(1-a)*3.3));   // little entrance pop
+  const sz=sp.size*pop, fill='hsl('+sp.hue+',88%,'+(depth>=10?54:60)+'%)';
+  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
+  const y=Math.max(60, cy-cellRad[ringCells[4][0]]-18);
+  ctx.lineWidth=4+sz*0.07; ctx.strokeStyle=PAPER; ctx.strokeText('chain x'+depth,cx,y);
   ctx.fillStyle=fill; ctx.fillText('chain x'+depth,cx,y); ctx.restore(); }
 function render(now){
   ctx.clearRect(0,0,W,H);
+  ctx.save();
+  if(shakeMag>0&&shakeT>0){ const m=shakeMag*(shakeT/0.32); ctx.translate((Math.random()*2-1)*m,(Math.random()*2-1)*m); }
   drawScaffold(); drawAimGlow(); drawGoo(); drawBalls(now); drawAimRings();
-  drawFlyers(); drawPuffs(); drawCenterWell(); drawAimLine(); drawQueue(); drawChain();
+  drawFlyers(); drawPuffs(); drawCenterWell(); drawAimLine(); drawQueue(); drawScorePops(); drawChain();
+  ctx.restore();
 }
 function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now;
   const active=isAnimating();
@@ -647,7 +720,8 @@ $('sFire').value=fireMult; $('vFire').textContent=fireMult.toFixed(1);
 $('sCasc').value=cascMult; $('vCasc').textContent=cascMult.toFixed(1);
 
 function updateHUD(){
-  $('score').textContent=score; $('best').textContent=best|0;
+  const disp=Math.round(scoreShown);
+  $('score').textContent=disp; $('best').textContent=best|0;
   $('stShots').textContent=stats.shots; $('stMatches').textContent=stats.matches;
   $('stArcs').textContent=stats.arcs; $('stRadials').textContent=stats.radials;
   $('stChain').textContent=stats.maxChain; $('stEject').textContent=stats.ejected;
@@ -656,7 +730,7 @@ function updateHUD(){
   if(mode==='timed' && phase==='play'){
     clk.style.display='block'; clk.textContent=fmtClock(clock); clk.classList.toggle('low',clock<=10);
     gl.style.display='flex'; bar.style.display='none'; lvl.style.display='none';
-    if(goal.type==='score'){ $('goalDot').style.display='none'; $('goalTxt').textContent='reach '+goal.target+' · '+score; }
+    if(goal.type==='score'){ $('goalDot').style.display='none'; $('goalTxt').textContent='reach '+goal.target+' · '+disp; }
     else { $('goalDot').style.display='inline-block'; $('goalDot').style.background=colOf(goal.color);
       $('goalTxt').textContent='collect '+goal.target+' · '+(collect[goal.color]||0); }
   } else if(mode==='endless' && phase==='play'){
@@ -689,6 +763,12 @@ window.GYRE={
   get occupied(){ return occupiedCount(); },
   get current(){ return current; }, get next(){ return next.slice(); },
   get stats(){ return Object.assign({},stats); }, get score(){ return score; }, get best(){ return best; },
+  get scoreShown(){ return Math.round(scoreShown); }, get scoreTarget(){ return score; },
+  get lastResolve(){ return lastResolve?Object.assign({},lastResolve):null; },
+  labelSpec(depth){ return labelSpec(depth); },
+  scoreResolve(rounds){ return scoreResolve(rounds); },
+  get chainLabel(){ return chainLabel?{ n:chainLabel.n, size:(chainLabel.spec||labelSpec(chainLabel.n)).size, hue:(chainLabel.spec||labelSpec(chainLabel.n)).hue }:null; },
+  scoreParams(){ return { BASE, ROUND_K, ROUND_CAP, GAP_K, WRAP_BASE, WRAP_WRAP, COMBO_K, COMBO_CAP, DEPTH_CAP }; },
   get collect(){ return Object.assign({},collect); },
   get resolving(){ return !!resolver; }, get resolverPhase(){ return resolver?resolver.phase:null; },
   get aim(){ return { active:aim.active, angle:aim.angle, rawAngle:aim.rawAngle, target:aim.target, snap:aimSnap }; },
@@ -718,7 +798,8 @@ window.GYRE={
   goalProgress(){ return goalProgress(); }, goalMet(){ return goalMet(); },
   get ebar(){ return ebar; }, get ebarMax(){ return EBAR_MAX; }, get level(){ return endlessLevel; }, get colors(){ return COLORS; },
   startTimed(opts){ startTimed(opts||{}); }, startEndless(opts){ startEndless(opts||{}); },
-  toMenu(){ toMenu(); }, setScore(n){ score=n|0; if(score>best){best=score;saveBest();} updateHUD(); },
+  toMenu(){ toMenu(); }, setScore(n){ score=n|0; if(score>best){best=score;saveBest();} updateHUD(); },  // sets target only; scoreShown tweens
+  snapScore(){ scoreShown=score; updateHUD(); },
   setClock(s){ clock=s; }, setEbar(s){ ebar=s; },
   wake(){ wake(); }
 };
