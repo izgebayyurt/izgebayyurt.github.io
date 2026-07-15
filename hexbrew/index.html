@@ -78,7 +78,7 @@ body{
 .screen.show{ opacity:1; visibility:visible; pointer-events:auto; transition:opacity .25s var(--calm), visibility 0s; }
 .logo{ font-family:var(--font-d); font-weight:700; font-size:52px; letter-spacing:.5px; color:var(--ink);
   text-shadow:0 4px 0 var(--shadow); }
-.logo .b{ color:#f2913d; }
+.logo .b{ color:#f57420; }
 .tag{ font-family:var(--font-d); font-weight:600; font-size:16px; color:var(--ink-soft); margin-top:-6px; letter-spacing:.6px; }
 .big{ font-family:var(--font-d); font-weight:700; font-size:38px; text-shadow:0 3px 0 var(--shadow); }
 .sub{ font-family:var(--font-u); font-weight:700; font-size:15px; color:var(--ink-soft); text-align:center; max-width:280px; }
@@ -207,10 +207,10 @@ body{
     </g>
     <g stroke="#2c2733" stroke-width="3" fill="none">
       <circle cx="120" cy="52" r="24" fill="#ef4a5a"/>
-      <circle cx="150" cy="70" r="24" fill="#f6c445"/>
+      <circle cx="150" cy="70" r="24" fill="#ffd23a"/>
       <circle cx="128" cy="86" r="24" fill="#3d8bdf"/>
       <circle cx="98" cy="74" r="21" fill="#57c268"/>
-      <circle cx="176" cy="52" r="21" fill="#f2913d"/>
+      <circle cx="176" cy="52" r="21" fill="#f57420"/>
     </g>
     <!-- tiny bomb -->
     <g transform="translate(196,96)">
@@ -259,8 +259,8 @@ body{
 <div class="screen" id="scrHelp">
   <div class="hcard">
     <div class="htitle">how to brew</div>
-    <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#f6c445"></span><b>=</b><span class="hdot" style="background:#f2913d"></span><span class="hlbl">orange</span></div>
-    <div class="hrow"><span class="hdot" style="background:#f6c445"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#57c268"></span><span class="hlbl">green</span></div>
+    <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#ffd23a"></span><b>=</b><span class="hdot" style="background:#f57420"></span><span class="hlbl">orange</span></div>
+    <div class="hrow"><span class="hdot" style="background:#ffd23a"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#57c268"></span><span class="hlbl">green</span></div>
     <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#9b62d6"></span><span class="hlbl">purple</span></div>
     <div class="hsep"></div>
     <div class="hline"><b>white</b> — brew three colours in one swap. swap white into any colour to wipe every ball of that colour.</div>
@@ -288,7 +288,7 @@ body{
 // ================= constants =================
 const PRIMS = ['R','Y','B'];
 const SECS  = ['O','G','P'];
-const HEX = { R:'#ef4a5a', Y:'#f6c445', B:'#3d8bdf', O:'#f2913d', G:'#57c268', P:'#9b62d6' };
+const HEX = { R:'#ef4a5a', Y:'#ffd23a', B:'#3d8bdf', O:'#f57420', G:'#57c268', P:'#9b62d6' };
 const WHITEC='#faf6ec', BOMBC='#2c2733';
 const INK = '#2c2733', INK_SOFT='#6b6472', PAPER='#f0e6cf', PAPER2='#fbf5e6', ACCENT='#ffd15c';
 const DECOMP = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'] };
@@ -296,7 +296,7 @@ const MIX = { RY:'O', YR:'O', RB:'P', BR:'P', YB:'G', BY:'G' };
 const NAME = { R:'red', Y:'yellow', B:'blue', O:'orange', G:'green', P:'purple', W:'white' };
 function isSec(c){ return c==='O'||c==='G'||c==='P'; }
 function colOf(c){ return c==='W'?WHITEC:(c==='K'||c==='I'?BOMBC:HEX[c]); }   // 'I' = ink (flyer icon colour)
-const FORGE_COUNT=2;      // secondaries per double step
+const FORGE_COUNT=3;      // secondaries per double step
 const BOMB_MIN=7;         // connected pop-group size that spawns a bomb
 const MIN_MATCH=3;
 
@@ -1486,7 +1486,7 @@ function tint(txt,col){ return '<b style="color:'+col+'">'+txt+'</b>'; }
 const LEVEL_TEACH={ 4:'bomb', 5:'brew', 9:'ink' };
 const FECARDS={
   bomb:{ title:'a gift', html:'the '+tint('bomb',INK)+' — pops 7+ at once forge one. it blows after your next match.' },
-  brew:{ title:'brewing', html:'complete two colour matches in ONE swap: '
+  brew:{ title:'brewing', html:'pop two different colours at the same moment to brew their mix: '
           +tint('R',HEX.R)+'+'+tint('Y',HEX.Y)+'='+tint('orange',HEX.O)+' · '
           +tint('Y',HEX.Y)+'+'+tint('B',HEX.B)+'='+tint('green',HEX.G)+' · '
           +tint('R',HEX.R)+'+'+tint('B',HEX.B)+'='+tint('purple',HEX.P) },
