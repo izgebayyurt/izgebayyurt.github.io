@@ -179,7 +179,7 @@ function placeCounters(L, spec, rng, mech, gatesPlaced) {
 /* ONE composable maker: any builder (junction/fork/chain/prism), any growth twist
    (portals/bridges), any decoration (gates/arrows/ice/counters) — driven purely by spec. */
 const BUILDS = { junction: buildJunctionLevel, fork: buildForkLevel, chain: buildChainLevel, prism: buildPrismLevel };
-function makeMix(spec, rng) {
+export function makeMix(spec, rng) {
   const build = BUILDS[spec.build || "junction"];
   const L = build(spec.n, rng, { looseness: spec.looseness == null ? 1.0 : spec.looseness, minCells: 12, jump: spec.jump, bridge: spec.bridge });
   if (!L) return null;
@@ -323,6 +323,18 @@ const RAMPS = {
     [10, { n: 7, minOpen: 41, jump: 2, bridge: 1, ice: 2 }],                          // portal + overpass + ice
     [10, { build: "chain", n: 7, minOpen: 41, jump: 1, bridge: 1 }],                  // brown + portal + overpass
     [10, { build: "chain", n: 7, minOpen: 43, ice: 2, counts: 2, zeros: true }],      // brown + ice + numbers
+    // band 4 — QUADS (four mechanics on one board)
+    [10, { build: "chain", n: 7, minOpen: 40, jump: 1, ice: 2, gates: 2, arrows: 2 }],             // brown + portal + ice + arrows
+    [10, { build: "prism", n: 7, minOpen: 40, jump: 1, ice: 2, gates: 2, arrows: 2 }],             // prism + portal + ice + arrows
+    [10, { build: "chain", n: 8, minOpen: 52, jump: 1, bridge: 1, ice: 2 }],                       // brown + portal + overpass + ice
+    [10, { build: "fork",  n: 8, minOpen: 52, jump: 1, ice: 2, gates: 2, arrows: 2, counts: 2, zeros: true }], // portal + ice + arrows + numbers
+    [10, { build: "prism", n: 7, minOpen: 41, bridge: 1, ice: 2, gates: 2, arrows: 1 }],           // prism + overpass + ice + arrows
+    // band 5 — QUINTS (five mechanics: full chaos). tally never shares with bridges.
+    [10, { build: "chain", n: 8, minOpen: 52, jump: 1, ice: 2, gates: 2, arrows: 1, counts: 2, zeros: true }], // brown + portal + ice + arrows + numbers
+    [10, { build: "prism", n: 8, minOpen: 52, jump: 1, ice: 2, gates: 2, arrows: 1, counts: 2, zeros: true }], // prism + portal + ice + arrows + numbers
+    [10, { build: "prism", n: 8, minOpen: 52, jump: 1, bridge: 1, ice: 2, gates: 2, arrows: 1 }],  // prism + portal + overpass + ice + arrows
+    [10, { build: "chain", n: 8, minOpen: 50, jump: 1, bridge: 1, ice: 2, gates: 2, arrows: 1 }],  // brown + portal + overpass + ice + arrows
+    [10, { build: "chain", n: 7, minOpen: 40, jump: 1, ice: 1, gates: 2, arrows: 1, counts: 2, zeros: true }], // brown + portal + ice + arrows + numbers
   ] },
 };
 
