@@ -135,7 +135,7 @@ body{
   <h3>Tuning <span class="x" id="drawerClose">&times;</span></h3>
   <div class="row"><label>Timer (s)</label><input type="range" id="sTimer" min="30" max="180" step="5"><span class="val" id="vTimer">90</span></div>
   <div class="row"><label>Endless ramp</label><input type="range" id="sRamp" min="0.5" max="2.0" step="0.1"><span class="val" id="vRamp">1.0</span></div>
-  <div class="row"><label>Colours</label><input type="range" id="sCol" min="4" max="6" step="1"><span class="val" id="vCol">5</span></div>
+  <div class="row"><label>Colours</label><input type="range" id="sCol" min="4" max="6" step="1"><span class="val" id="vCol">6</span></div>
   <div class="row"><label>Aim snap</label><div class="pills"><button class="pill on" id="pSnapOn">snap</button><button class="pill" id="pSnapOff">free</button></div></div>
   <div class="row"><label>Fire speed</label><input type="range" id="sFire" min="0.5" max="2.2" step="0.1"><span class="val" id="vFire">1.0</span></div>
   <div class="row"><label>Spiral speed</label><input type="range" id="sCasc" min="0.5" max="2.2" step="0.1"><span class="val" id="vCasc">1.0</span></div>
@@ -246,7 +246,7 @@ function trackPos(t){
 }
 
 // ================= tunables =================
-let COLORS=5;
+let COLORS=6;             // 6-colour game by default (orange #f57420 in play); slider 4-6 in the drawer
 let aimSnap=true;
 let fireMult=1.0, cascMult=1.0;
 let timerLen=90, endlessRamp=1.0;
@@ -797,6 +797,7 @@ window.GYRE={
   get clock(){ return clock; }, get goal(){ return goal?Object.assign({},goal):null; },
   goalProgress(){ return goalProgress(); }, goalMet(){ return goalMet(); },
   get ebar(){ return ebar; }, get ebarMax(){ return EBAR_MAX; }, get level(){ return endlessLevel; }, get colors(){ return COLORS; },
+  get palette(){ return palette.slice(); },
   startTimed(opts){ startTimed(opts||{}); }, startEndless(opts){ startEndless(opts||{}); },
   toMenu(){ toMenu(); }, setScore(n){ score=n|0; if(score>best){best=score;saveBest();} updateHUD(); },  // sets target only; scoreShown tweens
   snapScore(){ scoreShown=score; updateHUD(); },
