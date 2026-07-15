@@ -23,7 +23,7 @@ bottom.
 ## 2. AdMob — Android app + units
 - [ ] AdMob → Apps → **Add app → Android** → "Huemeld".
 - [ ] Copy the **App ID** (`ca-app-pub-…~…`, with the `~`) → paste into `android/app/src/main/AndroidManifest.xml` (the `com.google.android.gms.ads.APPLICATION_ID` meta-data; currently Google's sample id).
-- [ ] Add two ad units → **Interstitial** and **Rewarded**. Copy both unit IDs (`ca-app-pub-…/…`).
+- [ ] Add a **Rewarded** ad unit. Copy its unit ID (`ca-app-pub-…/…`). (No interstitial needed — Huemeld shows **no forced ads**; ads are opt-in only: a rewarded hint, or "watch to unlock 8 pack levels". You can skip the Interstitial unit.)
 - [ ] In `native.js`: set `ANDROID_INTERSTITIAL_ID` and `ANDROID_REWARDED_ID`.
 
 ## 3. RevenueCat — Google Play app
