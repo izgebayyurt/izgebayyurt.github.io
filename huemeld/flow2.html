@@ -1317,6 +1317,29 @@ function step(cell){
       drag = excess.length ? null : {t:"jun", i:junctions.length-1};
       renderPaths(); return;
     }
+    // THIRD COLOUR INTO A FEEDER: the other line already feeds a junction (e.g. blue
+    // feeds a red+blue = purple mix). Dropping our colour on it mixes a secondary right
+    // there (yellow + blue = green) and DEEPENS the junction it fed (green + red = brown
+    // at the tip). Same end state as retreating the far feeder, mixing here, then
+    // re-merging - just done in one move.
+    if(oleg.jun>=0 && myLeg.jun<0 && sec && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      var fji=oleg.jun, FJ=junctions[fji], p2=null;
+      ems.forEach(function(E){ E.legs.forEach(function(lg){ if(lg!==oleg && lg.jun===fji) p2=E.col; }); });
+      if(p2==null) junctions.forEach(function(K,ki){ if(ki!==fji && K.jun===fji) p2=K.sec; });
+      var deep = p2!=null ? mixOf(sec, p2) : null;   // (our secondary) + the junction's other input
+      var deepWanted = deep && ((tgtFor(deep)&&!tgtFor(deep).done) || (tgtFor("N")&&!tgtFor("N").done));
+      if(FJ && (FJ.jun==null||FJ.jun<0) && deep && deepWanted){
+        myLeg.cells.push(cell);
+        var GA={ cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:fji };
+        oleg.cells=oleg.cells.slice(0, o.idx+1);     // the other line now ends at the new mix (a feeder)
+        junctions.push(GA); var gai=junctions.length-1;
+        myLeg.jun=gai; oleg.jun=gai;                 // our line + the other now feed the new secondary
+        FJ.sec=deep;                                 // the fed junction deepens: e.g. purple -> brown
+        addBloom(cell[0],cell[1],HEX[sec],660); addBloom(FJ.cell[0],FJ.cell[1],HEX[deep],660);
+        drawSteps=0; sfxJun(); hap("medium"); discover(sec,cell[0],cell[1]); discover(deep,FJ.cell[0],FJ.cell[1]);
+        drag=null; reconcileAndFixDrag(); renderPaths(); checkWin(); return;
+      }
+    }
     rejectMix(cell); return;   // an illegal mix (blend already made, or the other pipe already feeds a circle)
   }
   // CHAIN (other direction): a primary line runs into an existing blend -> browN
@@ -1352,11 +1375,11 @@ function step(cell){
   // PRISM's core (whose co-located ray emitters shadow the target in occAt, so look
   // the target up by cell, not by occupant type)
   if(drag.t==="jun" && (o.t==="tgt" || tgtAt(cell[0],cell[1]))){
-    var T=tgtAt(cell[0],cell[1]), J3=junctions[drag.i];
-    if(T.col===J3.sec && !T.done){
-      J3.leg.push(cell); T.done=true;
-      addBloom(cell[0],cell[1], HEX[T.col], 760); addSweep(J3.leg.slice(), "#fff", 0, 480);
-      bounceDot(T.r,T.c); drag=null;
+    var TG=tgtAt(cell[0],cell[1]), J3=junctions[drag.i];
+    if(TG.col===J3.sec && !TG.done){
+      J3.leg.push(cell); TG.done=true;
+      addBloom(cell[0],cell[1], HEX[TG.col], 760); addSweep(J3.leg.slice(), "#fff", 0, 480);
+      bounceDot(TG.r,TG.c); drag=null;
       sfxDone(); renderPaths(); checkWin(); return;
     }
   }
@@ -1382,6 +1405,15 @@ function noDangling(){
       var h=lg.cells[lg.cells.length-1]; if(tgtAt(h[0],h[1])) continue;
       return false;
     }
+  }
+  // a mix must PAY OFF: its blend has to feed a deeper mix (chain) or DELIVER to a
+  // matching circle. A blend that just stubs out - or winds around to fill cells and
+  // dead-ends nowhere - is not a real connection (that's how junk mixes cheat coverage).
+  for(var j=0;j<junctions.length;j++){ var J=junctions[j];
+    if(J.jun>=0) continue;                                    // chains into a deeper mix
+    var bh=J.leg[J.leg.length-1], BT=tgtAt(bh[0],bh[1]);
+    if(BT && BT.col===J.sec) continue;                        // delivers to its own circle
+    return false;                                             // otherwise it's a dead-end mix
   }
   return true;
 }
