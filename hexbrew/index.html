@@ -78,7 +78,7 @@ body{
 .screen.show{ opacity:1; visibility:visible; pointer-events:auto; transition:opacity .25s var(--calm), visibility 0s; }
 .logo{ font-family:var(--font-d); font-weight:700; font-size:52px; letter-spacing:.5px; color:var(--ink);
   text-shadow:0 4px 0 var(--shadow); }
-.logo .b{ color:#f2913d; }
+.logo .b{ color:#f57420; }
 .tag{ font-family:var(--font-d); font-weight:600; font-size:16px; color:var(--ink-soft); margin-top:-6px; letter-spacing:.6px; }
 .big{ font-family:var(--font-d); font-weight:700; font-size:38px; text-shadow:0 3px 0 var(--shadow); }
 .sub{ font-family:var(--font-u); font-weight:700; font-size:15px; color:var(--ink-soft); text-align:center; max-width:280px; }
@@ -207,10 +207,10 @@ body{
     </g>
     <g stroke="#2c2733" stroke-width="3" fill="none">
       <circle cx="120" cy="52" r="24" fill="#ef4a5a"/>
-      <circle cx="150" cy="70" r="24" fill="#f6c445"/>
+      <circle cx="150" cy="70" r="24" fill="#ffd23a"/>
       <circle cx="128" cy="86" r="24" fill="#3d8bdf"/>
       <circle cx="98" cy="74" r="21" fill="#57c268"/>
-      <circle cx="176" cy="52" r="21" fill="#f2913d"/>
+      <circle cx="176" cy="52" r="21" fill="#f57420"/>
     </g>
     <!-- tiny bomb -->
     <g transform="translate(196,96)">
@@ -259,11 +259,11 @@ body{
 <div class="screen" id="scrHelp">
   <div class="hcard">
     <div class="htitle">how to brew</div>
-    <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#f6c445"></span><b>=</b><span class="hdot" style="background:#f2913d"></span><span class="hlbl">orange</span></div>
-    <div class="hrow"><span class="hdot" style="background:#f6c445"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#57c268"></span><span class="hlbl">green</span></div>
+    <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#ffd23a"></span><b>=</b><span class="hdot" style="background:#f57420"></span><span class="hlbl">orange</span></div>
+    <div class="hrow"><span class="hdot" style="background:#ffd23a"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#57c268"></span><span class="hlbl">green</span></div>
     <div class="hrow"><span class="hdot" style="background:#ef4a5a"></span><b>+</b><span class="hdot" style="background:#3d8bdf"></span><b>=</b><span class="hdot" style="background:#9b62d6"></span><span class="hlbl">purple</span></div>
     <div class="hsep"></div>
-    <div class="hline"><b>white</b> — brew three colours in one swap. white is wild, but only joins brewed colours.</div>
+    <div class="hline"><b>white</b> — brew three colours in one swap. swap white into any colour to wipe every ball of that colour.</div>
     <div class="hline"><b>bomb</b> — pop 7+ balls at once to forge one; it blows after your next match.</div>
     <div class="hline"><b>ink</b> — pop on a stained cell to scrub it; a bomb scrubs everything it hits.</div>
     <div class="hline">a swap that matches nothing still moves — and still costs a move.</div>
@@ -288,7 +288,7 @@ body{
 // ================= constants =================
 const PRIMS = ['R','Y','B'];
 const SECS  = ['O','G','P'];
-const HEX = { R:'#ef4a5a', Y:'#f6c445', B:'#3d8bdf', O:'#f2913d', G:'#57c268', P:'#9b62d6' };
+const HEX = { R:'#ef4a5a', Y:'#ffd23a', B:'#3d8bdf', O:'#f57420', G:'#57c268', P:'#9b62d6' };
 const WHITEC='#faf6ec', BOMBC='#2c2733';
 const INK = '#2c2733', INK_SOFT='#6b6472', PAPER='#f0e6cf', PAPER2='#fbf5e6', ACCENT='#ffd15c';
 const DECOMP = { R:['R'], Y:['Y'], B:['B'], O:['R','Y'], G:['Y','B'], P:['R','B'] };
@@ -296,7 +296,7 @@ const MIX = { RY:'O', YR:'O', RB:'P', BR:'P', YB:'G', BY:'G' };
 const NAME = { R:'red', Y:'yellow', B:'blue', O:'orange', G:'green', P:'purple', W:'white' };
 function isSec(c){ return c==='O'||c==='G'||c==='P'; }
 function colOf(c){ return c==='W'?WHITEC:(c==='K'||c==='I'?BOMBC:HEX[c]); }   // 'I' = ink (flyer icon colour)
-const FORGE_COUNT=2;      // secondaries per double step
+const FORGE_COUNT=3;      // secondaries per double step
 const BOMB_MIN=7;         // connected pop-group size that spawns a bomb
 const MIN_MATCH=3;
 
@@ -333,28 +333,27 @@ const RING1=ringQR(1), RING2=ringQR(2);   // 6 and 12 cells
 //   matching swap's cascade settles, clearing/scrubbing their radius.
 //  L5 O4: two deliberate R+Y doubles forge 4 orange; collecting 4 needs one O-line (3) + one more,
 //   so ~3 doubles or a 4-line — the teaching beat is "engineer the double, then line the brew".
-//  L7 seeded O/G near centre diversify cascade steps: a cascade round popping 3 distinct colours forges the white.
+//  L7 Greenhouse: two deliberate Y+B doubles forge 4 green (brew goal), then one green line collects 3.
 //  L13 Triple Distilled: one deliberate double of each pair (R+Y, Y+B, R+B) forges 2 of each secondary.
 //  L14 chain ≥3 occurs naturally every handful of cascading swaps.
-//  (boom goal type retained in code for future levels; palette path likewise, currently unused.)
+//  (boom + white goal types retained in code for future levels; palette path likewise, currently unused.)
 const LEVELS = [
   { name:'Warm-up',        goals:[{t:'col',c:'R',need:36}], moves:21 },
   { name:'Two of a Kind',  goals:[{t:'col',c:'R',need:45},{t:'col',c:'B',need:45}], moves:22 },
   { name:'Triple Order',   goals:[{t:'col',c:'R',need:48},{t:'col',c:'Y',need:48},{t:'col',c:'B',need:48}], moves:24 },
   { name:'The Gift',       goals:[{t:'col',c:'R',need:50}], moves:20, seed:[{q:3,r:0,c:'K'}] },
-  { name:'First Brew',     goals:[{t:'col',c:'O',need:4}], moves:22 },
-  { name:'Green Thumb',    goals:[{t:'col',c:'G',need:5},{t:'col',c:'P',need:5}], moves:30 },
-  { name:'White Lightning',goals:[{t:'white',need:1}], moves:24,
-    seed:[{q:0,r:-1,c:'O'},{q:1,r:1,c:'O'},{q:-1,r:0,c:'O'},{q:1,r:-1,c:'G'},{q:-1,r:1,c:'G'},{q:0,r:2,c:'G'},{q:2,r:-1,c:'O'},{q:-2,r:1,c:'G'}] },
+  { name:'First Brew',     goals:[{t:'col',c:'O',need:6}], moves:22 },
+  { name:'Green Thumb',    goals:[{t:'col',c:'G',need:8},{t:'col',c:'P',need:8}], moves:30 },
+  { name:'Greenhouse',     goals:[{t:'brew',c:'G',need:6},{t:'col',c:'G',need:3}], moves:20 },
   { name:'Production Line',goals:[{t:'brew',need:6},{t:'col',c:'Y',need:52}], moves:26 },
   { name:'Ink Spill',      goals:[{t:'ink',need:7}], moves:20, ink:[[0,0],...RING1] },
-  { name:'Deep Clean',     goals:[{t:'ink',need:10},{t:'col',c:'O',need:4}], moves:30, ink:[...RING1,[2,-1],[-2,1],[0,-2],[0,2]] },
+  { name:'Deep Clean',     goals:[{t:'ink',need:10},{t:'col',c:'O',need:8}], moves:30, ink:[...RING1,[2,-1],[-2,1],[0,-2],[0,2]] },
   { name:'Powder Keg',     goals:[{t:'ink',need:12}], moves:26, ink:[...RING2], seed:[{q:1,r:-1,c:'K'}] },
-  { name:'Spotless',       goals:[{t:'ink',need:14},{t:'white',need:1}], moves:32, ink:[...RING2,[0,0],[0,-1]] },
-  { name:'Triple Distilled',goals:[{t:'brew',c:'O',need:2},{t:'brew',c:'G',need:2},{t:'brew',c:'P',need:2}], moves:8 },
-  { name:'Chain Reaction', goals:[{t:'chain',need:3},{t:'col',c:'P',need:6}], moves:28 },
-  { name:'Night Cap',      goals:[{t:'col',c:'G',need:8},{t:'ink',need:6}], moves:26, ink:[...RING1] },
-  { name:'The Full Brew',  goals:[{t:'col',c:'O',need:5},{t:'col',c:'G',need:5},{t:'col',c:'P',need:5},{t:'white',need:1},{t:'ink',need:6}], moves:36, ink:[...RING1] },
+  { name:'Spotless',       goals:[{t:'ink',need:14}], moves:11, ink:[...RING2,[0,0],[0,-1]] },
+  { name:'Triple Distilled',goals:[{t:'brew',c:'O',need:5},{t:'brew',c:'G',need:5},{t:'brew',c:'P',need:5}], moves:10 },
+  { name:'Chain Reaction', goals:[{t:'chain',need:3},{t:'col',c:'P',need:10}], moves:28 },
+  { name:'Night Cap',      goals:[{t:'col',c:'G',need:14},{t:'ink',need:6}], moves:26, ink:[...RING1] },
+  { name:'The Full Brew',  goals:[{t:'col',c:'O',need:9},{t:'col',c:'G',need:9},{t:'col',c:'P',need:9},{t:'ink',need:6}], moves:36, ink:[...RING1] },
 ];
 function starThresholds(moves){ return { s3:Math.max(2,Math.round(moves*0.35)), s2:Math.max(1,Math.round(moves*0.15)) }; }
 
@@ -440,6 +439,11 @@ const SFX=(()=>{
     win(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:'triangle',d:0.3,peak:0.16,delay:i*0.13})); },
     lose(){ tone(392,{type:'triangle',d:0.3,peak:0.15}); tone(311,{type:'triangle',d:0.45,peak:0.14,delay:0.18}); },
     warn(){ tone(330,{type:'sine',d:0.09,peak:0.1}); },                                // low-moves tick
+    sweep(){ noise({dur:0.5,peak:0.2,f0:400,f1:2600,ftype:'bandpass'});               // white colour-clear whoosh
+      tone(523,{type:'sine',d:0.42,peak:0.12,slide:1568}); },
+    bigsweep(){ noise({dur:0.8,peak:0.26,f0:250,f1:3200,ftype:'bandpass'});           // white+white board wipe
+      tone(392,{type:'sine',d:0.7,peak:0.16,slide:2093});
+      tone(784,{type:'triangle',d:0.5,peak:0.1,delay:0.25,slide:1568}); },
     scrub(){ tone(880,{type:'sine',slide:1500,d:0.08,peak:0.12}); tone(1250,{type:'sine',slide:720,d:0.09,peak:0.1,delay:0.085}); } // squeaky-clean
   };
 })();
@@ -524,10 +528,10 @@ let inkFx=[];                         // scrub wipe animations {x,y,born,seed}
 function randPrim(){ return PALETTE[(Math.random()*PALETTE.length)|0]; }
 function inkGoal(){ return goals.find(g=>g.t==='ink'); }
 
-// ================= match finding (white = SECONDARY-only wildcard) =================
-// White joins O/G/P lines only — a brewed white can never be swept away by a random
-// primary cascade; spending it is always a deliberate secondary match.
-function matchesColour(c,col){ return c===col || (c==='W' && isSec(col)); }
+// ================= match finding (white is INERT in lines) =================
+// White never joins line matches — it's a COLOUR BOMB: swap it into any coloured
+// ball to fire it (see fireWhite). Plain equality here.
+function matchesColour(c,col){ return c===col; }
 function findMatches(){
   const out=[];
   const COLOURS=['R','Y','B','O','G','P'];
@@ -548,6 +552,9 @@ function findMatches(){
 }
 function hasInstantMatch(){ return findMatches().length>0; }
 function hasMatchingMove(){
+  // a white beside any coloured ball can always FIRE — that's a productive move
+  for(let i=0;i<N;i++){ if(cells[i].c==='W'){
+    for(const nb of NEIGH[i]){ const c=cells[nb].c; if(c!=null && c!=='K') return true; } } }
   for(let a=0;a<N;a++){
     for(const b of NEIGH[a]){
       if(b<=a) continue;
@@ -766,7 +773,8 @@ function refillEmpties(orders){
   for(const o of orders){ for(let k=0;k<o.count && idx<byTop.length;k++){
       const ci=byTop[idx++]; used.add(ci);
       cells[ci].c=(o.type==='white')?'W':o.colour; cells[ci].fresh=false; cells[ci].forgeFx=performance.now();
-      if(o.type==='white'){ stats.whites++; for(let s=0;s<10;s++) sparks.push(mkSpark(cells[ci].x,cells[ci].y,WHITEC)); }
+      if(o.type==='white'){ stats.whites++; for(let s=0;s<10;s++) sparks.push(mkSpark(cells[ci].x,cells[ci].y,WHITEC));
+        showFECard('white'); }   // teach on the FIRST white ever forged (SEEN-guarded)
       else { stats.forges++; if(stats.brewedBy[o.colour]!==undefined) stats.brewedBy[o.colour]++; }
     } }
   for(const ci of newSlots){ if(used.has(ci)) continue; const pick=pickRefillColour(ci); cells[ci].fresh=pick.biased; }
@@ -861,6 +869,47 @@ function stepResolver(dt){
 
 // ================= swap =================
 function adjacent(a,b){ return NEIGH[a].includes(b); }
+// ---------- white = COLOUR BOMB ----------
+// Swapping a white with any adjacent coloured ball FIRES it: the white is consumed and
+// EVERY ball of the target's colour pops in a ripple radiating from the swap site —
+// collected toward goals, scrubbing ink under each. White+white wipes the whole board.
+// This is a swap (costs 1 move) but NOT a match: the clear itself never forges and
+// never spawns a bomb (it isn't a match-group); the gravity/cascades it triggers then
+// resolve completely normally (those CAN forge, chain, and spawn bombs).
+function fireWhite(a,b){
+  const both = cells[a].c==='W' && cells[b].c==='W';
+  const w = cells[a].c==='W' ? a : b;
+  const tcol = both ? null : cells[w===a?b:a].c;
+  movesLeft--; stats.swaps++; vibrate(both?[16,30,16,30,16]:[14,24,14]);
+  goalsDoneAtSwap=goals.filter(g=>remainingOf(g)<=0).length;
+  if(movesLeft>0 && movesLeft<=3) SFX.warn();
+  const origin={x:(cells[a].x+cells[b].x)/2, y:(cells[a].y+cells[b].y)/2};
+  lastResolve=null;
+  resolver={ phase:'squish', t:SQUISH_DUR, depth:1, pendingForge:[], origin, popStep:0 };
+  // targets: W+W → every occupied cell; single → both swap cells + every ball of the colour
+  const targets=[];
+  for(let i=0;i<N;i++){ const c=cells[i].c; if(c==null) continue;
+    if(both){ targets.push(i); continue; }
+    if(i===a||i===b||c===tcol) targets.push(i); }
+  targets.sort((u,v)=>((cells[u].x-origin.x)**2+(cells[u].y-origin.y)**2)
+                     -((cells[v].x-origin.x)**2+(cells[v].y-origin.y)**2));
+  let k=0;
+  for(const ci of targets){ const c=cells[ci].c;
+    let goalT=null;
+    if(c==='W'){ goalT=whiteTargetGoal(); if(goalT) collect[goalT.c]=Math.min(goalT.need, collect[goalT.c]+1); }
+    else if(c!=='K'){ if(collect[c]!==undefined) collect[c]++; goalT=goalFor(c); }
+    const scrub=scrubInkAt(ci);                    // clears scrub ink under every popped cell
+    pops.push({ ci, x:cells[ci].x, y:cells[ci].y+cells[ci].oy, tx:cells[ci].x, ty:cells[ci].y, c, goal:goalT,
+                scrub, inkG:scrub?inkGoal():null,
+                delay:k*POP_STAGGER, step:resolver.popStep++, fired:false });
+    k++;
+    cells[ci].c=null; cells[ci].fresh=false; cells[ci].bombBorn=0; }
+  resolver.t=SQUISH_DUR + k*POP_STAGGER;           // ripple owns the squish, then gravity/cascades
+  if(both){ SFX.bigsweep(); impact(4.5, 3, '#fff6d8', 340); brewFlash('clean sweep!', WHITEC, true); }
+  else { SFX.sweep(); impact(2.6, 1); }
+  wake();
+  return {type:'fire', colour:both?'ALL':tcol, cleared:k};
+}
 // ALL rejections route through refuse(): a hard refuse (illegal move) shakes + buzzes;
 // a soft refuse ("wait" — mid-resolution or win-pending) only nudges, no buzz, since it's
 // not an error. The drag path suppresses its own SFX.spring when swapCore already refused.
@@ -872,7 +921,8 @@ function swapCore(a,b){
   if(a===b||a<0||b<0||a>=N||b>=N) return {type:'blocked',reason:'bad'};
   if(!adjacent(a,b)){ refuse(a,b); return {type:'blocked',reason:'nonadjacent'}; }
   const ca=cells[a].c, cb=cells[b].c;
-  if(ca==null||cb==null||ca==='K'||cb==='K'){ refuse(a,b); return {type:'blocked',reason:'empty'}; }
+  if(ca==null||cb==null||ca==='K'||cb==='K'){ refuse(a,b); return {type:'blocked',reason:'empty'}; }  // incl. white-onto-bomb
+  if(ca==='W'||cb==='W') return fireWhite(a,b);   // colour bomb: fire (handles W+W board wipe) — before the same-colour check
   if(ca===cb){ refuse(a,b); return {type:'blocked',reason:'same'}; }
   cells[a].c=cb; cells[b].c=ca; animSwap(a,b);
   const trig=findMatches().filter(m=>m.cells.includes(a)||m.cells.includes(b));
@@ -1148,9 +1198,16 @@ function drawOneBall(i,now,remixing){
     if(remixing){ const f=ease((now-remixFx.t0)/remixFx.dur);
       const ang=(i*0.53)+(1-f)*5.0; const rr=(1-f)*(90+((i*13)%60));
       x=latCX+Math.cos(ang)*rr + (b.x-latCX)*f; y=latCY+Math.sin(ang)*rr*0.7 + (b.y-latCY)*f; }
+    // white-drag blast preview: every ball of the aimed colour pulses gently
+    const previewed = whitePreviewCol && i!==dragStart && b.c && b.c!=='K'
+      && (whitePreviewCol==='ALL' || b.c===whitePreviewCol);
+    if(previewed) scale*=1+0.07*Math.sin(now/120+i*0.7);
     let r=(ballRad + Math.sin(now/170+i)*0.6)*scale;
     const age=now-b.born; if(age<260){ const f=age/260; r*=0.62+0.38*f; }
     if(b.c==='K'){ if(b.bombBorn) drawBomb(x,y,r,now,i); return; }  // hidden until its pop fires (condenses out of the ball)
+    if(previewed){ ctx.save(); ctx.beginPath(); ctx.arc(x,y,r+4,0,6.2832);
+      ctx.strokeStyle='rgba(255,209,92,'+(0.55+0.3*Math.sin(now/120+i*0.7)).toFixed(2)+')';
+      ctx.lineWidth=3; ctx.stroke(); ctx.restore(); }
     let sq=0; if(b.land){ const la=now-b.land; if(la<140) sq=1-la/140; else b.land=0; }
     if(sq>0){ ctx.save(); ctx.translate(x,y); ctx.scale(1+0.16*sq,1-0.22*sq); ctx.translate(-x,-y); }
     const sel=(i===selIdx);
@@ -1425,14 +1482,15 @@ const SEEN=(()=>{ try{ const o=JSON.parse(lsGet('hb_seen','{}')); return (o&&typ
 function seenSave(){ lsSet('hb_seen', JSON.stringify(SEEN)); }
 function tint(txt,col){ return '<b style="color:'+col+'">'+txt+'</b>'; }
 // one card per mechanic, shown at the START of the level that first demands it
-const LEVEL_TEACH={ 4:'bomb', 5:'brew', 7:'white', 9:'ink' };
+// (white's card fires the FIRST TIME a white is forged, any level — see refillEmpties)
+const LEVEL_TEACH={ 4:'bomb', 5:'brew', 9:'ink' };
 const FECARDS={
   bomb:{ title:'a gift', html:'the '+tint('bomb',INK)+' — pops 7+ at once forge one. it blows after your next match.' },
-  brew:{ title:'brewing', html:'complete two colour matches in ONE swap: '
+  brew:{ title:'brewing', html:'pop two different colours at the same moment to brew their mix: '
           +tint('R',HEX.R)+'+'+tint('Y',HEX.Y)+'='+tint('orange',HEX.O)+' · '
           +tint('Y',HEX.Y)+'+'+tint('B',HEX.B)+'='+tint('green',HEX.G)+' · '
           +tint('R',HEX.R)+'+'+tint('B',HEX.B)+'='+tint('purple',HEX.P) },
-  white:{ title:'white', html:tint('white',INK)+' — brew three colours in one go. white is wild, but only joins brewed colours.' },
+  white:{ title:'white', html:tint('white',INK)+' — swap it into any colour to wipe every ball of that colour from the board.' },
   ink:{ title:'ink', html:tint('ink',INK)+' — pop a ball on a stained cell to scrub it clean. bombs scrub everything they hit.' }
 };
 function showFECard(key){ const card=FECARDS[key]; if(!card||SEEN[key]) return;
@@ -1468,8 +1526,10 @@ function ballAt(x,y){ let best=-1,bd=ballRad*1.3; for(let i=0;i<N;i++){ const b=
 const DRAG_CAP=0.55, DRAG_COMMIT=0.45, DRAG_PICK=0.15, LEAN=0.25;
 let dragStart=-1, downPos={x:0,y:0}, movedFar=false;
 let dragOff={x:0,y:0}, dragTgt=-1, dragLean={x:0,y:0};
+let whitePreviewCol=null;   // dragging a white toward a colour: that colour ('ALL' for W+W) pulses as a blast preview
 function springTo(i,ox,oy){ const c=cells[i]; if(!c) return; c.fx=ox; c.fy=oy; c.fvx=0; c.fvy=0; }
-function clearDrag(){ dragStart=-1; dragTouchId=null; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0}; }
+function clearDrag(){ dragStart=-1; dragTouchId=null; dragTgt=-1; dragOff={x:0,y:0}; dragLean={x:0,y:0};
+  if(whitePreviewCol){ whitePreviewCol=null; wake(); } }
 function onDown(ev){ wake(); if(state!=='play'||landscapeLock) return;
   if(dragStart>=0) return;                                   // a drag is live — ignore extra fingers
   const isTouch=!!ev.changedTouches;
@@ -1501,9 +1561,13 @@ function onMove(ev){ if(dragStart<0) return;
     const f=Math.min(1, Math.hypot(dragOff.x,dragOff.y)/cap);
     dragLean={x:(A.x-B.x)*LEAN*f, y:(A.y-B.y)*LEAN*f}; }
   else dragLean={x:0,y:0};
+  // dragging a white: pulse every ball of the aimed colour — the blast is previewed before commit
+  const pv=(A.c==='W' && dragTgt>=0 && cells[dragTgt].c && cells[dragTgt].c!=='K')
+    ? (cells[dragTgt].c==='W' ? 'ALL' : cells[dragTgt].c) : null;
+  if(pv!==whitePreviewCol){ whitePreviewCol=pv; wake(); }
   // drag far enough and the swap just happens — no need to let go
   if(dragTgt>=0){ const B=cells[dragTgt];
-    if(A.c!==B.c){
+    if(A.c!==B.c || A.c==='W'){                    // W+W is a legal commit (board wipe)
       const dx=B.x-A.x, dy=B.y-A.y, dl=Math.hypot(dx,dy)||1;
       const proj=(dragOff.x*dx+dragOff.y*dy)/dl;
       if(proj>=DRAG_COMMIT*ROW_DY){
@@ -1513,7 +1577,7 @@ function onMove(ev){ if(dragStart<0) return;
         if(res.type==='match'||res.type==='positional'){
           springTo(tgt, (A.x+off.x)-B.x, (A.y+off.y)-B.y);
           springTo(start, (B.x+lean.x)-A.x, (B.y+lean.y)-A.y);
-        } else { springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
+        } else if(res.type!=='fire'){ springTo(start, off.x, off.y); springTo(tgt, lean.x, lean.y); SFX.spring(); }
         selIdx=-1;
       } } }
 }
@@ -1571,6 +1635,7 @@ window.HB = {
   get winPending(){ return !!pendingWin; },
   get flyersInFlight(){ return flyers.length; },
   get drag(){ return { start:dragStart, touch:dragTouchId }; },
+  get whitePreview(){ return whitePreviewCol; },
   get winInfo(){ return winInfo?Object.assign({},winInfo):null; },
   get progress(){ return JSON.parse(JSON.stringify(progress)); },
   colours(){ return cells.map(c=>c.c); },
