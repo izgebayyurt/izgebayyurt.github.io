@@ -1406,6 +1406,15 @@ function noDangling(){
       return false;
     }
   }
+  // a mix must PAY OFF: its blend has to feed a deeper mix (chain) or DELIVER to a
+  // matching circle. A blend that just stubs out - or winds around to fill cells and
+  // dead-ends nowhere - is not a real connection (that's how junk mixes cheat coverage).
+  for(var j=0;j<junctions.length;j++){ var J=junctions[j];
+    if(J.jun>=0) continue;                                    // chains into a deeper mix
+    var bh=J.leg[J.leg.length-1], BT=tgtAt(bh[0],bh[1]);
+    if(BT && BT.col===J.sec) continue;                        // delivers to its own circle
+    return false;                                             // otherwise it's a dead-end mix
+  }
   return true;
 }
 function checkWin(){
