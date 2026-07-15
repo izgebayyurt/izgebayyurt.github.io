@@ -520,7 +520,9 @@ function setLang(l){ LANG=l; localStorage.setItem("hm_flow2_lang",l); applyLang(
 var MIXMAP={RY:"O",BR:"P",BY:"G",BO:"N",GR:"N",PY:"N"};
 var COMPS={O:["R","Y"],G:["B","Y"],P:["B","R"]};   // what a PRISM splits a secondary back into
 function mixOf(a,b){ return MIXMAP[[a,b].sort().join("")]||null; }
-var CBGLYPH={R:"R",Y:"Y",B:"B",O:"O",G:"G",P:"P",N:"Br"};   // colour-blind letters
+/* colour-blind glyphs: distinct GEOMETRIC shapes (a shape is read faster and more
+   reliably than a colour letter). Our own marks - not the licensed ColorADD set. */
+var CBGLYPH={R:"▲",Y:"●",B:"■",O:"◆",G:"▼",P:"✚",N:"⬢"};
 
 /* iOS zoom guards */
 document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
