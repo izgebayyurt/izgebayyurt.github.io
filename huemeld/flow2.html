@@ -345,7 +345,6 @@ var TR = {
   "How to play":"Nasıl oynanır",                                    /* 6 */
   "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
   "Support Huemeld":"Huemeld'e Destek Ol",
-  "That line's already mixed - run your colour into the blended pipe to combine further.":"Bu çizgi zaten karıştı - daha fazla birleştirmek için renginizi karışmış boruya sürün.",
   "Menu":"Menü",                                                    /* 8 */
   "Language":"Dil",                                                 /* 9 */
   // - level chrome -
@@ -1318,12 +1317,29 @@ function step(cell){
       drag = excess.length ? null : {t:"jun", i:junctions.length-1};
       renderPaths(); return;
     }
-    // that line is already spent in another mix - a primary can only join one. If
-    // running our colour into the blend it feeds WOULD make a wanted colour (e.g.
-    // blue's already in purple, and yellow + purple = brown), point the way.
-    var oj = oleg.jun>=0 ? junctions[oleg.jun] : null;
-    if(oj){ var ns=mixOf(me.col, oj.sec); if(ns && tgtFor(ns) && !tgtFor(ns).done)
-      toast(T("That line's already mixed - run your colour into the blended pipe to combine further.")); }
+    // THIRD COLOUR INTO A FEEDER: the other line already feeds a junction (e.g. blue
+    // feeds a red+blue = purple mix). Dropping our colour on it mixes a secondary right
+    // there (yellow + blue = green) and DEEPENS the junction it fed (green + red = brown
+    // at the tip). Same end state as retreating the far feeder, mixing here, then
+    // re-merging - just done in one move.
+    if(oleg.jun>=0 && myLeg.jun<0 && sec && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      var fji=oleg.jun, FJ=junctions[fji], p2=null;
+      ems.forEach(function(E){ E.legs.forEach(function(lg){ if(lg!==oleg && lg.jun===fji) p2=E.col; }); });
+      if(p2==null) junctions.forEach(function(K,ki){ if(ki!==fji && K.jun===fji) p2=K.sec; });
+      var deep = p2!=null ? mixOf(sec, p2) : null;   // (our secondary) + the junction's other input
+      var deepWanted = deep && ((tgtFor(deep)&&!tgtFor(deep).done) || (tgtFor("N")&&!tgtFor("N").done));
+      if(FJ && (FJ.jun==null||FJ.jun<0) && deep && deepWanted){
+        myLeg.cells.push(cell);
+        var GA={ cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:fji };
+        oleg.cells=oleg.cells.slice(0, o.idx+1);     // the other line now ends at the new mix (a feeder)
+        junctions.push(GA); var gai=junctions.length-1;
+        myLeg.jun=gai; oleg.jun=gai;                 // our line + the other now feed the new secondary
+        FJ.sec=deep;                                 // the fed junction deepens: e.g. purple -> brown
+        addBloom(cell[0],cell[1],HEX[sec],660); addBloom(FJ.cell[0],FJ.cell[1],HEX[deep],660);
+        drawSteps=0; sfxJun(); hap("medium"); discover(sec,cell[0],cell[1]); discover(deep,FJ.cell[0],FJ.cell[1]);
+        drag=null; reconcileAndFixDrag(); renderPaths(); checkWin(); return;
+      }
+    }
     rejectMix(cell); return;   // an illegal mix (blend already made, or the other pipe already feeds a circle)
   }
   // CHAIN (other direction): a primary line runs into an existing blend -> browN
