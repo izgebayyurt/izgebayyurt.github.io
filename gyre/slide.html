@@ -1,9 +1,9 @@
 <!doctype html>
-<!-- GYRE · SLIDE — a fork of gyre/index.html exploring a different verb. SOLID dense hexagon (radius 4,
-     61 cells, all filled). Tap a ball and flick along a hex axis: the clicked ball and everything ahead
-     of it shift one cell that way, the far-edge ball ejects, the origin refills from the queue. Matches
-     are STRAIGHT LATTICE LINES ONLY (no ring/arc). One queue feeds every emptied cell. Move-limited
-     rounds with a rising score target. House paper/ink aesthetic, forked feel from hexbrew. -->
+<!-- GYRE · SLIDE — a fork of gyre/index.html exploring a different verb. SOLID dense hexagon (radius 3,
+     37 cells, all filled — Hexbrew's size). Tap a ball and flick along a hex axis: by default the WHOLE
+     straight line through that ball shifts one cell that way, the far-edge ball ejects, and a fresh ball
+     slides in at the near edge from the queue. Matches are STRAIGHT LATTICE LINES ONLY (no ring/arc).
+     One queue feeds every emptied cell. Move-limited rounds with a rising score target. House paper/ink. -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -116,7 +116,7 @@ body{
 <div class="hudL" id="hudL">
   <div class="rnd" id="rnd">Round 1</div>
   <div class="moves" id="moves">15 <small>MOVES</small></div>
-  <div class="tgt" id="tgt">target 2000</div>
+  <div class="tgt" id="tgt">target 6000</div>
 </div>
 <div class="score"><b id="score">0</b><span class="bst">best <span id="best">0</span></span></div>
 
@@ -125,7 +125,7 @@ body{
   <h3>Tuning <span class="x" id="drawerClose">&times;</span></h3>
   <div class="row"><label>Round moves</label><input type="range" id="sMoves" min="8" max="25" step="1"><span class="val" id="vMoves">15</span></div>
   <div class="row"><label>Colours</label><input type="range" id="sCol" min="4" max="6" step="1"><span class="val" id="vCol">6</span></div>
-  <div class="row"><label>Slide mode</label><div class="pills"><button class="pill on" id="pClicked">clicked</button><button class="pill" id="pLine">line</button></div></div>
+  <div class="row"><label>Slide mode</label><div class="pills"><button class="pill on" id="pLine">line</button><button class="pill" id="pClicked">clicked</button></div></div>
   <div class="row"><label>Slide speed</label><input type="range" id="sSlide" min="0.5" max="2.2" step="0.1"><span class="val" id="vSlide">1.0</span></div>
   <div class="btnrow">
     <button class="tbtn" id="bReroll">Reroll board</button>
@@ -175,8 +175,8 @@ function angDelta(to,from){ let d=to-from; while(d>Math.PI)d-=2*Math.PI; while(d
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 
-// ================= DENSE HEXAGON geometry (hexbrew-style axial, radius 4) — ALL 61 cells filled =================
-const RAD=4;
+// ================= DENSE HEXAGON geometry (hexbrew-style axial, radius 3) — ALL 37 cells filled =================
+const RAD=3;
 const CELLS_QR=[]; for(let q=-RAD;q<=RAD;q++){ const r1=Math.max(-RAD,-q-RAD), r2=Math.min(RAD,-q+RAD);
   for(let r=r1;r<=r2;r++) CELLS_QR.push([q,r]); }
 const NC=CELLS_QR.length;                                   // 61
@@ -206,7 +206,8 @@ const ALL_LINES=(()=>{ function build(keyf,ordf){ const m={};
 
 // ================= tunables =================
 let COLORS=6;             // 6-colour game by default (orange in play); drawer slider 4-6
-let slideMode='clicked'; // 'clicked' (clicked ball + forward; origin refills) | 'line' (whole line; near edge refills)
+let slideMode='line';    // DEFAULT 'line' (whole line shifts one; far edge ejects, near edge refills from queue) |
+                         // 'clicked' (legacy partial: clicked ball + forward segment; origin pops in) — behind the drawer toggle
 let movesPerRound=15, slideMult=1.0;
 const DEPTH_CAP=40;
 // ---------- scoring (forked from index.html; ring-wrap premium DROPPED — straight lines only) ----------
@@ -283,7 +284,8 @@ function layout(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const topHUD=72, botTray=64, margin=30;                   // extra right margin leaves room for the queue stack
   const availW=W-2*margin, availH=H-topHUD-botTray;
-  size=Math.min(availW/13.6, availH/15.5, 30);
+  // radius-3 flat-top hexagon: half-extents 1.5·3=4.5 (x) and √3·3≈5.2 (y) size-units, +~0.82 ball
+  size=Math.min(availW/10.8, availH/12.2, 34);
   ballRad=size*0.82;
   cx=W/2-8; cy=topHUD+availH/2;
   for(let i=0;i<NC;i++){ cellX[i]=cx+size*cellUX[i]; cellY[i]=cy+size*cellUY[i]; }
@@ -304,7 +306,7 @@ let shakeMag=0, shakeT=0;
 let stats={ slides:0, matches:0, lines:0, maxChain:0, ejected:0, pops:0 };
 // rounds
 let phase='menu';                    // menu | play | over
-let round=1, movesLeft=15, roundTarget=2000;
+let round=1, movesLeft=15, roundTarget=6000;
 
 function* allBalls(){ for(let i=0;i<NC;i++) if(grid[i]) yield grid[i]; }
 function mkBall(c,cell){ return { c, cell, vx:cellX[cell], vy:cellY[cell], anim:null, land:0, popping:false }; }
@@ -420,7 +422,11 @@ function finishResolve(){
 }
 
 // ================= rounds =================
-function roundTargetFor(r){ let t=0, d=2000; for(let i=1;i<=r;i++){ t+=d; d=Math.round(d*1.35); } return t; }  // cumulative, rising
+// cumulative, rising target. Retuned for the radius-3 board + whole-row 'line' default: whole-row slides are
+// far more productive than the old partial-segment shove, so a random 15-move round now banks a median ~8.5k
+// (measured). Round-1 lifted 2000->6000 (a real but fair opener), growth 1.35->1.4 to keep the ramp biting.
+// First-pass values — genuine playtest territory.
+function roundTargetFor(r){ let t=0, d=6000; for(let i=1;i<=r;i++){ t+=d; d=Math.round(d*1.4); } return t; }
 function startRun(opts){ opts=opts||{};
   phase='play'; COLORS=opts.colors||COLORS; palette=ORDER.slice(0,COLORS);
   movesPerRound=opts.moves||movesPerRound;
@@ -518,7 +524,7 @@ function drawScorePops(){ for(const s of scorePops){ const a=Math.max(0,s.life/s
 function drawChain(){ if(!chainLabel) return; const sp=chainLabel.spec; const a=Math.max(0,chainLabel.life/chainLabel.maxLife);
   const depth=Math.max(2,chainLabel.n); const pop=1+0.18*Math.max(0,Math.min(1,(1-a)*3.3)); const sz=sp.size*pop;
   ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
-  const y=Math.max(60, cy-4.6*size-18);
+  const y=Math.max(56, cy-(Math.sqrt(3)*RAD+0.82)*size-12);   // just above the (smaller) hexagon's top edge
   ctx.lineWidth=4+sz*0.07; ctx.strokeStyle=PAPER; ctx.strokeText('chain x'+depth,cx,y);
   ctx.fillStyle='hsl('+sp.hue+',88%,'+(depth>=10?54:60)+'%)'; ctx.fillText('chain x'+depth,cx,y); ctx.restore(); }
 function drawRoundFlash(){ if(!roundFlash) return; const a=Math.max(0,roundFlash.life/roundFlash.max);
@@ -574,7 +580,7 @@ $('gear').addEventListener('click',()=> $('drawer').classList.toggle('open'));
 $('drawerClose').addEventListener('click',()=> $('drawer').classList.remove('open'));
 bindRange('sMoves','vMoves',n=>{ movesPerRound=n; if(phase!=='play'){ movesLeft=n; updateHUD(); } });
 bindRange('sCol','vCol',n=>{ COLORS=n; palette=ORDER.slice(0,COLORS); if(phase!=='play'){ resetRun(); } });
-bindPills('pClicked','pLine',v=>{ slideMode=v?'clicked':'line'; });
+bindPills('pLine','pClicked',v=>{ slideMode=v?'line':'clicked'; });
 bindRange('sSlide','vSlide',n=>{ slideMult=n; }, n=>n.toFixed(1));
 $('bReroll').addEventListener('click',()=>{ if(busy())return; fillRandom(); wake(); });
 $('bMenu').addEventListener('click',()=>{ $('drawer').classList.remove('open'); toMenu(); });
@@ -598,8 +604,9 @@ function updateHUD(){
 
 // ================= window.SLIDE debug handle (deterministic, step-driven) =================
 function boardColors(){ return CELLS_QR.map((_,i)=>colorAt(i)); }
+function ringCounts(){ const rc={}; for(let i=0;i<NC;i++){ const k=cellRing[i]; rc[k]=(rc[k]||0)+1; } return rc; }
 window.SLIDE={
-  get geometry(){ return { radius:RAD, cells:NC, occupied:NC, full:true, dirs:DIRS.length, cx, cy, size, ballRad }; },
+  get geometry(){ return { radius:RAD, cells:NC, occupied:NC, full:true, maxRing:RAD, ringCounts:ringCounts(), dirs:DIRS.length, cx, cy, size, ballRad }; },
   cells(){ return boardColors(); },
   colorAtQR(q,r){ const i=IDX[q+','+r]; return i==null?null:colorAt(i); },
   cellIndex(q,r){ const i=IDX[q+','+r]; return i==null?-1:i; },
