@@ -690,10 +690,20 @@ function ensureAudio(){
 // on background, FADE the music down (don't hard-pause) so it never cuts out abruptly;
 // fade it back up on return. (On native iOS the webview may still suspend media while
 // backgrounded, but there's no jarring stop, and it eases back in on foreground.)
+function resumeMusic(){
+  if(!musicOn || !musicStarted || demoing) return;
+  if(actx && actx.state==="suspended"){ try{ actx.resume(); }catch(e){} }
+  if(musicEl){ musicEl.volume=0; var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); fadeMusic(musicTargetVol(), 800); }
+}
+window.__resumeAudio=resumeMusic;   // native (Capacitor App resume) calls this too
 document.addEventListener("visibilitychange", function(){
-  if(document.hidden){ fadeMusic(0, 600); }
-  else if(musicOn && musicStarted){ if(musicEl){ var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } fadeMusic(musicTargetVol(), 800); }
+  // set the volume directly on hide (background timers throttle the fade), and do a
+  // robust play()+fade-in on return so the track never stays silent after a switch.
+  if(document.hidden){ if(musicEl) musicEl.volume=0; fadeMusic(0, 400); }
+  else resumeMusic();
 });
+window.addEventListener("pageshow", resumeMusic);
+window.addEventListener("focus", resumeMusic);
 function setVolume(v){   // sound-effects volume only (music has its own slider)
   volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
   if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
@@ -1123,6 +1133,7 @@ function reconcile(){
    Fixes the stuck-terminal bug: delivering set done=true, but retreating a pipe off
    a circle used to leave it "done" forever (looked fed, refused new connections). */
 function recomputeTargets(){
+  var prev=tgts.map(function(t){ return t.done; });
   for(var i=0;i<tgts.length;i++) tgts[i].done=false;
   ems.forEach(function(E){ E.legs.forEach(function(Lg){
     if(Lg.jun>=0 || Lg.cells.length<2) return;
@@ -1134,6 +1145,14 @@ function recomputeTargets(){
     var h=J.leg[J.leg.length-1], T=tgtAt(h[0],h[1]);
     if(T && T.col===J.sec) T.done=true;
   });
+  // a circle that WAS fed and no longer is (e.g. a mix delivered to it, then the mix
+  // broke): the line pops out of the square with a little tone.
+  if(!demoing) for(var j=0;j<tgts.length;j++) if(prev[j] && !tgts[j].done) popOut(tgts[j]);
+}
+function popOut(T){
+  bounceDot(T.r, T.c);
+  addBloom(T.r, T.c, HEX[T.col] || "#dfe8f7", 500);
+  try{ voice(500, 0.16, {type:"sine", to:280, gl:0.12, lp:2600, g:0.05, atk:0.003}); }catch(e){}   // soft downward "pop out"
 }
 /* drop STRAY emitter legs (just the emitter cell, no pipe) left behind when a fork/branch
    was started but not drawn - otherwise the phantom leg fills the 2-leg slot and locks the
