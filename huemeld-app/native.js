@@ -209,6 +209,12 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
         .then(function () { return Purchases.getCustomerInfo(); })
         .then(function (res) { pushEnts(entsOf(res)); })
         .then(pushSave)
+        .then(function () {   // show the store's LOCALIZED price on the buy buttons (e.g. "₺49,99")
+          return Purchases.getProducts({ productIdentifiers: [PRODUCT_FULL] }).then(function (res) {
+            var pr = res && res.products && res.products[0];
+            if (pr && pr.priceString && window.__applyPrices) window.__applyPrices({ full: pr.priceString });
+          });
+        })
         .catch(function () {});
     }
   });

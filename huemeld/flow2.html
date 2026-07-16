@@ -275,12 +275,12 @@ body.menuopen .helpfab{ display:none; }
         <ul class="uplist">
           <li><span class="upic"></span><span data-t="No ads, ever">No ads, ever</span></li>
           <li><span class="upic"></span><span data-t="All 7 puzzle packs · 350 levels">All 7 puzzle packs · 350 levels</span></li>
-          <li><span class="upic"></span><span data-t="Plus the 150 level medley for extra challenges!">Plus the 150 level medley for extra challenges!</span></li>
+          <li><span class="upic"></span><span data-t="Plus the 250 level medley for extra challenges!">Plus the 250 level medley for extra challenges!</span></li>
           <li><span class="upic"></span><span data-t="Daily archive - replay the last 3 weeks">Daily archive - replay the last 3 weeks</span></li>
           <li><span class="upic"></span><span data-t="Every chapter unlocked instantly">Every chapter unlocked instantly</span></li>
         </ul>
-        <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
-        <button class="mk" id="btnUpNoAds" style="background:#bfe3ff" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
+        <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $2.99</button>
+        <button class="mk" id="btnUpNoAds" style="background:#bfe3ff">Watch to unlock</button>
         <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)" data-t="Not now">Not now</button>
       </div>
     </div>
@@ -293,7 +293,7 @@ body.menuopen .helpfab{ display:none; }
         <div class="setrow"><span data-t="Volume">Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
         <div class="setrow"><span data-t="Colour-blind labels">Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
-        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
+        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $2.99</button>
         <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Restore Purchases">Restore Purchases</button>
         <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px" data-t="Privacy Policy">Privacy Policy</a></p>
         <p style="margin-top:8px;font-size:11px;color:var(--sub);line-height:1.6"><span data-t="Music from">Music from</span> <a href="https://uppbeat.io" target="_blank" rel="noopener" style="color:var(--sub)">Uppbeat</a>, by lloom:<br>
@@ -383,7 +383,7 @@ var TR = {
   "One purchase, the whole game:":"Tek fiyatla bütün bölümleri aç",      /* 37 */
   "No ads, ever":"Sonsuza dek reklamsız",                           /* 38 */
   "All 7 puzzle packs · 350 levels":"7 bulmaca paketi · 350 bölüm", /* 39 */
-  "Plus the 150 level medley for extra challenges!":"Ekstra zorluk için 150 karma mekanikli bölüm!", /* 40 */
+  "Plus the 250 level medley for extra challenges!":"Ekstra zorluk için 250 karma mekanikli bölüm!", /* 40 */
   "Daily archive - replay the last 3 weeks":"Günlük arşiv - son 3 haftayı tekrar oyna", /* 41 */
   "Every chapter unlocked instantly":"Tüm bölümler anında açılır", /* 42 */
   "Remove Ads · $2.99":"Reklamları Kaldır · $2.99",                 /* 43 */
@@ -465,6 +465,12 @@ var TR = {
   "{0} teaser done - {1} more levels in the full game!":"{0} tanıtımı bitti - tam oyunda {1} bölüm daha var!", /* 111 */
   "Continue · Level {0}":"Devam · Seviye {0}",                       /* 112 */
   "How {0} works":"{0} nasıl çalışır",                              /* 113 */
+  "Unlock more levels":"Daha fazla bölüm aç",
+  "Watch a short video to unlock the next {0} levels of {1} - or get the whole game with Pro.":"{1} paketinin sonraki {0} bölümünü açmak için kısa bir video izle - ya da Pro ile tüm oyunu al.",
+  "Watch to unlock {0} levels":"{0} bölüm açmak için izle",
+  "Loading a video…":"Video yükleniyor…",
+  "{0} more levels unlocked!":"{0} bölüm daha açıldı!",
+  "Not unlocked - the video didn't finish":"Açılmadı - video tamamlanmadı",
   "Chapter {0} · {1}":"Bölüm {0} · {1}",                            /* 114 */
   // - win messages -
   "Whole board covered.":"Tüm tahta kaplandı.",                     /* 115 */
@@ -574,8 +580,18 @@ var KOFI_URL="https://ko-fi.com/YOUR_HANDLE";
 function entFull(){ return !isNativeApp() || localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
+var PRO_PRICE="$2.99";   // fallback; the native bridge overrides with the store's LOCALIZED price
+var UNLOCK_BATCH=8;   // levels a single rewarded video unlocks (free players)
 var UNLOCK_ALL=false;   // RELEASE: teasers + entitlements gate content (was DEV-open).
-function packLevelUnlocked(k){ return UNLOCK_ALL || entFull() || k<PACK_FREE; }
+function adUnlocked(pid){ return +(localStorage.getItem("hm_flow2_adunlock_"+pid)||0); }
+function grantAdUnlock(pid){ localStorage.setItem("hm_flow2_adunlock_"+pid, ""+(adUnlocked(pid)+UNLOCK_BATCH)); }
+/* Free players get the teaser + however many batches they've unlocked by watching a
+   rewarded video. Pro (and legacy Remove-Ads owners) get everything. No forced ads. */
+function packLevelUnlocked(k, pid){
+  if(UNLOCK_ALL || entFull() || entNoAds()) return true;
+  pid = pid || (PACKS[curPack] && PACKS[curPack].id);
+  return k < PACK_FREE + adUnlocked(pid);
+}
 function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[c].n; if(i<a) return c; } return CHAPTERS.length-1; }
 function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
 function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
@@ -835,7 +851,7 @@ function loadDaily(off){
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
   var pk=PACKS[pi]; if(!pk || !pk.levels[k]) return;
-  if(!packLevelUnlocked(k)){ toast(Tf("The {0} teaser ends here - Huemeld Pro unlocks the rest!", T(pk.name))); showUpsell("pro"); return; }
+  if(!packLevelUnlocked(k, pk.id)){ showUpsell("pro", {pi:pi, k:k}); return; }
   isTut=false; mode="pack"; curPack=pi; packIdx=k;
   relabel();
   document.getElementById("btnPrev").style.visibility = k>0 ? "" : "hidden";
@@ -1431,7 +1447,7 @@ function checkWin(){
   solved=true; preGesture=null; sfxWin(); playWinCascade(); hap("success");
   updateUndoUI(); updateHintUI();
   if(demoing) return;   // the ghost demo celebrates but earns nothing - no progress, no overlay
-  solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount); maybeInterstitial();
+  solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount);   // no forced ads - see monetization seams
   var wn=document.getElementById("btnWinNext");
   document.querySelector("#ovWin h2").innerHTML="Solved! "+icn("spark",20);
   var nextBtn = function(){ wn.innerHTML=T("Next")+" "+icn("arrowR",15); };
@@ -2082,7 +2098,7 @@ function renderPicker(){
       ph2+='<button class="mk mechhow" data-mech="'+pk2.id+'">'+icn("play",15)+' '+Tf("How {0} works", T(pk2.name))+'</button>';
     ph2+='<div class="pkgrid">';
     for(var k=0;k<pk2.levels.length;k++){
-      var open=packLevelUnlocked(k);
+      var open=packLevelUnlocked(k, pk2.id);
       ph2+='<button class="pkbtn'+(mode==="pack"&&curPack===pi2&&packIdx===k?" cur":"")+(open?"":" lk")+'" data-p="'+pi2+'" data-k="'+k+'"><span>'+(k+1)+'</span><span class="pkd">'+(d2[k]?icn("check",11):(open?"":icn("lock",10)))+'</span></button>';
     }
     ph2+='</div>';
@@ -2122,9 +2138,9 @@ document.getElementById("btnHome").innerHTML=icn("home",17);
 var ICONBTN={
   btnPick:["list","levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
   btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
-  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"], btnMenuKofi:["coffee","Support Huemeld"],
+  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro"], btnMenuKofi:["coffee","Support Huemeld"],
   btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
-  btnUpBuy:["spark","Huemeld Pro · $4.99"], btnFull:["spark","Huemeld Pro · $4.99"], btnDemo:["play","Show me"],
+  btnDemo:["play","Show me"],   // btnUpBuy/btnFull labels carry the localized price - set by refreshProLabels()
   btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
 };
 function applyIconButtons(){
@@ -2139,6 +2155,7 @@ function applyLang(){
   var wn=document.getElementById("btnWinNext"); if(wn) wn.innerHTML=T("Next")+" "+icn("arrowR",15);
   var sk=document.getElementById("demoskip"); if(sk) sk.innerHTML=T("Skip tutorial")+" "+icn("arrowR",13);
   var lb=document.getElementById("btnMenuLang"); if(lb) lb.innerHTML=icn("globe",16)+" "+(LANG==="tr"?"English":"Türkçe");
+  refreshProLabels();
   try{ relabel(); }catch(e){}
   try{ syncToggles(); }catch(e){}
   try{ if(document.getElementById("ovPick").classList.contains("show")) renderPicker(); }catch(e){}
@@ -2178,21 +2195,48 @@ function updateProEntry(){
   var k=document.getElementById("btnMenuKofi");   // web/PWA only, and only once a real handle is set
   if(k) k.style.display = (!isNativeApp() && KOFI_URL.indexOf("YOUR_HANDLE")<0) ? "" : "none";
 }
-function showUpsell(mode){
+/* the two "buy Pro" buttons carry the price; the label is built here so it can pick up
+   the store's localized price (via __applyPrices) and survive a language switch. */
+function refreshProLabels(){
+  var lbl=icn("spark",16)+" "+T("Huemeld Pro")+" · "+PRO_PRICE;
+  ["btnUpBuy","btnFull"].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=lbl; });
+}
+window.__applyPrices=function(p){ if(p && p.full){ PRO_PRICE=p.full; refreshProLabels(); } };
+var pendingUnlock=null;   // {pi,k} the locked pack level a rewarded video would open
+function showUpsell(mode, unlock){
   if(entFull()) return;                                   // nothing left to sell
   var t=document.getElementById("upTitle"), d=document.getElementById("upDesc"),
-      na=document.getElementById("btnUpNoAds"), pr=document.getElementById("btnUpBuy");
-  if(mode==="ads"){ t.textContent=T("Tired of ads?"); d.textContent=T("Remove them forever - or unlock everything:"); }
-  else { t.innerHTML=icn("spark",20)+" "+T("Huemeld Pro"); d.textContent=T("One purchase, the whole game:"); }
-  na.style.display = entNoAds() ? "none" : "";            // already ad-free -> Pro only
+      wa=document.getElementById("btnUpNoAds"), pr=document.getElementById("btnUpBuy");
+  var nb=nativeBridge();
+  pendingUnlock = (unlock && nb && nb.rewarded) ? unlock : null;   // rewarded only exists in the app
+  if(pendingUnlock){
+    var pk=PACKS[unlock.pi];
+    t.innerHTML=icn("unlock",20)+" "+T("Unlock more levels");
+    d.textContent=Tf("Watch a short video to unlock the next {0} levels of {1} - or get the whole game with Pro.", UNLOCK_BATCH, T(pk.name));
+    wa.innerHTML=icn("play",16)+" "+Tf("Watch to unlock {0} levels", UNLOCK_BATCH);
+    wa.style.display="";
+  } else {
+    t.innerHTML=icn("spark",20)+" "+T("Huemeld Pro"); d.textContent=T("One purchase, the whole game:");
+    wa.style.display="none";
+  }
   pr.style.display = "";
   ovUp.classList.add("show");
 }
 document.getElementById("btnMenuPro").addEventListener("click", function(){ ensureAudio(); showUpsell("pro"); });
+/* the modal's secondary button is now "watch a rewarded video -> unlock a batch" */
 document.getElementById("btnUpNoAds").addEventListener("click", function(){
+  ensureAudio();
+  var u=pendingUnlock; if(!u) return;
   var nb=nativeBridge();
-  if(!nb || !nb.buyRemoveAds){ toast(T("Available in the app")); return; }
-  nb.buyRemoveAds(function(ok){ if(ok){ if(window.__applyEnt) window.__applyEnt({noads:1}); ovUp.classList.remove("show"); updateProEntry(); toast(T("Ads removed - thank you!")); } else toast(T("Purchase not completed")); });
+  if(!nb || !nb.rewarded){ toast(T("Available in the app")); return; }
+  toast(T("Loading a video…"));
+  nb.rewarded(function(ok){
+    if(ok){ grantAdUnlock(PACKS[u.pi].id); pendingUnlock=null; ovUp.classList.remove("show");
+      try{ renderPicker(); }catch(e){}
+      toast(Tf("{0} more levels unlocked!", UNLOCK_BATCH));
+      loadPackLevel(u.pi, u.k);
+    } else toast(T("Not unlocked - the video didn't finish"));
+  });
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
 ovMech=document.getElementById("ovMech");
@@ -2239,20 +2283,11 @@ document.getElementById("btnUndo").addEventListener("click", function(){ ensureA
    (no ads shown). See PUBLISHING.md. */
 function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNative) ? window.HuemeldNative : null; }
 var solveCount=+(localStorage.getItem("hm_flow2_solves")||0);
-var AD_HONEYMOON=15;   // the first session is sacred: no interstitials before this many solves
-function maybeInterstitial(){
-  if(entNoAds()){ localStorage.removeItem("hm_flow2_addue"); return; }
-  // the due flag persists: closing the app on an ad slot only defers it
-  if(solveCount>=AD_HONEYMOON && solveCount%4===0) localStorage.setItem("hm_flow2_addue","1");
-  var n=nativeBridge();
-  if(!n || !n.interstitial) return;
-  if(localStorage.getItem("hm_flow2_addue")==="1"){ try{ n.interstitial(); }catch(_e){} }
-}
-var adNudge=0;
-window.__adShown=function(){ localStorage.removeItem("hm_flow2_addue");
-  adNudge++;
-  if(!entNoAds() && adNudge%3===0) setTimeout(function(){ showUpsell("ads"); }, 700);
-};
+/* NO FORCED ADS. Huemeld never shows an interstitial. Ads are opt-in only:
+   a rewarded video for a hint, or to unlock the next batch of pack levels.
+   (Kept as harmless no-ops in case the native bootstrap references them.) */
+function maybeInterstitial(){}
+window.__adShown=function(){};
 
 /* ---------- rewarded-ad hints: watch a video, reveal a ghost of one pipe ----------
    Solution strokes ship as L.sol (or L.demo on tutorial/pack-1 boards). Longest
@@ -2298,15 +2333,16 @@ document.getElementById("btnHint").addEventListener("click", function(){
 /* ---------- settings ---------- */
 var ovSet=document.getElementById("ovSet");
 (function(){ var n=nativeBridge(), rm=document.getElementById("btnNoAds"), fl=document.getElementById("btnFull"), rs=document.getElementById("btnRestore");
+  // "Remove Ads" is retired (there are no forced ads to remove): never offered for sale,
+  // but existing owners keep their entitlement (entNoAds -> everything unlocked, no prompts).
+  if(rm) rm.style.display="none";
   function applyEnt(e){   // the bridge reports entitlements -> flip flags + refresh UI
     if(e && e.noads) localStorage.setItem("hm_flow2_ent_noads","1");
     if(e && e.full) localStorage.setItem("hm_flow2_ent_full","1");
-    rm.style.display = (n && n.buyRemoveAds && !entNoAds()) ? "" : "none";
     fl.style.display = (n && n.buyFull && !entFull()) ? "" : "none";
     try{ renderPicker(); }catch(_e){}
   }
   window.__applyEnt=applyEnt;   // native bootstrap calls this on launch + after purchases
-  if(n && n.buyRemoveAds && !entNoAds()) rm.style.display="";       // only meaningful in the app
   if(n && n.buyFull && !entFull()) fl.style.display="";
   if(n && n.restore) rs.style.display="";
   rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast(T("Available in the app")); return; }

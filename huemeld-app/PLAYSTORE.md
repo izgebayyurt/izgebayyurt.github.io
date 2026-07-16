@@ -23,7 +23,7 @@ bottom.
 ## 2. AdMob — Android app + units
 - [ ] AdMob → Apps → **Add app → Android** → "Huemeld".
 - [ ] Copy the **App ID** (`ca-app-pub-…~…`, with the `~`) → paste into `android/app/src/main/AndroidManifest.xml` (the `com.google.android.gms.ads.APPLICATION_ID` meta-data; currently Google's sample id).
-- [ ] Add two ad units → **Interstitial** and **Rewarded**. Copy both unit IDs (`ca-app-pub-…/…`).
+- [ ] Add a **Rewarded** ad unit. Copy its unit ID (`ca-app-pub-…/…`). (No interstitial needed — Huemeld shows **no forced ads**; ads are opt-in only: a rewarded hint, or "watch to unlock 8 pack levels". You can skip the Interstitial unit.)
 - [ ] In `native.js`: set `ANDROID_INTERSTITIAL_ID` and `ANDROID_REWARDED_ID`.
 
 ## 3. RevenueCat — Google Play app
@@ -35,15 +35,16 @@ bottom.
 ## 4. Play Console — create the app
 - [ ] Play Console → **Create app** → name **Huemeld**, Game, Free, package `com.griezwahlm.huemeld`.
 
-## 5. Play Console — the two in-app products
-Monetize → **In-app products** → create two **one-time (managed) products** with IDs matching iOS + RevenueCat exactly:
+## 5. Play Console — the in-app product
+Monetize → **In-app products** → create **one** one-time (managed) product with the ID matching iOS + RevenueCat exactly:
 
 | Product ID | Name | Price |
 |---|---|---|
-| `huemeld_no_ads` | Remove Ads | ~$2.99 |
-| `huemeld_pro` | Huemeld Pro | ~$4.99 |
+| `huemeld_pro` | Huemeld Pro | **$2.99** |
 
-- [ ] Activate both. Then attach them to the RevenueCat entitlements (step 3).
+- [ ] Activate it. Then attach it to the RevenueCat `huemeld_pro` entitlement (step 3).
+- [ ] **Do NOT create `huemeld_no_ads`.** It's retired — the app shows no forced ads, so there's nothing to "remove". Ship Pro only. (iOS keeps the old product live only so past buyers can restore.)
+- [ ] Set the **Turkey** price sensibly — the auto price from $2.99 USD may be high for local purchasing power; lower it if so.
 
 ## 6. Build the app bundle (Android Studio)
 On a machine with **Android Studio + JDK 17**:

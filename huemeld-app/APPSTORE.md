@@ -22,6 +22,16 @@ Work top to bottom; each step tells you exactly what to paste where.
 - [ ] Create a **Google AdMob** account at admob.google.com (uses your Google account; hook up payment info later — required before real payouts, not before launch).
 - [ ] Create a free **RevenueCat** account at app.revenuecat.com.
 
+## Ad scheme (current — read first)
+
+Huemeld shows **NO forced ads.** There are no interstitials. Ads are **opt-in only**:
+1. **Rewarded hint** — watch a video → reveal one ghost pipe.
+2. **Rewarded unlock** — past the 5-level free teaser, a free player can watch a video to unlock the next **8 levels** of a pack (`UNLOCK_BATCH` in `flow2.html`). **Huemeld Pro** ($4.99) unlocks everything with no videos.
+
+Consequences for store setup:
+- The AdMob **Interstitial** unit is no longer used — you can skip creating it (the Rewarded unit is the only one that matters).
+- **"Remove Ads" (`huemeld_no_ads`) is retired.** The app no longer sells it (there are no forced ads to remove). Existing owners are still honored (their entitlement unlocks everything). **Don't create a new `huemeld_no_ads` product** for launch — ship **Huemeld Pro only.** (Keep the old product in RevenueCat so past purchasers restore fine; just don't offer it for sale.)
+
 ## 2. AdMob (5 minutes)
 
 - [ ] AdMob → Apps → **Add app** → iOS → "Huemeld" (say "not yet listed" — you can link the store listing after launch).
@@ -106,11 +116,12 @@ Notes:
 - [ ] ASC → TestFlight → add yourself as internal tester, install via TestFlight app.
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, no service-worker weirdness (the wrapper strips it).
-  - [ ] Fresh install → the **ATT prompt** shows at launch. Then solve 15 levels → the next 4th solve shows a **test interstitial** (test ads are on).
+  - [ ] Fresh install → the **ATT prompt** shows at launch. Solve levels → **no interstitial ever appears** (there are none).
   - [ ] Tap **Hint** (💡, in the action bar) → a **rewarded test video** plays; finish it → a dotted ghost pipe appears. Close it early → no hint. Tapping Hint again reveals the next pipe. (Paid/No-Ads players get hints free, no video.)
   - [ ] **Haptics**: a light tick as you draw across cells, a firmer thump when two colours mix, a success buzz on win. (Wired via `@capacitor/haptics`; `npm install` + `npx cap sync ios` pulls the pod.)
   - [ ] **Colour discovery**: the FIRST time you ever mix each secondary/brown, the colour names itself with a pop ("Purple!" / "Mor!") and a bright chime. Only once per colour (persisted).
-  - [ ] Settings shows **Remove Ads · $2.99**, **✦ Huemeld Pro · $4.99**, **Restore Purchases** (they're hidden on web, bridge-gated).
+  - [ ] Settings shows **✦ Huemeld Pro · $4.99** and **Restore Purchases** (no "Remove Ads" — it's retired; both hidden on web, bridge-gated).
+  - [ ] Past the 5-level teaser in a pack, tapping a locked level → **"Watch to unlock 8 levels"** (rewarded test video) → the batch unlocks and the level opens. **Huemeld Pro** unlocks everything with no video.
   - [ ] Sandbox-buy No Ads (ASC → Users & Access → Sandbox Testers if you want a separate test Apple ID) → ads stop, button disappears.
   - [ ] Delete app, reinstall, **Restore Purchases** → entitlement comes back.
   - [ ] Sandbox-buy Huemeld Pro → all packs, Medley, daily archive, and locked chapters open instantly.
@@ -222,7 +233,7 @@ Because AdMob serves ads (and may use the IDFA when the user allows tracking):
 - [ ] Version page → attach the release build from step 7's second upload.
 - [ ] Attach both IAPs to the version.
 - [ ] **App Review notes**, paste:
-  > Free puzzle game with two one-time purchases. The App Tracking Transparency prompt appears at launch. To reach ads quickly: ads only start after 15 solved levels (then every 4th solve). Purchases: Settings (gear icon) → "Remove Ads" / "Huemeld Pro" / "Restore Purchases". No account or login required.
+  > Free puzzle game with one in-app purchase (Huemeld Pro). No forced ads — ads are opt-in only: an optional "watch a video" to reveal a hint, or to unlock the next batch of pack levels. The App Tracking Transparency prompt appears at launch. Purchase & restore: Settings (gear icon) → "Huemeld Pro" / "Restore Purchases". No account or login required.
 - [ ] Release option: "Automatically release after approval" (or manual if you want to coordinate).
 - [ ] Submit for review. First reviews typically take 1–3 days.
 
