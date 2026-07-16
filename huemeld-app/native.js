@@ -189,6 +189,15 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   setInterval(pushSave, 45000);
   restoreSave();   // fire immediately — the sooner the reload, the less flash
 
+  // returning to the app foreground: nudge the game to resume its background music
+  // (the webview may pause media while backgrounded; visibilitychange can be flaky).
+  if (P.App && P.App.addListener) {
+    try {
+      P.App.addListener("appStateChange", function (s) { if (s && s.isActive && window.__resumeAudio) window.__resumeAudio(); });
+      P.App.addListener("resume", function () { if (window.__resumeAudio) window.__resumeAudio(); });
+    } catch (e) {}
+  }
+
   // boot: ads engine + purchases SDK + entitlement sync (covers reinstalls)
   document.addEventListener("DOMContentLoaded", function () {
     // ATT is requested natively at launch (AppDelegate). Here we just spin up the
