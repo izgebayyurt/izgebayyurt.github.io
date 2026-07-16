@@ -798,6 +798,7 @@ function applyLevel(L){
   if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; }
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
+  shakeAmp=0; board.style.transform="";
   undoStack=[]; preGesture=null;
   ems=L.sq.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
@@ -1584,6 +1585,9 @@ function discover(col,r,c){
   if(nativeBridge() && nativeBridge().haptic) try{ nativeBridge().haptic("success"); }catch(e){}
 }
 var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
+var shakeAmp=0, shakeDur=0, shakeT0=0;   // board-shake juice: a decaying jitter on the whole board
+function shake(amp, dur){ shakeAmp=amp; shakeDur=dur||300; shakeT0=nowMs(); }
+function hexA(hex,a){ if(hex[0]!=="#") return hex; var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return "rgba("+r+","+g+","+b+","+a+")"; }
 var drawSteps=0;
 /* native haptics (no-op on web / if the plugin isn't present): a light tick per drawn
    cell, a medium thump on a colour mix, success on win, error on an illegal move. */
@@ -1597,6 +1601,7 @@ function rejectMix(cell){
   lastReject={key:key, t:now};
   hap("error");
   rejects.push({r:cell[0], c:cell[1], t0:now});
+  shake(Math.min(cs()*0.03, 3.5), 170);   // a tiny "no" nudge
   try{ if(navigator.vibrate) navigator.vibrate(60); }catch(_e){}
   try{ voice(180,0.16,{type:"triangle", to:120, gl:0.12, lp:900, g:0.05, atk:0.004}); }catch(_e){}  // a soft "nope" thud
   renderPaths();
@@ -1617,6 +1622,7 @@ function playWinCascade(){
   legList.forEach(function(cells,i){ addSweep(cells,"#fff", i*100, 560); });
   dotL.querySelectorAll(".dot.sq").forEach(function(d){ d.classList.add("winspin"); });   // the ✦ objectives (now squares) do the victory spin
   spawnConfetti();
+  shake(Math.min(cs()*0.09, 11), 360);   // a satisfying settle-shake on the win (px-capped so big cells don't over-shake)
 }
 
 /* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
@@ -1647,6 +1653,18 @@ function renderPaths(){
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if(ghostStrokes.length) drawGhostHints(s);
+  // idle goal shimmer: unsolved objectives breathe a soft coloured halo (under the pipes) to catch the eye
+  if(!solved){
+    var gp=0.5+0.5*Math.sin(animT/560);
+    ctx.save();
+    for(var gi=0; gi<tgts.length; gi++){ var GT=tgts[gi]; if(GT.done||GT.prism) continue;
+      var gcx=GT.c*s+s/2, gcy=GT.r*s+s/2, GR=s*(0.60+0.06*gp), gcol=HEX[GT.col]||"#ffffff";
+      var gg=ctx.createRadialGradient(gcx,gcy,s*0.33, gcx,gcy,GR);
+      gg.addColorStop(0, hexA(gcol,0)); gg.addColorStop(0.62, hexA(gcol, 0.09+0.13*gp)); gg.addColorStop(1, hexA(gcol,0));
+      ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(gcx,gcy,GR,0,6.2832); ctx.fill();
+    }
+    ctx.restore();
+  }
   var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
   var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
@@ -1967,7 +1985,12 @@ function renderPaths(){
 }
 window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 /* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti */
-function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
+function frame(){ animT=nowMs()-animStart; renderPaths();
+  if(shakeAmp>0){ var st=nowMs()-shakeT0, e=st/shakeDur;
+    if(e>=1){ shakeAmp=0; board.style.transform=""; }
+    else { var k=(1-e)*(1-e), dx=Math.sin(st*0.061)*shakeAmp*k, dy=Math.cos(st*0.049)*shakeAmp*k; board.style.transform="translate("+dx.toFixed(2)+"px,"+dy.toFixed(2)+"px)"; }
+  }
+  requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 
 /* ---------- mechanic tutorials: a pop-up card the first time a mechanic
