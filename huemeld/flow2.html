@@ -956,6 +956,14 @@ function isIce(r,c){ return !!iceSet[r+","+c]; }
 function portTwin(r,c){ for(var i=0;i<portals.length;i++){ var p=portals[i];
   if(p[0]===r&&p[1]===c) return [p[2],p[3]];
   if(p[2]===r&&p[3]===c) return [p[0],p[1]]; } return null; }
+/* how far to keep when RETREATING a path to index `idx`. Normally idx+1 (idx stays the
+   head), but never leave the head on a portal ENTRANCE whose warp-twin we're cutting off
+   - that lets the line resume from the entrance and skip the teleport. Drop it too. */
+function retreatCut(cells, idx){
+  if(idx+1<cells.length){ var tw=portTwin(cells[idx][0],cells[idx][1]);
+    if(tw && same(cells[idx+1], tw)) return idx; }
+  return idx+1;
+}
 /* the pipe (junction blend or emitter ray) whose cells include (r,c) - {cells,idx} */
 function pathAt(r,c){
   for(var j=0;j<junctions.length;j++){ var jd=indexIn(junctions[j].leg,r,c); if(jd>=0) return {cells:junctions[j].leg, idx:jd}; }
@@ -1201,7 +1209,7 @@ board.addEventListener("pointerdown", function(e){
     drag={t:"jun", i:ji};
   } else if(o.t==="jleg"){
     var ji2=dropChildOf(o.i);
-    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0,o.idx+1);
+    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0, retreatCut(J2.leg, o.idx));
     var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
     drag={t:"jun", i:ji2};
   } else if(o.t==="emdot"){
@@ -1227,13 +1235,13 @@ board.addEventListener("pointerdown", function(e){
       // to pull it back to that cell; the line it merged into is handed its blend
       // tail back and left whole. Grab-drag from here to redraw.
       separateFeeder(leg);
-      leg.cells=leg.cells.slice(0, o.idx+1);
+      leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
       drag={t:"em", e:o.e, l:o.l};
       reconcileAndFixDrag();
     } else if(isHead){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
     else {
       // tap partway along your own line -> retreat it to the tapped cell (then drag to redraw)
-      leg.cells=leg.cells.slice(0, o.idx+1);
+      leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
       drag={t:"em", e:o.e, l:o.l};
       reconcileAndFixDrag();
     }
