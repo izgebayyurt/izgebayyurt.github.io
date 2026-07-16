@@ -71,8 +71,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot.prism2{ border:none; background:transparent; box-shadow:none; }
 .dot.prism2.donept{ box-shadow:none; filter:drop-shadow(0 0 6px rgba(87,194,104,.9)) drop-shadow(0 0 2px #fff); border-radius:0; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
-.dot .gband{ position:absolute; inset:0; width:100%; height:100%; z-index:1; overflow:hidden; border-radius:inherit; opacity:.8; pointer-events:none; }
+.dot .gband{ position:absolute; inset:0; width:100%; height:100%; z-index:1; overflow:hidden; border-radius:inherit; opacity:.72; pointer-events:none; filter:blur(1.4px); }   /* blur softens the ribbon edges */
 .dot.donept .gband{ display:none; }   /* a delivered goal drops the "fill me" ribbon */
+@keyframes gbandDrift{ from{ transform:translate(0,0); } to{ transform:translate(120px,-120px); } }   /* one period = the copy spacing, so it loops seamlessly */
+.gbandmove{ animation:gbandDrift 5.5s linear infinite; will-change:transform; }
+@media (prefers-reduced-motion:reduce){ .gbandmove{ animation:none; } }
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
 @keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
 .dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
@@ -1548,9 +1551,20 @@ function renderDots(){
   function dot(col,r,c,shape,star){
     var sz=s*0.84, off=(s-sz)/2;
     var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
-    // goal squares carry a 45° ribbon drawn as its two parallel edges (tone-on-tone) so an
-    // unfilled goal reads as "fill me"; it hides once the goal is delivered (.donept)
-    var band = shape==="sq" ? '<svg class="gband" viewBox="0 0 100 100" preserveAspectRatio="none"><g fill="none" stroke="'+lighten(HEX[col],0.5)+'" stroke-width="7" stroke-linecap="round"><line x1="30" y1="-2" x2="102" y2="70"/><line x1="-2" y1="30" x2="70" y2="102"/></g></svg>' : '';
+    // goal squares carry a soft 45° ribbon (two close parallel edges, tone-on-tone) that slowly
+    // drifts across the tile so an unfilled goal reads as "fill me"; hidden once delivered (.donept).
+    // Three copies spaced one drift-period apart make the diagonal flow seamless as it loops.
+    var band="";
+    if(shape==="sq"){
+      var gg=9, cp="";   // gg = half the gap between the two edges (small = close together)
+      [-120,0,120].forEach(function(o){
+        cp+='<g transform="translate('+o+','+(-o)+')">'
+          +'<line x1="-80" y1="'+(-80-gg)+'" x2="180" y2="'+(180-gg)+'"/>'
+          +'<line x1="-80" y1="'+(-80+gg)+'" x2="180" y2="'+(180+gg)+'"/></g>';
+      });
+      band='<svg class="gband" viewBox="0 0 100 100" preserveAspectRatio="none">'
+        +'<g class="gbandmove" fill="none" stroke="'+lighten(HEX[col],0.5)+'" stroke-width="6" stroke-linecap="round">'+cp+'</g></svg>';
+    }
     return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+band+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
   ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
