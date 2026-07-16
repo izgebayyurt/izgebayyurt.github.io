@@ -124,7 +124,7 @@ body{
 <div class="drawer" id="drawer">
   <h3>Tuning <span class="x" id="drawerClose">&times;</span></h3>
   <div class="row"><label>Round moves</label><input type="range" id="sMoves" min="8" max="25" step="1"><span class="val" id="vMoves">15</span></div>
-  <div class="row"><label>Colours</label><input type="range" id="sCol" min="4" max="6" step="1"><span class="val" id="vCol">6</span></div>
+  <div class="row"><label>Colours</label><input type="range" id="sCol" min="4" max="6" step="1"><span class="val" id="vCol">5</span></div>
   <div class="row"><label>Slide mode</label><div class="pills"><button class="pill on" id="pLine">line</button><button class="pill" id="pClicked">clicked</button></div></div>
   <div class="row"><label>Slide speed</label><input type="range" id="sSlide" min="0.5" max="2.2" step="0.1"><span class="val" id="vSlide">1.0</span></div>
   <div class="btnrow">
@@ -164,7 +164,9 @@ body{
 (function(){
 // ================= palette / helpers =================
 const HEX={ R:'#ef4a5a', Y:'#ffd23a', B:'#3d8bdf', G:'#57c268', P:'#9b62d6', O:'#f57420' };
-const ORDER=['R','Y','B','G','P','O'];          // orange (#f57420) is the 6th colour, in play by default
+// 5-colour game by default (R,Y,B,G,P — the most distinct set): matches at 6 were too rare, so combos felt
+// luck-driven. Orange (#f57420) is the 6th, reachable via the drawer slider / future difficulty ramp.
+const ORDER=['R','Y','B','G','P','O'];
 const INK='#2c2733', PAPER='#f0e6cf', PAPER2='#fbf5e6', CARD='#fffdf6', ACCENT='#ffd15c', INK_SOFT='#6b6472';
 function colOf(c){ return HEX[c]||INK; }
 function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
@@ -179,7 +181,7 @@ function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 const RAD=3;
 const CELLS_QR=[]; for(let q=-RAD;q<=RAD;q++){ const r1=Math.max(-RAD,-q-RAD), r2=Math.min(RAD,-q+RAD);
   for(let r=r1;r<=r2;r++) CELLS_QR.push([q,r]); }
-const NC=CELLS_QR.length;                                   // 61
+const NC=CELLS_QR.length;                                   // 37 (radius-3 dense hexagon)
 const IDX={}; CELLS_QR.forEach(([q,r],i)=>IDX[q+','+r]=i);
 const ringOfQR=(q,r)=>Math.max(Math.abs(q),Math.abs(r),Math.abs(-q-r));
 const cellRing=CELLS_QR.map(([q,r])=>ringOfQR(q,r));
@@ -205,7 +207,7 @@ const ALL_LINES=(()=>{ function build(keyf,ordf){ const m={};
   return [ ...build(q=>q,(q,r)=>r), ...build((q,r)=>r,q=>q), ...build((q,r)=>q+r,q=>q) ]; })();
 
 // ================= tunables =================
-let COLORS=6;             // 6-colour game by default (orange in play); drawer slider 4-6
+let COLORS=5;             // 5-colour game by default (R,Y,B,G,P); drawer slider 4-6
 let slideMode='line';    // DEFAULT 'line' (whole line shifts one; far edge ejects, near edge refills from queue) |
                          // 'clicked' (legacy partial: clicked ball + forward segment; origin pops in) — behind the drawer toggle
 let movesPerRound=15, slideMult=1.0;
@@ -225,10 +227,20 @@ function scoreResolve(rounds){                       // pure scorer (mirrors the
   const D=rounds.length||1, pre=acc.base+acc.cascade+acc.gap, cm=comboMult(D), combo=pre*(cm-1);
   return { base:acc.base, cascade:acc.cascade, gap:acc.gap, combo, total:pre+combo, gain:Math.round(pre+combo), depth:D, comboMult:cm };
 }
-function labelSpec(depth){ const d=Math.max(2,depth); const t=Math.min(1,(d-2)/10);
-  return { size:Math.min(58,18+d*3), hue:Math.round(198+(8-198)*t), life:Math.min(2.2,0.9+d*0.09), shake:d>=6?Math.min(6,(d-5)*0.85):0 }; }
+// chain label escalates HARD with depth: a x2 is a whisper, a x6+ is a screen event. Colour ramps
+// cool->hot (blue ~210° at x2 -> red-hot ~2° by x6), font grows fast, hold lengthens. Screen shake (px)
+// kicks in at depth>=2 and grows (bounded so it never obscures which cells matched).
+function labelSpec(depth){ const d=Math.max(2,depth); const t=Math.min(1,(d-2)/4);
+  return { size:Math.min(66,20+d*5), hue:Math.round(210+(2-210)*t), sat:Math.round(82+t*16),
+    life:Math.min(2.6,1.0+d*0.13), shake:depth>=2?Math.min(9,1.6+(depth-2)*1.35):0 }; }
 let palette=ORDER.slice(0,COLORS);
 function slideDur(){ return 0.2/slideMult; }
+// ---------- cascade JUICE pacing (purely visual/audio — scoring VALUES are identical) ----------
+const ANTICIPATE=0.14;    // s: matched group pulses/scales up before it pops so the eye registers the group
+const POP_STAGGER=0.05;   // s per ball: pops ripple from each group's centre outward (not one instant flash)
+function hitstopFor(depth){ return depth>=2 ? Math.min(0.08, 0.04+(depth-2)*0.012) : 0; } // 40->80ms freeze, deeper=longer
+const FLOURISH_DEPTH=4;   // chain depth that earns the screen-wide "Cascade!" payoff (flash + banner + slow-mo beat)
+function flourishName(d){ return d>=8?'GYRE!':(d>=6?'MEGA CASCADE!':'CASCADE!'); }
 function randColor(){ return palette[(Math.random()*palette.length)|0]; }
 let refillSeed=[];
 let queue=[];             // visible incoming stack (also the refill source)
@@ -261,10 +273,14 @@ const SFX=(()=>{
     init, get ready(){return ready;}, get muted(){return muted;}, setMuted(m){muted=!!m;},
     resume(){ try{ if(ac&&ac.state==='suspended') ac.resume(); }catch(e){} },
     slide(){ tone(300,{type:'sine',d:0.09,peak:0.12,slide:200}); },
-    pop(step){ tone(pfreq(step),{type:'triangle',d:0.13,peak:0.2}); },
+    // chunkier pop: bright triangle (pentatonic, climbs with step/depth) + a low sine body for weight
+    pop(step){ tone(pfreq(step),{type:'triangle',d:0.13,peak:0.2}); tone(pfreq(step)/2,{type:'sine',d:0.1,peak:0.09}); },
     eject(){ tone(280,{type:'sine',d:0.26,peak:0.12,slide:110}); noise({dur:0.2,peak:0.08,f0:800,f1:180,ftype:'lowpass'}); },
     chain(d){ d=Math.max(2,d|0); const b=392*Math.pow(2,Math.min(9,d-2)/6);
       tone(b,{type:'triangle',d:0.13,peak:0.16}); tone(b*1.5,{type:'triangle',d:0.18,peak:0.12,delay:0.06}); },
+    payoff(d){ d=Math.max(4,d|0); const m=1+(d-4)*0.028;        // distinct depth>=4 sting: rising arpeggio + sweep
+      [523,659,784,1047,1319].forEach((f,i)=>tone(f*m,{type:'triangle',d:0.26,peak:0.15,delay:i*0.05}));
+      noise({dur:0.4,peak:0.11,f0:500,f1:3400,ftype:'bandpass'}); },
     round(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:'triangle',d:0.22,peak:0.14,delay:i*0.08})); },
     over(){ tone(392,{type:'triangle',d:0.3,peak:0.15}); tone(311,{type:'triangle',d:0.45,peak:0.14,delay:0.18}); }
   };
@@ -274,6 +290,7 @@ for(const evn of ['pointerdown','touchstart','mousedown','keydown'])
 
 // ================= canvas / layout =================
 const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score'); scoreEl.style.transformOrigin='100% 50%';
 let W=390,H=800,DPR=1;
 let cx=195, cy=400, size=26, ballRad=21;
 function layout(){
@@ -299,10 +316,13 @@ let grid=new Array(NC).fill(null);
 let resolver=null;
 let popList=[], goo=[], puffs=[], flyers=[], scorePops=[];
 let drag={ active:false, cell:-1, dir:-1, x0:0, y0:0 };
-let chainLabel=null, roundFlash=null;
+let chainLabel=null, roundFlash=null, flourish=null;
 let score=0, scoreShown=0, best=+lsGet('gyre_best','0')||0;
 let lastResolve=null;
-let shakeMag=0, shakeT=0;
+let shakeMag=0, shakeT=0, shakeRot=0;
+let freezeT=0;             // hitstop: while >0, update() freezes the whole sim (deterministic — drained by dt)
+let flashT=0, flashMax=0.34; // screen-wide flourish flash
+let surgeT=0;              // score readout pulse while banking a chain
 let stats={ slides:0, matches:0, lines:0, maxChain:0, ejected:0, pops:0 };
 // rounds
 let phase='menu';                    // menu | play | over
@@ -329,7 +349,7 @@ function fillRandom(){
 }
 function resetRun(){ refillSeed=[]; queue=[]; refillQueue(); fillRandom();
   score=0; scoreShown=0; lastResolve=null; resolver=null; popList=[]; goo=[]; puffs=[]; flyers=[]; scorePops=[];
-  chainLabel=null; roundFlash=null; shakeMag=0; shakeT=0;
+  chainLabel=null; roundFlash=null; flourish=null; shakeMag=0; shakeT=0; shakeRot=0; freezeT=0; flashT=0; surgeT=0;
   stats={ slides:0, matches:0, lines:0, maxChain:0, ejected:0, pops:0 };
   round=1; movesLeft=movesPerRound; roundTarget=roundTargetFor(1); }
 
@@ -372,37 +392,55 @@ function stepResolver(dt){
   if(!resolver) return; const R=resolver; R.t+=dt;
   if(R.phase==='postslide'){ if(allSettled()){ R.phase='detect'; R.t=0; } return; }
   if(R.phase==='detect'){ const ms=findMatches();
-    if(ms.length && (R.depth||0)<DEPTH_CAP){ beginPops(ms,R); R.phase='popping'; R.t=0; } else { finishResolve(); } return; }
-  if(R.phase==='popping'){ if(popList.length===0){ R.phase='refill'; R.t=0; } return; }
+    if(ms.length && (R.depth||0)<DEPTH_CAP){ beginPops(ms,R); R.phase='anticipate'; R.t=0; } else { finishResolve(); } return; }
+  if(R.phase==='anticipate'){ if(R.t>=ANTICIPATE){ R.phase='popping'; R.t=0; } return; }                        // beat 1: the group swells
+  if(R.phase==='popping'){ if(popList.length===0){ R.phase='refill'; R.t=0; } return; }                          // beat 2: staggered ripple
   if(R.phase==='refill'){ doRefill(); R.phase='refilling'; R.t=0; return; }
   if(R.phase==='refilling'){ if(allSettled()){ R.phase='detect'; R.t=0; } return; }
 }
 function beginPops(ms,R){
   R.depth=(R.depth||0)+1; const r=R.depth, rm=roundMult(r);
   if(!R.acc) R.acc={ base:0, cascade:0, gap:0 };
-  const seen=new Set(), cells=[], cellVal={}; let lines=0;
+  const seen=new Set(), cells=[], cellVal={}, cellDelay={}; let lines=0;
   for(const m of ms){ lines++;
     const g=m.len, b=BASE*g;
     const spanned=new Set(m.cells.map(c=>cellRing[c])).size;   // rings a straight line crosses (gap bonus)
     const gm=1+GAP_K*(spanned-1); m._spanned=spanned;
+    // SCORING VALUES UNCHANGED — identical additive decomposition to before, juice is layered on top only
     R.acc.base+=b; R.acc.cascade+=b*(rm-1); R.acc.gap+=b*rm*(gm-1);
     const per=(b*rm*gm)/g;
+    // ripple this group from its own centre outward (staggered pops, not one flash)
+    let gxx=0,gyy=0; for(const c of m.cells){ gxx+=cellX[c]; gyy+=cellY[c]; } gxx/=m.cells.length; gyy/=m.cells.length;
+    m.cells.slice().sort((a,b)=>Math.hypot(cellX[a]-gxx,cellY[a]-gyy)-Math.hypot(cellX[b]-gxx,cellY[b]-gyy))
+      .forEach((c,idx)=>{ cellDelay[c]=Math.min(cellDelay[c]??1e9, idx*POP_STAGGER); });
     for(const c of m.cells){ cellVal[c]=Math.max(cellVal[c]||0, per); if(!seen.has(c)){ seen.add(c); cells.push(c); } }
   }
   stats.matches+=ms.length; stats.lines+=lines; stats.maxChain=Math.max(stats.maxChain,r); stats.pops+=cells.length;
   if(r>=2){ setChainLabel(r); SFX.chain(r); }
-  cells.sort((a,b)=> cellRing[a]-cellRing[b]);                  // inner cells pop first (ripple outward)
-  cells.forEach((c,i)=>{ const b=grid[c]; if(!b) return; b.popping=true;
-    popList.push({ ball:b, cell:c, delay:i*0.04, step:i, done:false, value:Math.round(cellVal[c]||0) }); });
+  if(r>=FLOURISH_DEPTH) triggerFlourish(r);                     // depth>=4 payoff: banner + flash + slow-mo beat + sting
+  let lastFire=0; for(const c of cells) lastFire=Math.max(lastFire, cellDelay[c]);
+  const pitchBase=(r-1)*2;                                      // pentatonic climb rises with chain depth
+  cells.sort((a,b)=> cellDelay[a]-cellDelay[b]);
+  cells.forEach((c)=>{ const b=grid[c]; if(!b) return; b.popping=true;
+    popList.push({ ball:b, cell:c, delay:cellDelay[c], step:pitchBase+Math.round(cellDelay[c]/POP_STAGGER),
+      done:false, value:Math.round(cellVal[c]||0),
+      hit:(r>=2 && cellDelay[c]===lastFire)?hitstopFor(r):0 }); });   // hitstop fires on the round's last/decisive pop
   updateHUD();
 }
-function setChainLabel(depth){ const sp=labelSpec(depth); chainLabel={ n:depth, life:sp.life, maxLife:sp.life, spec:sp };
-  if(sp.shake>0){ shakeMag=Math.max(shakeMag,sp.shake); shakeT=0.32; } }
-function firePop(p){ p.done=true; const b=p.ball;
-  goo.push({ x:b.vx, y:b.vy, r:ballRad*0.85, col:colOf(b.c), rgb:hexToRgb(colOf(b.c)), t:0, dur:0.28 });
-  for(let k=0;k<5;k++) puffs.push(mkPuff(b.vx,b.vy,colOf(b.c)));
-  if(p.value>0) scorePops.push({ x:b.vx, y:b.vy, v:p.value, life:0.85, max:0.85, col:colOf(b.c) });
+function triggerFlourish(depth){ flourish={ text:flourishName(depth), depth, life:1.5, max:1.5, born:performance.now() };
+  flashT=flashMax; freezeT=Math.max(freezeT,0.12); SFX.payoff(depth); }   // the "fever" beat — a brief slow-mo freeze + flash
+function setChainLabel(depth){ const sp=labelSpec(depth); chainLabel={ n:depth, life:sp.life, maxLife:sp.life, spec:sp, born:performance.now() };
+  if(sp.shake>0){ shakeMag=Math.max(shakeMag,sp.shake);
+    shakeRot=Math.max(shakeRot, Math.min(0.022, 0.004+(depth-2)*0.0045));   // fractional-degree rotation reads as force
+    shakeT=Math.max(shakeT, 0.3+(depth-2)*0.03); } }
+function firePop(p){ p.done=true; const b=p.ball; const col=colOf(b.c), rgb=hexToRgb(col);
+  goo.push({ x:b.vx, y:b.vy, r:ballRad*0.95, col, rgb, t:0, dur:0.3 });
+  for(let s=0;s<2;s++){ const a=Math.random()*6.283, d=ballRad*(0.5+Math.random()*0.55);  // satellite splats -> juicier metaball burst
+    goo.push({ x:b.vx+Math.cos(a)*d, y:b.vy+Math.sin(a)*d, r:ballRad*0.4, col, rgb, t:0, dur:0.22 }); }
+  for(let k=0;k<8;k++) puffs.push(mkPuff(b.vx,b.vy,col));
+  if(p.value>0) scorePops.push({ x:b.vx, y:b.vy, v:p.value, life:0.9, max:0.9, col });
   SFX.pop(p.step);
+  if(p.hit>0) freezeT=Math.max(freezeT,p.hit);                  // hitstop on the decisive pop
   if(grid[p.cell]===b) grid[p.cell]=null;
 }
 // ONE queue refills every emptied (popped) cell in place — board stays full at 61.
@@ -412,6 +450,7 @@ function finishResolve(){
   if(R && R.acc){ const D=R.depth||1, pre=R.acc.base+R.acc.cascade+R.acc.gap;
     const cm=comboMult(D), combo=pre*(cm-1), total=pre+combo, gain=Math.round(total);
     score+=gain; if(score>best){ best=score; saveBest(); }
+    if(gain>0) surgeT=0.5;                                       // pulse the score readout as it banks
     lastResolve={ base:R.acc.base, cascade:R.acc.cascade, gap:R.acc.gap, combo, total, gain, depth:D, comboMult:cm }; }
   resolver=null;
   if(phase==='play'){                                          // round frame: reach target to advance; else out of moves = over
@@ -450,11 +489,15 @@ function isAnimating(){
   return false;
 }
 function update(dt,now){
+  // HITSTOP / slow-mo beat: freeze the entire sim for a few frames (deterministic — drained by dt, so
+  // step()/settle() still advance through it; settle just takes a few more iterations).
+  if(freezeT>0){ freezeT=Math.max(0,freezeT-dt); return; }
   stepResolver(dt);
   for(const b of allBalls()){ if(!b.anim) continue; const a=b.anim; a.t+=dt; const e=ease(a.t/a.dur);
     if(a.kind==='move'){ b.vx=lerp(a.x0,a.x1,e); b.vy=lerp(a.y0,a.y1,e); }
     if(a.t>=a.dur){ b.anim=null; b.vx=cellX[b.cell]; b.vy=cellY[b.cell]; b.land=now; } }
-  for(const p of popList){ if(p.done) continue; p.delay-=dt; if(p.delay<=0) firePop(p); }
+  // pops only ripple during the popping beat (held frozen through the anticipation beat)
+  if(!resolver || resolver.phase==='popping'){ for(const p of popList){ if(p.done) continue; p.delay-=dt; if(p.delay<=0) firePop(p); } }
   popList=popList.filter(p=>!p.done);
   for(const g of goo){ g.t+=dt; g.r+=(ballRad*0.35-g.r)*Math.min(1,dt*8); }
   goo=goo.filter(g=>g.t<g.dur);
@@ -466,9 +509,13 @@ function update(dt,now){
   scorePops=scorePops.filter(s=>s.life>0);
   if(chainLabel){ chainLabel.life-=dt; if(chainLabel.life<=0) chainLabel=null; }
   if(roundFlash){ roundFlash.life-=dt; if(roundFlash.life<=0) roundFlash=null; }
-  if(scoreShown!==score){ const diff=score-scoreShown, stepAmt=Math.max(1, Math.abs(diff)*Math.min(1,dt*2.2));
+  if(flourish){ flourish.life-=dt; if(flourish.life<=0) flourish=null; }
+  if(flashT>0) flashT=Math.max(0,flashT-dt);
+  if(surgeT>0) surgeT=Math.max(0,surgeT-dt);
+  // score count-up — races faster during a chain (the surging number is the hero of the payoff)
+  if(scoreShown!==score){ const diff=score-scoreShown, spd=resolver?3.0:2.2, stepAmt=Math.max(1, Math.abs(diff)*Math.min(1,dt*spd));
     scoreShown = (stepAmt>=Math.abs(diff)) ? score : scoreShown+Math.sign(diff)*stepAmt; }
-  if(shakeT>0){ shakeT-=dt; if(shakeT<=0){ shakeT=0; shakeMag=0; } }
+  if(shakeT>0){ shakeT-=dt; if(shakeT<=0){ shakeT=0; shakeMag=0; shakeRot=0; } }
 }
 
 // ================= render =================
@@ -496,11 +543,17 @@ function drawDragPreview(){ if(!drag.active||drag.dir<0||drag.cell<0) return;
   ctx.beginPath(); ctx.moveTo(ah,0); ctx.lineTo(-ah*0.7,ah*0.8); ctx.lineTo(-ah*0.7,-ah*0.8); ctx.closePath();
   ctx.fillStyle=ACCENT; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=INK; ctx.stroke();
   ctx.restore(); }
-function drawBalls(now){ for(const b of allBalls()){ let r=ballRad;
-  if(b.anim && b.anim.kind==='grow'){ r*=lerp(0.3,1,easeBack(b.anim.t/b.anim.dur)); }
-  if(b.popping) r*=1.0+0.12*Math.sin(now/40);
-  if(b.land && now-b.land<160){ const t=(now-b.land)/160; r*=1+0.14*(1-t)*Math.sin(t*9); }
-  stickerCircle(b.vx,b.vy,r,colOf(b.c),INK,3); } }
+function drawBalls(now){ const antic = resolver && resolver.phase==='anticipate';
+  const aT = antic ? ease(Math.min(1, resolver.t/ANTICIPATE)) : 0;
+  for(const b of allBalls()){ let r=ballRad;
+    if(b.anim && b.anim.kind==='grow'){ r*=lerp(0.3,1,easeBack(b.anim.t/b.anim.dur)); }
+    if(antic && b.popping){ r*=1+0.34*aT;                        // ANTICIPATION: the matched group swells + haloes
+      ctx.save(); const g=ctx.createRadialGradient(b.vx,b.vy,r*0.5,b.vx,b.vy,r*1.75);
+      g.addColorStop(0,'rgba(255,209,92,'+(0.6*aT).toFixed(3)+')'); g.addColorStop(1,'rgba(255,209,92,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(b.vx,b.vy,r*1.75,0,6.28); ctx.fill(); ctx.restore(); }
+    else if(b.popping){ r*=1.0+0.12*Math.sin(now/40); }
+    if(b.land && now-b.land<160){ const t=(now-b.land)/160; r*=1+0.14*(1-t)*Math.sin(t*9); }
+    stickerCircle(b.vx,b.vy,r,colOf(b.c),INK,3); } }
 function drawGoo(){ if(!goo.length) return; ctx.save(); ctx.globalAlpha=0.8;
   for(const g of goo){ const R=g.r*1.9; const [r,gr,bl]=g.rgb;
     const grd=ctx.createRadialGradient(g.x,g.y,0,g.x,g.y,R);
@@ -522,11 +575,27 @@ function drawScorePops(){ for(const s of scorePops){ const a=Math.max(0,s.life/s
   ctx.lineWidth=3.5; ctx.strokeStyle=PAPER; ctx.strokeText('+'+s.v,s.x,s.y);
   ctx.fillStyle=s.col; ctx.fillText('+'+s.v,s.x,s.y); ctx.restore(); } ctx.globalAlpha=1; }
 function drawChain(){ if(!chainLabel) return; const sp=chainLabel.spec; const a=Math.max(0,chainLabel.life/chainLabel.maxLife);
-  const depth=Math.max(2,chainLabel.n); const pop=1+0.18*Math.max(0,Math.min(1,(1-a)*3.3)); const sz=sp.size*pop;
+  const depth=Math.max(2,chainLabel.n);
+  const app=Math.min(1,(performance.now()-chainLabel.born)/150), sz=sp.size*easeBack(app);   // punchy back-eased reveal, bigger per depth
+  const y=Math.max(60, cy-(Math.sqrt(3)*RAD+0.82)*size-14);
   ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
-  const y=Math.max(56, cy-(Math.sqrt(3)*RAD+0.82)*size-12);   // just above the (smaller) hexagon's top edge
-  ctx.lineWidth=4+sz*0.07; ctx.strokeStyle=PAPER; ctx.strokeText('chain x'+depth,cx,y);
-  ctx.fillStyle='hsl('+sp.hue+',88%,'+(depth>=10?54:60)+'%)'; ctx.fillText('chain x'+depth,cx,y); ctx.restore(); }
+  ctx.lineWidth=4+sz*0.08; ctx.strokeStyle=PAPER; ctx.strokeText('chain ×'+depth,cx,y);
+  ctx.fillStyle='hsl('+sp.hue+','+sp.sat+'%,'+(depth>=6?52:58)+'%)'; ctx.fillText('chain ×'+depth,cx,y);
+  if(resolver){ const cm=comboMult(resolver.depth||depth); ctx.globalAlpha=a*0.9;   // running combo multiplier readout
+    ctx.font='800 13px Nunito, sans-serif'; ctx.fillStyle=INK_SOFT; ctx.fillText('combo ×'+cm.toFixed(1), cx, y+15); }
+  ctx.restore(); }
+// screen-wide payoff flash (brief, fades fast — never sits on the board long enough to hide it)
+function drawFlash(){ if(flashT<=0) return; const a=flashT/flashMax;
+  ctx.save(); ctx.globalAlpha=0.26*a; ctx.fillStyle='#fff4d6'; ctx.fillRect(0,0,W,H); ctx.restore(); }
+// big-chain banner (depth>=4): the "fever" moment
+function drawFlourish(){ if(!flourish) return; const a=Math.max(0,flourish.life/flourish.max);
+  const app=Math.min(1,(performance.now()-flourish.born)/180), sc=easeBack(app);
+  ctx.save(); ctx.globalAlpha=Math.min(1,a*1.6); ctx.textAlign='center';
+  const sz=Math.min(52, 34+flourish.depth*2)*sc; ctx.font='700 '+sz+'px Fredoka, sans-serif';
+  const y=Math.max(46, cy-(Math.sqrt(3)*RAD+0.82)*size-52);
+  ctx.lineWidth=8; ctx.strokeStyle=INK; ctx.strokeText(flourish.text,cx,y);
+  const grd=ctx.createLinearGradient(cx-120,y,cx+120,y); grd.addColorStop(0,'#f57420'); grd.addColorStop(0.5,'#ffd23a'); grd.addColorStop(1,'#ef4a5a');
+  ctx.fillStyle=grd; ctx.fillText(flourish.text,cx,y); ctx.restore(); }
 function drawRoundFlash(){ if(!roundFlash) return; const a=Math.max(0,roundFlash.life/roundFlash.max);
   ctx.save(); ctx.globalAlpha=Math.min(1,a*1.4); ctx.textAlign='center'; ctx.font='700 44px Fredoka, sans-serif';
   ctx.lineWidth=6; ctx.strokeStyle=PAPER; ctx.strokeText(roundFlash.text,cx,cy); ctx.fillStyle=ACCENT; ctx.strokeText(roundFlash.text,cx,cy);
@@ -534,10 +603,14 @@ function drawRoundFlash(){ if(!roundFlash) return; const a=Math.max(0,roundFlash
 function render(now){
   ctx.clearRect(0,0,W,H);
   ctx.save();
-  if(shakeMag>0&&shakeT>0){ const m=shakeMag*(shakeT/0.32); ctx.translate((Math.random()*2-1)*m,(Math.random()*2-1)*m); }
+  if(shakeMag>0&&shakeT>0){ const k=Math.min(1,shakeT*3.2), m=shakeMag*k;      // translation + a fractional rotation about board centre
+    ctx.translate(cx,cy); ctx.rotate(shakeRot*k*(Math.random()*2-1)); ctx.translate(-cx,-cy);
+    ctx.translate((Math.random()*2-1)*m,(Math.random()*2-1)*m); }
   drawScaffold(); drawDragPreview(); drawGoo(); drawBalls(now); drawFlyers(); drawPuffs();
   drawQueueStack(); drawScorePops(); drawChain(); drawRoundFlash();
   ctx.restore();
+  drawFlash(); drawFlourish();                                                 // full-screen payoff overlays, unshaken (stay readable)
+  scoreEl.style.transform = surgeT>0 ? 'scale('+(1+0.26*(surgeT/0.5)).toFixed(3)+')' : '';
 }
 function tick(now){ let dt=(now-last)/1000; if(dt>0.05) dt=0.05; last=now;
   const active=isAnimating();
@@ -636,7 +709,12 @@ window.SLIDE={
   get palette(){ return palette.slice(); }, get colors(){ return COLORS; },
   scoreResolve(rounds){ return scoreResolve(rounds); }, scoreParams(){ return { BASE, ROUND_K, ROUND_CAP, GAP_K, COMBO_K, COMBO_CAP, DEPTH_CAP }; },
   get lastResolve(){ return lastResolve?Object.assign({},lastResolve):null; },
-  labelSpec(d){ return labelSpec(d); }, get chainLabel(){ return chainLabel?{ n:chainLabel.n }:null; },
+  labelSpec(d){ return labelSpec(d); }, get chainLabel(){ return chainLabel?{ n:chainLabel.n, size:chainLabel.spec.size, hue:chainLabel.spec.hue }:null; },
+  // juice observability (visual/audio pacing — for tests + tuning)
+  get flourish(){ return flourish?{ text:flourish.text, depth:flourish.depth }:null; },
+  get frozen(){ return freezeT>0; }, get freezeT(){ return freezeT; }, get flashing(){ return flashT>0; },
+  get shakeState(){ return { mag:shakeMag, rot:shakeRot, t:shakeT }; },
+  juiceParams(){ return { ANTICIPATE, POP_STAGGER, FLOURISH_DEPTH, hitstop2:hitstopFor(2), hitstop4:hitstopFor(4), hitstop6:hitstopFor(6) }; },
   get stats(){ return Object.assign({},stats); }, get score(){ return score; }, get best(){ return best; }, get scoreShown(){ return Math.round(scoreShown); },
   setScore(n){ score=n|0; if(score>best){ best=score; saveBest(); } updateHUD(); }, snapScore(){ scoreShown=score; updateHUD(); },
   // rounds
