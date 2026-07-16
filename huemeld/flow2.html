@@ -275,11 +275,11 @@ body.menuopen .helpfab{ display:none; }
         <ul class="uplist">
           <li><span class="upic"></span><span data-t="No ads, ever">No ads, ever</span></li>
           <li><span class="upic"></span><span data-t="All 7 puzzle packs · 350 levels">All 7 puzzle packs · 350 levels</span></li>
-          <li><span class="upic"></span><span data-t="Plus the 150 level medley for extra challenges!">Plus the 150 level medley for extra challenges!</span></li>
+          <li><span class="upic"></span><span data-t="Plus the 250 level medley for extra challenges!">Plus the 250 level medley for extra challenges!</span></li>
           <li><span class="upic"></span><span data-t="Daily archive - replay the last 3 weeks">Daily archive - replay the last 3 weeks</span></li>
           <li><span class="upic"></span><span data-t="Every chapter unlocked instantly">Every chapter unlocked instantly</span></li>
         </ul>
-        <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $4.99</button>
+        <button class="mk" id="btnUpBuy">✦ Huemeld Pro · $2.99</button>
         <button class="mk" id="btnUpNoAds" style="background:#bfe3ff">Watch to unlock</button>
         <button class="mk" id="btnUpClose" style="background:var(--card);color:var(--ink)" data-t="Not now">Not now</button>
       </div>
@@ -293,7 +293,7 @@ body.menuopen .helpfab{ display:none; }
         <div class="setrow"><span data-t="Volume">Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
         <div class="setrow"><span data-t="Colour-blind labels">Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
-        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $4.99</button>
+        <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $2.99</button>
         <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Restore Purchases">Restore Purchases</button>
         <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px" data-t="Privacy Policy">Privacy Policy</a></p>
         <p style="margin-top:8px;font-size:11px;color:var(--sub);line-height:1.6"><span data-t="Music from">Music from</span> <a href="https://uppbeat.io" target="_blank" rel="noopener" style="color:var(--sub)">Uppbeat</a>, by lloom:<br>
@@ -383,7 +383,7 @@ var TR = {
   "One purchase, the whole game:":"Tek fiyatla bütün bölümleri aç",      /* 37 */
   "No ads, ever":"Sonsuza dek reklamsız",                           /* 38 */
   "All 7 puzzle packs · 350 levels":"7 bulmaca paketi · 350 bölüm", /* 39 */
-  "Plus the 150 level medley for extra challenges!":"Ekstra zorluk için 150 karma mekanikli bölüm!", /* 40 */
+  "Plus the 250 level medley for extra challenges!":"Ekstra zorluk için 250 karma mekanikli bölüm!", /* 40 */
   "Daily archive - replay the last 3 weeks":"Günlük arşiv - son 3 haftayı tekrar oyna", /* 41 */
   "Every chapter unlocked instantly":"Tüm bölümler anında açılır", /* 42 */
   "Remove Ads · $2.99":"Reklamları Kaldır · $2.99",                 /* 43 */
@@ -580,6 +580,7 @@ var KOFI_URL="https://ko-fi.com/YOUR_HANDLE";
 function entFull(){ return !isNativeApp() || localStorage.getItem("hm_flow2_ent_full")==="1"; }
 function entNoAds(){ return entFull() || localStorage.getItem("hm_flow2_ent_noads")==="1" || localStorage.getItem("hm_flow2_noads")==="1"; }
 var PACK_FREE=5;   // free teaser levels per pack
+var PRO_PRICE="$2.99";   // fallback; the native bridge overrides with the store's LOCALIZED price
 var UNLOCK_BATCH=8;   // levels a single rewarded video unlocks (free players)
 var UNLOCK_ALL=false;   // RELEASE: teasers + entitlements gate content (was DEV-open).
 function adUnlocked(pid){ return +(localStorage.getItem("hm_flow2_adunlock_"+pid)||0); }
@@ -2137,9 +2138,9 @@ document.getElementById("btnHome").innerHTML=icn("home",17);
 var ICONBTN={
   btnPick:["list","levels"], btnSet:["gear",""], btnPrev:["arrowL",""], btnNext:["arrowR",""],
   btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
-  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro · Remove Ads"], btnMenuKofi:["coffee","Support Huemeld"],
+  btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro"], btnMenuKofi:["coffee","Support Huemeld"],
   btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
-  btnUpBuy:["spark","Huemeld Pro · $4.99"], btnFull:["spark","Huemeld Pro · $4.99"], btnDemo:["play","Show me"],
+  btnDemo:["play","Show me"],   // btnUpBuy/btnFull labels carry the localized price - set by refreshProLabels()
   btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
 };
 function applyIconButtons(){
@@ -2154,6 +2155,7 @@ function applyLang(){
   var wn=document.getElementById("btnWinNext"); if(wn) wn.innerHTML=T("Next")+" "+icn("arrowR",15);
   var sk=document.getElementById("demoskip"); if(sk) sk.innerHTML=T("Skip tutorial")+" "+icn("arrowR",13);
   var lb=document.getElementById("btnMenuLang"); if(lb) lb.innerHTML=icn("globe",16)+" "+(LANG==="tr"?"English":"Türkçe");
+  refreshProLabels();
   try{ relabel(); }catch(e){}
   try{ syncToggles(); }catch(e){}
   try{ if(document.getElementById("ovPick").classList.contains("show")) renderPicker(); }catch(e){}
@@ -2193,6 +2195,13 @@ function updateProEntry(){
   var k=document.getElementById("btnMenuKofi");   // web/PWA only, and only once a real handle is set
   if(k) k.style.display = (!isNativeApp() && KOFI_URL.indexOf("YOUR_HANDLE")<0) ? "" : "none";
 }
+/* the two "buy Pro" buttons carry the price; the label is built here so it can pick up
+   the store's localized price (via __applyPrices) and survive a language switch. */
+function refreshProLabels(){
+  var lbl=icn("spark",16)+" "+T("Huemeld Pro")+" · "+PRO_PRICE;
+  ["btnUpBuy","btnFull"].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=lbl; });
+}
+window.__applyPrices=function(p){ if(p && p.full){ PRO_PRICE=p.full; refreshProLabels(); } };
 var pendingUnlock=null;   // {pi,k} the locked pack level a rewarded video would open
 function showUpsell(mode, unlock){
   if(entFull()) return;                                   // nothing left to sell
