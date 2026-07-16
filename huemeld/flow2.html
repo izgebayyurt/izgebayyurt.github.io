@@ -1875,7 +1875,12 @@ function renderPaths(){
       ctx.save(); ctx.lineJoin="round";
       ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
       ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
-      if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.06; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
+      if(ok){   // satisfied: a steady second (outer) ring - the same "locked in" double ring as number clues
+        var ggap=s*0.05, ow=gs+ggap*2, orr=rr+ggap;
+        ctx.lineWidth=s*0.032; ctx.globalAlpha=0.92;
+        roundRect(ctx, cx-ow/2, cy-ow/2, ow, ow, orr); ctx.stroke();
+        ctx.globalAlpha=1;
+      }
       if(G.dir){   // arrow gate: a double chevron » shows the demanded crossing direction
         var v=DIRV[G.dir], ang=Math.atan2(v[0],v[1]);
         ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang); ctx.scale(pop,pop);
