@@ -290,7 +290,8 @@ body.menuopen .helpfab{ display:none; }
         <div class="setrow"><span data-t="Dark theme">Dark theme</span><button class="tgl" id="tglTheme" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span data-t="Sound">Sound</span><button class="tgl" id="tglSound" aria-pressed="true"><i></i></button></div>
         <div class="setrow"><span data-t="Music">Music</span><button class="tgl" id="tglMusic" aria-pressed="true"><i></i></button></div>
-        <div class="setrow"><span data-t="Volume">Volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Volume"></div>
+        <div class="setrow"><span data-t="Sound volume">Sound volume</span><input type="range" class="vol" id="volSlide" min="0" max="100" step="1" value="70" aria-label="Sound volume"></div>
+        <div class="setrow"><span data-t="Music volume">Music volume</span><input type="range" class="vol" id="musicSlide" min="0" max="100" step="1" value="35" aria-label="Music volume"></div>
         <div class="setrow"><span data-t="Colour-blind labels">Colour-blind labels</span><button class="tgl" id="tglCB" aria-pressed="false"><i></i></button></div>
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $2.99</button>
@@ -374,6 +375,8 @@ var TR = {
   "Dark theme":"Koyu tema",                                         /* 29 */
   "Sound":"Ses",                                                    /* 30 */
   "Volume":"Ses düzeyi",                                            /* 31 */
+  "Sound volume":"Ses düzeyi",
+  "Music volume":"Müzik düzeyi",
   "Colour-blind labels":"Renk körü etiketleri",                     /* 32 */
   "Restore Purchases":"Satın Alımları Geri Yükle",                  /* 33 */
   "Privacy Policy":"Gizlilik Politikası",                           /* 34 */
@@ -691,20 +694,23 @@ document.addEventListener("visibilitychange", function(){
   if(document.hidden){ fadeMusic(0, 600); }
   else if(musicOn && musicStarted){ if(musicEl){ var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } fadeMusic(musicTargetVol(), 800); }
 });
-function setVolume(v){
+function setVolume(v){   // sound-effects volume only (music has its own slider)
   volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
   if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
-  applyMusicVol();
 }
 /* ---------- background music: lloom tracks from Uppbeat, looped + shuffled ----------
    Lazy (preload=none) so it never blocks startup. Its own on/off toggle, but the
    Volume slider drives it too (kept quieter than the SFX so it stays in the back). */
 var MUSIC_TRACKS=["music/vashon.mp3","music/childhood-afternoons.mp3","music/simple-mornings.mp3"];
-var MUSIC_VOL=0.6;
+var MUSIC_VOL=0.6;   // ceiling: even at slider 100 the music stays in the background
 var musicOn = localStorage.getItem("hm_flow2_music")!=="0";
+// music has its OWN volume, separate from the sound-effects volume, and starts quiet
+var musicVolume = (function(){ var v=parseFloat(localStorage.getItem("hm_flow2_musicvol")); return isNaN(v)?0.35:Math.max(0,Math.min(1,v)); })();
+var demoSoon=false;   // a tutorial demo is imminent/running -> hold the music
 var musicEl=null, musicOrder=[0,1,2], musicIdx=0, musicStarted=false;
 var musicFade=null;
-function musicTargetVol(){ return Math.max(0,Math.min(1, volume*MUSIC_VOL)); }
+function musicTargetVol(){ return Math.max(0,Math.min(1, musicVolume*MUSIC_VOL)); }
+function setMusicVolume(v){ musicVolume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_musicvol",""+musicVolume); applyMusicVol(); }
 function applyMusicVol(){ if(musicFade){ clearInterval(musicFade); musicFade=null; } if(musicEl) musicEl.volume=musicTargetVol(); }
 function fadeMusic(to, ms){
   if(!musicEl) return;
@@ -724,7 +730,8 @@ function ensureMusic(){
   for(var i=musicOrder.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=musicOrder[i]; musicOrder[i]=musicOrder[j]; musicOrder[j]=t; }  // shuffle the order
 }
 function musicPlayCurrent(){ if(!musicEl) return; musicEl.src=MUSIC_TRACKS[musicOrder[musicIdx]]; applyMusicVol(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); }
-function startMusic(){ if(!musicOn) return; ensureMusic(); if(!musicStarted){ musicStarted=true; musicPlayCurrent(); } else { var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } }
+function startMusic(){ if(!musicOn || demoing || demoSoon) return;   // no music during tutorials
+  ensureMusic(); if(!musicStarted){ musicStarted=true; musicPlayCurrent(); } else { var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } }
 function stopMusic(){ if(musicEl) musicEl.pause(); }
 /* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
 function voice(freq,dur,o){
@@ -875,14 +882,16 @@ function fireDemo(type,cell){
 }
 function stopDemo(){   // clear timers + chrome; does NOT touch the board
   demoTimers.forEach(clearTimeout); demoTimers=[];
-  demoing=false; demoFiring=false;
+  demoing=false; demoFiring=false; demoSoon=false;
   ghostEl.style.display="none"; demobanEl.classList.remove("show"); demoskipEl.classList.remove("show");
+  if(musicOn){ startMusic(); if(musicEl) fadeMusic(musicTargetVol(), 900); }   // ease the music back in
 }
 var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
 function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast(T("Your turn!")); }
 function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
   if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
   demoing=true;                                             // specific cell to change the caption
+  if(musicEl) fadeMusic(0, 400);   // no music over a tutorial
   ghostEl.style.display="block"; ghostEl.style.transition="left .27s linear, top .27s linear";
   demoskipEl.classList.add("show");
   marks=marks||{};
@@ -2162,10 +2171,13 @@ function applyLang(){
   document.documentElement.lang = LANG;
 }
 document.getElementById("btnHome").addEventListener("click", function(){ ensureAudio(); showMenu(); });
-document.getElementById("btnMenuPlay").addEventListener("click", function(){ ensureAudio(); hideMenu();
+document.getElementById("btnMenuPlay").addEventListener("click", function(){
+  var willDemo = firstRun && LEVELS[0] && LEVELS[0].demo && li===0;
+  if(willDemo) demoSoon=true;   // hold the music so it never starts under the boot tutorial
+  ensureAudio(); hideMenu();
   // very first play: show the game with the ghost hand instead of telling it
   if(firstRun){ firstRun=false;
-    if(LEVELS[0] && LEVELS[0].demo && li===0) setTimeout(playDemo, 400);
+    if(willDemo) setTimeout(playDemo, 400);
     else document.getElementById("ovHelp").classList.add("show");
   } });
 document.getElementById("btnMenuDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); loadDaily(0); });
@@ -2356,7 +2368,8 @@ function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-p
   var tm=document.getElementById("tglMusic"); if(tm) tm.setAttribute("aria-pressed",musicOn?"true":"false");
   document.getElementById("tglCB").setAttribute("aria-pressed",cbOn?"true":"false");
   document.getElementById("tglTheme").setAttribute("aria-pressed",theme==="dark"?"true":"false");
-  var vs=document.getElementById("volSlide"); if(vs){ vs.value=Math.round(volume*100); vs.disabled=!soundOn&&!musicOn; } }
+  var vs=document.getElementById("volSlide"); if(vs){ vs.value=Math.round(volume*100); vs.disabled=!soundOn; }
+  var ms=document.getElementById("musicSlide"); if(ms){ ms.value=Math.round(musicVolume*100); ms.disabled=!musicOn; } }
 document.getElementById("btnSet").addEventListener("click", function(){ syncToggles(); ovSet.classList.add("show"); });
 document.getElementById("btnSetClose").addEventListener("click", function(){ ovSet.classList.remove("show"); });
 document.getElementById("tglTheme").addEventListener("click", function(){ theme = theme==="dark"?"light":"dark"; localStorage.setItem("hm_flow2_theme",theme); applyTheme(); renderDots(); syncToggles(); });
@@ -2366,6 +2379,11 @@ document.getElementById("tglMusic").addEventListener("click", function(){ musicO
   vs.addEventListener("input", function(){ ensureAudio(); setVolume((+vs.value||0)/100);
     // a quick blip so the player HEARS the level they're setting
     if(soundOn) bell(660,0.16,0.06); });
+})();
+(function(){ var ms=document.getElementById("musicSlide"); if(!ms) return;
+  ms.addEventListener("input", function(){ setMusicVolume((+ms.value||0)/100);
+    // nudge the track audible while dragging even if it hadn't started yet
+    if(musicOn && !demoing){ ensureAudio(); startMusic(); } });
 })();
 document.getElementById("tglCB").addEventListener("click", function(){ cbOn=!cbOn; localStorage.setItem("hm_flow2_cb",cbOn?"1":"0"); syncToggles(); renderDots(); });
 /* "How to play" in the picker opens the same ? legend */
