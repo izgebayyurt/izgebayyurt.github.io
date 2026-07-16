@@ -630,12 +630,12 @@ var undoStack=[], preGesture=null, UNDO_CAP=60;
 function snapState(){ return JSON.stringify({
   ems:ems.map(function(E){ return E.legs.map(function(l){ return {c:l.cells.map(function(x){return [x[0],x[1]];}), j:l.jun}; }); }),
   tg:tgts.map(function(t){ return t.done; }),
-  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun)}; })
+  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun), tr:J.triple?1:0}; })
 }); }
 function restoreState(str){ var s=JSON.parse(str);
   s.ems.forEach(function(legs,i){ if(ems[i]) ems[i].legs=legs.map(function(l){ return {cells:l.c.map(function(x){return [x[0],x[1]];}), jun:l.j}; }); });
   s.tg.forEach(function(d,i){ if(tgts[i]) tgts[i].done=d; });
-  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju)}; });
+  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju), triple:!!J.tr}; });
   drag=null; renderPaths(); updateUndoUI();
 }
 function pushUndo(){ if(preGesture!=null && preGesture!==snapState()){ undoStack.push(preGesture); if(undoStack.length>UNDO_CAP) undoStack.shift(); } preGesture=null; updateUndoUI(); }
@@ -1127,7 +1127,10 @@ function reconcile(){
       var J=junctions[j], feeders=[];
       ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg.cells); }); });
       junctions.forEach(function(K,ki){ if(ki!==j && K.jun===j) feeders.push(K.leg); });
-      var ok = feeders.length===2 && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
+      // normal junctions have exactly 2 feeders; a TRIPLE (three primaries -> brown at one
+      // point) has 3. Losing any feeder from a triple dissolves it (2 primaries aren't brown).
+      var need = J.triple ? 3 : 2;
+      var ok = feeders.length===need && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
       if(!ok){ dropJunction(j); stable=false; break; }
     }
   }
@@ -1416,6 +1419,21 @@ function step(cell){
       renderPaths(); return;
     }
     rejectMix(cell); return;
+  }
+  // TRIPLE MIX: a primary reaches the CELL of a 2-primary secondary junction -> all three
+  // colours meet at one point and make brown (instead of the two-step chain).
+  if(drag.t==="em" && o.t==="jun"){
+    var TJ=junctions[o.i], myL3=ems[drag.e].legs[drag.l];
+    var canTriple = TJ && !TJ.triple && (TJ.jun==null||TJ.jun<0) && "OGP".indexOf(TJ.sec)>=0;
+    var ns3 = canTriple ? mixOf(TJ.sec, ems[drag.e].col) : null;
+    if(ns3==="N" && myL3.jun<0 && tgtFor("N") && !tgtFor("N").done
+       && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      myL3.cells.push(cell);
+      myL3.jun=o.i; TJ.sec="N"; TJ.triple=true;    // the junction now takes THREE feeders
+      addBloom(cell[0],cell[1], HEX.N, 660); drawSteps=0; sfxJun(); hap("medium"); discover("N",cell[0],cell[1]);
+      drag=null; reconcileAndFixDrag(); recomputeTargets(); renderPaths(); checkWin(); return;
+    }
+    // not a valid triple -> leave the junction as it was (no-op, like before)
   }
   // DIRECT delivery: a primary line reaches a same-colour circle (no mixing)
   if(drag.t==="em" && o.t==="tgt"){
