@@ -941,6 +941,7 @@ function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
 function isWall(r,c){ return !!wallSet[r+","+c]; }
 function paintTarget(){ return N*N - walls.length; }
 function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) return i; return -1; }
+function indicesIn(list,r,c){ var out=[]; for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) out.push(i); return out; }   // a line may cross a bridge cell twice (self-overpass)
 /* a circle of this colour that still needs feeding (prefer an undone one; else any) */
 function tgtFor(col){ var any=null; for(var i=0;i<tgts.length;i++) if(tgts[i].col===col){ if(!tgts[i].done) return tgts[i]; any=any||tgts[i]; } return any; }
 function tgtAt(r,c){ for(var i=0;i<tgts.length;i++) if(tgts[i].r===r && tgts[i].c===c) return tgts[i]; return null; }
@@ -984,10 +985,10 @@ function iceOK(){
 }
 function isBridge(r,c){ return !!bridgeSet[r+","+c]; }
 /* ALL pipes whose cells include (r,c) - a bridge cell can carry two */
-function pathsAt(r,c){
+function pathsAt(r,c){   // one entry PER passage - a self-overpass adds the same leg twice
   var out=[];
-  junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd, col:J.sec}); });
-  ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id, col:E.col}); }); });
+  junctions.forEach(function(J){ indicesIn(J.leg,r,c).forEach(function(jd){ out.push({cells:J.leg, idx:jd, col:J.sec}); }); });
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ indicesIn(Lg.cells,r,c).forEach(function(id){ out.push({cells:Lg.cells, idx:id, col:E.col}); }); }); });
   return out;
 }
 /* the colour a tile visibly WEARS: circles/prisms and emitter dots count as their
@@ -1288,8 +1289,10 @@ function step(cell){
     }
     renderPaths(); return;
   }
-  // BRIDGE: a second line may cross an occupied bridge cell - perpendicular only
-  if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg") && indexIn(leg,cell[0],cell[1])<0){
+  // BRIDGE: cross an occupied bridge cell - perpendicular only. This includes crossing
+  // a DIFFERENT line, OR crossing your OWN line (self-overpass): every existing passage
+  // through the cell just has to be perpendicular to how you're entering now.
+  if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg")){
     var d0=[cell[0]-head[0], cell[1]-head[1]];
     var ps0=pathsAt(cell[0],cell[1]);
     var okX=ps0.length>0 && ps0.every(function(pp){
@@ -1694,21 +1697,23 @@ function renderPaths(){
   if(bridges.length){
     ctx.save();
     bridges.forEach(function(bc){
-      var through=legs.filter(function(L){ return indexIn(L.cells,bc[0],bc[1])>=0; });
-      if(through.length<2) return;                          // needs two lines sharing the tile
-      var over=through[through.length-1], oi=indexIn(over.cells,bc[0],bc[1]);
-      if(oi<=0 || oi>=over.cells.length-1) return;          // over-line must pass straight through
-      var dy=over.cells[oi+1][0]-over.cells[oi][0], dx=over.cells[oi+1][1]-over.cells[oi][1];  // over-line axis
+      // one entry per PASSAGE (in render order); a self-crossing line counts twice
+      var passes=[];
+      legs.forEach(function(L){ indicesIn(L.cells,bc[0],bc[1]).forEach(function(idx){ passes.push({L:L, idx:idx}); }); });
+      if(passes.length<2) return;                           // needs two passages sharing the tile
+      var over=passes[passes.length-1], oc=over.L.cells, oi=over.idx;   // last-drawn passage is on top
+      if(oi<=0 || oi>=oc.length-1) return;                  // the over passage must go straight through
+      var dy=oc[oi+1][0]-oc[oi][0], dx=oc[oi+1][1]-oc[oi][1];   // over-passage axis
       var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
       ctx.lineCap="butt";
       ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
       ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
-      ctx.save();                                           // repaint the over leg's colour, clipped to the deck
-      ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();
+      ctx.save();                                           // repaint ONLY the over passage (a 3-cell segment)
+      ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();   // so a self-crossing line's under-pass isn't repainted
       ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
-      paintLegColour(over);
+      paintLegColour({ cells: oc.slice(oi-1, oi+2), color: over.L.color, blend:null });
       ctx.restore();
     });
     ctx.restore();
