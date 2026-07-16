@@ -71,6 +71,11 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot.prism2{ border:none; background:transparent; box-shadow:none; }
 .dot.prism2.donept{ box-shadow:none; filter:drop-shadow(0 0 6px rgba(87,194,104,.9)) drop-shadow(0 0 2px #fff); border-radius:0; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
+.dot .gband{ position:absolute; inset:0; width:100%; height:100%; z-index:1; overflow:hidden; border-radius:inherit; opacity:.72; pointer-events:none; filter:blur(1.4px); }   /* blur softens the ribbon edges */
+.dot.donept .gband{ display:none; }   /* a delivered goal drops the "fill me" ribbon */
+@keyframes gbandDrift{ from{ transform:translate(0,0); } to{ transform:translate(120px,-120px); } }   /* one period = the copy spacing, so it loops seamlessly */
+.gbandmove{ animation:gbandDrift 5.5s linear infinite; will-change:transform; }
+@media (prefers-reduced-motion:reduce){ .gbandmove{ animation:none; } }
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
 @keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
 .dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
@@ -630,12 +635,12 @@ var undoStack=[], preGesture=null, UNDO_CAP=60;
 function snapState(){ return JSON.stringify({
   ems:ems.map(function(E){ return E.legs.map(function(l){ return {c:l.cells.map(function(x){return [x[0],x[1]];}), j:l.jun}; }); }),
   tg:tgts.map(function(t){ return t.done; }),
-  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun)}; })
+  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun), tr:J.triple?1:0}; })
 }); }
 function restoreState(str){ var s=JSON.parse(str);
   s.ems.forEach(function(legs,i){ if(ems[i]) ems[i].legs=legs.map(function(l){ return {cells:l.c.map(function(x){return [x[0],x[1]];}), jun:l.j}; }); });
   s.tg.forEach(function(d,i){ if(tgts[i]) tgts[i].done=d; });
-  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju)}; });
+  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju), triple:!!J.tr}; });
   drag=null; renderPaths(); updateUndoUI();
 }
 function pushUndo(){ if(preGesture!=null && preGesture!==snapState()){ undoStack.push(preGesture); if(undoStack.length>UNDO_CAP) undoStack.shift(); } preGesture=null; updateUndoUI(); }
@@ -798,6 +803,7 @@ function applyLevel(L){
   if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; }
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
+  shakeAmp=0; board.style.transform="";
   undoStack=[]; preGesture=null;
   ems=L.sq.map(function(s){ return {col:s[0], r:s[1], c:s[2], legs:[]}; });
   tgts=L.ci.map(function(t){ return {col:t[0], r:t[1], c:t[2], done:false}; });
@@ -941,6 +947,7 @@ function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
 function isWall(r,c){ return !!wallSet[r+","+c]; }
 function paintTarget(){ return N*N - walls.length; }
 function indexIn(list,r,c){ for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) return i; return -1; }
+function indicesIn(list,r,c){ var out=[]; for(var i=0;i<list.length;i++) if(list[i][0]===r&&list[i][1]===c) out.push(i); return out; }   // a line may cross a bridge cell twice (self-overpass)
 /* a circle of this colour that still needs feeding (prefer an undone one; else any) */
 function tgtFor(col){ var any=null; for(var i=0;i<tgts.length;i++) if(tgts[i].col===col){ if(!tgts[i].done) return tgts[i]; any=any||tgts[i]; } return any; }
 function tgtAt(r,c){ for(var i=0;i<tgts.length;i++) if(tgts[i].r===r && tgts[i].c===c) return tgts[i]; return null; }
@@ -955,6 +962,14 @@ function isIce(r,c){ return !!iceSet[r+","+c]; }
 function portTwin(r,c){ for(var i=0;i<portals.length;i++){ var p=portals[i];
   if(p[0]===r&&p[1]===c) return [p[2],p[3]];
   if(p[2]===r&&p[3]===c) return [p[0],p[1]]; } return null; }
+/* how far to keep when RETREATING a path to index `idx`. Normally idx+1 (idx stays the
+   head), but never leave the head on a portal ENTRANCE whose warp-twin we're cutting off
+   - that lets the line resume from the entrance and skip the teleport. Drop it too. */
+function retreatCut(cells, idx){
+  if(idx+1<cells.length){ var tw=portTwin(cells[idx][0],cells[idx][1]);
+    if(tw && same(cells[idx+1], tw)) return idx; }
+  return idx+1;
+}
 /* the pipe (junction blend or emitter ray) whose cells include (r,c) - {cells,idx} */
 function pathAt(r,c){
   for(var j=0;j<junctions.length;j++){ var jd=indexIn(junctions[j].leg,r,c); if(jd>=0) return {cells:junctions[j].leg, idx:jd}; }
@@ -984,10 +999,10 @@ function iceOK(){
 }
 function isBridge(r,c){ return !!bridgeSet[r+","+c]; }
 /* ALL pipes whose cells include (r,c) - a bridge cell can carry two */
-function pathsAt(r,c){
+function pathsAt(r,c){   // one entry PER passage - a self-overpass adds the same leg twice
   var out=[];
-  junctions.forEach(function(J){ var jd=indexIn(J.leg,r,c); if(jd>=0) out.push({cells:J.leg, idx:jd, col:J.sec}); });
-  ems.forEach(function(E){ E.legs.forEach(function(Lg){ var id=indexIn(Lg.cells,r,c); if(id>=0) out.push({cells:Lg.cells, idx:id, col:E.col}); }); });
+  junctions.forEach(function(J){ indicesIn(J.leg,r,c).forEach(function(jd){ out.push({cells:J.leg, idx:jd, col:J.sec}); }); });
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ indicesIn(Lg.cells,r,c).forEach(function(id){ out.push({cells:Lg.cells, idx:id, col:E.col}); }); }); });
   return out;
 }
 /* the colour a tile visibly WEARS: circles/prisms and emitter dots count as their
@@ -1118,7 +1133,10 @@ function reconcile(){
       var J=junctions[j], feeders=[];
       ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) feeders.push(Lg.cells); }); });
       junctions.forEach(function(K,ki){ if(ki!==j && K.jun===j) feeders.push(K.leg); });
-      var ok = feeders.length===2 && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
+      // normal junctions have exactly 2 feeders; a TRIPLE (three primaries -> brown at one
+      // point) has 3. Losing any feeder from a triple dissolves it (2 primaries aren't brown).
+      var need = J.triple ? 3 : 2;
+      var ok = feeders.length===need && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
       if(!ok){ dropJunction(j); stable=false; break; }
     }
   }
@@ -1200,7 +1218,7 @@ board.addEventListener("pointerdown", function(e){
     drag={t:"jun", i:ji};
   } else if(o.t==="jleg"){
     var ji2=dropChildOf(o.i);
-    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0,o.idx+1);
+    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0, retreatCut(J2.leg, o.idx));
     var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
     drag={t:"jun", i:ji2};
   } else if(o.t==="emdot"){
@@ -1226,13 +1244,13 @@ board.addEventListener("pointerdown", function(e){
       // to pull it back to that cell; the line it merged into is handed its blend
       // tail back and left whole. Grab-drag from here to redraw.
       separateFeeder(leg);
-      leg.cells=leg.cells.slice(0, o.idx+1);
+      leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
       drag={t:"em", e:o.e, l:o.l};
       reconcileAndFixDrag();
     } else if(isHead){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
     else {
       // tap partway along your own line -> retreat it to the tapped cell (then drag to redraw)
-      leg.cells=leg.cells.slice(0, o.idx+1);
+      leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
       drag={t:"em", e:o.e, l:o.l};
       reconcileAndFixDrag();
     }
@@ -1288,8 +1306,10 @@ function step(cell){
     }
     renderPaths(); return;
   }
-  // BRIDGE: a second line may cross an occupied bridge cell - perpendicular only
-  if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg") && indexIn(leg,cell[0],cell[1])<0){
+  // BRIDGE: cross an occupied bridge cell - perpendicular only. This includes crossing
+  // a DIFFERENT line, OR crossing your OWN line (self-overpass): every existing passage
+  // through the cell just has to be perpendicular to how you're entering now.
+  if(isBridge(cell[0],cell[1]) && (o.t==="em"||o.t==="jleg")){
     var d0=[cell[0]-head[0], cell[1]-head[1]];
     var ps0=pathsAt(cell[0],cell[1]);
     var okX=ps0.length>0 && ps0.every(function(pp){
@@ -1406,6 +1426,21 @@ function step(cell){
     }
     rejectMix(cell); return;
   }
+  // TRIPLE MIX: a primary reaches the CELL of a 2-primary secondary junction -> all three
+  // colours meet at one point and make brown (instead of the two-step chain).
+  if(drag.t==="em" && o.t==="jun"){
+    var TJ=junctions[o.i], myL3=ems[drag.e].legs[drag.l];
+    var canTriple = TJ && !TJ.triple && (TJ.jun==null||TJ.jun<0) && "OGP".indexOf(TJ.sec)>=0;
+    var ns3 = canTriple ? mixOf(TJ.sec, ems[drag.e].col) : null;
+    if(ns3==="N" && myL3.jun<0 && tgtFor("N") && !tgtFor("N").done
+       && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
+      myL3.cells.push(cell);
+      myL3.jun=o.i; TJ.sec="N"; TJ.triple=true;    // the junction now takes THREE feeders
+      addBloom(cell[0],cell[1], HEX.N, 660); drawSteps=0; sfxJun(); hap("medium"); discover("N",cell[0],cell[1]);
+      drag=null; reconcileAndFixDrag(); recomputeTargets(); renderPaths(); checkWin(); return;
+    }
+    // not a valid triple -> leave the junction as it was (no-op, like before)
+  }
   // DIRECT delivery: a primary line reaches a same-colour circle (no mixing)
   if(drag.t==="em" && o.t==="tgt"){
     var TD=tgts[o.i], mine=ems[drag.e].legs[drag.l];
@@ -1516,7 +1551,21 @@ function renderDots(){
   function dot(col,r,c,shape,star){
     var sz=s*0.84, off=(s-sz)/2;
     var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
-    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
+    // goal squares carry a soft 45° ribbon (two close parallel edges, tone-on-tone) that slowly
+    // drifts across the tile so an unfilled goal reads as "fill me"; hidden once delivered (.donept).
+    // Three copies spaced one drift-period apart make the diagonal flow seamless as it loops.
+    var band="";
+    if(shape==="sq"){
+      var gg=9, cp="";   // gg = half the gap between the two edges (small = close together)
+      [-120,0,120].forEach(function(o){
+        cp+='<g transform="translate('+o+','+(-o)+')">'
+          +'<line x1="-80" y1="'+(-80-gg)+'" x2="180" y2="'+(180-gg)+'"/>'
+          +'<line x1="-80" y1="'+(-80+gg)+'" x2="180" y2="'+(180+gg)+'"/></g>';
+      });
+      band='<svg class="gband" viewBox="0 0 100 100" preserveAspectRatio="none">'
+        +'<g class="gbandmove" fill="none" stroke="'+lighten(HEX[col],0.5)+'" stroke-width="6" stroke-linecap="round">'+cp+'</g></svg>';
+    }
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+band+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
   ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
   tgts.forEach(function(T){
@@ -1555,6 +1604,8 @@ function discover(col,r,c){
   if(nativeBridge() && nativeBridge().haptic) try{ nativeBridge().haptic("success"); }catch(e){}
 }
 var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
+var shakeAmp=0, shakeDur=0, shakeT0=0;   // board-shake juice: a decaying jitter on the whole board
+function shake(amp, dur){ shakeAmp=amp; shakeDur=dur||300; shakeT0=nowMs(); }
 var drawSteps=0;
 /* native haptics (no-op on web / if the plugin isn't present): a light tick per drawn
    cell, a medium thump on a colour mix, success on win, error on an illegal move. */
@@ -1568,6 +1619,7 @@ function rejectMix(cell){
   lastReject={key:key, t:now};
   hap("error");
   rejects.push({r:cell[0], c:cell[1], t0:now});
+  shake(Math.min(cs()*0.03, 3.5), 170);   // a tiny "no" nudge
   try{ if(navigator.vibrate) navigator.vibrate(60); }catch(_e){}
   try{ voice(180,0.16,{type:"triangle", to:120, gl:0.12, lp:900, g:0.05, atk:0.004}); }catch(_e){}  // a soft "nope" thud
   renderPaths();
@@ -1588,6 +1640,7 @@ function playWinCascade(){
   legList.forEach(function(cells,i){ addSweep(cells,"#fff", i*100, 560); });
   dotL.querySelectorAll(".dot.sq").forEach(function(d){ d.classList.add("winspin"); });   // the ✦ objectives (now squares) do the victory spin
   spawnConfetti();
+  shake(Math.min(cs()*0.09, 11), 360);   // a satisfying settle-shake on the win (px-capped so big cells don't over-shake)
 }
 
 /* pipes are drawn on a canvas as metaball chains: at each cell a CIRCLE whose diameter is the pipe
@@ -1694,21 +1747,23 @@ function renderPaths(){
   if(bridges.length){
     ctx.save();
     bridges.forEach(function(bc){
-      var through=legs.filter(function(L){ return indexIn(L.cells,bc[0],bc[1])>=0; });
-      if(through.length<2) return;                          // needs two lines sharing the tile
-      var over=through[through.length-1], oi=indexIn(over.cells,bc[0],bc[1]);
-      if(oi<=0 || oi>=over.cells.length-1) return;          // over-line must pass straight through
-      var dy=over.cells[oi+1][0]-over.cells[oi][0], dx=over.cells[oi+1][1]-over.cells[oi][1];  // over-line axis
+      // one entry per PASSAGE (in render order); a self-crossing line counts twice
+      var passes=[];
+      legs.forEach(function(L){ indicesIn(L.cells,bc[0],bc[1]).forEach(function(idx){ passes.push({L:L, idx:idx}); }); });
+      if(passes.length<2) return;                           // needs two passages sharing the tile
+      var over=passes[passes.length-1], oc=over.L.cells, oi=over.idx;   // last-drawn passage is on top
+      if(oi<=0 || oi>=oc.length-1) return;                  // the over passage must go straight through
+      var dy=oc[oi+1][0]-oc[oi][0], dx=oc[oi+1][1]-oc[oi][1];   // over-passage axis
       var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
       ctx.lineCap="butt";
       ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
       ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
-      ctx.save();                                           // repaint the over leg's colour, clipped to the deck
-      ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();
+      ctx.save();                                           // repaint ONLY the over passage (a 3-cell segment)
+      ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();   // so a self-crossing line's under-pass isn't repainted
       ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=pipeW;
-      paintLegColour(over);
+      paintLegColour({ cells: oc.slice(oi-1, oi+2), color: over.L.color, blend:null });
       ctx.restore();
     });
     ctx.restore();
@@ -1862,7 +1917,12 @@ function renderPaths(){
       ctx.save(); ctx.lineJoin="round";
       ctx.lineWidth=s*0.105; ctx.strokeStyle=INK; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();   // dark backing
       ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
-      if(ok){ ctx.globalAlpha=0.3+0.4*gp; ctx.lineWidth=s*0.06; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke(); }
+      if(ok){   // satisfied: a steady second (outer) ring - the same "locked in" double ring as number clues
+        var ggap=s*0.05, ow=gs+ggap*2, orr=rr+ggap;
+        ctx.lineWidth=s*0.032; ctx.globalAlpha=0.92;
+        roundRect(ctx, cx-ow/2, cy-ow/2, ow, ow, orr); ctx.stroke();
+        ctx.globalAlpha=1;
+      }
       if(G.dir){   // arrow gate: a double chevron » shows the demanded crossing direction
         var v=DIRV[G.dir], ang=Math.atan2(v[0],v[1]);
         ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang); ctx.scale(pop,pop);
@@ -1931,7 +1991,12 @@ function renderPaths(){
 }
 window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 /* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti */
-function frame(){ animT=nowMs()-animStart; renderPaths(); requestAnimationFrame(frame); }
+function frame(){ animT=nowMs()-animStart; renderPaths();
+  if(shakeAmp>0){ var st=nowMs()-shakeT0, e=st/shakeDur;
+    if(e>=1){ shakeAmp=0; board.style.transform=""; }
+    else { var k=(1-e)*(1-e), dx=Math.sin(st*0.061)*shakeAmp*k, dy=Math.cos(st*0.049)*shakeAmp*k; board.style.transform="translate("+dx.toFixed(2)+"px,"+dy.toFixed(2)+"px)"; }
+  }
+  requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 
 /* ---------- mechanic tutorials: a pop-up card the first time a mechanic
