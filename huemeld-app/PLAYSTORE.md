@@ -90,6 +90,6 @@ Because AdMob uses the advertising ID:
 - [ ] Upload to the **Production** track, roll out. First reviews are usually hours–days.
 
 ## Notes / known gaps
-- **Cross-reinstall save**: iOS mirrors progress to iCloud (the CloudKV plugin). Android has no equivalent wired — progress persists through app updates but a **delete + reinstall loses it** unless you add a backup (Android Auto Backup is enabled via `allowBackup="true"`, but WebView localStorage isn't reliably included). Fine for v1; tell me if you want Play Games Saved Games or a Drive backup added.
+- **Cross-reinstall save**: the save mirror now writes to **@capacitor/preferences** (native SharedPreferences) on Android, in addition to iCloud on iOS. Every `hm_flow2_*` key is captured (progress, settings, language, rewarded-unlocks). Because `allowBackup="true"` and Preferences use SharedPreferences, **Android Auto Backup includes them**, so a delete+reinstall restores — *provided the device has Google backup on* (Settings → Google → Backup) and a backup has run. It also survives app updates. (Play Games Saved Games is a heavier alternative if you ever want cloud saves that don't depend on Auto Backup.)
 - **ATT** is iOS-only; on Android there's no tracking prompt. For EEA/UK users you may later add a **UMP consent form** (GDPR) via the AdMob plugin — not required to launch elsewhere.
 - **Icons/splash**: Android currently uses the default Capacitor launcher icon. Generate a proper Android icon set (`@capacitor/assets` or Android Studio's Image Asset tool) before release.

@@ -147,39 +147,55 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     },
   };
 
-  /* ---- save mirror: localStorage -> iCloud key-value store (CloudKV plugin).
-     Deleting + reinstalling the app wipes the webview's localStorage; the
-     mirror restores it on first boot (same iCloud account). ---- */
-  var CloudKV = P.CloudKV;
-  var SAVE_KEYS = ["hm_flow2_done","hm_flow2_packdone","hm_flow2_daily","hm_flow2_solves","hm_flow2_i",
-    "hm_flow2_seen","hm_flow2_mech","hm_flow2_forktip","hm_flow2_addue",
-    "hm_flow2_ent_full","hm_flow2_ent_noads","hm_flow2_noads",
-    "hm_flow2_theme","hm_flow2_sound","hm_flow2_cb"];
+  /* ---- save mirror: localStorage -> durable native storage, restored on a fresh
+     install (deleting/reinstalling wipes the webview's localStorage). Two durable
+     stores are written, best-effort:
+       • CloudKV  (iCloud NSUbiquitousKeyValueStore, iOS) - cross-device + reinstall
+       • Preferences (@capacitor/preferences: UserDefaults / SharedPreferences) -
+         survives app UPDATES on both platforms, and Android reinstall via Auto Backup
+     EVERY hm_flow2_* key is captured (dynamic), so settings, language and the
+     rewarded-unlock progress (hm_flow2_adunlock_*) all come back too. ---- */
+  var CloudKV = P.CloudKV, Prefs = P.Preferences;
+  var SAVE_PREFIX = "hm_flow2_", SAVE_KEY = "hmsave";
   var lastPushed = "";
   // snapshot NOW: native.js runs before the game script, which writes
   // hm_flow2_seen at boot and would otherwise mask a fresh install
   var freshInstall = !(localStorage.getItem("hm_flow2_done") || localStorage.getItem("hm_flow2_solves") || localStorage.getItem("hm_flow2_seen"));
   function collectSave() {
     var o = {};
-    SAVE_KEYS.forEach(function (k) { var v = localStorage.getItem(k); if (v != null) o[k] = v; });
+    for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(SAVE_PREFIX) === 0) o[k] = localStorage.getItem(k); }
     return JSON.stringify(o);
   }
+  function durableSet(value) {   // write to every available durable store
+    if (CloudKV) CloudKV.set({ key: SAVE_KEY, value: value }).catch(function () {});
+    if (Prefs) Prefs.set({ key: SAVE_KEY, value: value }).catch(function () {});
+  }
+  function durableGet() {        // read the freshest available (iCloud preferred), Promise<string|null>
+    return new Promise(function (resolve) {
+      function fromPrefs(seed) {
+        if (!Prefs) { resolve(seed); return; }
+        Prefs.get({ key: SAVE_KEY }).then(function (r) { resolve(seed || (r && r.value) || null); }).catch(function () { resolve(seed); });
+      }
+      if (CloudKV) CloudKV.get({ key: SAVE_KEY }).then(function (r) { fromPrefs((r && r.value) || null); }).catch(function () { fromPrefs(null); });
+      else fromPrefs(null);
+    });
+  }
   function pushSave() {
-    if (!CloudKV) return;
+    if (!CloudKV && !Prefs) return;
     var save = collectSave();
     if (save === lastPushed || save === "{}") return;   // nothing new / nothing at all
     lastPushed = save;
-    CloudKV.set({ key: "hmsave", value: save }).catch(function () { lastPushed = ""; });
+    durableSet(save);
   }
   function restoreSave() {
-    if (!CloudKV) return;
+    if (!CloudKV && !Prefs) return;
     // only a FRESH install restores (no progress before this page loaded); one reload applies it
     if (!freshInstall || sessionStorage.getItem("hm_restored")) return;
-    CloudKV.get({ key: "hmsave" }).then(function (res) {
-      var v = res && res.value;
+    durableGet().then(function (v) {
       if (!v) return;
-      var o = JSON.parse(v), n = 0;
-      SAVE_KEYS.forEach(function (k) { if (o[k] != null) { localStorage.setItem(k, o[k]); n++; } });
+      var o; try { o = JSON.parse(v); } catch (e) { return; }
+      var n = 0;
+      Object.keys(o).forEach(function (k) { if (k.indexOf(SAVE_PREFIX) === 0 && o[k] != null) { localStorage.setItem(k, o[k]); n++; } });
       if (n) { sessionStorage.setItem("hm_restored", "1"); location.reload(); }
     }).catch(function () {});
   }
