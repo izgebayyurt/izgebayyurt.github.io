@@ -5,23 +5,33 @@
    ┌─────────────────────────────────────────────────────────────────────┐
    │ FILL THESE IN before shipping (see ../APPSTORE.md, steps 2–4):      │
    └─────────────────────────────────────────────────────────────────────┘ */
+// ---- iOS ----
 var RC_IOS_API_KEY = "appl_EORtDZXyCAbQuULpxKCowUMwcGG";       // RevenueCat public Apple API key (production)
-var IOS_INTERSTITIAL_ID = "ca-app-pub-1320023287922220/7689139513"; // AdMob → your interstitial ad unit
-var IOS_REWARDED_ID = "ca-app-pub-1320023287922220/1175702057";    // AdMob → your rewarded ad unit (hint videos)
-var ADMOB_TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/4411468910"; // Google's official iOS test id
-var ADMOB_TEST_REWARDED = "ca-app-pub-3940256099942544/1712485313";     // Google's official iOS rewarded test id
+var IOS_INTERSTITIAL_ID = "ca-app-pub-1320023287922220/7689139513"; // AdMob → iOS interstitial ad unit
+var IOS_REWARDED_ID = "ca-app-pub-1320023287922220/1175702057";    // AdMob → iOS rewarded ad unit (hint videos)
+// ---- Android (fill these in before the Play Store release — see PLAYSTORE.md) ----
+var RC_ANDROID_API_KEY = "goog_XXXXXXXXXXXXXXXXXXXXXXXXXX";     // RevenueCat public Google API key
+var ANDROID_INTERSTITIAL_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN"; // AdMob → Android interstitial ad unit
+var ANDROID_REWARDED_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/NNNNNNNNNN";     // AdMob → Android rewarded ad unit
+// ---- Google's official test ad units (per platform) ----
+var IOS_TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/4411468910",  IOS_TEST_REWARDED = "ca-app-pub-3940256099942544/1712485313";
+var AND_TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/1033173712",  AND_TEST_REWARDED = "ca-app-pub-3940256099942544/5224354917";
 var USE_TEST_ADS = false;                                       // RELEASE: real ad units
-var PRODUCT_NOADS = "huemeld_no_ads";                          // $2.99 non-consumable (App Store product ID)
-var PRODUCT_FULL = "huemeld_pro";                              // $4.99 non-consumable (App Store product ID)
+// products + entitlements are shared across stores (name the Google Play products the
+// same as the App Store ones and attach both to these RevenueCat entitlements)
+var PRODUCT_NOADS = "huemeld_no_ads";                          // non-consumable / one-time product ID
+var PRODUCT_FULL = "huemeld_pro";                              // non-consumable / one-time product ID
 var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat entitlement ids
 
 (function () {
   var cap = window.Capacitor;
   if (!cap || !cap.isNativePlatform || !cap.isNativePlatform()) return;   // web build: no bridge
+  var isAndroid = cap.getPlatform && cap.getPlatform() === "android";
+  var RC_API_KEY = isAndroid ? RC_ANDROID_API_KEY : RC_IOS_API_KEY;
   var P = cap.Plugins || {};
   var AdMob = P.AdMob, Purchases = P.Purchases, Haptics = P.Haptics;
-  var adUnit = USE_TEST_ADS ? ADMOB_TEST_INTERSTITIAL : IOS_INTERSTITIAL_ID;
-  var rewardUnit = USE_TEST_ADS ? ADMOB_TEST_REWARDED : IOS_REWARDED_ID;
+  var adUnit = USE_TEST_ADS ? (isAndroid ? AND_TEST_INTERSTITIAL : IOS_TEST_INTERSTITIAL) : (isAndroid ? ANDROID_INTERSTITIAL_ID : IOS_INTERSTITIAL_ID);
+  var rewardUnit = USE_TEST_ADS ? (isAndroid ? AND_TEST_REWARDED : IOS_TEST_REWARDED) : (isAndroid ? ANDROID_REWARDED_ID : IOS_REWARDED_ID);
   var adReady = false, attAsked = false, attInFlight = false;
   var rewardReady = false, rewardGot = false, rewardCb = null, rewardWired = false;
 
@@ -76,21 +86,28 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
 
   function buy(productId, entKey, cb) {
     if (!Purchases) { cb(false); return; }
-    // purchaseStoreProduct needs a REAL StoreProduct from the store — a synthesized
-    // {identifier} is rejected and no purchase sheet ever appears. Fetch it first,
-    // then purchase that object. If the product can't be fetched (not configured in
-    // App Store Connect, not yet "Ready to Submit", or no sandbox account signed in),
-    // getProducts returns an empty list -> report failure instead of hanging.
+    // Always report the TRUE entitlement state read back from RevenueCat after the
+    // attempt — the source of truth. This handles every case correctly:
+    //   • fresh purchase      -> entitlement now active  -> unlock
+    //   • already-owned IAP   -> StoreKit completes without a new transaction, or
+    //                            purchaseStoreProduct rejects "already purchased";
+    //                            getCustomerInfo still shows it owned -> unlock
+    //   • user cancelled      -> no entitlement -> false
+    // It also pushes entitlements so the UI updates even if the callback is missed.
+    function reconcile() {
+      Purchases.getCustomerInfo()
+        .then(function (res) { var e = entsOf(res); pushEnts(e); cb(entKey === "full" ? e.full : e.noads); })
+        .catch(function () { cb(false); });
+    }
+    // purchaseStoreProduct needs a REAL StoreProduct from the store (a synthesized
+    // {identifier} is rejected). Fetch it first, then purchase that object.
     Purchases.getProducts({ productIdentifiers: [productId] })
       .then(function (res) {
         var product = res && res.products && res.products[0];
-        if (!product) { cb(false); return; }               // product unavailable
-        return Purchases.purchaseStoreProduct({ product: product }).then(function (pr) {
-          var e = entsOf(pr);
-          cb(entKey === "full" ? e.full : e.noads);
-        });
+        if (!product) { reconcile(); return; }               // fetch odd? still check existing entitlements
+        return Purchases.purchaseStoreProduct({ product: product }).then(reconcile, reconcile);
       })
-      .catch(function () { cb(false); });                  // user cancelled or purchase failed
+      .catch(reconcile);
   }
 
   window.HuemeldNative = {
@@ -181,10 +198,23 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
       wireReward(); prepareAd(); prepareReward();
     }).catch(function () {});
     if (Purchases) {
-      Purchases.configure({ apiKey: RC_IOS_API_KEY })
+      // any entitlement change (purchase, restore, renewal, cross-device sync) pushes
+      // to the game immediately — so the UI unlocks even if a buy() callback is missed.
+      try {
+        Purchases.addCustomerInfoUpdateListener(function (info) {
+          pushEnts(entsOf({ customerInfo: info && info.customerInfo ? info.customerInfo : info }));
+        });
+      } catch (e) {}
+      Purchases.configure({ apiKey: RC_API_KEY })
         .then(function () { return Purchases.getCustomerInfo(); })
         .then(function (res) { pushEnts(entsOf(res)); })
         .then(pushSave)
+        .then(function () {   // show the store's LOCALIZED price on the buy buttons (e.g. "₺49,99")
+          return Purchases.getProducts({ productIdentifiers: [PRODUCT_FULL] }).then(function (res) {
+            var pr = res && res.products && res.products[0];
+            if (pr && pr.priceString && window.__applyPrices) window.__applyPrices({ full: pr.priceString });
+          });
+        })
         .catch(function () {});
     }
   });

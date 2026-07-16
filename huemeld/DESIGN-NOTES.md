@@ -285,3 +285,314 @@ Two things made this loop fast and low‑friction:
 *This document is intentionally engine‑ and process‑oriented rather than a
 feature list. The specific bugs will differ next time; the shape of the
 solutions probably won't.*
+
+---
+---
+
+# Part II — Addenda from Glass Fold
+
+Written after shipping **Glass Fold**, a coloured‑glass folding puzzle (React +
+TypeScript + Vite, Capacitor to iOS/Android, ~589 generated campaign levels,
+ads + IAP monetization, Firebase community levels). Glass Fold *confirmed*
+nearly everything in Part I — it had its own `window.__game` harness (§5), its
+own one‑knob juice loop (§8), its own additive mechanic flags (§3). What
+follows is only what was **new**: the lessons Huemeld couldn't teach because it
+never had real money paths, a second storage backend, or an App Store reviewer
+saying no.
+
+---
+
+## 11. Persistence has two axes: where it lives, and *when it loads*
+
+Part I said "enumerate saved keys by prefix" (§9). Glass Fold found the
+much nastier cousin of that bug, twice:
+
+- **The hydrate whitelist.** Native storage was Capacitor Preferences (async)
+  mirrored into a sync in‑memory cache, filled once at boot by
+  `hydrate([...4 keys])`. Every key *not* on that list — all campaign progress,
+  the 2000‑coin Fold Buffer, the $2.99 Coin Doubler, every purchased theme —
+  read as `null` after a cold launch. Worse: the next read‑modify‑write
+  (`unlockBoost` reads the empty set, appends, writes back) **permanently
+  erased the real data on disk**. And it was invisible in every dev session,
+  because writes populate the cache — only a force‑quit + relaunch shows it.
+- **The half‑migration.** `progress.ts` still wrote raw WKWebView localStorage
+  while the coin wallet lived in Preferences. Two stores die independently: iOS
+  evicts localStorage under pressure → stars and the star‑coin payout *ledger*
+  vanish while the wallet survives → replaying levels re‑pays every coin.
+  Asymmetric survival of related state is its own bug class.
+
+> **Principle.** One storage service; every module goes through it. Load
+> **everything** at boot by enumerating the backend (`Preferences.keys()`),
+> never a whitelist — per‑level flags are dynamic and a list will always drift.
+> Treat *force‑quit + relaunch* and *delete + reinstall* as first‑class test
+> cases; a single session proves nothing about persistence. And distrust every
+> read‑modify‑write over a cached view: if the read can be wrong, the write is
+> destruction.
+
+---
+
+## 12. Boot is a protocol: permission prompts, SDK order, and the true first launch
+
+Apple rejected the build (Guideline 2.1) because the ATT prompt "did not
+appear." It genuinely didn't — twice, for two different reasons:
+
+1. **Lazy gating.** ATT fired on *first ad use*; interstitials had a 20‑level
+   grace period and rewarded ads are opt‑in — so a short review session never
+   triggered it at all. OS permission prompts must fire **unconditionally at
+   cold launch**, in the platform's required order (UMP consent → ATT → ad SDK
+   init), never behind gameplay gates.
+2. **Chained inits.** The fix then failed *on the first launch only*:
+   `IAP.init().then(() => Ads.init()).catch(...)` meant a slow first‑launch
+   RevenueCat handshake (real network calls, nothing cached yet) fell into the
+   shared catch and silently skipped `Ads.init()` — which is what fires ATT.
+   Second launch had warm caches and worked. Unrelated SDKs must init
+   **independently**, each with its own catch; and every *network* call on the
+   boot path gets a timeout (user‑paced modals never do — you'd be racing a
+   human's decision).
+
+> **Principle.** The first launch is a different code path from every launch
+> after it: cold caches, unenabled APIs, empty keychains. Test it explicitly —
+> fresh install, airplane‑mode variant, slow‑network variant — because that is
+> exactly the launch the reviewer performs.
+
+---
+
+## 13. Money paths: assume the network dies and the player double‑taps
+
+An adversarial audit of the monetization code found a bug in nearly every
+money path, all the same shape — trusting the happy path:
+
+- Rewarded ads **granted the reward on every failure path** ("don't punish the
+  player") → airplane mode farmed unlimited rewards. Grant only on the
+  positive `Rewarded` event; every failure resolves "no".
+- Hint **charged 50 coins before running the solver**; on an unsolvable board
+  the player paid and got nothing. Compute the good *first*, charge only when
+  it exists.
+- Coin packs are consumables: a crash between the App Store charge and
+  `addCoins()` lost the purchase forever (consumables are invisible to
+  Restore). Fix: a **delivered‑transaction ledger reconciled against the
+  store's transaction history on every launch** — scoped to this install, or
+  reinstalls farm the replay.
+- A truthy placeholder (`'goog_REPLACE_ME'`) defeated the "no key → purchases
+  disabled" safety. Safety checks must fail on placeholders, not just absence.
+- The Coin Doubler's copy said "every coin you earn, doubled" but ad‑reward
+  coins skipped the multiplier. **Store copy is a contract** — route every
+  grant through the same path the copy describes.
+
+> **Principle.** For each money path ask exactly two questions: *what happens
+> if the network fails right here?* and *what happens if the player taps twice,
+> fast?* Then make the answer boring: positive‑confirmation grants, an
+> in‑flight guard on every rewarded button, idempotent ledgers.
+
+---
+
+## 14. Bound every search the UI can trigger
+
+Glass Fold's hint solver (`solveShortest`) had a node guard but no depth
+bound. Folds spread panes across an unbounded plane, so an **unsolvable**
+position has an effectively infinite reachable space: measured 35 s and 580 MB
+on a four‑pane board — a certain freeze and a likely jetsam kill, synchronously
+inside a React reducer. The cruel part: players tap Hint precisely when stuck,
+i.e. when the position is most likely unsolvable. **The worst case was the
+common case.**
+
+The fix was three layers, each cheap:
+
+1. an O(cells) **impossibility proof** first (colour parity: with no
+   transmuting mechanics on board, fuses remove panes in same‑colour pairs, so
+   any odd count is unsolvable) — answers the common case in 0 ms;
+2. a depth bound (no real hint needs >14 folds);
+3. a node guard **calibrated from shipped content** — the level generator had
+   validated every campaign level within ~2,500 explored states, so a 20,000
+   guard is provably generous (hardest par‑7 level: 182 ms) while capping the
+   residual unsolvable case at ~2 s.
+
+> **Principle.** Any search a tap can trigger needs: a cheap impossibility
+> shortcut, a depth bound justified by design ("no useful answer is deeper than
+> X"), and a state guard calibrated against your own shipped content — you
+> already know how big real solutions are, because you generated them.
+
+---
+
+## 15. Generated content wants an independent re‑validator (and a fast pipeline)
+
+Glass Fold's engine exists twice: the runtime TypeScript and the level
+generator's copy. When the portal semantics changed (teleport only into an
+*empty* gate), both had to change — and the independent validator
+(`validate.mjs`, which **re‑solves every shipped level with the real rules**)
+caught what nothing else would have: 7 levels whose stored par silently
+changed. Rules drift; a validator that replays all content turns drift into a
+list of line numbers. This is Part I §5's oracle principle with a twist: the
+oracle must re‑run after *rule* changes, not just content changes.
+
+The pipeline itself also produced the project's most expensive mistake: a
+**6.5‑hour generation run**. Root causes, in order of importance: board sizes
+too large (generation cost is superlinear in cell count — each candidate runs
+multiple solves), solver guards set for correctness rather than throughput, no
+per‑stage timing logs (so the slow pool was discovered hours in), and an
+orphaned process from a killed run still eating a core. After capping boards to
+7–8 cells and adding per‑pool timings, the same pipeline ran in ~1 hour.
+
+> **Principle.** Instrument per‑stage timings in any content pipeline from day
+> one. When a stage is slow, shrink the *input* (board size) before tuning the
+> *search* (guards) — the former is superlinear leverage. And `ps aux` before
+> blaming the code: zombie processes from killed runs are real.
+
+---
+
+## 16. The device is the truth: a standing boundary‑condition matrix
+
+Every one of these shipped past web testing and typechecking, and every one is
+an iOS‑device‑only failure:
+
+- `ctx.filter = 'blur(...)'` is a **silent no‑op** on iOS ≤ 17 canvas — five
+  themes rendered hard‑edged raw polygons. Detect with a *pixel probe* (draw,
+  read back), never a property check: the property exists, it just does
+  nothing. Fallback: quarter‑resolution offscreen layer, bilinear upscale.
+- WebKit parks the AudioContext in a non‑standard `'interrupted'` state after
+  a full‑screen ad or phone call. Code that only resumes from `'suspended'`
+  (the only state TypeScript knows about) goes **silent forever**. Recover
+  from any non‑running state; recreate when closed.
+- `yesterday = now - 86,400,000 ms` breaks streaks on the DST fall‑back day.
+  Calendar math uses calendar arithmetic (`setDate(getDate() - 1)`).
+- Daily claims hooked only to a React screen transition never fire for players
+  who resume the suspended app. Hook `visibilitychange`/app‑resume too, and
+  make the claim idempotent per day.
+- Fonts loaded from Google's CDN at runtime = broken typography offline and a
+  network dependency in a native app. Self‑host (`@fontsource`, static
+  packages so family names match your CSS exactly).
+- Canvas `shadowBlur` per particle per frame is the single most expensive
+  thing you can do casually. Pre‑render glow sprites once; stamp them.
+
+> **Principle.** Keep a standing test matrix and run it before every
+> submission: **fresh install · force‑quit + relaunch · offline · oldest
+> supported OS · DST boundary · resume from background · during/after an ad**.
+> None of these appear in a dev-server session; all of them appear in week one
+> of real players.
+
+---
+
+## 17. Overlays over live gameplay: hide, never unmount
+
+Opening the Store mid‑level (the out‑of‑folds "Get coins" flow!) swapped
+screens and unmounted the game — so buying a continue returned the player to a
+**reset board**. The purchase flow's entire premise destroyed the thing being
+purchased for. Keep the game mounted and hidden (`display:none`) under any
+overlay; React state lives in the component you just unmounted.
+
+Notably: play‑testing never caught this, because developers navigate fast and
+never buy. The audit caught it by reading the unmount. Money flows deserve
+walkthroughs *as a paying stranger*, slowly.
+
+---
+
+## 18. UGC is hostile input, and moderation needs memory
+
+Community levels arrive as share codes — attacker‑controlled strings:
+
+- The decoder accepted truncated tokens (NaN cells → silently unwinnable
+  boards), colours with no palette entry (invisible panes), and had **no grid
+  size cap** — a crafted `?lvl=` link froze the app at boot. Strict validation
+  with hard caps (400 chars, 32×32), throwing into the existing catch.
+- Firestore rules validated some fields but not `par` or `createdAt`, letting a
+  client pin itself atop date‑sorted feeds; fixed with full field validation +
+  `keys().hasOnly([...])` + `createdAt == request.time`.
+- The subtlest one: the Cloud Function hid profane titles by setting
+  `hidden: true` — and the vote/report **recount recomputed `hidden` from
+  counters alone**, quietly re‑publishing slurs on the next upvote. Moderation
+  state must record *why* (`profane: true`), or any later recomputation undoes
+  it.
+
+> **Principle.** Parse, validate, cap — then trust. And any automated
+> moderation decision must persist its **reason**, because some other process
+> will eventually recompute the field it wrote.
+
+---
+
+## 19. Audit adversarially before the store does
+
+The single highest‑leverage pre‑submission act was a structured audit:
+independent reviewers per subsystem, each finding required to cite file, line,
+and a **concrete traced failure scenario** — then a separate adversarial pass
+per finding whose default verdict was *refuted*. Results: 51 findings → 46
+confirmed, 4 refuted, 1 launch‑blocking (the §11 persistence wipe), 8 high
+(most of §13). Every confirmed finding came with the failure trace already
+written, which made fixing mechanical.
+
+Two framing rules made it work: findings without a reproducible scenario are
+noise and get dropped; and verification must be *hostile* (trying to disprove),
+or the audit just launders guesses into a to‑do list.
+
+Separately: **treat the App Store review guidelines as a test suite** and run
+it yourself first — orientation lock actually locked, ATT prompt on a fresh
+install (record the video before they ask), one *distinct* promotional image
+per promoted IAP (they reject duplicates — Guideline 2.3.2), privacy labels
+matching actual SDK behavior. A review cycle costs days; the self‑run costs an
+hour.
+
+---
+
+## 20. Taste at scale: audition rigs and data‑driven flair
+
+Part I §8 said "ship, react, tune, one knob per effect." Glass Fold pushed it
+further in two useful ways:
+
+- **Audition rigs.** For sound design, instead of shipping one attempt and
+  reacting, build a throwaway interactive page with 4–5 live variants per
+  effect (Web Audio synthesis, one button each) and let the taste‑owner *pick
+  and mix* ("reverse swell, longer build", "mix #3 with more sparkle"). Every
+  SFX in the game came out of maybe six rounds of this. Picking between live
+  options is an order of magnitude faster than describing changes to a single
+  version.
+- **Flair as data.** Every theme's entire ambient personality — particle
+  shapes, counts, palettes, signature motion, win burst — lives in one typed
+  config object (`FLAIR`), and the renderer interprets it. "Sakura petals
+  should bank on gusts" or "aurora is too bright" become data edits with tiny
+  interpreter additions, ten themes stay visually distinct without ten
+  renderers, and the whole look of the game is reviewable in one file.
+
+---
+
+## 21. One repo, one remote, from day one
+
+Glass Fold started as a folder inside an unrelated research monorepo. By the
+end there were two working copies (the split‑out repo and the stale nested
+one), an Xcode project that could open from either, and a "which folder are you
+working on?" / "I don't see the changes in git" conversation that cost real
+time — the standalone repo had **no remote at all** for its first two weeks of
+commits. The split itself was painless (`git subtree split` preserved all 246
+commits); the delay in doing it was the only cost.
+
+> **Principle.** The moment a prototype becomes a product: its own repo, its
+> own remote, pushed the same day. Two working copies of a codebase is one too
+> many, and a repo without a remote is a single hardware failure away from not
+> existing.
+
+---
+
+## 22. Checklist additions (continuing §10)
+
+13. **One storage service, hydrate by enumeration, never a whitelist.** Test
+    force‑quit + relaunch and delete + reinstall; distrust read‑modify‑write
+    over cached state.
+14. **Permission prompts fire unconditionally at cold launch,** in platform
+    order; SDKs init independently; timeout boot network calls; test the true
+    first launch (fresh install, cold caches, airplane variant).
+15. **Money paths:** grant only on positive confirmation, compute before
+    charging, ledger consumables per install, in‑flight guards on every
+    rewarded button, placeholder‑proof safety checks, copy = contract.
+16. **Bound every UI‑triggered search:** impossibility proof → depth bound →
+    guard calibrated from shipped content.
+17. **Re‑solve all shipped content with runtime rules after any mechanic
+    change;** per‑stage timings in the pipeline; shrink inputs before tuning
+    guards.
+18. **Standing device matrix:** fresh install, cold relaunch, offline, oldest
+    OS, DST boundary, resume from background, during/after an ad.
+19. **Overlays hide live game state; never unmount it.** Walk money flows as a
+    slow, paying stranger.
+20. **UGC: parse, validate, cap; moderation records its reasons.**
+21. **Adversarial audit before first submission** (traced scenarios or it
+    doesn't count; verifiers try to refute); run the store's review guidelines
+    as your own test suite first.
+22. **Audition rigs for taste decisions; theme/juice personality as data.**
+23. **Own repo + pushed remote the day a prototype becomes a product.**
