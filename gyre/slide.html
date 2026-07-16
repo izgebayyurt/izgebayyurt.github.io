@@ -116,7 +116,7 @@ body{
 <div class="hudL" id="hudL">
   <div class="rnd" id="rnd">Round 1</div>
   <div class="moves" id="moves">15 <small>MOVES</small></div>
-  <div class="tgt" id="tgt">target 6000</div>
+  <div class="tgt" id="tgt">target 2500</div>
 </div>
 <div class="score"><b id="score">0</b><span class="bst">best <span id="best">0</span></span></div>
 
@@ -212,20 +212,49 @@ let slideMode='line';    // DEFAULT 'line' (whole line shifts one; far edge ejec
                          // 'clicked' (legacy partial: clicked ball + forward segment; origin pops in) — behind the drawer toggle
 let movesPerRound=15, slideMult=1.0;
 const DEPTH_CAP=40;
-// ---------- scoring (forked from index.html; ring-wrap premium DROPPED — straight lines only) ----------
-const BASE=10;
-const ROUND_K=0.75, ROUND_CAP=12;
-const GAP_K=0.5;                    // a straight line spanning more rings still pays (+50% per extra ring crossed)
-const COMBO_K=0.3, COMBO_CAP=6;
-function roundMult(r){ return Math.min(ROUND_CAP, 1+ROUND_K*(r-1)); }
-function comboMult(D){ return Math.min(COMBO_CAP, 1+COMBO_K*(D-1)); }
-function scoreResolve(rounds){                       // pure scorer (mirrors the live resolver), no wrap term
-  const acc={ base:0, cascade:0, gap:0 };
-  rounds.forEach((groups,ri)=>{ const rm=roundMult(ri+1);
-    for(const grp of groups){ const b=BASE*grp.g; const gm=1+GAP_K*((grp.spanned||1)-1);
-      acc.base+=b; acc.cascade+=b*(rm-1); acc.gap+=b*rm*(gm-1); } });
-  const D=rounds.length||1, pre=acc.base+acc.cascade+acc.gap, cm=comboMult(D), combo=pre*(cm-1);
-  return { base:acc.base, cascade:acc.cascade, gap:acc.gap, combo, total:pre+combo, gain:Math.round(pre+combo), depth:D, comboMult:cm };
+// ---------- CHIPS × MULT scoring (Balatro engine) — SCORE = CHIPS × MULT, per resolve ----------
+//  CHIPS = flat pool: CHIP_BASE per popped ball (colour-agnostic; relics will colour-weight later). A
+//    3-match = 30 chips; a deep cascade pops more balls = more chips. Accrues from ALL pops, engineered or lucky.
+//  MULT  = (MULT_BASE + addMult) × xMult, grown DURING the resolve:
+//    · each matched line adds to addMult, weighted by roundWeight(r)=ROUND_DECAY^(r-1) — so ENGINEERED
+//      round-1 matches (the player's own slide) pay FULL mult and each LUCKY cascade round (2+) DIMINISHES.
+//      This is the snowball soft-cap: an infinite chain's addMult converges to 1/(1-DECAY)× a single round.
+//    · a single round landing matches on 2+ AXES simultaneously grows xMult — the skill reward for a real setup.
+//    · bigger lines (size) and gap shots (rings spanned) add a little more addMult.
+//  Deep chains still pay well — but through CHIPS (more balls popped), NOT runaway MULT. Every lever is
+//  hard-capped so the DEPTH_CAP=40 worst case stays finite & sane (≈ a few hundred k, never near Number limits).
+const CHIP_BASE=10;
+const MULT_BASE=1.0;
+const GROUP_MULT=1.0;     // each matched line: +1.0 addMult at full round weight
+const SIZE_MULT=0.5;      // + per ball beyond 3 in a line
+const GAP_MULT=0.5;       // + per extra ring a straight line spans (gap / skill shot)
+const AXIS_X=0.8;         // multi-axis: xMult *= 1 + AXIS_X·(axes-1)·roundWeight (engineered 2-axis is a big hit)
+const ROUND_DECAY=0.6;    // roundWeight(r)=0.6^(r-1): round1 full, then diminishing — the chain-mult soft cap
+const ADDMULT_CAP=14, XMULT_CAP=8, MULT_CAP=45;   // hard bounds → provably finite/NaN-free at DEPTH_CAP
+function roundWeight(r){ return Math.pow(ROUND_DECAY, Math.max(0,r-1)); }
+// axis a straight line lies on: 0=const q, 1=const r, 2=const q+r (from its cells)
+function axisOfCells(cells){ const [q0,r0]=CELLS_QR[cells[0]];
+  if(cells.every(c=>CELLS_QR[c][0]===q0)) return 0;
+  if(cells.every(c=>CELLS_QR[c][1]===r0)) return 1;
+  return 2; }
+// pure scorer — the single source of truth, mirrored exactly by the live resolver.
+// rounds[i] = array of that round's groups: { g:size, spanned:ringsCrossed, axis:0|1|2 }.
+function scoreResolve(rounds){
+  let chips=0, addMult=0, xMult=1, engAdd=0, luckyAdd=0, engX=1, luckyX=1;
+  rounds.forEach((groups,ri)=>{ const r=ri+1, rw=roundWeight(r), eng=(r===1); const axes=new Set();
+    for(const grp of (groups||[])){ const g=grp.g||3;
+      chips+=CHIP_BASE*g;
+      const gm=(GROUP_MULT + SIZE_MULT*Math.max(0,g-3) + GAP_MULT*Math.max(0,(grp.spanned||1)-1))*rw;
+      addMult+=gm; if(eng) engAdd+=gm; else luckyAdd+=gm;
+      if(grp.axis!=null) axes.add(grp.axis); }
+    if(axes.size>=2){ const xf=1+AXIS_X*(axes.size-1)*rw; xMult*=xf; if(eng) engX*=xf; else luckyX*=xf; } });
+  addMult=Math.min(addMult,ADDMULT_CAP); xMult=Math.min(xMult,XMULT_CAP);
+  engX=Math.min(engX,XMULT_CAP); luckyX=Math.min(luckyX,XMULT_CAP);
+  const mult=Math.min(MULT_CAP,(MULT_BASE+addMult)*xMult);
+  const chipsR=Math.round(chips), total=Math.round(chipsR*mult), depth=rounds.length||1;
+  const engineeredMult=(MULT_BASE+engAdd)*engX;
+  return { chips:chipsR, addMult, xMult, mult, engineeredMult, luckyMult:(engineeredMult>0?mult/engineeredMult:mult),
+    engAdd, luckyAdd, engX, luckyX, total, gain:total, depth };
 }
 // chain label escalates HARD with depth: a x2 is a whisper, a x6+ is a screen event. Colour ramps
 // cool->hot (blue ~210° at x2 -> red-hot ~2° by x6), font grows fast, hold lengthens. Screen shake (px)
@@ -319,6 +348,8 @@ let drag={ active:false, cell:-1, dir:-1, x0:0, y0:0 };
 let chainLabel=null, roundFlash=null, flourish=null;
 let score=0, scoreShown=0, best=+lsGet('gyre_best','0')||0;
 let lastResolve=null;
+// CHIPS × MULT live readout (blue chips build as balls pop; red mult builds as rounds land; a "= total" slam at end)
+let panelChips=0, panelMult=1.0, panelHold=0, panelSlam=null;
 let shakeMag=0, shakeT=0, shakeRot=0;
 let freezeT=0;             // hitstop: while >0, update() freezes the whole sim (deterministic — drained by dt)
 let flashT=0, flashMax=0.34; // screen-wide flourish flash
@@ -326,7 +357,7 @@ let surgeT=0;              // score readout pulse while banking a chain
 let stats={ slides:0, matches:0, lines:0, maxChain:0, ejected:0, pops:0 };
 // rounds
 let phase='menu';                    // menu | play | over
-let round=1, movesLeft=15, roundTarget=6000;
+let round=1, movesLeft=15, roundTarget=2500;
 
 function* allBalls(){ for(let i=0;i<NC;i++) if(grid[i]) yield grid[i]; }
 function mkBall(c,cell){ return { c, cell, vx:cellX[cell], vy:cellY[cell], anim:null, land:0, popping:false }; }
@@ -399,22 +430,25 @@ function stepResolver(dt){
   if(R.phase==='refilling'){ if(allSettled()){ R.phase='detect'; R.t=0; } return; }
 }
 function beginPops(ms,R){
-  R.depth=(R.depth||0)+1; const r=R.depth, rm=roundMult(r);
-  if(!R.acc) R.acc={ base:0, cascade:0, gap:0 };
-  const seen=new Set(), cells=[], cellVal={}, cellDelay={}; let lines=0;
+  R.depth=(R.depth||0)+1; const r=R.depth, rw=roundWeight(r), eng=(r===1);
+  if(!R.acc) R.acc={ chips:0, addMult:0, xMult:1, engAdd:0, luckyAdd:0, engX:1, luckyX:1 };
+  if(r===1){ panelChips=0; panelMult=MULT_BASE; panelSlam=null; }        // fresh CHIPS×MULT readout for this resolve
+  const seen=new Set(), cells=[], cellDelay={}; let lines=0; const axes=new Set();
   for(const m of ms){ lines++;
-    const g=m.len, b=BASE*g;
+    const g=m.len;
     const spanned=new Set(m.cells.map(c=>cellRing[c])).size;   // rings a straight line crosses (gap bonus)
-    const gm=1+GAP_K*(spanned-1); m._spanned=spanned;
-    // SCORING VALUES UNCHANGED — identical additive decomposition to before, juice is layered on top only
-    R.acc.base+=b; R.acc.cascade+=b*(rm-1); R.acc.gap+=b*rm*(gm-1);
-    const per=(b*rm*gm)/g;
+    const axis=axisOfCells(m.cells); m._spanned=spanned; m._axis=axis; axes.add(axis);
+    // MULT grows here (chips accrue per-ball in firePop). addMult weighted by roundWeight -> engineered full, lucky diminished.
+    const gm=(GROUP_MULT + SIZE_MULT*Math.max(0,g-3) + GAP_MULT*Math.max(0,spanned-1))*rw;
+    R.acc.addMult+=gm; if(eng) R.acc.engAdd+=gm; else R.acc.luckyAdd+=gm;
     // ripple this group from its own centre outward (staggered pops, not one flash)
     let gxx=0,gyy=0; for(const c of m.cells){ gxx+=cellX[c]; gyy+=cellY[c]; } gxx/=m.cells.length; gyy/=m.cells.length;
     m.cells.slice().sort((a,b)=>Math.hypot(cellX[a]-gxx,cellY[a]-gyy)-Math.hypot(cellX[b]-gxx,cellY[b]-gyy))
       .forEach((c,idx)=>{ cellDelay[c]=Math.min(cellDelay[c]??1e9, idx*POP_STAGGER); });
-    for(const c of m.cells){ cellVal[c]=Math.max(cellVal[c]||0, per); if(!seen.has(c)){ seen.add(c); cells.push(c); } }
+    for(const c of m.cells){ if(!seen.has(c)){ seen.add(c); cells.push(c); } }
   }
+  if(axes.size>=2){ const xf=1+AXIS_X*(axes.size-1)*rw; R.acc.xMult*=xf; if(eng) R.acc.engX*=xf; else R.acc.luckyX*=xf; }  // multi-axis skill reward
+  panelMult=Math.min(MULT_CAP,(MULT_BASE+Math.min(R.acc.addMult,ADDMULT_CAP))*Math.min(R.acc.xMult,XMULT_CAP));  // live MULT readout
   stats.matches+=ms.length; stats.lines+=lines; stats.maxChain=Math.max(stats.maxChain,r); stats.pops+=cells.length;
   if(r>=2){ setChainLabel(r); SFX.chain(r); }
   if(r>=FLOURISH_DEPTH) triggerFlourish(r);                     // depth>=4 payoff: banner + flash + slow-mo beat + sting
@@ -423,7 +457,7 @@ function beginPops(ms,R){
   cells.sort((a,b)=> cellDelay[a]-cellDelay[b]);
   cells.forEach((c)=>{ const b=grid[c]; if(!b) return; b.popping=true;
     popList.push({ ball:b, cell:c, delay:cellDelay[c], step:pitchBase+Math.round(cellDelay[c]/POP_STAGGER),
-      done:false, value:Math.round(cellVal[c]||0),
+      done:false, value:CHIP_BASE,                                       // each popped ball = CHIP_BASE chips
       hit:(r>=2 && cellDelay[c]===lastFire)?hitstopFor(r):0 }); });   // hitstop fires on the round's last/decisive pop
   updateHUD();
 }
@@ -438,6 +472,8 @@ function firePop(p){ p.done=true; const b=p.ball; const col=colOf(b.c), rgb=hexT
   for(let s=0;s<2;s++){ const a=Math.random()*6.283, d=ballRad*(0.5+Math.random()*0.55);  // satellite splats -> juicier metaball burst
     goo.push({ x:b.vx+Math.cos(a)*d, y:b.vy+Math.sin(a)*d, r:ballRad*0.4, col, rgb, t:0, dur:0.22 }); }
   for(let k=0;k<8;k++) puffs.push(mkPuff(b.vx,b.vy,col));
+  if(resolver&&resolver.acc) resolver.acc.chips+=CHIP_BASE;             // CHIPS tick up as each ball pops
+  panelChips+=CHIP_BASE;
   if(p.value>0) scorePops.push({ x:b.vx, y:b.vy, v:p.value, life:0.9, max:0.9, col });
   SFX.pop(p.step);
   if(p.hit>0) freezeT=Math.max(freezeT,p.hit);                  // hitstop on the decisive pop
@@ -447,11 +483,16 @@ function firePop(p){ p.done=true; const b=p.ball; const col=colOf(b.c), rgb=hexT
 function doRefill(){ for(let i=0;i<NC;i++){ if(!grid[i]){ const nb=placeBall(spawnRefill(),i); setGrow(nb, 0.2); } } }
 function finishResolve(){
   const R=resolver;
-  if(R && R.acc){ const D=R.depth||1, pre=R.acc.base+R.acc.cascade+R.acc.gap;
-    const cm=comboMult(D), combo=pre*(cm-1), total=pre+combo, gain=Math.round(total);
+  if(R && R.acc){                                               // SCORE = CHIPS × MULT
+    const D=R.depth||1, chips=R.acc.chips;
+    const addMult=Math.min(R.acc.addMult,ADDMULT_CAP), xMult=Math.min(R.acc.xMult,XMULT_CAP);
+    const mult=Math.min(MULT_CAP,(MULT_BASE+addMult)*xMult);
+    const gain=Math.round(chips*mult);
     score+=gain; if(score>best){ best=score; saveBest(); }
-    if(gain>0) surgeT=0.5;                                       // pulse the score readout as it banks
-    lastResolve={ base:R.acc.base, cascade:R.acc.cascade, gap:R.acc.gap, combo, total, gain, depth:D, comboMult:cm }; }
+    if(gain>0){ surgeT=0.5; panelChips=chips; panelMult=mult; panelSlam={ chips, mult, total:gain, born:performance.now() }; panelHold=1.3; }
+    const engineeredMult=(MULT_BASE+R.acc.engAdd)*Math.min(R.acc.engX,XMULT_CAP);
+    lastResolve={ chips, addMult, xMult, mult, engineeredMult, luckyMult:(engineeredMult>0?mult/engineeredMult:mult),
+      engAdd:R.acc.engAdd, luckyAdd:R.acc.luckyAdd, engX:R.acc.engX, luckyX:R.acc.luckyX, total:gain, gain, depth:D }; }
   resolver=null;
   if(phase==='play'){                                          // round frame: reach target to advance; else out of moves = over
     if(score>=roundTarget) advanceRound();
@@ -461,11 +502,11 @@ function finishResolve(){
 }
 
 // ================= rounds =================
-// cumulative, rising target. Retuned for the radius-3 board + whole-row 'line' default: whole-row slides are
-// far more productive than the old partial-segment shove, so a random 15-move round now banks a median ~8.5k
-// (measured). Round-1 lifted 2000->6000 (a real but fair opener), growth 1.35->1.4 to keep the ramp biting.
-// First-pass values — genuine playtest territory.
-function roundTargetFor(r){ let t=0, d=6000; for(let i=1;i<=r;i++){ t+=d; d=Math.round(d*1.4); } return t; }
+// cumulative, rising target — RESCALED to the CHIPS × MULT magnitudes. Measured (120 runs, random 15-move
+// play, 5 colours): median banked ~2650/round, p75 ~5000, p90 ~8300. So round-1 needs 2500 (a hair under the
+// random median — a fair on-ramp most players clear), and each round's INCREMENT grows ×1.4 (2500, 3500,
+// 4900, 6860…), pulling ahead of what a median run banks so the ladder becomes skill-gated. Playtest territory.
+function roundTargetFor(r){ let t=0, d=2500; for(let i=1;i<=r;i++){ t+=d; d=Math.round(d*1.4); } return t; }
 function startRun(opts){ opts=opts||{};
   phase='play'; COLORS=opts.colors||COLORS; palette=ORDER.slice(0,COLORS);
   movesPerRound=opts.moves||movesPerRound;
@@ -483,7 +524,7 @@ let last=performance.now(), idleDrawn=false;
 function wake(){ idleDrawn=false; }
 function isAnimating(){
   if(resolver||popList.length||goo.length||puffs.length||flyers.length||scorePops.length) return true;
-  if(drag.active||chainLabel||roundFlash) return true;
+  if(drag.active||chainLabel||roundFlash||panelHold>0) return true;
   if(scoreShown!==score || (shakeMag>0&&shakeT>0)) return true;
   for(const b of allBalls()) if(b.anim||(b.land&&performance.now()-b.land<160)) return true;
   return false;
@@ -512,6 +553,7 @@ function update(dt,now){
   if(flourish){ flourish.life-=dt; if(flourish.life<=0) flourish=null; }
   if(flashT>0) flashT=Math.max(0,flashT-dt);
   if(surgeT>0) surgeT=Math.max(0,surgeT-dt);
+  if(panelHold>0){ panelHold=Math.max(0,panelHold-dt); if(panelHold===0) panelSlam=null; }
   // score count-up — races faster during a chain (the surging number is the hero of the payoff)
   if(scoreShown!==score){ const diff=score-scoreShown, spd=resolver?3.0:2.2, stepAmt=Math.max(1, Math.abs(diff)*Math.min(1,dt*spd));
     scoreShown = (stepAmt>=Math.abs(diff)) ? score : scoreShown+Math.sign(diff)*stepAmt; }
@@ -581,8 +623,27 @@ function drawChain(){ if(!chainLabel) return; const sp=chainLabel.spec; const a=
   ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center'; ctx.font='700 '+sz+'px Fredoka, sans-serif';
   ctx.lineWidth=4+sz*0.08; ctx.strokeStyle=PAPER; ctx.strokeText('chain ×'+depth,cx,y);
   ctx.fillStyle='hsl('+sp.hue+','+sp.sat+'%,'+(depth>=6?52:58)+'%)'; ctx.fillText('chain ×'+depth,cx,y);
-  if(resolver){ const cm=comboMult(resolver.depth||depth); ctx.globalAlpha=a*0.9;   // running combo multiplier readout
-    ctx.font='800 13px Nunito, sans-serif'; ctx.fillStyle=INK_SOFT; ctx.fillText('combo ×'+cm.toFixed(1), cx, y+15); }
+  ctx.restore(); }
+// CHIPS × MULT readout: cool-blue chips (build as balls pop) × warm-red mult (builds as rounds land);
+// at resolve end a "= total" slam pops in, feeding the score count-up. The two axes made legible.
+function drawScorePanel(){
+  const active=(resolver&&resolver.acc)||panelHold>0; if(!active) return;
+  const slam=panelSlam && !resolver;
+  const pop=slam?easeBack(Math.min(1,(performance.now()-panelSlam.born)/220)):1;
+  const y=Math.min(H-56, cy+(Math.sqrt(3)*RAD+1.0)*size+30);
+  const fs=Math.round(26*(0.85+0.15*pop));
+  const chipsTxt=String(Math.round(panelChips)), multTxt='× '+panelMult.toFixed(1), totTxt=slam?('= '+panelSlam.total):'';
+  ctx.save(); ctx.font='700 '+fs+'px Fredoka, sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  const gap=fs*0.42;
+  const wC=ctx.measureText(chipsTxt).width, wM=ctx.measureText(multTxt).width, wT=slam?ctx.measureText(totTxt).width:0;
+  const totalW=wC+gap+wM+(slam?gap+wT:0);
+  let x=cx-totalW/2;
+  function piece(txt,fill){ ctx.lineWidth=4.5; ctx.strokeStyle=PAPER; ctx.strokeText(txt,x,y); ctx.fillStyle=fill; ctx.fillText(txt,x,y); x+=ctx.measureText(txt).width; }
+  const cxs=x+wC/2; piece(chipsTxt,'#3d8bdf'); x+=gap;                  // CHIPS (blue)
+  const mxs=x+wM/2; piece(multTxt,'#ef4a5a'); x+=gap;                   // MULT (red)
+  if(slam) piece(totTxt,'#f57420');                                    // = TOTAL (orange slam)
+  ctx.textAlign='center'; ctx.font='800 9px Nunito, sans-serif'; ctx.fillStyle=INK_SOFT;
+  ctx.fillText('CHIPS',cxs,y+13); ctx.fillText('MULT',mxs,y+13);
   ctx.restore(); }
 // screen-wide payoff flash (brief, fades fast — never sits on the board long enough to hide it)
 function drawFlash(){ if(flashT<=0) return; const a=flashT/flashMax;
@@ -609,6 +670,7 @@ function render(now){
   drawScaffold(); drawDragPreview(); drawGoo(); drawBalls(now); drawFlyers(); drawPuffs();
   drawQueueStack(); drawScorePops(); drawChain(); drawRoundFlash();
   ctx.restore();
+  drawScorePanel();                                                    // CHIPS × MULT readout (unshaken, always legible)
   drawFlash(); drawFlourish();                                                 // full-screen payoff overlays, unshaken (stay readable)
   scoreEl.style.transform = surgeT>0 ? 'scale('+(1+0.26*(surgeT/0.5)).toFixed(3)+')' : '';
 }
@@ -707,8 +769,16 @@ window.SLIDE={
   get resolving(){ return !!resolver; }, get resolverPhase(){ return resolver?resolver.phase:null; },
   get drag(){ return { active:drag.active, cell:drag.cell, dir:drag.dir }; },
   get palette(){ return palette.slice(); }, get colors(){ return COLORS; },
-  scoreResolve(rounds){ return scoreResolve(rounds); }, scoreParams(){ return { BASE, ROUND_K, ROUND_CAP, GAP_K, COMBO_K, COMBO_CAP, DEPTH_CAP }; },
+  scoreResolve(rounds){ return scoreResolve(rounds); },
+  scoreParams(){ return { CHIP_BASE, MULT_BASE, GROUP_MULT, SIZE_MULT, GAP_MULT, AXIS_X, ROUND_DECAY, ADDMULT_CAP, XMULT_CAP, MULT_CAP, DEPTH_CAP }; },
+  axisOfCells(cells){ return axisOfCells(cells); },
   get lastResolve(){ return lastResolve?Object.assign({},lastResolve):null; },
+  // last resolve's two-axis breakdown (chips, addMult, xMult, mult, engineered vs lucky, total) — relics hook here
+  get scoreContext(){ return lastResolve?Object.assign({},lastResolve):null; },
+  // live readouts during a resolve (step-driven): CHIPS build per pop, MULT builds per round
+  get liveChips(){ return Math.round(panelChips); }, get liveMult(){ return panelMult; },
+  get scorePanelActive(){ return (!!(resolver&&resolver.acc))||panelHold>0; },
+  get resolveAcc(){ return resolver&&resolver.acc?Object.assign({},resolver.acc):null; },
   labelSpec(d){ return labelSpec(d); }, get chainLabel(){ return chainLabel?{ n:chainLabel.n, size:chainLabel.spec.size, hue:chainLabel.spec.hue }:null; },
   // juice observability (visual/audio pacing — for tests + tuning)
   get flourish(){ return flourish?{ text:flourish.text, depth:flourish.depth }:null; },
