@@ -71,6 +71,8 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot.prism2{ border:none; background:transparent; box-shadow:none; }
 .dot.prism2.donept{ box-shadow:none; filter:drop-shadow(0 0 6px rgba(87,194,104,.9)) drop-shadow(0 0 2px #fff); border-radius:0; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
+.dot .gband{ position:absolute; inset:0; width:100%; height:100%; z-index:1; overflow:hidden; border-radius:inherit; opacity:.8; pointer-events:none; }
+.dot.donept .gband{ display:none; }   /* a delivered goal drops the "fill me" ribbon */
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
 @keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
 .dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
@@ -1546,7 +1548,10 @@ function renderDots(){
   function dot(col,r,c,shape,star){
     var sz=s*0.84, off=(s-sz)/2;
     var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
-    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
+    // goal squares carry a 45° ribbon drawn as its two parallel edges (tone-on-tone) so an
+    // unfilled goal reads as "fill me"; it hides once the goal is delivered (.donept)
+    var band = shape==="sq" ? '<svg class="gband" viewBox="0 0 100 100" preserveAspectRatio="none"><g fill="none" stroke="'+lighten(HEX[col],0.5)+'" stroke-width="7" stroke-linecap="round"><line x1="30" y1="-2" x2="102" y2="70"/><line x1="-2" y1="30" x2="70" y2="102"/></g></svg>' : '';
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+band+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
   ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
   tgts.forEach(function(T){
@@ -1587,7 +1592,6 @@ function discover(col,r,c){
 var animStart=nowMs(), animT=0, blooms=[], sweeps=[], confetti=[], rejects=[], lastReject={key:"",t:0};
 var shakeAmp=0, shakeDur=0, shakeT0=0;   // board-shake juice: a decaying jitter on the whole board
 function shake(amp, dur){ shakeAmp=amp; shakeDur=dur||300; shakeT0=nowMs(); }
-function hexA(hex,a){ if(hex[0]!=="#") return hex; var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return "rgba("+r+","+g+","+b+","+a+")"; }
 var drawSteps=0;
 /* native haptics (no-op on web / if the plugin isn't present): a light tick per drawn
    cell, a medium thump on a colour mix, success on win, error on an illegal move. */
@@ -1653,18 +1657,6 @@ function renderPaths(){
   if(canvas.width!==Math.round(W*dpr)){ canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if(ghostStrokes.length) drawGhostHints(s);
-  // idle goal shimmer: unsolved objectives breathe a soft coloured halo (under the pipes) to catch the eye
-  if(!solved){
-    var gp=0.5+0.5*Math.sin(animT/560);
-    ctx.save();
-    for(var gi=0; gi<tgts.length; gi++){ var GT=tgts[gi]; if(GT.done||GT.prism) continue;
-      var gcx=GT.c*s+s/2, gcy=GT.r*s+s/2, GR=s*(0.60+0.06*gp), gcol=HEX[GT.col]||"#ffffff";
-      var gg=ctx.createRadialGradient(gcx,gcy,s*0.33, gcx,gcy,GR);
-      gg.addColorStop(0, hexA(gcol,0)); gg.addColorStop(0.62, hexA(gcol, 0.09+0.13*gp)); gg.addColorStop(1, hexA(gcol,0));
-      ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(gcx,gcy,GR,0,6.2832); ctx.fill();
-    }
-    ctx.restore();
-  }
   var pipeW=s*0.36, pipeInk=pipeW+s*0.115, jP=0, jR=0, JUNC_BUMP=s*0.055;
   var junSet={}; junctions.forEach(function(J){ junSet[J.cell[0]+","+J.cell[1]]=1; });
   function P(cell){ var j=jvec(cell[0],cell[1]); return [ cell[1]*s+s/2 + j[0]*jP, cell[0]*s+s/2 + j[1]*jP ]; }
