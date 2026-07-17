@@ -60,6 +60,7 @@ function buildModel(L) {
    search nodes; if exceeded we abort (caller treats as "reject / too hard"). */
 export function countSolutions(L, cap = 2, budget = 4_000_000) {
   const { n, wall, type, allow } = buildModel(L);
+  const iceSet = new Set((L.ice || []).map(([r, c]) => r + "," + c));   // ice: a field pipe forced straight
 
   // edge storage: horizontal H[r][c] = edge between (r,c)-(r,c+1); vertical V[r][c] = (r,c)-(r+1,c).
   // value: null = OFF, else a colour char.
@@ -91,8 +92,18 @@ export function countSolutions(L, cap = 2, budget = 4_000_000) {
       return deg === 1 && cols[0] === t.col;                // exactly one pipe of its colour
     }
     // field: degree 2 (a pipe, both edges same colour) or degree 3 (a junction)
-    if (deg === 2) return cols[0] === cols[1];
+    const isIce = iceSet.has(r + "," + c);
+    if (deg === 2) {
+      if (cols[0] !== cols[1]) return false;
+      if (isIce) {   // ICE: the two ON edges must be a STRAIGHT pair (a turn is forbidden)
+        const straightH = c > 0 && H[r][c - 1] != null && c < n - 1 && H[r][c] != null;
+        const straightV = r > 0 && V[r - 1][c] != null && r < n - 1 && V[r][c] != null;
+        if (!straightH && !straightV) return false;
+      }
+      return true;
+    }
     if (deg === 3) {
+      if (isIce) return false;   // ice can't be a junction — a line only passes straight through
       // a junction: colours must be {p1,p2,sec} with sec = mix(p1,p2)
       const secOnes = cols.filter((x) => SECS.includes(x));
       if (secOnes.length !== 1) return false;
