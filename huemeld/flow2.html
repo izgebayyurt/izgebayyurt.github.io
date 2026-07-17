@@ -1939,7 +1939,9 @@ function renderPaths(){
       ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
       if(ok){   // satisfied: a steady second (outer) ring - the same "locked in" double ring as number clues
         var ggap=s*0.05, ow=gs+ggap*2, orr=rr+ggap;
-        ctx.lineWidth=s*0.032; ctx.globalAlpha=0.92;
+        ctx.globalAlpha=1; ctx.lineWidth=s*0.062; ctx.strokeStyle=INK;   // dark border so the ring reads crisply over the pipe, like the number tiles
+        roundRect(ctx, cx-ow/2, cy-ow/2, ow, ow, orr); ctx.stroke();
+        ctx.lineWidth=s*0.032; ctx.strokeStyle=col; ctx.globalAlpha=0.92;
         roundRect(ctx, cx-ow/2, cy-ow/2, ow, ow, orr); ctx.stroke();
         ctx.globalAlpha=1;
       }
