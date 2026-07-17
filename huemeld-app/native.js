@@ -205,12 +205,17 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   setInterval(pushSave, 45000);
   restoreSave();   // fire immediately — the sooner the reload, the less flash
 
-  // returning to the app foreground: nudge the game to resume its background music
-  // (the webview may pause media while backgrounded; visibilitychange can be flaky).
+  // app foreground/background: resume music on return, and PAUSE it on leaving so it
+  // doesn't keep playing in the background (visibilitychange can be flaky in a webview).
   if (P.App && P.App.addListener) {
     try {
-      P.App.addListener("appStateChange", function (s) { if (s && s.isActive && window.__resumeAudio) window.__resumeAudio(); });
+      P.App.addListener("appStateChange", function (s) {
+        if (!s) return;
+        if (s.isActive) { if (window.__resumeAudio) window.__resumeAudio(); }
+        else if (window.__suspendAudio) window.__suspendAudio();
+      });
       P.App.addListener("resume", function () { if (window.__resumeAudio) window.__resumeAudio(); });
+      P.App.addListener("pause", function () { if (window.__suspendAudio) window.__suspendAudio(); });
     } catch (e) {}
   }
 
