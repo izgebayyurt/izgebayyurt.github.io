@@ -112,6 +112,10 @@ function placeCounters(L, spec, rng, mech, gatesPlaced) {
   (L.prisms || []).forEach(([, r, c]) => skip.add(key(r, c)));
   const wallSet = new Set(L.walls.map(([r, c]) => key(r, c)));
   const bridgeSet = new Set((L.bridges || []).map(([r, c]) => key(r, c)));
+  // colours that actually appear in the constructed solution: a "0" clue may only name
+  // one of these, so it says "this real colour stays away from here" — never "0 of a
+  // colour the board doesn't even have" (e.g. blue 0 with no blue anywhere).
+  const present = new Set(L.paint.values());
   // candidate = [r, c, isWall] — clue value derived per candidate below
   const open = [], wallCand = [];
   for (const [k2] of L.paint) { if (!skip.has(k2)) open.push([...k2.split(",").map(Number), 0]); }
@@ -130,7 +134,7 @@ function placeCounters(L, spec, rng, mech, gatesPlaced) {
       if (pc) hood[pc] = (hood[pc] || 0) + 1;
     }
     if (spec.zeros && rng() < 0.25) {
-      const absent = ["R", "Y", "B", "O", "G", "P"].filter((x) => !hood[x]);
+      const absent = ["R", "Y", "B", "O", "G", "P"].filter((x) => !hood[x] && present.has(x));
       if (absent.length) return [absent[(rng() * absent.length) | 0], 0];
     }
     const cols = Object.keys(hood);
@@ -202,7 +206,13 @@ export function makeMix(spec, rng) {
     mech.forEach((k2) => skip.add(k2));
     (L.prisms || []).forEach(([, r, c]) => skip.add(key(r, c)));
     gates.forEach((g) => skip.add(key(g[1], g[2])));
-    const straight = pathInteriors(L.gest).filter((x) => !skip.has(key(x.r, x.c)) && x.din[0] === x.dout[0] && x.din[1] === x.dout[1]);
+    const wallSet = new Set((L.walls || []).map(([r, c]) => key(r, c)));
+    const openCell = (r, c) => r >= 0 && c >= 0 && r < L.n && c < L.n && !wallSet.has(key(r, c));
+    // ICE must sit where a TURN was geometrically possible (an open off-axis neighbour),
+    // exactly like arrows — otherwise "go straight" forbids nothing and the ice is redundant.
+    const straight = pathInteriors(L.gest).filter((x) =>
+      !skip.has(key(x.r, x.c)) && x.din[0] === x.dout[0] && x.din[1] === x.dout[1]
+      && (openCell(x.r + x.din[1], x.c + x.din[0]) || openCell(x.r - x.din[1], x.c - x.din[0])));
     const picked = spreadPick(straight, spec.ice, rng);
     if (!picked) return null;
     ice = picked.map((x) => [x.r, x.c]);

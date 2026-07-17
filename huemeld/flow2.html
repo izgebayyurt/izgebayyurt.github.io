@@ -715,13 +715,22 @@ function resumeMusic(){
   if(actx && actx.state==="suspended"){ try{ actx.resume(); }catch(e){} }
   if(musicEl){ musicEl.volume=0; var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); fadeMusic(musicTargetVol(), 800); }
 }
+// leaving the app must actually PAUSE the audio, not just mute it - a muted <audio>
+// keeps playing (and holds the media session) in a native webview's background.
+function suspendAudio(){
+  if(musicFade){ clearInterval(musicFade); musicFade=null; }
+  if(musicEl){ musicEl.volume=0; try{ musicEl.pause(); }catch(e){} }
+  if(actx && actx.state==="running"){ try{ actx.suspend(); }catch(e){} }
+}
 window.__resumeAudio=resumeMusic;   // native (Capacitor App resume) calls this too
+window.__suspendAudio=suspendAudio; // native (Capacitor App pause) calls this too
 document.addEventListener("visibilitychange", function(){
-  // set the volume directly on hide (background timers throttle the fade), and do a
-  // robust play()+fade-in on return so the track never stays silent after a switch.
-  if(document.hidden){ if(musicEl) musicEl.volume=0; fadeMusic(0, 400); }
+  // pause outright on hide (a muted-but-playing track survives backgrounding on
+  // native), and do a robust play()+fade-in on return so it never stays silent.
+  if(document.hidden) suspendAudio();
   else resumeMusic();
 });
+window.addEventListener("pagehide", suspendAudio);
 window.addEventListener("pageshow", resumeMusic);
 window.addEventListener("focus", resumeMusic);
 function setVolume(v){   // sound-effects volume only (music has its own slider)
@@ -1939,7 +1948,9 @@ function renderPaths(){
       ctx.lineWidth=s*0.06; ctx.strokeStyle=col; ctx.globalAlpha=ok?1:0.85; roundRect(ctx,x,y,gs,gs,rr); ctx.stroke();
       if(ok){   // satisfied: a steady second (outer) ring - the same "locked in" double ring as number clues
         var ggap=s*0.05, ow=gs+ggap*2, orr=rr+ggap;
-        ctx.lineWidth=s*0.032; ctx.globalAlpha=0.92;
+        ctx.globalAlpha=1; ctx.lineWidth=s*0.062; ctx.strokeStyle=INK;   // dark border so the ring reads crisply over the pipe, like the number tiles
+        roundRect(ctx, cx-ow/2, cy-ow/2, ow, ow, orr); ctx.stroke();
+        ctx.lineWidth=s*0.032; ctx.strokeStyle=col; ctx.globalAlpha=0.92;
         roundRect(ctx, cx-ow/2, cy-ow/2, ow, ow, orr); ctx.stroke();
         ctx.globalAlpha=1;
       }
@@ -2244,7 +2255,7 @@ document.getElementById("btnPick").addEventListener("click", function(){ ensureA
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 /* ---------- main menu: home screen at boot, the home button brings it back ---------- */
 var ovMenu=document.getElementById("ovMenu"), firstRun=false;
-function showMenu(){ hideToast(); ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
+function showMenu(){ hideToast(); ovWin.classList.remove("show"); ovPick.classList.remove("show"); ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
 function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
 document.body.classList.add("menuopen");   // the menu is up when the page opens
 updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
