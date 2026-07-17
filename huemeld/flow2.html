@@ -1025,6 +1025,15 @@ function pathsAt(r,c){   // one entry PER passage - a self-overpass adds the sam
   ems.forEach(function(E){ E.legs.forEach(function(Lg){ indicesIn(Lg.cells,r,c).forEach(function(id){ out.push({cells:Lg.cells, idx:id, col:E.col}); }); }); });
   return out;
 }
+/* the occ descriptor of the TOP passage through a cell, in RENDER order (emitter legs
+   first, then junction blends; last drawn is on top). Used so tapping a bridge grabs
+   the line you SEE on top, not the one hidden underneath. */
+function topPassAt(r,c){
+  var top=null;
+  ems.forEach(function(E,e){ E.legs.forEach(function(Lg,l){ indicesIn(Lg.cells,r,c).forEach(function(idx){ top={t:"em", e:e, l:l, idx:idx}; }); }); });
+  junctions.forEach(function(J,j){ indicesIn(J.leg,r,c).forEach(function(idx){ top = idx===0 ? {t:"jun", i:j} : {t:"jleg", i:j, idx:idx}; }); });
+  return top;
+}
 /* the colour a tile visibly WEARS: circles/prisms and emitter dots count as their
    own colour even before a pipe arrives; otherwise it's the pipe through the cell */
 function cellColorFull(r,c){
@@ -1221,6 +1230,9 @@ board.addEventListener("pointerdown", function(e){
   var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
   var o=occAt(cell[0],cell[1]);
   if(!o) return;
+  // on a bridge, grab the line drawn ON TOP (what the player sees/touches), not the
+  // under-pass that occAt happens to find first.
+  if(isBridge(cell[0],cell[1])){ var tp=topPassAt(cell[0],cell[1]); if(tp) o=tp; }
   preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
   drawSteps=0; melodyReset();
   var pri=prismStartAt(cell[0],cell[1]);
@@ -1762,9 +1774,11 @@ function renderPaths(){
       var dy=oc[oi+1][0]-oc[oi][0], dx=oc[oi+1][1]-oc[oi][1];   // over-passage axis
       var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
       ctx.lineCap="butt";
-      ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
+      // the cut has to hide the under-pipe all the way out to (past) the deck rails,
+      // or a thin sliver of it peeks through the gap between the cut and each rail.
+      ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.32;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
-      ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
+      ctx.strokeStyle=INK; ctx.lineWidth=pipeInk+s*0.19;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
       ctx.save();                                           // repaint ONLY the over passage (a 3-cell segment)
       ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();   // so a self-crossing line's under-pass isn't repainted
