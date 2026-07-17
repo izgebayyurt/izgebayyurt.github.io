@@ -71,11 +71,10 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .dot.prism2{ border:none; background:transparent; box-shadow:none; }
 .dot.prism2.donept{ box-shadow:none; filter:drop-shadow(0 0 6px rgba(87,194,104,.9)) drop-shadow(0 0 2px #fff); border-radius:0; }
 .dot .st{ position:relative; z-index:2; color:#fff; font-size:13px; -webkit-text-stroke:1px var(--line); font-family:var(--font-d); font-weight:700; }
-.dot .gband{ position:absolute; inset:0; width:100%; height:100%; z-index:1; overflow:hidden; border-radius:inherit; opacity:.72; pointer-events:none; filter:blur(1.4px); }   /* blur softens the ribbon edges */
-.dot.donept .gband{ display:none; }   /* a delivered goal drops the "fill me" ribbon */
-@keyframes gbandDrift{ from{ transform:translate(0,0); } to{ transform:translate(120px,-120px); } }   /* one period = the copy spacing, so it loops seamlessly */
-.gbandmove{ animation:gbandDrift 5.5s linear infinite; will-change:transform; }
-@media (prefers-reduced-motion:reduce){ .gbandmove{ animation:none; } }
+/* an unfilled goal gently pulses its ✦ star to read as "fill me"; stops once delivered (.donept) */
+@keyframes starPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.34); } }
+.dot.sq:not(.donept) .st{ display:inline-block; animation:starPulse 1.7s ease-in-out infinite; }
+@media (prefers-reduced-motion:reduce){ .dot.sq:not(.donept) .st{ animation:none; } }
 .dot.donept{ box-shadow:0 0 0 3px #fff, 0 0 10px 2px rgba(87,194,104,.6); }
 @keyframes dotBounce{ 0%{transform:scale(1)} 32%{transform:scale(1.24)} 66%{transform:scale(.93)} 100%{transform:scale(1)} }
 .dot.bounce{ animation:dotBounce .42s cubic-bezier(.34,1.7,.6,1); }
@@ -141,10 +140,10 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcsub{ font-size:11px; color:var(--ink-soft); font-weight:600; line-height:1.3; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
 .mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
-#ovMech{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovMech,#ovDemoEnd{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
 #ovSet{ position:fixed; border-radius:0; background:rgba(10,7,16,.92); }   /* full-screen fade: cover the top bar + nav, not just the board */
-#ovMech .panel{ max-width:320px; }
-#ovMech .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
+#ovMech .panel,#ovDemoEnd .panel{ max-width:320px; }
+#ovMech .mk,#ovDemoEnd .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
 .mechicon{ margin:2px 0 6px; }
 .mechblurb{ font-size:14px !important; margin-top:2px; }
 .mk.mechhow{ height:40px; padding:0 16px; font-size:13.5px; background:#bfe3ff; margin-top:8px; }
@@ -317,6 +316,8 @@ body.menuopen .helpfab{ display:none; }
           <p data-th="<b>Drag</b> from a circle to draw a line."><b>Drag</b> from a circle to draw a line.</p>
           <p data-th="When two lines <b>meet</b>, their colours <b>mix</b>.">When two lines <b>meet</b>, their colours <b>mix</b>.</p>
           <p data-th="Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.">Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
+          <p data-th="<b>Tap a line</b> anywhere - or retrace it - to <b>pull it back</b> to that spot."><b>Tap a line</b> anywhere - or retrace it - to <b>pull it back</b> to that spot.</p>
+          <p data-th="<b>Double-tap a circle</b> to <b>erase</b> its whole line."><b>Double-tap a circle</b> to <b>erase</b> its whole line.</p>
           <p data-th="A <b>gate</b> only lets its own colour pass.">A <b>gate</b> only lets its own colour pass.</p>
           <p data-th="Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.">Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
         </div>
@@ -325,6 +326,14 @@ body.menuopen .helpfab{ display:none; }
       </div>
     </div>
     <div class="ghost" id="ghost"></div>
+    <div class="ov" id="ovDemoEnd">
+      <div class="panel">
+        <h2 data-t="Ready to try?">Ready to try?</h2>
+        <p class="mechblurb" data-t="Watch it again, or take it from here.">Watch it again, or take it from here.</p>
+        <button class="mk" id="btnDemoAgain" style="background:#e6d9ff">↻ Watch again</button>
+        <button class="mk" id="btnDemoGo" style="background:var(--card);color:var(--ink)" data-t="My turn!">My turn!</button>
+      </div>
+    </div>
   </div>
   <div class="actionbar">
     <button class="mkk" id="btnUndo" title="Undo last move">↶ Undo</button>
@@ -376,6 +385,12 @@ var TR = {
   "Got it":"Anladım",                                               /* 26 */
   "Watch how it works":"Nasıl oynandığını izle",                       /* 27 */
   "Show me":"Göster",                                          /* 28 */
+  "Ready to try?":"Denemeye hazır mısın?",
+  "Watch it again, or take it from here.":"Tekrar izle ya da buradan devam et.",
+  "My turn!":"Sıra bende!",
+  "Watch again":"Tekrar izle",
+  "<b>Tap a line</b> anywhere - or retrace it - to <b>pull it back</b> to that spot.":"Geri çekmek için <b>çizginin</b> herhangi bir yerine dokun ya da üzerinden geri git; çizgi oraya kadar geri çekilir.",
+  "<b>Double-tap a circle</b> to <b>erase</b> its whole line.":"Bir <b>daireye çift dokun</b>arak çizgisinin tamamını <b>sil</b>.",
   // - settings -
   "Dark theme":"Koyu tema",                                         /* 29 */
   "Sound":"Ses",                                                    /* 30 */
@@ -903,7 +918,11 @@ function stopDemo(){   // clear timers + chrome; does NOT touch the board
   if(musicOn){ startMusic(); if(musicEl) fadeMusic(musicTargetVol(), 900); }   // ease the music back in
 }
 var demoReturn=null;   // where the ghost hands the board back (default: campaign level 1)
-function endDemo(){ stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast(T("Your turn!")); }
+var demoReplay=null;   // re-run the SAME demo (reset its board, replay) for "Watch again"
+// proceed to play: reset the board to a fresh (undrawn) level and hand it over
+function demoProceed(){ if(ovDemoEnd) ovDemoEnd.classList.remove("show"); stopDemo(); var r=demoReturn; demoReturn=null; if(r) r(); else loadLevel(0); toast(T("Your turn!")); }
+// the demo finished on its own: DON'T auto-hand-back - ask first (read-confirm + watch-again)
+function demoFinish(){ stopDemo(); if(ovDemoEnd) ovDemoEnd.classList.add("show"); else demoProceed(); }
 function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
   if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
   demoing=true;                                             // specific cell to change the caption
@@ -925,7 +944,7 @@ function playDemoOn(demo, caps, marks){   // the board is already loaded; the gh
     (function(cl){ demoAt(t,function(){ fireDemo("pointerup",cl); }); })(cells[cells.length-1]);
     t+=1300;
   });
-  demoAt(t+1400,endDemo);
+  demoAt(t+1400,demoFinish);
   return true;
 }
 function playDemo(){
@@ -934,11 +953,12 @@ function playDemo(){
   loadLevel(0);
   demoReturn=null;   // hand back to campaign level 1
   // pause on the mix cell and the gate cell of level 1's baked solution
-  return playDemoOn(demo,
-    [T("Drag a line out of a circle…"),T("Now bring in the other colour…"),T("Fill the board and light every square to win!")],
-    { "1:7":  { cap:T("Where colours meet, they MIX - red + blue makes purple!"), hold:1700 },
+  var caps=[T("Drag a line out of a circle…"),T("Now bring in the other colour…"),T("Fill the board and light every square to win!")];
+  var marks={ "1:7":  { cap:T("Where colours meet, they MIX - red + blue makes purple!"), hold:1700 },
       "1:10": { cap:T("A gate passes only its own colour. Purple flows right through."), hold:1900 },
-      "1:18": { cap:T("Cover every cell and light each square to win!"), hold:1100 } });
+      "1:18": { cap:T("Cover every cell and light each square to win!"), hold:1100 } };
+  demoReplay=function(){ loadLevel(0); playDemoOn(demo, caps, marks); };
+  return playDemoOn(demo, caps, marks);
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
 function cs(){ return board.clientWidth/N; }
@@ -1004,6 +1024,15 @@ function pathsAt(r,c){   // one entry PER passage - a self-overpass adds the sam
   junctions.forEach(function(J){ indicesIn(J.leg,r,c).forEach(function(jd){ out.push({cells:J.leg, idx:jd, col:J.sec}); }); });
   ems.forEach(function(E){ E.legs.forEach(function(Lg){ indicesIn(Lg.cells,r,c).forEach(function(id){ out.push({cells:Lg.cells, idx:id, col:E.col}); }); }); });
   return out;
+}
+/* the occ descriptor of the TOP passage through a cell, in RENDER order (emitter legs
+   first, then junction blends; last drawn is on top). Used so tapping a bridge grabs
+   the line you SEE on top, not the one hidden underneath. */
+function topPassAt(r,c){
+  var top=null;
+  ems.forEach(function(E,e){ E.legs.forEach(function(Lg,l){ indicesIn(Lg.cells,r,c).forEach(function(idx){ top={t:"em", e:e, l:l, idx:idx}; }); }); });
+  junctions.forEach(function(J,j){ indicesIn(J.leg,r,c).forEach(function(idx){ top = idx===0 ? {t:"jun", i:j} : {t:"jleg", i:j, idx:idx}; }); });
+  return top;
 }
 /* the colour a tile visibly WEARS: circles/prisms and emitter dots count as their
    own colour even before a pipe arrives; otherwise it's the pipe through the cell */
@@ -1201,6 +1230,9 @@ board.addEventListener("pointerdown", function(e){
   var cell=cellAt(e.clientX,e.clientY); if(!cell) return;
   var o=occAt(cell[0],cell[1]);
   if(!o) return;
+  // on a bridge, grab the line drawn ON TOP (what the player sees/touches), not the
+  // under-pass that occAt happens to find first.
+  if(isBridge(cell[0],cell[1])){ var tp=topPassAt(cell[0],cell[1]); if(tp) o=tp; }
   preGesture=snapState();               // snapshot before this gesture mutates the board (for undo)
   drawSteps=0; melodyReset();
   var pri=prismStartAt(cell[0],cell[1]);
@@ -1551,21 +1583,7 @@ function renderDots(){
   function dot(col,r,c,shape,star){
     var sz=s*0.84, off=(s-sz)/2;
     var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
-    // goal squares carry a soft 45° ribbon (two close parallel edges, tone-on-tone) that slowly
-    // drifts across the tile so an unfilled goal reads as "fill me"; hidden once delivered (.donept).
-    // Three copies spaced one drift-period apart make the diagonal flow seamless as it loops.
-    var band="";
-    if(shape==="sq"){
-      var gg=9, cp="";   // gg = half the gap between the two edges (small = close together)
-      [-120,0,120].forEach(function(o){
-        cp+='<g transform="translate('+o+','+(-o)+')">'
-          +'<line x1="-80" y1="'+(-80-gg)+'" x2="180" y2="'+(180-gg)+'"/>'
-          +'<line x1="-80" y1="'+(-80+gg)+'" x2="180" y2="'+(180+gg)+'"/></g>';
-      });
-      band='<svg class="gband" viewBox="0 0 100 100" preserveAspectRatio="none">'
-        +'<g class="gbandmove" fill="none" stroke="'+lighten(HEX[col],0.5)+'" stroke-width="6" stroke-linecap="round">'+cp+'</g></svg>';
-    }
-    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+band+(star?'<span class="st">✦</span>':'')+cb+'</div>';
+    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
   ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
   tgts.forEach(function(T){
@@ -1756,9 +1774,11 @@ function renderPaths(){
       var dy=oc[oi+1][0]-oc[oi][0], dx=oc[oi+1][1]-oc[oi][1];   // over-passage axis
       var cxp=bc[1]*s+s/2, cyp=bc[0]*s+s/2, HL=s*0.53;
       ctx.lineCap="butt";
-      ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.12;
+      // the cut has to hide the under-pipe all the way out to (past) the deck rails,
+      // or a thin sliver of it peeks through the gap between the cut and each rail.
+      ctx.strokeStyle="rgba(0,0,0,0.34)"; ctx.lineWidth=pipeInk+s*0.32;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
-      ctx.strokeStyle=INK; ctx.lineWidth=pipeInk;
+      ctx.strokeStyle=INK; ctx.lineWidth=pipeInk+s*0.19;
       ctx.beginPath(); ctx.moveTo(cxp-dx*HL,cyp-dy*HL); ctx.lineTo(cxp+dx*HL,cyp+dy*HL); ctx.stroke();
       ctx.save();                                           // repaint ONLY the over passage (a 3-cell segment)
       ctx.beginPath(); ctx.rect(cxp-HL, cyp-HL, HL*2, HL*2); ctx.clip();   // so a self-crossing line's under-pass isn't repainted
@@ -2068,7 +2088,9 @@ function watchMech(k, rewatch){
   };
   isTut=false; mode="campaign"; lvNameEl.textContent=T(M.name);
   applyLevel(dl);
-  playDemoOn(dl.demo, M.caps.map(function(c){ return T(c); }));
+  var caps=M.caps.map(function(c){ return T(c); });
+  demoReplay=function(){ applyLevel(dl); playDemoOn(dl.demo, caps); };
+  playDemoOn(dl.demo, caps);
 }
 /* ---------- inline SVG icons (no emoji): stroke follows text colour ---------- */
 function icn(name,sz,extra){
@@ -2233,7 +2255,7 @@ var ICONBTN={
   btnMenuPlay:["play","Play"], btnMenuDaily:["star","Daily Puzzle"], btnMenuLevels:["list","Levels"],
   btnMenuSet:["gear","Settings"], btnMenuPro:["spark","Go Pro"], btnMenuKofi:["coffee","Support Huemeld"],
   btnContinue:["play","Continue"], btnDaily:["star","Daily Puzzle"], btnMechWatch:["play","Watch how it works"],
-  btnDemo:["play","Show me"],   // btnUpBuy/btnFull labels carry the localized price - set by refreshProLabels()
+  btnDemo:["play","Show me"], btnDemoAgain:["reset","Watch again"],   // btnUpBuy/btnFull labels carry the localized price - set by refreshProLabels()
   btnUndo:["undo","Undo"], btnReset:["reset","Reset"], btnHint:["bulb","Hint"]
 };
 function applyIconButtons(){
@@ -2486,7 +2508,10 @@ applyTheme();
 if(!chapterUnlocked(chapterOf(li))) li=0;   // saved position outlived its unlock (cleared progress) - restart safely
 loadLevel(li);
 applyLang();   // paint icons + translate the whole UI into the saved language
-demoskipEl.addEventListener("click", function(){ ensureAudio(); endDemo(); });
+demoskipEl.addEventListener("click", function(){ ensureAudio(); demoProceed(); });
+var ovDemoEnd=document.getElementById("ovDemoEnd");
+document.getElementById("btnDemoGo").addEventListener("click", function(){ ensureAudio(); demoProceed(); });
+document.getElementById("btnDemoAgain").addEventListener("click", function(){ ensureAudio(); ovDemoEnd.classList.remove("show"); if(demoReplay) demoReplay(); });
 document.getElementById("btnDemo").addEventListener("click", function(){ ensureAudio(); ovHelp.classList.remove("show"); playDemo(); });
 if(!(LEVELS[0] && LEVELS[0].demo)) document.getElementById("btnDemo").style.display="none";
 if(!localStorage.getItem("hm_flow2_seen")){
