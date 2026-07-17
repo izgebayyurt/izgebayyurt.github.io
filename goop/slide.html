@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Goop — slide &amp; mix (demo)</title>
+<style>
+  :root{color-scheme:light;}
+  html,body{margin:0;height:100%;background:#efe7d6;overflow:hidden;color:#2a2622;
+    font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  #top{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:8px;align-items:stretch;}
+  .chip{background:#fbf6ea;border:2.5px solid #2a2622;border-radius:12px;box-shadow:2px 3px 0 #2a2622;
+    font:800 13px ui-rounded,system-ui;color:#2a2622;padding:7px 12px;display:flex;align-items:center;gap:7px;}
+  button.chip{cursor:pointer;transition:transform .06s,box-shadow .06s;}
+  button.chip:active{transform:translate(1px,2px);box-shadow:1px 1px 0 #2a2622;}
+  #lvlname{min-width:96px;justify-content:center;text-align:center;}
+  #goalrow{gap:6px;}
+  .gdot{width:16px;height:16px;border-radius:5px;border:2.5px solid #2a2622;position:relative;}
+  .gdot.done::after{content:"";position:absolute;inset:2px;border-radius:2px;background:#2a2622;
+    -webkit-mask:linear-gradient(#000,#000);}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#6f6656;
+    background:#fbf6ea;border:2px solid #2a2622;border-radius:11px;padding:6px 13px;box-shadow:2px 2px 0 #2a2622;max-width:88vw;text-align:center;}
+  #hint b{color:#2a2622;}
+  #win{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;
+    background:rgba(239,231,214,.72);backdrop-filter:blur(2px);}
+  #win h2{margin:0;font:900 30px ui-rounded,system-ui;color:#2a2622;text-shadow:2px 2px 0 #fff;}
+  #win .chip{font-size:16px;padding:11px 20px;}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="top">
+    <button class="chip" id="prev" title="Previous level">◀</button>
+    <div class="chip" id="lvlname">—</div>
+    <button class="chip" id="next" title="Next level">▶</button>
+    <button class="chip" id="reset" title="Restart level">↺</button>
+    <div class="chip" id="goalrow"></div>
+  </div>
+  <div id="hint">Swipe or use <b>arrow keys</b> — you slide until you hit something.</div>
+  <div id="win">
+    <h2>Solved!</h2>
+    <button class="chip" id="wnext">Next level ▶</button>
+  </div>
+
+<script>
+(function(){
+  'use strict';
+  const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+
+  // ---- colour model --------------------------------------------------------
+  // 0 neutral, 1 red, 2 yellow, 3 blue, 4 orange, 5 green, 6 purple
+  const NEUTRAL=0,RED=1,YEL=2,BLU=3,ORG=4,GRN=5,PUR=6;
+  const HEX={0:'#c8bfa e'.replace(' ',''),1:'#e35545',2:'#f1c04b',3:'#3f8be6',4:'#ec8a3a',5:'#57a75d',6:'#8a5bc6'};
+  HEX[0]='#c8bfae';
+  const NAME={0:'clear',1:'red',2:'yellow',3:'blue',4:'orange',5:'green',6:'purple'};
+  const INK='#2a2622';
+  // secondary from two distinct primaries
+  const SECOND={1:{2:ORG,3:PUR},2:{1:ORG,3:GRN},3:{1:PUR,2:GRN}};
+  const isPrimary=x=>x>=1&&x<=3, isSecondary=x=>x>=4;
+  function mixContact(cur,p){            // p is a primary source colour
+    if(cur===NEUTRAL) return p;
+    if(cur===p) return cur;              // same primary → no-op
+    if(isPrimary(cur)) return SECOND[cur][p];
+    return cur;                          // secondary + primary → reject (unchanged)
+  }
+
+  // ---- level authoring -----------------------------------------------------
+  // chars: '#'wall  '.'/' 'empty  '@'start
+  //        r y b sources   w cleaner
+  //        R Y B O G P goals(need that colour)
+  //        1..6 gate (pass only if your colour == that index)
+  const GCHAR={R:RED,Y:YEL,B:BLU,O:ORG,G:GRN,P:PUR};
+  const LEVELS=[
+    {name:'Dip & Drop', hint:'Slide into a paint block to <b>pick up its colour</b>, then carry it into the matching goal.',
+     map:['#######',
+          '#@...r#',
+          '#.....#',
+          '#.....#',
+          '#R....#',
+          '#######']},
+    {name:'Make Purple', hint:'<b>Red + Blue = Purple.</b> Grab one, carry it into the other.',
+     map:['#########',
+          '#@.....b#',
+          '#.......#',
+          '#r.....P#',
+          '#.......#',
+          '#########']},
+    {name:'Rinse Between', hint:'A secondary colour is <b>locked</b> — visit the <b>sink</b> to wash clean before mixing again.',
+     map:['#######',
+          '##...y#',
+          '#..@GP#',
+          '#w....#',
+          '#..br.#',
+          '#.#..##',
+          '#######']},
+    {name:'Keyed Gate', hint:'A <b>gate</b> only opens for its own colour. Become it, pass through, deliver.',
+     map:['#########',
+          '#@..b..3#',
+          '#.......#',
+          '#####.###',
+          '#B....3.#',
+          '#.......#',
+          '#########']},
+  ];
+
+  // ---- parsed board state --------------------------------------------------
+  let gw,gh,cells,start,goals,player,moves,levelIdx,won;
+  // cell = {type:'empty|wall|src|clean|goal|gate', color?, id?, done?}
+  function parse(lv){
+    const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
+    cells=[]; goals=[]; start={r:1,c:1}; let gid=0;
+    for(let r=0;r<gh;r++){ const row=[]; const line=m[r];
+      for(let c=0;c<gw;c++){ const ch=line[c]||'#'; let cell={type:'empty'};
+        if(ch==='#') cell={type:'wall'};
+        else if(ch==='@'){ start={r,c}; cell={type:'empty'}; }
+        else if(ch==='r') cell={type:'src',color:RED};
+        else if(ch==='y') cell={type:'src',color:YEL};
+        else if(ch==='b') cell={type:'src',color:BLU};
+        else if(ch==='w') cell={type:'clean'};
+        else if('RYBOGP'.includes(ch)){ cell={type:'goal',color:GCHAR[ch],id:gid++,done:false}; goals.push(cell); }
+        else if('123456'.includes(ch)) cell={type:'gate',color:+ch};
+        row.push(cell);
+      } cells.push(row);
+    }
+  }
+  const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
+  const at=(r,c)=>inb(r,c)?cells[r][c]:null;
+
+  // ---- pure move resolution (engine + solver share this) -------------------
+  const DIRS={up:[-1,0],down:[1,0],left:[0,-1],right:[0,1]};
+  function passable(r,c,color){ const t=at(r,c); if(!t) return false;
+    if(t.type==='empty') return true;
+    if(t.type==='gate') return t.color===color;
+    return false; }                       // wall/src/clean/goal all block
+  // resolve a move from a state; returns new state + what happened
+  function resolve(r,c,color,doneSet,dir){
+    const [dr,dc]=DIRS[dir]; let nr=r,nc=c;
+    while(passable(nr+dr,nc+dc,color)){ nr+=dr; nc+=dc; }
+    const br=nr+dr, bc=nc+dc, blk=at(br,bc);
+    let ncolor=color, ndone=doneSet, effect=null, reject=false;
+    if(blk){
+      if(blk.type==='src'){ const mx=mixContact(color,blk.color);
+        if(mx===color && isSecondary(color)) reject=true; ncolor=mx; effect=reject?null:'src'; }
+      else if(blk.type==='clean'){ ncolor=NEUTRAL; effect='clean'; }
+      else if(blk.type==='goal'){
+        if(color===blk.color && !doneSet.has(blk.id)){ ndone=new Set(doneSet); ndone.add(blk.id); effect='goal'; }
+        else if(color!==blk.color) reject=true; }
+    }
+    const moved=(nr!==r||nc!==c);
+    const changed=moved||ncolor!==color||ndone!==doneSet;
+    return {r:nr,c:nc,color:ncolor,done:ndone,effect,reject,moved,changed,br,bc};
+  }
+
+  // ---- BFS solver (oracle + future hints) ----------------------------------
+  function solve(){
+    const allIds=goals.map(g=>g.id);
+    const key=s=>s.r+','+s.c+','+s.color+','+[...s.done].sort().join('|');
+    const s0={r:start.r,c:start.c,color:NEUTRAL,done:new Set()};
+    const q=[{s:s0,path:[]}]; const seen=new Set([key(s0)]);
+    while(q.length){ const {s,path}=q.shift();
+      if(allIds.every(id=>s.done.has(id))) return path;
+      if(path.length>40) continue;
+      for(const dir of ['up','down','left','right']){
+        const nx=resolve(s.r,s.c,s.color,s.done,dir); if(!nx.changed) continue;
+        const ns={r:nx.r,c:nx.c,color:nx.color,done:nx.done}; const k=key(ns);
+        if(seen.has(k)) continue; seen.add(k); q.push({s:ns,path:path.concat(dir)});
+      }
+    }
+    return null;
+  }
+
+  // ---- juice: springy goopy cube -------------------------------------------
+  let px=0,py=0,tx=0,ty=0,vx=0,vy=0;      // pixel centre + velocity (spring)
+  let jelly=0,jvel=0, lastDir=[0,0], impact=0, rejectShake=0, winT=0;
+  function loadLevel(i){
+    levelIdx=(i+LEVELS.length)%LEVELS.length; won=false; winT=0; moves=0;
+    parse(LEVELS[levelIdx]);
+    player={r:start.r,c:start.c,color:NEUTRAL,moving:false,pending:null,rcolor:NEUTRAL};
+    const ctr=cellCentre(player.r,player.c); px=tx=ctr.x; py=ty=ctr.y; vx=vy=0; jelly=0;jvel=0;
+    document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
+    document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
+    document.getElementById('win').style.display='none';
+    buildGoalRow(); layout();
+    // sanity: warn in console if a level ships unsolvable
+    if(!solve()) console.warn('[goop] level not solvable:',LEVELS[levelIdx].name);
+  }
+  function buildGoalRow(){ const gr=document.getElementById('goalrow'); gr.innerHTML='';
+    goals.forEach(g=>{ const d=document.createElement('div'); d.className='gdot'+(g.done?' done':'');
+      d.style.background=HEX[g.color]; d.dataset.id=g.id; gr.appendChild(d); }); }
+  function refreshGoalRow(){ [...document.querySelectorAll('.gdot')].forEach(d=>{
+      const g=goals[+d.dataset.id]; d.classList.toggle('done',!!g.done); }); }
+
+  // ---- input ---------------------------------------------------------------
+  function tryMove(dir,instant){
+    if(player.moving||won) return;
+    const nx=resolve(player.r,player.c,player.color,doneSet(),dir);
+    if(!nx.changed){ if(nx.reject){ rejectShake=1; kick(dir,.35);} return; }
+    moves++;
+    player.pending={color:nx.color,effect:nx.effect,reject:nx.reject,goalCell:nx.effect==='goal'?at(nx.br,nx.bc):null};
+    player.r=nx.r; player.c=nx.c; player.moving=true;
+    const ctr=cellCentre(nx.r,nx.c); tx=ctr.x; ty=ctr.y;
+    lastDir=DIRS[dir];
+    if(instant) settle(true);
+  }
+  function doneSet(){ const s=new Set(); goals.forEach(g=>{ if(g.done) s.add(g.id); }); return s; }
+  function settle(instant){
+    const p=player.pending; if(!p){ player.moving=false; return; }
+    player.rcolor=player.color=p.color;
+    if(p.goalCell) p.goalCell.done=true;
+    player.moving=false; player.pending=null;
+    impact=1; jvel-=(Math.abs(lastDir[0])+Math.abs(lastDir[1]))?.9:.5;
+    if(p.reject) rejectShake=1;
+    refreshGoalRow();
+    if(goals.length && goals.every(g=>g.done)){ won=true; winT=0;
+      document.getElementById('win').style.display='flex'; }
+    if(instant){ px=tx;py=ty;vx=vy=0; }
+  }
+  function kick(dir,amt){ const d=DIRS[dir]; vx+=d[1]*amt*cellSize()*.25; vy+=d[0]*amt*cellSize()*.25; }
+
+  addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    const map={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'};
+    if(map[k]){ e.preventDefault(); tryMove(map[k]); }
+    else if(k==='r'){ loadLevel(levelIdx); }
+  });
+  let ts=null;
+  cv.addEventListener('touchstart',e=>{ ts=e.changedTouches[0]; },{passive:true});
+  cv.addEventListener('touchend',e=>{ if(!ts)return; const t=e.changedTouches[0];
+    const dx=t.clientX-ts.clientX, dy=t.clientY-ts.clientY;
+    if(Math.hypot(dx,dy)<24){ ts=null; return; }
+    if(Math.abs(dx)>Math.abs(dy)) tryMove(dx>0?'right':'left'); else tryMove(dy>0?'down':'up'); ts=null; },{passive:true});
+  // mouse drag (desktop swipe)
+  let ms=null;
+  cv.addEventListener('mousedown',e=>{ ms={x:e.clientX,y:e.clientY}; });
+  addEventListener('mouseup',e=>{ if(!ms)return; const dx=e.clientX-ms.x,dy=e.clientY-ms.y;
+    if(Math.hypot(dx,dy)>24){ if(Math.abs(dx)>Math.abs(dy)) tryMove(dx>0?'right':'left'); else tryMove(dy>0?'down':'up'); } ms=null; });
+
+  document.getElementById('prev').onclick=()=>loadLevel(levelIdx-1);
+  document.getElementById('next').onclick=()=>loadLevel(levelIdx+1);
+  document.getElementById('reset').onclick=()=>loadLevel(levelIdx);
+  document.getElementById('wnext').onclick=()=>loadLevel(levelIdx+1);
+
+  // ---- layout & rendering --------------------------------------------------
+  let S=40, ox=0, oy=0, dpr=1;
+  function cellSize(){ return S; }
+  function cellCentre(r,c){ return {x:ox+c*S+S/2, y:oy+r*S+S/2}; }
+  function layout(){
+    dpr=Math.min(2,devicePixelRatio||1);
+    const w=innerWidth, h=innerHeight;
+    cv.width=w*dpr; cv.height=h*dpr; cv.style.width=w+'px'; cv.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const padTop=64, padBot=64, padX=18;
+    S=Math.floor(Math.min((w-padX*2)/gw,(h-padTop-padBot)/gh));
+    S=Math.max(24,Math.min(S,86));
+    ox=Math.round((w-gw*S)/2); oy=Math.round(padTop+((h-padTop-padBot)-gh*S)/2);
+    const ctr=cellCentre(player.r,player.c); if(!player.moving){ px=tx=ctr.x; py=ty=ctr.y; }
+  }
+  addEventListener('resize',layout);
+
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function shade(hex,f){ const n=parseInt(hex.slice(1),16); let R=n>>16,G=(n>>8)&255,B=n&255;
+    R=Math.round(R+(f>0?(255-R)*f:R*f)); G=Math.round(G+(f>0?(255-G)*f:G*f)); B=Math.round(B+(f>0?(255-B)*f:B*f));
+    return 'rgb('+R+','+G+','+B+')'; }
+
+  function drawCell(r,c){
+    const cell=cells[r][c]; const x=ox+c*S, y=oy+r*S, m=Math.round(S*0.09), rad=Math.round(S*0.26);
+    if(cell.type==='wall'){ ctx.fillStyle='#d9cfbb'; rr(x+1,y+1,S-2,S-2,6); ctx.fill();
+      ctx.fillStyle='#b7ab92'; rr(x+m,y+m,S-2*m,S-2*m,rad*.7); ctx.fill(); return; }
+    // floor tile
+    ctx.fillStyle=((r+c)&1)?'#ece3d0':'#efe7d6'; ctx.fillRect(x,y,S,S);
+    if(cell.type==='src'){ const col=HEX[cell.color];
+      ctx.fillStyle=shade(col,-.28); rr(x+m,y+m+2,S-2*m,S-2*m,rad); ctx.fill();
+      ctx.fillStyle=col; rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.fill();
+      ctx.strokeStyle=shade(col,-.35); ctx.lineWidth=Math.max(2,S*.05); rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.5)'; rr(x+m+S*.12,y+m+S*.11,S*.24,S*.14,S*.07); ctx.fill();
+    } else if(cell.type==='clean'){
+      ctx.fillStyle='#dfeef7'; rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.fill();
+      ctx.strokeStyle='#8fb9d6'; ctx.lineWidth=Math.max(2,S*.05); rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.stroke();
+      // droplet
+      ctx.fillStyle='#5aa0d8'; ctx.beginPath(); const cx=x+S/2, cy=y+S/2+S*.05, rD=S*.16;
+      ctx.moveTo(cx,cy-rD*1.6); ctx.quadraticCurveTo(cx+rD,cy,cx,cy+rD); ctx.quadraticCurveTo(cx-rD,cy,cx,cy-rD*1.6); ctx.fill();
+    } else if(cell.type==='gate'){ const col=HEX[cell.color];
+      ctx.fillStyle=shade(col,.55); rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.fill();
+      ctx.setLineDash([S*.12,S*.09]); ctx.strokeStyle=col; ctx.lineWidth=Math.max(2.5,S*.06);
+      rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x+S/2,y+S/2-S*.03,S*.1,0,7); ctx.fill();
+      ctx.fillRect(x+S/2-S*.03,y+S/2-S*.03,S*.06,S*.16);
+    } else if(cell.type==='goal'){ const col=HEX[cell.color];
+      if(cell.done){ ctx.fillStyle=col; rr(x+m,y+m,S-2*m,S-2*m,rad); ctx.fill();
+        ctx.strokeStyle=INK; ctx.lineWidth=Math.max(3,S*.08); ctx.lineCap='round'; ctx.beginPath();
+        ctx.moveTo(x+S*.32,y+S*.52); ctx.lineTo(x+S*.45,y+S*.66); ctx.lineTo(x+S*.7,y+S*.34); ctx.stroke(); ctx.lineCap='butt';
+      } else {
+        ctx.strokeStyle=col; ctx.lineWidth=Math.max(3,S*.09); ctx.setLineDash([S*.16,S*.12]);
+        ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.30,0,7); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle=shade(col,.4); ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.14,0,7); ctx.fill();
+      }
+    }
+  }
+
+  function drawPlayer(){
+    const col=HEX[player.rcolor];
+    let sx=1+Math.max(-.001,Math.abs(vx)*.010)-Math.abs(vy)*.010;
+    let sy=1+Math.max(-.001,Math.abs(vy)*.010)-Math.abs(vx)*.010;
+    const jl=jelly; sx+=jl*.28*(Math.abs(lastDir[1])?1:-1); sy+=jl*.28*(Math.abs(lastDir[0])?1:-1);
+    sx=Math.max(.62,Math.min(1.4,sx)); sy=Math.max(.62,Math.min(1.4,sy));
+    let jx=0,jy=0; if(rejectShake>0){ jx=Math.sin(rejectShake*40)*rejectShake*6; }
+    const w=S*.74*sx, h=S*.74*sy, x=px-w/2+jx, y=py-h/2+jy, rad=Math.min(w,h)*.42;
+    // shadow
+    ctx.fillStyle='rgba(42,38,34,.16)'; rr(px-S*.34,py+S*.20,S*.68,S*.16,S*.08); ctx.fill();
+    // body
+    ctx.fillStyle=shade(col,-.22); rr(x,y+h*.06,w,h,rad); ctx.fill();
+    ctx.fillStyle=col; rr(x,y,w,h,rad); ctx.fill();
+    ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.5,S*.055); rr(x,y,w,h,rad); ctx.stroke();
+    // gloss
+    ctx.fillStyle='rgba(255,255,255,.55)'; rr(x+w*.16,y+h*.14,w*.34,h*.20,rad*.5); ctx.fill();
+    // eyes (goopy face)
+    const eo=w*.15, ey=y+h*.44, er=Math.max(2,S*.055);
+    ctx.fillStyle=INK; ctx.beginPath(); ctx.arc(px-eo+jx,ey,er,0,7); ctx.arc(px+eo+jx,ey,er,0,7); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px-eo+jx-er*.3,ey-er*.3,er*.35,0,7); ctx.arc(px+eo+jx-er*.3,ey-er*.3,er*.35,0,7); ctx.fill();
+    if(player.rcolor===NEUTRAL){ ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2,S*.045); ctx.beginPath();
+      ctx.arc(px+jx,ey+S*.12,S*.06,.15*Math.PI,.85*Math.PI); ctx.stroke(); }
+  }
+
+  function frame(){
+    // spring toward target
+    const k=.34, damp=.72;
+    vx+=(tx-px)*k; vy+=(ty-py)*k; vx*=damp; vy*=damp; px+=vx; py+=vy;
+    // jelly spring
+    jvel+=(0-jelly)*.28; jvel*=.80; jelly+=jvel;
+    if(impact>0) impact=Math.max(0,impact-.05);
+    if(rejectShake>0) rejectShake=Math.max(0,rejectShake-.06);
+    // arrival
+    if(player.moving && Math.abs(tx-px)<0.6 && Math.abs(ty-py)<0.6 && Math.hypot(vx,vy)<0.6){ settle(false); }
+
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(let r=0;r<gh;r++)for(let c=0;c<gw;c++) drawCell(r,c);
+    drawPlayer();
+    if(won){ winT=Math.min(1,winT+.04);
+      // confetti-ish sparkle ring
+      ctx.save(); ctx.globalAlpha=winT; ctx.translate(px,py);
+      for(let i=0;i<10;i++){ const a=i/10*Math.PI*2+winT*3, rr2=S*(.5+winT*1.3);
+        ctx.fillStyle=HEX[1+(i%6)]; ctx.beginPath();
+        ctx.arc(Math.cos(a)*rr2,Math.sin(a)*rr2,S*.09*(1-winT*.4),0,7); ctx.fill(); }
+      ctx.restore();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---- test / oracle hook --------------------------------------------------
+  window.__goop={
+    state:()=>({level:LEVELS[levelIdx].name,idx:levelIdx,color:player.color,colorName:NAME[player.color],
+      pos:[player.r,player.c],moves,goals:goals.map(g=>({need:NAME[g.color],done:g.done})),won}),
+    move:(d)=>tryMove(d,true),
+    solve:()=>solve(),
+    load:(i)=>loadLevel(i),
+    count:()=>LEVELS.length,
+  };
+
+  // ---- boot ----------------------------------------------------------------
+  loadLevel(0); layout(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
