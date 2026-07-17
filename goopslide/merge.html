@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Goop — merge (prototype)</title>
+<style>
+  :root{color-scheme:light;}
+  html,body{margin:0;height:100%;overflow:hidden;color:#3a2f24;
+    background:radial-gradient(120% 120% at 50% 18%, #f6efdd 0%, #efe4cb 62%, #e6d8b9 100%);
+    font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  #top{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:8px;}
+  .chip{background:#fbf5e6;border:2.5px solid #3a2f24;border-radius:13px;box-shadow:2px 3px 0 #3a2f24;
+    font:800 13px ui-rounded,system-ui;color:#3a2f24;padding:8px 12px;display:flex;align-items:center;gap:6px;}
+  button.chip{cursor:pointer;transition:transform .06s,box-shadow .06s;}
+  button.chip:active{transform:translate(1px,2px);box-shadow:1px 1px 0 #3a2f24;}
+  #lvlname{min-width:120px;justify-content:center;text-align:center;}
+  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#6a5f4c;
+    background:#fbf5e6;border:2px solid #3a2f24;border-radius:12px;padding:7px 14px;box-shadow:2px 2px 0 #3a2f24;max-width:88vw;text-align:center;}
+  #hint b{color:#3a2f24;}
+  #win{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;}
+  #win .card{background:#fbf5e6;border:3px solid #3a2f24;border-radius:20px;box-shadow:4px 6px 0 #3a2f24;
+    padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+  #win h2{margin:0;font:900 28px ui-rounded,system-ui;}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="top">
+    <button class="chip" id="prev">◀</button>
+    <div class="chip" id="lvlname">—</div>
+    <button class="chip" id="next">▶</button>
+    <button class="chip" id="undo" title="Undo (Z)">↶</button>
+    <button class="chip" id="reset" title="Restart (R)">↺</button>
+    <div class="chip" id="moves">0</div>
+  </div>
+  <div id="hint">One swipe moves <b>every</b> droplet. They <b>merge</b> on contact — fill each mould with a blob of its size.</div>
+  <div id="win"><div class="card"><h2>Solved! 🎉</h2><button class="chip" id="wnext">Next ▶</button></div></div>
+
+<script>
+(function(){
+  'use strict';
+  const cv=document.getElementById('c'), ctx=cv.getContext('2d'); const INK='#3a2f24';
+  const GOOP='#4bb39a', GOOPD='#2f8f79';
+
+  // '#'wall  '.'/' 'floor  'o'droplet(size1)  '1'..'9' mould(need that size)
+  const LEVELS=[
+    {name:'Two Become One', hint:'One swipe moves <b>both</b> droplets. Slam them together, then drop the size-2 blob in the mould.',
+     map:['######','#o..o#','#....#','#....#','#2####','######']},
+    {name:'Keep One Back', hint:'Merge two into a <b>2</b>, but keep the third a <b>1</b> — don’t let all three touch.',
+     map:['#######','#o.o.o#','#.....#','#.#.#.#','#2...1#','#######']},
+    {name:'Two and Two', hint:'Two moulds, both want <b>2</b>. Pair them up.',
+     map:['#######','#o.o..#','#o.o..#','#.....#','#2...2#','#######']},
+    {name:'Three Please', hint:'Build a <b>3</b> from three droplets and leave one as a <b>1</b>.',
+     map:['#######','#ooo.o#','#.....#','#.....#','#3###1#','#######']},
+    {name:'Snug Corners', hint:'Two moulds, five droplets. Mind which ones touch.',
+     map:['######','#.oo3#','#.#o2#','#o#o.#','######']},
+    {name:'Split Decision', hint:'A <b>3</b> and a <b>1</b> — pick the odd one out early.',
+     map:['######','#.1o.#','#o.o3#','#....#','#o.#.#','######']},
+    {name:'Tight Squeeze', hint:'Five droplets, a <b>3</b> and a <b>2</b>, and not much room.',
+     map:['#######','#o.#..#','#ooo..#','#....o#','#.#32.#','#######']},
+  ];
+
+  let gw,gh,grid,level0,state,undoStack,moves,levelIdx,won;
+  const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
+  function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
+    grid=[]; const drops=[], molds=[]; let id=0;
+    for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
+      if(ch==='#'){ row.push('#'); } else { row.push('.');
+        if(ch==='o') drops.push({id:id++,r,c,size:1,locked:false});
+        else if('123456789'.includes(ch)) molds.push({r,c,size:+ch,filled:false}); } }
+      grid.push(row); }
+    return {drops,molds}; }
+
+  const DIRS={up:[-1,0],down:[1,0],left:[0,-1],right:[0,1]};
+  const sig=(drops,molds)=>drops.map(d=>d.r+','+d.c+','+d.size+','+(d.locked?1:0)).sort().join(';')+'|'+molds.map(m=>m.filled?1:0).join('');
+  function simulate(drops,molds,dir){
+    const [dr,dc]=DIRS[dir]; const ds=drops.map(d=>({...d})), ms=molds.map(m=>({...m}));
+    const occ={}; ds.forEach((d,i)=>{ if(d.locked) occ[d.r+','+d.c]=i; });
+    const order=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*dr+ds[b].c*dc)-(ds[a].r*dr+ds[a].c*dc));
+    const removed=new Set(), merges=[];
+    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c;
+      while(true){ const nr=r+dr,nc=c+dc,k=nr+','+nc;
+        if(!inb(nr,nc)||grid[nr][nc]==='#') break;
+        if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked) break;
+          ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
+        r=nr;c=nc; }
+      if(removed.has(i))continue; ds[i].r=r; ds[i].c=c; occ[r+','+c]=i; }
+    const nd=ds.filter((d,i)=>!removed.has(i)); const locks=[];
+    for(const mo of ms){ if(mo.filled)continue; const d=nd.find(d=>!d.locked&&d.r===mo.r&&d.c===mo.c&&d.size===mo.size);
+      if(d){ d.locked=true; mo.filled=true; locks.push(d.id); } }
+    return {drops:nd,molds:ms,merges,locks};
+  }
+  const isWin=molds=>molds.every(m=>m.filled);
+
+  // BFS oracle
+  function solve(){
+    const s0={drops:state0().drops,molds:state0().molds};
+    const key=s=>sig(s.drops,s.molds); const q=[{s:s0,p:[]}], seen=new Set([key(s0)]);
+    while(q.length){ const {s,p}=q.shift(); if(isWin(s.molds)) return p; if(p.length>40) continue;
+      for(const dir of ['up','down','left','right']){ const r=simulate(s.drops,s.molds,dir);
+        const ns={drops:r.drops,molds:r.molds}; if(sig(s.drops,s.molds)===key(ns))continue;
+        const k=key(ns); if(seen.has(k))continue; seen.add(k); q.push({s:ns,p:p.concat(dir)}); } }
+    return null;
+  }
+  let _l0; function state0(){ return {drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m})) }; }
+
+  // ---- render state --------------------------------------------------------
+  let renderById={}, ghosts=[], moving=false;
+  function loadLevel(i){ levelIdx=(i+LEVELS.length)%LEVELS.length; won=false; moves=0; undoStack=[]; ghosts=[]; renderById={};
+    _l0=parse(LEVELS[levelIdx]); state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
+    layout(); state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; });
+    document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
+    document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
+    document.getElementById('moves').textContent='0';
+    document.getElementById('win').style.display='none';
+    if(!solve()) console.warn('[merge] not solvable:',LEVELS[levelIdx].name);
+  }
+  function snapshot(){ return {drops:state.drops.map(d=>({...d})), molds:state.molds.map(m=>({...m})), moves}; }
+  function applyMove(dir,instant){ if((moving&&!instant)||won) return;
+    const before=sig(state.drops,state.molds); const res=simulate(state.drops,state.molds,dir);
+    if(before===sig(res.drops,res.molds)) return;
+    undoStack.push(snapshot()); moves++;
+    res.merges.forEach(m=>{ const g=renderById[m.from]; if(g) ghosts.push({px:g.px,py:g.py,tx:cellX(m.c),ty:cellY(m.r),life:1,rr:g.rr}); delete renderById[m.from]; });
+    state.drops=res.drops; state.molds=res.molds;
+    state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0}; e.tr=sizeR(d.size); });
+    res.merges.forEach(m=>{ const e=renderById[m.to]; if(e) e.pop=1; });
+    res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
+    document.getElementById('moves').textContent=moves; moving=true;
+    if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; } } ghosts=[]; moving=false; }
+    if(isWin(state.molds)){ won=true; setTimeout(()=>document.getElementById('win').style.display='flex',380); }
+  }
+  function undo(){ if(moving||!undoStack.length) return; const s=undoStack.pop();
+    state={drops:s.drops.map(d=>({...d})),molds:s.molds.map(m=>({...m}))}; moves=s.moves; won=false;
+    document.getElementById('win').style.display='none'; document.getElementById('moves').textContent=moves;
+    renderById={}; ghosts=[]; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; }); }
+
+  // ---- input ---------------------------------------------------------------
+  addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
+    const mp={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'};
+    if(mp[k]){ e.preventDefault(); applyMove(mp[k]); } else if(k==='z'){ undo(); } else if(k==='r'){ loadLevel(levelIdx); } });
+  let ps=null; const dn=(x,y)=>ps={x,y};
+  const upn=(x,y)=>{ if(!ps)return; const dx=x-ps.x,dy=y-ps.y; ps=null; if(Math.hypot(dx,dy)<24)return;
+    if(Math.abs(dx)>Math.abs(dy)) applyMove(dx>0?'right':'left'); else applyMove(dy>0?'down':'up'); };
+  cv.addEventListener('touchstart',e=>{const t=e.changedTouches[0];dn(t.clientX,t.clientY);},{passive:true});
+  cv.addEventListener('touchend',e=>{const t=e.changedTouches[0];upn(t.clientX,t.clientY);},{passive:true});
+  cv.addEventListener('mousedown',e=>dn(e.clientX,e.clientY)); addEventListener('mouseup',e=>upn(e.clientX,e.clientY));
+  document.getElementById('prev').onclick=()=>loadLevel(levelIdx-1);
+  document.getElementById('next').onclick=()=>loadLevel(levelIdx+1);
+  document.getElementById('undo').onclick=undo;
+  document.getElementById('reset').onclick=()=>loadLevel(levelIdx);
+  document.getElementById('wnext').onclick=()=>loadLevel(levelIdx+1);
+
+  // ---- layout & draw -------------------------------------------------------
+  let S=48,ox=0,oy=0,dpr=1,TRAY=14;
+  const cellX=c=>ox+c*S+S/2, cellY=r=>oy+r*S+S/2;
+  const sizeR=sz=>Math.min(S*0.28+(sz-1)*S*0.10, S*0.46);
+  function layout(){ dpr=Math.min(2,devicePixelRatio||1); const w=innerWidth,h=innerHeight;
+    cv.width=w*dpr;cv.height=h*dpr;cv.style.width=w+'px';cv.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
+    S=Math.floor(Math.min((w-40-2*TRAY)/gw,(h-150-2*TRAY)/gh)); S=Math.max(30,Math.min(S,96));
+    ox=Math.round((w-gw*S)/2); oy=Math.round(72+((h-144)-gh*S)/2); }
+  addEventListener('resize',()=>{ layout(); for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d&&!moving){renderById[id].px=cellX(d.c);renderById[id].py=cellY(d.r);} } });
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function block(x,y,S){ const m=Math.round(S*.055),rad=Math.round(S*.28),d=Math.round(S*.085);
+    ctx.fillStyle='rgba(58,47,36,.16)';rr(x+m,y+m+d*1.3,S-2*m,S-2*m,rad);ctx.fill();
+    ctx.fillStyle='#b09a76';rr(x+m,y+m+d,S-2*m,S-2*m,rad);ctx.fill();
+    ctx.fillStyle='#cbb996';rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.fill();
+    ctx.strokeStyle=INK;ctx.lineWidth=Math.max(2.2,S*.045);rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.stroke(); }
+  function drawMold(mo){ const x=ox+mo.c*S,y=oy+mo.r*S,cx=x+S/2,cy=y+S/2;
+    ctx.fillStyle=mo.filled?'rgba(75,179,154,.18)':'rgba(58,47,36,.06)'; rr(x+S*.12,y+S*.12,S*.76,S*.76,S*.22); ctx.fill();
+    ctx.setLineDash([S*.14,S*.11]); ctx.lineWidth=Math.max(2.5,S*.07); ctx.strokeStyle=mo.filled?GOOPD:'#a9967a';
+    rr(x+S*.12,y+S*.12,S*.76,S*.76,S*.20); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=mo.filled?'rgba(47,143,121,.55)':'#a1927a';
+    ctx.font='900 '+Math.round(S*.34)+'px ui-rounded,system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(mo.size),cx,cy+S*.02); }
+  function drawBlob(e,d){ const rad=e.rr*(1+e.pop*.16), cx=e.px, cy=e.py;
+    ctx.fillStyle='rgba(58,47,36,.18)'; ctx.beginPath(); ctx.ellipse(cx,cy+rad*.72,rad*.95,rad*.34,0,0,7); ctx.fill();
+    ctx.fillStyle=GOOPD; ctx.beginPath(); ctx.arc(cx,cy+rad*.10,rad,0,7); ctx.fill();
+    ctx.fillStyle=d&&d.locked?'#7fcdb9':GOOP; ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fill();
+    ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.5,S*.05); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(cx-rad*.32,cy-rad*.34,rad*.32,rad*.2,-0.5,0,7); ctx.fill();
+    // eyes
+    const eo=rad*.34, er=Math.max(2,rad*.16);
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx-eo,cy-rad*.05,er,0,7); ctx.arc(cx+eo,cy-rad*.05,er,0,7); ctx.fill();
+    ctx.fillStyle=INK; ctx.beginPath(); ctx.arc(cx-eo,cy-rad*.05,er*.55,0,7); ctx.arc(cx+eo,cy-rad*.05,er*.55,0,7); ctx.fill();
+    if(d&&d.size>1){ ctx.fillStyle='#fff'; ctx.strokeStyle=INK; ctx.lineWidth=2.5; ctx.font='900 '+Math.round(rad*.7)+'px ui-rounded,system-ui';
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.strokeText(d.size,cx,cy+rad*.42); ctx.fillText(d.size,cx,cy+rad*.42); }
+  }
+  function frame(){
+    let mx=0; for(const id in renderById){ const e=renderById[id]; const d=state.drops.find(x=>x.id==id); if(!d)continue;
+      const tx=cellX(d.c),ty=cellY(d.r); e.px+=(tx-e.px)*.34; e.py+=(ty-e.py)*.34; e.rr+=(e.tr-e.rr)*.3; e.pop*=.86;
+      mx=Math.max(mx,Math.abs(tx-e.px),Math.abs(ty-e.py)); }
+    for(const g of ghosts){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; g.life-=.06; } ghosts=ghosts.filter(g=>g.life>0);
+    if(moving && mx<0.6 && !ghosts.length) moving=false;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='rgba(58,47,36,.13)'; rr(ox-TRAY,oy-TRAY+6,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
+    ctx.fillStyle='#f7f0de'; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
+    ctx.strokeStyle=INK; ctx.lineWidth=3; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.stroke();
+    for(let r=0;r<gh;r++)for(let c=0;c<gw;c++){ const x=ox+c*S,y=oy+r*S;
+      if(grid[r][c]==='#'){ block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#ece2ca':'#f1e8d2'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill(); } }
+    state.molds.forEach(drawMold);
+    for(const g of ghosts){ ctx.globalAlpha=g.life; ctx.fillStyle=GOOP; ctx.beginPath(); ctx.arc(g.px,g.py,g.rr*g.life,0,7); ctx.fill(); ctx.globalAlpha=1; }
+    // draw locked first (sit under), then movers
+    state.drops.filter(d=>d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
+    state.drops.filter(d=>!d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
+    requestAnimationFrame(frame);
+  }
+
+  window.__goop={ state:()=>({level:LEVELS[levelIdx].name,idx:levelIdx,moves,won,
+      drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
+    move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length };
+  loadLevel(0); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
