@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Goop — escape</title>
+<style>
+  :root{color-scheme:dark;}
+  html,body{margin:0;height:100%;overflow:hidden;color:#d9d4e8;
+    background:radial-gradient(120% 120% at 50% 12%, #2b2737 0%, #201c2b 55%, #151220 100%);
+    font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  #top{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:8px;}
+  .chip{background:#2c2839;border:2px solid #0d0b14;border-radius:13px;box-shadow:0 3px 0 #0d0b14;
+    font:800 13px ui-rounded,system-ui;color:#e8e3f5;padding:8px 12px;display:flex;align-items:center;gap:6px;}
+  button.chip{cursor:pointer;transition:transform .06s,box-shadow .06s;}
+  button.chip:active{transform:translateY(2px);box-shadow:0 1px 0 #0d0b14;}
+  #lvlname{min-width:120px;justify-content:center;text-align:center;}
+  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#9a92b5;
+    background:#2c2839;border:2px solid #0d0b14;border-radius:12px;padding:7px 14px;box-shadow:0 2px 0 #0d0b14;max-width:88vw;text-align:center;}
+  #hint b{color:#e8e3f5;} #hint i{color:#7d75a0;}
+  .modal{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.6);}
+  .modal .card{background:#2c2839;border:2px solid #0d0b14;border-radius:20px;box-shadow:0 6px 0 #0d0b14;
+    padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:86vw;}
+  .modal h2{margin:0;font:900 26px ui-rounded,system-ui;color:#e8e3f5;}
+  .modal .sub{color:#9a91b5;font-size:13.5px;text-align:center;}
+  #moves.low{color:#ff8f73;animation:lowpulse .7s ease-in-out infinite;}
+  @keyframes lowpulse{50%{transform:scale(1.12);}}
+  #pgrid{display:grid;grid-template-columns:repeat(5,52px);gap:9px;}
+  .lvbtn{width:52px;height:52px;border-radius:12px;border:2px solid #0d0b14;background:#39324e;box-shadow:0 3px 0 #0d0b14;
+    font:800 15px ui-rounded,system-ui;color:#e8e3f5;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;}
+  .lvbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0d0b14;}
+  .lvbtn.locked{background:#241f33;color:#5a5375;cursor:default;}
+  .lvbtn.done{background:#2f5e50;}
+  .lvbtn.cur{outline:2px solid #8ceccf;}
+  .lvbtn .st{position:absolute;top:-7px;right:-6px;font-size:13px;}
+  #adcount{font:900 34px ui-rounded,system-ui;color:#8ceccf;}
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="top">
+    <button class="chip" id="prev">◀</button>
+    <div class="chip" id="lvlname">—</div>
+    <button class="chip" id="next">▶</button>
+    <button class="chip" id="undo" title="Undo (Z)">↶</button>
+    <button class="chip" id="reset" title="Restart (R)">↺</button>
+    <button class="chip" id="grid" title="Levels">▦</button>
+    <div class="chip" title="Moves left"><span id="moves">0</span></div>
+  </div>
+  <div id="hint">Swipe moves <b>every</b> goop. Get each family home through <b>its own hole</b> — the wrong hole corks it.</div>
+  <div id="win" class="modal"><div class="card"><h2>Solved! 🎉</h2><div class="sub" id="wintxt"></div><button class="chip" id="wnext">Next ▶</button></div></div>
+  <div id="oom" class="modal"><div class="card"><h2>Out of moves</h2><div class="sub">Undo is always free — or top up and push on.</div>
+    <button class="chip" id="ad">▶ +8 moves <span style="opacity:.6">(watch ad)</span></button>
+    <button class="chip" id="oomres">↺ Restart</button></div></div>
+  <div id="adplay" class="modal"><div class="card"><h2>Ad break</h2><div class="sub">(demo ad — imagine something skippable)</div><div id="adcount">3</div></div></div>
+  <div id="pick" class="modal"><div class="card"><h2>Levels</h2><div id="pgrid"></div><button class="chip" id="pclose">✕ Close</button></div></div>
+
+<script>
+(function(){
+  'use strict';
+  const cv=document.getElementById('c'), ctx=cv.getContext('2d'); const INK='#0d0b14';
+  const GOOP='#3fd6ac', GOOPD='#27997a';
+  const COLORS=[{main:'#3fd6ac',dark:'#27997a',lock:'#8ceccf',glow:'rgba(63,214,172,'},   // mint
+                {main:'#ff8f73',dark:'#cf5f45',lock:'#ffbfae',glow:'rgba(255,143,115,'},  // coral
+                {main:'#a48fff',dark:'#7561d6',lock:'#cabffb',glow:'rgba(164,143,255,'}]; // violet
+
+  // Juice — one knob per effect (DESIGN-NOTES §8/§20: flair as data; "less/more" = one number)
+  const JUICE={
+    stretch:.045,      // in-flight elongation per px/frame of speed
+    squash:.15,        // arrival squash amplitude
+    trail:.45,         // slide trail alpha (0 = off)
+    trailFade:.07,     // trail fade per frame
+    shake:2.4,         // board nudge px on impact
+    breathe:.018,      // idle breathing scale ±
+    breathePeriod:2.8, // breathing period, seconds
+    ripple:1,          // merge ripple rings (0 = off)
+    winStagger:150,    // ms between family pops in the win cascade
+  };
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){ JUICE.shake=0; JUICE.trail=0; JUICE.breathe=0; }
+
+  // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
+  // '1'..'9' mould(need that size) — mould levels win by filling; no moulds → win by merging ALL into one
+  const LEVELS=[
+    {name:"Going Home", hint:"Every goop wants <b>out</b> — slide everyone and drop each family into <b>its own hole</b>. <i>(par: 3)</i>", par:3, limit:7,
+     map:["#######","#..p#.#","#o..o.#","#....A#","#.B.p.#","#######"]},
+    {name:"Two Doors", hint:"Other colours still <b>block</b> you — and draining a goop <b>spends a blocker</b>. Order matters. <i>(par: 4)</i>", par:4, limit:8,
+     map:["######","#B.p.#","#.o.p#","#.#.##","#A.o.#","######"]},
+    {name:"Wrong Door", hint:"Fall into the <b>wrong hole</b> and you cork it. <b>↶ Undo</b> is free. <i>(par: 5)</i>", par:5, limit:9,
+     map:["#######","#ApB..#","#.p..o#","#...o##","#.....#","#######"]},
+    {name:"Convoy", hint:"Every swipe moves everyone. <i>(par: 8)</i>", par:8, limit:12,
+     map:["#######","#...pB#","##..o##","##A#po#","#######"]},
+    {name:"Crowd Control", hint:"Order matters — a drained goop is a blocker you no longer have. <i>(par: 13)</i>", par:13, limit:18,
+     map:["#######","#ABop##","#o##.##","#p.#.##","##....#","#######"]},
+    {name:"Spent Blockers", hint:"Herd them home. <i>(par: 19)</i>", par:19, limit:27,
+     map:["#######","##...p#","#p.oA.#","#.o#o.#","###..##","##B.###","#######"]},
+    {name:"Musical Chairs", hint:"Park a blocker before you spend it. <i>(par: 21)</i>", par:21, limit:29,
+     map:["#######","#..#B##","#.o...#","#.##p##","#o.##A#","##op..#","#######"]},
+    {name:"Cork Alert", hint:"<b>Three families</b>, three exits. Same rules, more traffic. <i>(par: 22)</i>", par:22, limit:31,
+     map:["########","#B##o..#","#....C.#","#.#oo.p#","#...pq.#","#..q##A#","########"]},
+    {name:"Three Exits", hint:"Order matters — a drained goop is a blocker you no longer have. <i>(par: 27)</i>", par:27, limit:38,
+     map:["########","#p.....#","##.q...#","#..AC#.#","#o#..p.#","#B#q..o#","########"]},
+    {name:"Rush Hour", hint:"Herd them home. <i>(par: 29)</i>", par:29, limit:41,
+     map:["#######","#.....#","#.#p#A#","#..#.B#","##opo.#","#######"]},
+    {name:"Long Way Home", hint:"Park a blocker before you spend it. <i>(par: 30)</i>", par:30, limit:42,
+     map:["########","##o...A#","#Cp.#..#","##q#.###","##o#p.B#","#o..q.##","########"]},
+    {name:"Everybody Out", hint:"Every swipe moves everyone. <i>(par: 30)</i>", par:30, limit:42,
+     map:["########","#.....A#","#.##o#C#","#pq#...#","#po#..B#","#...q.o#","########"]},
+  ];
+
+  let gw,gh,grid,spikes,holes,holeMapG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
+  let limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0;
+  const PKEY='gm_escape_v1';
+  let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'{"best":{}}'); }catch(e){ prog={best:{}}; }
+  const saveProg=()=>{ try{ localStorage.setItem(PKEY,JSON.stringify(prog)); }catch(e){} };
+  const isUnlocked=i=>i===0||prog.best[i-1]!==undefined;
+  const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
+  function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
+    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; const drops=[], molds=[]; let id=0;
+    for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
+      if(ch==='#'){ row.push('#'); } else { row.push('.');
+        if(ch==='o') drops.push({id:id++,r,c,size:1,color:0,locked:false});
+        else if(ch==='p') drops.push({id:id++,r,c,size:1,color:1,locked:false});
+        else if(ch==='q') drops.push({id:id++,r,c,size:1,color:2,locked:false});
+        else if(ch==='A'){ holes.push({r,c,color:0}); holeMapG[r+','+c]=0; }
+        else if(ch==='B'){ holes.push({r,c,color:1}); holeMapG[r+','+c]=1; }
+        else if(ch==='C'){ holes.push({r,c,color:2}); holeMapG[r+','+c]=2; }
+        else if(ch==='^') spikes.add(r+','+c);
+        else if('123456789'.includes(ch)) molds.push({r,c,size:+ch,filled:false}); } }
+      grid.push(row); }
+    return {drops,molds}; }
+
+  const DIRS={up:[-1,0],down:[1,0],left:[0,-1],right:[0,1]};
+  const sig=(drops,molds)=>drops.map(d=>d.r+','+d.c+','+d.color+','+d.size+','+(d.locked?1:0)).sort().join(';')+'|'+molds.map(m=>m.filled?1:0).join('');
+  function simulate(drops,molds,dir){
+    const [dr,dc]=DIRS[dir]; const ds=drops.map(d=>({...d})), ms=molds.map(m=>({...m}));
+    const occ={}; ds.forEach((d,i)=>{ if(d.locked) occ[d.r+','+d.c]=i; });
+    const order=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*dr+ds[b].c*dc)-(ds[a].r*dr+ds[a].c*dc));
+    const removed=new Set(), merges=[], drains=[], corks=[];
+    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c;
+      while(true){ const nr=r+dr,nc=c+dc,k=nr+','+nc;
+        if(!inb(nr,nc)||grid[nr][nc]==='#') break;
+        if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked||ds[j].color!==ds[i].color) break;   // other colour = movable wall
+          ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
+        if(holeMapG[k]!==undefined){
+          if(holeMapG[k]===ds[i].color){ removed.add(i); drains.push({id:ds[i].id,r:nr,c:nc,color:ds[i].color}); }
+          else { ds[i].r=nr; ds[i].c=nc; ds[i].locked=true; occ[k]=i; corks.push({id:ds[i].id}); }
+          r=null; break; }
+        r=nr;c=nc; }
+      if(r===null||removed.has(i))continue; ds[i].r=r; ds[i].c=c; occ[r+','+c]=i; }
+    const nd=ds.filter((d,i)=>!removed.has(i)); const locks=[];
+    for(const mo of ms){ if(mo.filled)continue; const d=nd.find(d=>!d.locked&&d.r===mo.r&&d.c===mo.c&&d.size===mo.size);
+      if(d){ d.locked=true; mo.filled=true; locks.push(d.id); } }
+    return {drops:nd,molds:ms,merges,locks,drains,corks};
+  }
+  // win: everyone drained home
+  const isWinS=(drops,molds)=>drops.length===0;
+
+  // BFS oracle (prunes death branches: lost mass can never win)
+  function solve(){
+    const s0={drops:state0().drops,molds:state0().molds};
+    const key=s=>sig(s.drops,s.molds); const q=[{s:s0,p:[]}], seen=new Set([key(s0)]);
+    while(q.length){ const {s,p}=q.shift(); if(isWinS(s.drops,s.molds)) return p; if(p.length>40) continue;
+      for(const dir of ['up','down','left','right']){ const r=simulate(s.drops,s.molds,dir);
+        if(r.drops.some(d=>d.locked)) continue;
+        const ns={drops:r.drops,molds:r.molds}; if(sig(s.drops,s.molds)===key(ns))continue;
+        const k=key(ns); if(seen.has(k))continue; seen.add(k); q.push({s:ns,p:p.concat(dir)}); } }
+    return null;
+  }
+  let _l0; function state0(){ return {drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m})) }; }
+
+  // ---- render state --------------------------------------------------------
+  let renderById={}, ghosts=[], moving=false;
+  function loadLevel(i){ levelIdx=(i+LEVELS.length)%LEVELS.length; won=false; moves=0; undoStack=[]; ghosts=[]; renderById={};
+    _l0=parse(LEVELS[levelIdx]); mass0=_l0.drops.length;
+    colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
+    state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
+    layout(); state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; });
+    limitNow=LEVELS[levelIdx].limit||99; movesLeft=limitNow; parts=[]; trails=[]; rings=[]; sqA=0;
+    document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
+    document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
+    updateMoves();
+    ['win','oom','adplay','pick'].forEach(id=>document.getElementById(id).style.display='none');
+    if(!solve()) console.warn('[merge] not solvable:',LEVELS[levelIdx].name);
+  }
+  function snapshot(){ return {drops:state.drops.map(d=>({...d})), molds:state.molds.map(m=>({...m})), moves}; }
+  function applyMove(dir,instant){ if((moving&&!instant)||won) return;
+    const before=sig(state.drops,state.molds); const res=simulate(state.drops,state.molds,dir);
+    if(before===sig(res.drops,res.molds)) return;
+    undoStack.push(snapshot()); moves++;
+    const pre=undoStack[undoStack.length-1].drops;
+    const colOf=id=>{ const d=pre.find(x=>x.id===id); return d?d.color:0; };
+    res.merges.forEach(m=>{ const g=renderById[m.from]; if(g) ghosts.push({px:g.px,py:g.py,tx:cellX(m.c),ty:cellY(m.r),life:1,rr:g.rr,ci:colOf(m.from)}); delete renderById[m.from]; });
+    res.drains.forEach(dd=>{ const g=renderById[dd.id];
+      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),tx:cellX(dd.c),ty:cellY(dd.r),life:1,rr:g?g.rr:sizeR(1),ci:dd.color});
+      burst(cellX(dd.c),cellY(dd.r),COLORS[dd.color].main,16,S*.13);
+      if(JUICE.ripple) rings.push({x:cellX(dd.c),y:cellY(dd.r),ci:dd.color,life:1});
+      delete renderById[dd.id]; });
+    if(res.corks.length) document.getElementById('hint').innerHTML='🫙 Corked! A goop is stuck in the wrong hole — <b>↶ undo</b> (Z) is free.';
+    state.drops=res.drops; state.molds=res.molds;
+    state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0}; e.tr=sizeR(d.size); });
+    res.merges.forEach(m=>{ const e=renderById[m.to]; if(e) e.pop=1;
+      burst(cellX(m.c),cellY(m.r),COLORS[colOf(m.to)].main,12,S*.11);
+      if(JUICE.ripple) rings.push({x:cellX(m.c),y:cellY(m.r),ci:colOf(m.to),life:1}); });
+    res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
+    sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir];
+    movesLeft=limitNow-moves; updateMoves(); moving=true;
+    if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; } } ghosts=[]; moving=false; }
+    if(isWinS(state.drops,state.molds)){ won=true; onWin(); }
+    else if(movesLeft<=0){ setTimeout(()=>{ if(!won&&movesLeft<=0) document.getElementById('oom').style.display='flex'; },420); }
+  }
+  function updateMoves(){ const el=document.getElementById('moves'); el.textContent=movesLeft;
+    el.classList.toggle('low',movesLeft<=3&&!won); }
+  function onWin(){ const par=LEVELS[levelIdx].par||0; const star=moves<=par;
+    const prev=prog.best[levelIdx]; if(prev===undefined||moves<prev){ prog.best[levelIdx]=moves; saveProg(); }
+    document.getElementById('wintxt').innerHTML=moves+' moves · par '+par+(star?' · ⭐':'');
+    const spots=holes.slice();                                        // staggered win cascade at the holes
+    spots.forEach((h,i)=>{ setTimeout(()=>{ burst(cellX(h.c),cellY(h.r),COLORS[h.color].main,22,S*.16);
+      rings.push({x:cellX(h.c),y:cellY(h.r),ci:h.color,life:1}); }, i*JUICE.winStagger); });
+    setTimeout(()=>document.getElementById('win').style.display='flex',480+spots.length*JUICE.winStagger); }
+  function burst(x,y,color,n,spd){ for(let i=0;i<n;i++){ const a=i/n*6.283+(x%1);
+    parts.push({x,y,vx:Math.cos(a)*spd*(.5+(i%3)*.3),vy:Math.sin(a)*spd*(.5+(i%3)*.3)-spd*.35,
+      life:1,color,size:S*(.05+.04*((i*7)%3)/2)}); } if(parts.length>260)parts=parts.slice(-260); }
+  function undo(){ if(moving||!undoStack.length) return; const s=undoStack.pop();
+    state={drops:s.drops.map(d=>({...d})),molds:s.molds.map(m=>({...m}))}; moves=s.moves; won=false;
+    movesLeft=limitNow-moves; updateMoves();
+    document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
+    document.getElementById('win').style.display='none'; document.getElementById('oom').style.display='none';
+    renderById={}; ghosts=[]; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; }); }
+
+  // ---- input ---------------------------------------------------------------
+  addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
+    const mp={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'};
+    if(mp[k]){ e.preventDefault(); applyMove(mp[k]); } else if(k==='z'){ undo(); } else if(k==='r'){ loadLevel(levelIdx); } });
+  let ps=null; const dn=(x,y)=>ps={x,y};
+  const upn=(x,y)=>{ if(!ps)return; const dx=x-ps.x,dy=y-ps.y; ps=null; if(Math.hypot(dx,dy)<24)return;
+    if(Math.abs(dx)>Math.abs(dy)) applyMove(dx>0?'right':'left'); else applyMove(dy>0?'down':'up'); };
+  cv.addEventListener('touchstart',e=>{const t=e.changedTouches[0];dn(t.clientX,t.clientY);},{passive:true});
+  cv.addEventListener('touchend',e=>{const t=e.changedTouches[0];upn(t.clientX,t.clientY);},{passive:true});
+  cv.addEventListener('mousedown',e=>dn(e.clientX,e.clientY)); addEventListener('mouseup',e=>upn(e.clientX,e.clientY));
+  document.getElementById('prev').onclick=()=>loadLevel(levelIdx-1);
+  document.getElementById('next').onclick=()=>loadLevel(levelIdx+1);
+  document.getElementById('undo').onclick=undo;
+  document.getElementById('reset').onclick=()=>loadLevel(levelIdx);
+  document.getElementById('wnext').onclick=()=>loadLevel(levelIdx+1);
+  function buildPicker(){ const g=document.getElementById('pgrid'); g.innerHTML='';
+    LEVELS.forEach((L,i)=>{ const b=document.createElement('button'); b.className='lvbtn';
+      const done=prog.best[i]!==undefined, star=done&&prog.best[i]<=(L.par||0);
+      if(done)b.classList.add('done'); if(!isUnlocked(i))b.classList.add('locked'); if(i===levelIdx)b.classList.add('cur');
+      b.textContent=isUnlocked(i)?(i+1):'🔒';
+      if(star){ const s=document.createElement('span'); s.className='st'; s.textContent='⭐'; b.appendChild(s); }
+      b.onclick=()=>{ if(isUnlocked(i)) loadLevel(i); };
+      g.appendChild(b); }); }
+  document.getElementById('grid').onclick=()=>{ buildPicker(); document.getElementById('pick').style.display='flex'; };
+  document.getElementById('pclose').onclick=()=>document.getElementById('pick').style.display='none';
+  document.getElementById('oomres').onclick=()=>loadLevel(levelIdx);
+  document.getElementById('ad').onclick=()=>{ document.getElementById('oom').style.display='none';
+    const ap=document.getElementById('adplay'); ap.style.display='flex'; let t=3;
+    document.getElementById('adcount').textContent=t;
+    const iv=setInterval(()=>{ t--; if(t<=0){ clearInterval(iv); ap.style.display='none';
+        limitNow+=8; movesLeft=limitNow-moves; updateMoves(); }
+      else document.getElementById('adcount').textContent=t; },1000); };
+
+  // ---- layout & draw -------------------------------------------------------
+  let S=48,ox=0,oy=0,dpr=1,TRAY=14;
+  const cellX=c=>ox+c*S+S/2, cellY=r=>oy+r*S+S/2;
+  const sizeR=sz=>Math.min(S*0.28+(sz-1)*S*0.10, S*0.46);
+  function layout(){ dpr=Math.min(2,devicePixelRatio||1); const w=innerWidth,h=innerHeight;
+    cv.width=w*dpr;cv.height=h*dpr;cv.style.width=w+'px';cv.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
+    S=Math.floor(Math.min((w-40-2*TRAY)/gw,(h-150-2*TRAY)/gh)); S=Math.max(30,Math.min(S,96));
+    ox=Math.round((w-gw*S)/2); oy=Math.round(72+((h-144)-gh*S)/2); }
+  addEventListener('resize',()=>{ layout(); for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d&&!moving){renderById[id].px=cellX(d.c);renderById[id].py=cellY(d.r);} } });
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function block(x,y,S){ const m=Math.round(S*.04),rad=Math.round(S*.20);
+    ctx.fillStyle='#454060';rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.fill();
+    ctx.fillStyle='#5f5880';rr(x+m,y+m,S-2*m,S-2*m-S*.14,rad);ctx.fill();
+    ctx.strokeStyle=INK;ctx.lineWidth=Math.max(2.2,S*.045);rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.stroke(); }
+  function drawMold(mo){ const x=ox+mo.c*S,y=oy+mo.r*S,cx=x+S/2,cy=y+S/2;
+    ctx.fillStyle=mo.filled?'rgba(75,179,154,.18)':'rgba(58,47,36,.06)'; rr(x+S*.12,y+S*.12,S*.76,S*.76,S*.22); ctx.fill();
+    ctx.setLineDash([S*.14,S*.11]); ctx.lineWidth=Math.max(2.5,S*.07); ctx.strokeStyle=mo.filled?GOOPD:'#a9967a';
+    rr(x+S*.12,y+S*.12,S*.76,S*.76,S*.20); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=mo.filled?'rgba(47,143,121,.55)':'#a1927a';
+    ctx.font='900 '+Math.round(S*.34)+'px ui-rounded,system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(mo.size),cx,cy+S*.02); }
+  function drawBlob(e,d){ const rad=e.rr*(1+e.pop*.16), cx=e.px, cy=e.py;
+    const C=COLORS[(d&&d.color)||0];
+    const sp=Math.min(6,e.sp||0)*JUICE.stretch;                                    // in-flight stretch
+    const br=(!moving&&JUICE.breathe)?JUICE.breathe*Math.sin(tNow*6.283/JUICE.breathePeriod+((d&&d.id)||0)*1.7):0;
+    const ax=sqAxisH?1:-1, def=sp*.5-JUICE.squash*sqA;                             // stretch while fast, squash on stop
+    const rx=rad*(1+br)*(1+ax*def), ry=rad*(1+br)*(1-ax*def*.7);
+    if(d&&d.locked){ ctx.fillStyle=C.dark; ctx.beginPath(); ctx.arc(cx,cy,rad*.6,0,7); ctx.fill();
+      ctx.strokeStyle=INK; ctx.lineWidth=2; ctx.stroke(); return; }
+    const halo=ctx.createRadialGradient(cx,cy,rad*.4,cx,cy,rad*1.9);
+    halo.addColorStop(0,C.glow+'.25)'); halo.addColorStop(1,C.glow+'0)');
+    ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(cx,cy,rad*1.9,0,7); ctx.fill();
+    ctx.fillStyle=d&&d.locked?C.lock:C.main; ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,7); ctx.fill();
+    ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2,S*.04); ctx.stroke();
+    if(d&&d.size>1){ ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='800 '+Math.round(rad*.78)+'px ui-rounded,system-ui';
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(d.size,cx,cy+rad*.04); }
+  }
+  function frame(){
+    tNow=performance.now()/1000;
+    let mx=0; for(const id in renderById){ const e=renderById[id]; const d=state.drops.find(x=>x.id==id); if(!d)continue;
+      const ox0=e.px,oy0=e.py, tx=cellX(d.c),ty=cellY(d.r);
+      e.px+=(tx-e.px)*.34; e.py+=(ty-e.py)*.34; e.rr+=(e.tr-e.rr)*.3; e.pop*=.86;
+      e.sp=Math.hypot(e.px-ox0,e.py-oy0);
+      if(e.sp>1.4&&JUICE.trail>0){ trails.push({x:e.px,y:e.py,r:e.rr*.72,ci:d.color,life:1});
+        if(trails.length>300)trails=trails.slice(-300); }
+      mx=Math.max(mx,Math.abs(tx-e.px),Math.abs(ty-e.py)); }
+    for(const g of ghosts){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; g.life-=.06; } ghosts=ghosts.filter(g=>g.life>0);
+    if(moving && mx<0.6 && !ghosts.length){ moving=false; sqA=1; }
+    sqA*=.85;
+    for(const t of trails) t.life-=JUICE.trailFade; trails=trails.filter(t=>t.life>0);
+    for(const rg of rings) rg.life-=.045; rings=rings.filter(r=>r.life>0);
+    for(const p of parts){ p.vy+=.10; p.x+=p.vx; p.y+=p.vy; p.life-=.03; } parts=parts.filter(p=>p.life>0);
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.save(); ctx.translate(sqDir[1]*JUICE.shake*sqA, sqDir[0]*JUICE.shake*sqA);   // impact nudge
+    ctx.fillStyle='#211d2e'; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
+    ctx.strokeStyle=INK; ctx.lineWidth=3; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.stroke();
+    for(let r=0;r<gh;r++)for(let c=0;c<gw;c++){ const x=ox+c*S,y=oy+r*S;
+      if(grid[r][c]==='#'){ block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#2a2539':'#2d283d'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
+        const hj=holeMapG[r+','+c]; if(hj!==undefined){ const cx=x+S/2,cy=y+S/2;
+          ctx.fillStyle='#12101b'; ctx.beginPath(); ctx.arc(cx,cy,S*.30,0,7); ctx.fill();
+          ctx.strokeStyle=COLORS[hj].glow+'.25)'; ctx.lineWidth=Math.max(5,S*.11);
+          ctx.beginPath(); ctx.arc(cx,cy,S*.34,0,7); ctx.stroke();
+          ctx.strokeStyle=COLORS[hj].main; ctx.lineWidth=Math.max(2.5,S*.055);
+          ctx.beginPath(); ctx.arc(cx,cy,S*.30,0,7); ctx.stroke(); }
+        if(spikes.has(r+','+c)){ const cx=x+S/2, cy=y+S/2, R=S*.17;         // urchin mine
+          ctx.fillStyle='#8b84a8'; ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.4,S*.028);
+          for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; const tx=cx+Math.cos(a)*S*.34, ty=cy+Math.sin(a)*S*.34;
+            const px=Math.cos(a+Math.PI/2)*R*.42, py=Math.sin(a+Math.PI/2)*R*.42;
+            ctx.beginPath(); ctx.moveTo(cx+px,cy+py); ctx.lineTo(cx-px,cy-py); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+          ctx.fillStyle='#3a3450'; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
+          ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.036); ctx.stroke(); } } }
+    state.molds.forEach(drawMold);
+    for(const t of trails){ ctx.globalAlpha=t.life*JUICE.trail; ctx.fillStyle=COLORS[t.ci].main;
+      ctx.beginPath(); ctx.arc(t.x,t.y,t.r*t.life,0,7); ctx.fill(); } ctx.globalAlpha=1;
+    for(const rg of rings){ ctx.globalAlpha=rg.life; ctx.strokeStyle=COLORS[rg.ci].main;
+      ctx.lineWidth=Math.max(1.5,3.2*rg.life); ctx.beginPath();
+      ctx.arc(rg.x,rg.y,S*(.25+(1-rg.life)*1.1),0,7); ctx.stroke(); } ctx.globalAlpha=1;
+    for(const g of ghosts){ ctx.globalAlpha=g.life; const C=COLORS[g.ci||0];
+      if(g.splat){ ctx.fillStyle=C.dark; ctx.beginPath(); ctx.ellipse(g.px,g.py,g.rr*(1.5-.5*g.life),g.rr*g.life*.55,0,0,7); ctx.fill(); }
+      else { ctx.fillStyle=C.main; ctx.beginPath(); ctx.arc(g.px,g.py,g.rr*g.life,0,7); ctx.fill(); }
+      ctx.globalAlpha=1; }
+    // draw locked first (sit under), then movers
+    state.drops.filter(d=>d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
+    state.drops.filter(d=>!d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
+    for(const p of parts){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size*p.life+1,0,7); ctx.fill(); } ctx.globalAlpha=1;
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+
+  window.__goop={ state:()=>({level:LEVELS[levelIdx].name,idx:levelIdx,moves,won,
+      drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,color:d.color,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
+    move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length };
+  let start0=0; while(start0<LEVELS.length-1&&prog.best[start0]!==undefined) start0++;
+  loadLevel(start0); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
