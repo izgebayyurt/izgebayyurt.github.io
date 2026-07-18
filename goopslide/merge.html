@@ -44,31 +44,35 @@
   const cv=document.getElementById('c'), ctx=cv.getContext('2d'); const INK='#3a2f24';
   const GOOP='#4bb39a', GOOPD='#2f8f79';
 
-  // '#'wall  '.'/' 'floor  'o'droplet(size1)  '1'..'9' mould(need that size)
+  // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
+  // '1'..'9' mould(need that size) — mould levels win by filling; no moulds → win by merging ALL into one
   const LEVELS=[
-    {name:'Two Become One', hint:'One swipe moves <b>both</b> droplets. Slam them together, then drop the size-2 blob in the mould.',
-     map:['######','#o..o#','#....#','#....#','#2####','######']},
-    {name:'Keep One Back', hint:'Merge two into a <b>2</b>, but keep the third a <b>1</b> — don’t let all three touch.',
-     map:['#######','#o.o.o#','#.....#','#.#.#.#','#2...1#','#######']},
-    {name:'Two and Two', hint:'Two moulds, both want <b>2</b>. Pair them up.',
-     map:['#######','#o.o..#','#o.o..#','#.....#','#2...2#','#######']},
-    {name:'Three Please', hint:'Build a <b>3</b> from three droplets and leave one as a <b>1</b>.',
-     map:['#######','#ooo.o#','#.....#','#.....#','#3###1#','#######']},
-    {name:'Snug Corners', hint:'Two moulds, five droplets. Mind which ones touch.',
-     map:['######','#.oo3#','#.#o2#','#o#o.#','######']},
-    {name:'Split Decision', hint:'A <b>3</b> and a <b>1</b> — pick the odd one out early.',
-     map:['######','#.1o.#','#o.o3#','#....#','#o.#.#','######']},
-    {name:'Tight Squeeze', hint:'Five droplets, a <b>3</b> and a <b>2</b>, and not much room.',
-     map:['#######','#o.#..#','#ooo..#','#....o#','#.#32.#','#######']},
+    {name:'All Together', hint:'One swipe moves <b>every</b> goop, and they <b>merge</b> on contact. Merge them all into one!',
+     map:['######','#o..o#','#....#','#.o..#','######']},
+    {name:'First Thorns', hint:'<b>Spikes kill.</b> A goop that slides into them is gone — find the safe order. (↶ undoes.)',
+     map:['######','#o...#','#..^o#','#....#','######']},
+    {name:'Prickly Pair', hint:'Merge all four — the thorns crowd the lanes.',
+     map:['######','####.#','#.#o.#','#^oo##','#^.o^#','######']},
+    {name:'Crossfire', hint:'Five goops, thorns on both flanks.',
+     map:['########','#^o..###','#oo#...#','##..^oo#','#.o.#.##','########']},
+    {name:'Threading', hint:'Use a stopped goop as a <b>shield</b> — friends stop friends before the spikes do.',
+     map:['######','#^^#.#','##^o.#','#oo.##','#o...#','#^#..#','######']},
+    {name:'Thorn Garden', hint:'Six goops. Every lane is trapped.',
+     map:['#######','#^o..##','##o^o^#','#^#..o#','##.o###','#..####','#######']},
+    {name:'Shield Wall', hint:'The optimal path is 14 moves. Take your time.',
+     map:['#######','#.o##.#','#.#^oo#','#..o.##','#.o#^.#','#######']},
+    {name:'The Gauntlet', hint:'16 moves of choreography. The final exam.',
+     map:['#######','#^..#^#','##.o.o#','##.o.##','#.....#','#o^#.o#','#######']},
   ];
 
-  let gw,gh,grid,level0,state,undoStack,moves,levelIdx,won;
+  let gw,gh,grid,spikes,state,undoStack,moves,levelIdx,won,mass0;
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
-    grid=[]; const drops=[], molds=[]; let id=0;
+    grid=[]; spikes=new Set(); const drops=[], molds=[]; let id=0;
     for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
       if(ch==='#'){ row.push('#'); } else { row.push('.');
         if(ch==='o') drops.push({id:id++,r,c,size:1,locked:false});
+        else if(ch==='^') spikes.add(r+','+c);
         else if('123456789'.includes(ch)) molds.push({r,c,size:+ch,filled:false}); } }
       grid.push(row); }
     return {drops,molds}; }
@@ -79,27 +83,31 @@
     const [dr,dc]=DIRS[dir]; const ds=drops.map(d=>({...d})), ms=molds.map(m=>({...m}));
     const occ={}; ds.forEach((d,i)=>{ if(d.locked) occ[d.r+','+d.c]=i; });
     const order=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*dr+ds[b].c*dc)-(ds[a].r*dr+ds[a].c*dc));
-    const removed=new Set(), merges=[];
-    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c;
+    const removed=new Set(), merges=[], deaths=[];
+    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c,dead=null;
       while(true){ const nr=r+dr,nc=c+dc,k=nr+','+nc;
         if(!inb(nr,nc)||grid[nr][nc]==='#') break;
+        if(spikes.has(k)){ dead={r:nr,c:nc}; break; }
         if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked) break;
           ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
         r=nr;c=nc; }
+      if(dead){ removed.add(i); deaths.push({id:ds[i].id,r:dead.r,c:dead.c}); continue; }
       if(removed.has(i))continue; ds[i].r=r; ds[i].c=c; occ[r+','+c]=i; }
     const nd=ds.filter((d,i)=>!removed.has(i)); const locks=[];
     for(const mo of ms){ if(mo.filled)continue; const d=nd.find(d=>!d.locked&&d.r===mo.r&&d.c===mo.c&&d.size===mo.size);
       if(d){ d.locked=true; mo.filled=true; locks.push(d.id); } }
-    return {drops:nd,molds:ms,merges,locks};
+    return {drops:nd,molds:ms,merges,locks,deaths};
   }
-  const isWin=molds=>molds.every(m=>m.filled);
+  // moulds win by filling; no moulds → win by merging everything into one blob
+  const isWinS=(drops,molds)=>molds.length?molds.every(m=>m.filled):(drops.length===1&&drops[0].size===mass0);
 
-  // BFS oracle
+  // BFS oracle (prunes death branches: lost mass can never win)
   function solve(){
     const s0={drops:state0().drops,molds:state0().molds};
     const key=s=>sig(s.drops,s.molds); const q=[{s:s0,p:[]}], seen=new Set([key(s0)]);
-    while(q.length){ const {s,p}=q.shift(); if(isWin(s.molds)) return p; if(p.length>40) continue;
+    while(q.length){ const {s,p}=q.shift(); if(isWinS(s.drops,s.molds)) return p; if(p.length>40) continue;
       for(const dir of ['up','down','left','right']){ const r=simulate(s.drops,s.molds,dir);
+        if(r.drops.reduce((a,b)=>a+b.size,0)<mass0) continue;
         const ns={drops:r.drops,molds:r.molds}; if(sig(s.drops,s.molds)===key(ns))continue;
         const k=key(ns); if(seen.has(k))continue; seen.add(k); q.push({s:ns,p:p.concat(dir)}); } }
     return null;
@@ -109,7 +117,8 @@
   // ---- render state --------------------------------------------------------
   let renderById={}, ghosts=[], moving=false;
   function loadLevel(i){ levelIdx=(i+LEVELS.length)%LEVELS.length; won=false; moves=0; undoStack=[]; ghosts=[]; renderById={};
-    _l0=parse(LEVELS[levelIdx]); state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
+    _l0=parse(LEVELS[levelIdx]); mass0=_l0.drops.length;
+    state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; });
     document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
     document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
@@ -123,16 +132,21 @@
     if(before===sig(res.drops,res.molds)) return;
     undoStack.push(snapshot()); moves++;
     res.merges.forEach(m=>{ const g=renderById[m.from]; if(g) ghosts.push({px:g.px,py:g.py,tx:cellX(m.c),ty:cellY(m.r),life:1,rr:g.rr}); delete renderById[m.from]; });
+    res.deaths.forEach(dd=>{ const g=renderById[dd.id];
+      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),tx:cellX(dd.c),ty:cellY(dd.r),life:1,rr:g?g.rr:sizeR(1),splat:true});
+      delete renderById[dd.id]; });
+    if(res.deaths.length) document.getElementById('hint').innerHTML='💀 A goop hit the spikes — <b>↶ undo</b> (Z) or <b>↺ restart</b> (R).';
     state.drops=res.drops; state.molds=res.molds;
     state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0}; e.tr=sizeR(d.size); });
     res.merges.forEach(m=>{ const e=renderById[m.to]; if(e) e.pop=1; });
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
     document.getElementById('moves').textContent=moves; moving=true;
     if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; } } ghosts=[]; moving=false; }
-    if(isWin(state.molds)){ won=true; setTimeout(()=>document.getElementById('win').style.display='flex',380); }
+    if(isWinS(state.drops,state.molds)){ won=true; setTimeout(()=>document.getElementById('win').style.display='flex',380); }
   }
   function undo(){ if(moving||!undoStack.length) return; const s=undoStack.pop();
     state={drops:s.drops.map(d=>({...d})),molds:s.molds.map(m=>({...m}))}; moves=s.moves; won=false;
+    document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
     document.getElementById('win').style.display='none'; document.getElementById('moves').textContent=moves;
     renderById={}; ghosts=[]; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; }); }
 
@@ -199,9 +213,16 @@
     ctx.fillStyle='#f7f0de'; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
     ctx.strokeStyle=INK; ctx.lineWidth=3; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.stroke();
     for(let r=0;r<gh;r++)for(let c=0;c<gw;c++){ const x=ox+c*S,y=oy+r*S;
-      if(grid[r][c]==='#'){ block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#ece2ca':'#f1e8d2'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill(); } }
+      if(grid[r][c]==='#'){ block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#ece2ca':'#f1e8d2'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
+        if(spikes.has(r+','+c)){ ctx.fillStyle='rgba(176,71,58,.10)'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
+          ctx.fillStyle='#b0473a'; ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.035);
+          for(let i=0;i<3;i++){ const bx=x+S*(.24+.26*i), by=y+S*.74, w=S*.17, h=S*.36;
+            ctx.beginPath(); ctx.moveTo(bx-w/2,by); ctx.lineTo(bx+w/2,by); ctx.lineTo(bx,by-h); ctx.closePath(); ctx.fill(); ctx.stroke(); } } } }
     state.molds.forEach(drawMold);
-    for(const g of ghosts){ ctx.globalAlpha=g.life; ctx.fillStyle=GOOP; ctx.beginPath(); ctx.arc(g.px,g.py,g.rr*g.life,0,7); ctx.fill(); ctx.globalAlpha=1; }
+    for(const g of ghosts){ ctx.globalAlpha=g.life;
+      if(g.splat){ ctx.fillStyle=GOOPD; ctx.beginPath(); ctx.ellipse(g.px,g.py,g.rr*(1.5-.5*g.life),g.rr*g.life*.55,0,0,7); ctx.fill(); }
+      else { ctx.fillStyle=GOOP; ctx.beginPath(); ctx.arc(g.px,g.py,g.rr*g.life,0,7); ctx.fill(); }
+      ctx.globalAlpha=1; }
     // draw locked first (sit under), then movers
     state.drops.filter(d=>d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
     state.drops.filter(d=>!d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
