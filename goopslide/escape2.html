@@ -354,26 +354,26 @@
      map:["#######","App#.##","#_..p.#","#o##._#","#.#..o#","#####B#"]},
     {hint:"", par:17, limit:24,
      map:["#######","App#.##","#_..p##","#o##._#","#.#..o#","#####B#"]},
-    {hint:"<b>Triangles</b> fling you where they point. <b>Bumpers</b> send you back.", par:5, limit:9,
-     map:["#######","#.x.o.#","#o....#","####..#","###x.##","###A###"]},
+    {hint:"<b>Wedges</b> fling you where they point — their flat back bounces you off. <b>Bumpers</b> always send you back.", par:4, limit:8,
+     map:["########","#b##...#","#.##.#.#","#.z.w#o#","#..###zA","#o.#####","########"]},
+    {hint:"", par:4, limit:8,
+     map:["######","A..b.#","#w.o.#","#.o#.#","##..o#","######"]},
+    {hint:"", par:5, limit:9,
+     map:["########","##ob.z.#","##...x.#","#..poo.#","#xp....#","#.....pA","#####B##"]},
     {hint:"", par:6, limit:10,
-     map:["####A#","#.#..#","#o.w##","##.o##","##.x.#","##.o.#","######"]},
-    {hint:"", par:6, limit:10,
-     map:["########","#..#...#","##.p..p#","#....po#","#..o...A","#x....o#","#B######"]},
-    {hint:"", par:6, limit:10,
-     map:["#######","#o.z.xB","#zp...#","#.#p#.#","#.....#","Ao....#","#######"]},
+     map:["##A##","##o.#","#oop#","Bppw#","#####"]},
     {hint:"", par:7, limit:11,
-     map:["####A#","#.#..#","#o.w##","#..o##","##.x##","##.o##","######"]},
+     map:["########","##.po..#","#..p.y.#","#...w#o#","Bo..#..#","#......#","######A#"]},
     {hint:"", par:8, limit:12,
-     map:["####A#","#.#..#","#o#w##","#..o##","##.x##","##.o##","######"]},
+     map:["########","B..po..#","#.#..yp#","#....o.#","#....p.#","#x.....#","A....#.#","########"]},
     {hint:"", par:9, limit:13,
-     map:["#######","#o.#.p#","##.p.##","A...y.#","#x...zB","#.o.#.#","#######"]},
+     map:["#####","##ooB","Ao.p#","#ppw#","#####"]},
     {hint:"", par:11, limit:15,
-     map:["######","#o.xp#","Bb.y##","##.###","##o..#","A.o.p#","######"]},
-    {hint:"", par:13, limit:18,
-     map:["######","#o#xp#","Bb.y##","##.###","##o..#","A.o.p#","######"]},
+     map:["########","##ob.z.#","##...xo#","##.pop##","#x.....#","#.....pA","#####B##"]},
+    {hint:"", par:12, limit:17,
+     map:["#####","B.x.#","#o.pA","#..##","#..p#","#zoo#","#####"]},
     {hint:"", par:15, limit:21,
-     map:["#######","#....pB","Ao..#o#","#.w...#","#zp...#","#.#o#.#","#######"]},
+     map:["######","#pp.##","##o..#","#.wpx#","#....#","A.o#.#","#.o.b#","####B#"]},
   ];
 
   let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
@@ -419,6 +419,8 @@
         if(doorCellG===k&&!dOpen) break;
         if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked||ds[j].color!==ds[i].color) break;   // other colour = movable wall
           ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
+        const tv0=triMapG[k]; if(tv0!==undefined&&DIRV[tv0][0]===cdr&&DIRV[tv0][1]===cdc){
+          if(red<6){ cdr=-cdr; cdc=-cdc; red++; ds[i].corners.push({r,c}); continue; } break; }
         r=nr;c=nc;
         const tv=triMapG[k]; if(tv!==undefined&&red<6){ cdr=DIRV[tv][0]; cdc=DIRV[tv][1]; red++; ds[i].corners.push({r,c}); continue; }
         if(bumpSetG.has(k)&&red<6){ cdr=-cdr; cdc=-cdc; red++; ds[i].corners.push({r,c}); continue; } }
