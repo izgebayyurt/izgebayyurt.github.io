@@ -1,0 +1,990 @@
+<!doctype html>
+<!-- LUDUS — a gladiator-school idle game. Recruit fighters, train them, send them
+     to the arena, upgrade your ludus, and mourn the ones who don't come back. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#241a15" />
+<title>Ludus</title>
+<meta name="description" content="Run a gladiator school. Recruit fighters, train them, send them to the arena for glory and gold — an idle game." />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ludus" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23241a15'/%3E%3Ctext x='50' y='72' font-size='62' text-anchor='middle' fill='%23d9a441'%3E%E2%9A%94%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23241a15'/%3E%3Ctext x='50' y='72' font-size='62' text-anchor='middle' fill='%23d9a441'%3E%E2%9A%94%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Spectral+SC:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --sand:#e7d8bd; --sand2:#efe3cb; --parch:#f4ecd8;
+  --dark:#241a15; --ink:#3a2c22; --ink-soft:#6d5b48;
+  --line:#c9b592; --line2:#bda37c;
+  --blood:#932f22; --blood2:#b2402f;
+  --gold:#c8912f; --gold2:#e0b04a;
+  --bronze:#9c6b3f;
+  --green:#5a7d3c;
+  --str:#a5432f; --agi:#3f7a5c; --vit:#8a6a2b;
+  --shadow:rgba(36,26,21,.55);
+  --font-d:"Cinzel", Georgia, serif;
+  --font-sc:"Spectral SC", Georgia, serif;
+  --font-b:"Spectral", Georgia, serif;
+  --calm:cubic-bezier(.4,0,.2,1); --pop:cubic-bezier(.34,1.6,.6,1);
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; height:100%; }
+body{
+  background:#1c140f;
+  color:var(--ink); font-family:var(--font-b);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  -webkit-user-select:none; user-select:none;
+  overscroll-behavior:none;
+}
+#app{
+  position:relative; max-width:520px; margin:0 auto; min-height:100%;
+  min-height:100dvh; display:flex; flex-direction:column;
+  background:var(--sand);
+  background-image:
+    radial-gradient(rgba(36,26,21,.045) 1px, transparent 1.4px),
+    linear-gradient(180deg,#efe3cb,#e3d3b4);
+  background-size:6px 6px, 100% 100%;
+  box-shadow:0 0 60px rgba(0,0,0,.5);
+}
+
+/* ---------- top status bar ---------- */
+#top{
+  position:sticky; top:0; z-index:20;
+  padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;
+  background:linear-gradient(180deg,#241a15,#2f231b);
+  color:var(--sand);
+  box-shadow:0 3px 0 var(--gold), 0 6px 16px rgba(0,0,0,.4);
+}
+#brand{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+#brand h1{
+  font-family:var(--font-d); font-weight:700; font-size:19px; letter-spacing:.14em;
+  margin:0; color:var(--gold2); text-transform:uppercase;
+}
+#brand h1 span{ color:var(--sand); opacity:.65; font-size:11px; letter-spacing:.2em; }
+#daychip{ font-family:var(--font-sc); font-size:12px; color:var(--sand); opacity:.8; letter-spacing:.08em; }
+#stats{ display:flex; gap:8px; margin-top:8px; }
+.stat{
+  flex:1; background:rgba(0,0,0,.22); border:1px solid rgba(230,216,189,.14);
+  border-radius:9px; padding:6px 8px; text-align:center; overflow:hidden;
+}
+.stat b{ display:block; font-family:var(--font-d); font-size:17px; font-weight:600; line-height:1.1; }
+.stat small{ display:block; font-family:var(--font-sc); font-size:9px; letter-spacing:.14em; opacity:.62; text-transform:uppercase; margin-top:2px; }
+.stat.gold b{ color:var(--gold2); }
+.stat.fame b{ color:#cf9fb6; }
+.stat.pop b{ color:var(--sand); }
+
+/* ---------- main scroll area ---------- */
+#main{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 12px 92px; }
+.panel{ display:none; animation:fade .28s var(--calm); }
+.panel.on{ display:block; }
+@keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+.section-h{
+  font-family:var(--font-sc); font-size:12px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink-soft); margin:4px 2px 8px; display:flex; align-items:center; gap:8px;
+}
+.section-h::after{ content:""; flex:1; height:1px; background:var(--line2); opacity:.7; }
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--parch); border:1.5px solid var(--line);
+  border-radius:13px; padding:12px; margin-bottom:11px;
+  box-shadow:0 2px 0 var(--line2), 0 5px 14px rgba(36,26,21,.10);
+  position:relative; overflow:hidden;
+}
+.card.flash-win{ animation:flashwin .6s var(--calm); }
+.card.flash-lose{ animation:flashlose .6s var(--calm); }
+@keyframes flashwin{ 0%{box-shadow:0 0 0 3px var(--gold2), 0 5px 14px rgba(36,26,21,.10);} 100%{box-shadow:0 2px 0 var(--line2), 0 5px 14px rgba(36,26,21,.10);} }
+@keyframes flashlose{ 0%{box-shadow:0 0 0 3px var(--blood2), 0 5px 14px rgba(36,26,21,.10);} 100%{box-shadow:0 2px 0 var(--line2), 0 5px 14px rgba(36,26,21,.10);} }
+
+.g-head{ display:flex; align-items:center; gap:10px; }
+.g-portrait{
+  width:46px; height:46px; flex:none; border-radius:10px;
+  background:radial-gradient(circle at 35% 30%, #3a2c22, #241a15);
+  display:flex; align-items:center; justify-content:center; font-size:24px;
+  border:1.5px solid var(--bronze); box-shadow:inset 0 0 0 2px rgba(200,145,47,.25);
+}
+.g-name{ font-family:var(--font-d); font-weight:600; font-size:16px; line-height:1.05; color:var(--ink); }
+.g-title{ font-family:var(--font-sc); font-size:10.5px; letter-spacing:.1em; color:var(--bronze); text-transform:uppercase; }
+.g-meta{ flex:1; min-width:0; }
+.g-lvl{
+  font-family:var(--font-d); font-size:11px; font-weight:600; color:var(--sand);
+  background:var(--bronze); border-radius:20px; padding:2px 9px; white-space:nowrap;
+}
+
+/* HP + XP bars */
+.bar{ height:7px; border-radius:5px; background:rgba(36,26,21,.13); overflow:hidden; margin-top:3px; }
+.bar > i{ display:block; height:100%; border-radius:5px; transition:width .35s var(--calm); }
+.bar.hp > i{ background:linear-gradient(90deg,#b2402f,#d06450); }
+.bar.xp > i{ background:linear-gradient(90deg,#c8912f,#e0b04a); }
+.barrow{ display:flex; align-items:center; gap:7px; margin-top:7px; }
+.barrow .lab{ font-family:var(--font-sc); font-size:9px; letter-spacing:.1em; color:var(--ink-soft); width:22px; }
+.barrow .bar{ flex:1; margin-top:0; }
+.barrow .num{ font-family:var(--font-d); font-size:10px; color:var(--ink-soft); width:auto; white-space:nowrap; }
+
+/* stat pips */
+.g-stats{ display:flex; gap:6px; margin-top:9px; }
+.pip{
+  flex:1; text-align:center; border-radius:8px; padding:5px 2px 4px;
+  background:rgba(36,26,21,.05); border:1px solid rgba(36,26,21,.08);
+}
+.pip b{ display:block; font-family:var(--font-d); font-size:16px; font-weight:600; line-height:1; }
+.pip small{ display:block; font-family:var(--font-sc); font-size:8px; letter-spacing:.12em; margin-top:3px; opacity:.7; }
+.pip.str b{ color:var(--str);} .pip.agi b{ color:var(--agi);} .pip.vit b{ color:var(--vit);}
+.pip.pow{ background:rgba(156,107,63,.12); border-color:rgba(156,107,63,.28); }
+.pip.pow b{ color:var(--bronze); }
+
+/* status label */
+.g-status{
+  position:absolute; top:10px; right:10px;
+  font-family:var(--font-sc); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+  padding:2px 8px; border-radius:20px;
+}
+.st-idle{ background:rgba(36,26,21,.08); color:var(--ink-soft); }
+.st-fighting{ background:rgba(147,47,34,.14); color:var(--blood); }
+.st-training{ background:rgba(63,122,92,.16); color:var(--agi); }
+.st-injured{ background:rgba(120,60,30,.16); color:#8a4a24; }
+
+/* action buttons row */
+.g-actions{ display:flex; gap:6px; margin-top:11px; }
+.btn{
+  font-family:var(--font-sc); font-weight:600; font-size:12px; letter-spacing:.06em;
+  border:1.5px solid var(--ink); border-radius:9px; padding:9px 6px; cursor:pointer;
+  background:var(--sand2); color:var(--ink); flex:1; text-align:center;
+  box-shadow:0 2px 0 var(--line2); transition:transform .05s, box-shadow .05s, background .15s;
+  -webkit-user-select:none;
+}
+.btn:active{ transform:translateY(2px); box-shadow:0 0 0 var(--line2); }
+.btn.fight{ background:var(--blood); color:var(--sand); border-color:#5c1c14; box-shadow:0 2px 0 #5c1c14; }
+.btn.train{ background:#3f7a5c; color:var(--sand); border-color:#26543c; box-shadow:0 2px 0 #26543c; }
+.btn.rest{ background:#8a6a2b; color:var(--sand); border-color:#5f4718; box-shadow:0 2px 0 #5f4718; }
+.btn.recall{ background:var(--sand2); }
+.btn.gold{ background:var(--gold); color:#2a1e08; border-color:#8a611c; box-shadow:0 2px 0 #8a611c; }
+.btn[disabled]{ opacity:.42; pointer-events:none; }
+.btn small{ display:block; font-family:var(--font-b); font-size:9.5px; font-weight:400; opacity:.85; margin-top:1px; letter-spacing:0; }
+.btn.wide{ width:100%; }
+
+/* recruit / empty slot card */
+.slot-empty{
+  border:1.5px dashed var(--line2); background:rgba(244,236,216,.4);
+  text-align:center; padding:18px 12px; border-radius:13px; margin-bottom:11px;
+}
+.slot-empty .em{ font-size:26px; opacity:.5; }
+.slot-empty p{ font-family:var(--font-b); font-size:13px; color:var(--ink-soft); margin:6px 0 11px; }
+
+/* ---------- arena ---------- */
+.opp-card{ text-align:center; }
+.opp-portrait{
+  width:66px; height:66px; margin:2px auto 8px; border-radius:14px;
+  background:radial-gradient(circle at 40% 30%, #4a2620, #2a1512);
+  display:flex; align-items:center; justify-content:center; font-size:34px;
+  border:2px solid var(--blood); box-shadow:inset 0 0 0 3px rgba(147,47,34,.3);
+}
+.opp-name{ font-family:var(--font-d); font-weight:700; font-size:18px; color:var(--ink); }
+.opp-sub{ font-family:var(--font-sc); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--blood); margin-top:2px; }
+.opp-row{ display:flex; justify-content:center; gap:16px; margin:11px 0; }
+.opp-row .kv b{ display:block; font-family:var(--font-d); font-size:17px; }
+.opp-row .kv small{ display:block; font-family:var(--font-sc); font-size:9px; letter-spacing:.1em; text-transform:uppercase; opacity:.65; }
+.tier-nav{ display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:2px; }
+.tier-nav button{
+  font-family:var(--font-d); font-size:18px; width:38px; height:38px; border-radius:10px;
+  border:1.5px solid var(--ink); background:var(--sand2); color:var(--ink); cursor:pointer;
+  box-shadow:0 2px 0 var(--line2);
+}
+.tier-nav button:active{ transform:translateY(2px); box-shadow:none; }
+.tier-nav button[disabled]{ opacity:.3; pointer-events:none; }
+.tier-lab{ font-family:var(--font-sc); font-size:11px; letter-spacing:.14em; color:var(--ink-soft); min-width:96px; text-align:center; text-transform:uppercase;}
+.locked-note{ font-family:var(--font-b); font-style:italic; font-size:12px; color:var(--blood); margin-top:6px;}
+
+.auto-toggle{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--parch); border:1.5px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:11px; }
+.auto-toggle .t{ font-family:var(--font-sc); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+.auto-toggle .t small{ display:block; font-family:var(--font-b); font-size:11px; text-transform:none; letter-spacing:0; color:var(--ink-soft); margin-top:2px;}
+.switch{ width:52px; height:30px; border-radius:16px; background:rgba(36,26,21,.18); position:relative; flex:none; cursor:pointer; transition:background .2s;}
+.switch::after{ content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:var(--sand); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .2s var(--pop);}
+.switch.on{ background:var(--green);}
+.switch.on::after{ left:25px;}
+
+/* battle log */
+#log{ margin-top:4px; }
+.log-line{
+  font-family:var(--font-b); font-size:12.5px; line-height:1.5; padding:5px 10px; border-radius:8px;
+  margin-bottom:5px; border-left:3px solid var(--line2); background:rgba(244,236,216,.55); color:var(--ink);
+  animation:logIn .3s var(--calm);
+}
+@keyframes logIn{ from{opacity:0; transform:translateX(-6px);} to{opacity:1; transform:none;} }
+.log-line.win{ border-left-color:var(--gold); }
+.log-line.lose{ border-left-color:var(--bronze); }
+.log-line.death{ border-left-color:var(--blood); background:rgba(147,47,34,.09); font-weight:600; }
+.log-line.level{ border-left-color:var(--green); }
+.log-line b{ font-family:var(--font-d); font-weight:600; }
+.log-line .cash{ color:var(--gold); font-weight:600; }
+
+/* ---------- facilities ---------- */
+.fac{ display:flex; gap:11px; align-items:center; }
+.fac .ic{ font-size:28px; width:44px; text-align:center; flex:none; }
+.fac .body{ flex:1; min-width:0; }
+.fac .fname{ font-family:var(--font-d); font-weight:600; font-size:15px; color:var(--ink); }
+.fac .flvl{ font-family:var(--font-sc); font-size:10px; letter-spacing:.1em; color:var(--bronze); text-transform:uppercase; }
+.fac .fdesc{ font-family:var(--font-b); font-size:12px; color:var(--ink-soft); margin-top:3px; line-height:1.4; }
+.fac .fdesc em{ color:var(--green); font-style:normal; font-weight:600; }
+.fac-up{ margin-top:10px; }
+.fac.maxed .fdesc em{ color:var(--bronze); }
+
+/* ---------- bottom nav ---------- */
+#nav{
+  position:fixed; bottom:0; left:0; right:0; z-index:30; max-width:520px; margin:0 auto;
+  display:flex; background:linear-gradient(180deg,#2f231b,#241a15);
+  padding:6px 6px calc(env(safe-area-inset-bottom) + 6px);
+  box-shadow:0 -3px 0 var(--gold), 0 -6px 18px rgba(0,0,0,.4);
+}
+.nav-b{
+  flex:1; text-align:center; padding:7px 4px; border-radius:11px; cursor:pointer;
+  color:rgba(230,216,189,.55); position:relative;
+}
+.nav-b .ni{ font-size:21px; display:block; line-height:1; filter:grayscale(.4) brightness(.9); }
+.nav-b .nl{ font-family:var(--font-sc); font-size:9px; letter-spacing:.14em; text-transform:uppercase; margin-top:3px; display:block; }
+.nav-b.on{ color:var(--gold2); background:rgba(0,0,0,.25); }
+.nav-b.on .ni{ filter:none; }
+.nav-b .badge{
+  position:absolute; top:2px; right:calc(50% - 20px); min-width:16px; height:16px; padding:0 4px;
+  background:var(--blood2); color:#fff; border-radius:9px; font-family:var(--font-d);
+  font-size:10px; line-height:16px; font-weight:600;
+}
+
+/* ---------- modal ---------- */
+.overlay{
+  position:fixed; inset:0; z-index:50; background:rgba(28,20,15,.72);
+  display:flex; align-items:center; justify-content:center; padding:22px;
+  animation:fade .25s var(--calm);
+}
+.modal{
+  background:var(--parch); border:2px solid var(--gold); border-radius:16px;
+  max-width:380px; width:100%; padding:20px; box-shadow:0 12px 40px rgba(0,0,0,.5);
+  max-height:86vh; overflow-y:auto; animation:pop .35s var(--pop);
+}
+@keyframes pop{ from{opacity:0; transform:scale(.9) translateY(12px);} to{opacity:1; transform:none;} }
+.modal h2{ font-family:var(--font-d); font-weight:700; font-size:19px; text-align:center; color:var(--ink); margin:0 0 4px; letter-spacing:.06em; }
+.modal .sub{ font-family:var(--font-sc); text-align:center; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--bronze); margin-bottom:14px; }
+.away-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 2px; border-bottom:1px solid var(--line); font-family:var(--font-b); font-size:14px; }
+.away-row:last-child{ border-bottom:none; }
+.away-row b{ font-family:var(--font-d); font-size:16px; }
+.modal .m-btns{ display:flex; gap:8px; margin-top:16px; }
+
+/* choose stat popup */
+.chooser{ display:flex; gap:8px; margin-top:14px; }
+.chooser .cbtn{
+  flex:1; border:1.5px solid var(--ink); border-radius:11px; padding:12px 6px; cursor:pointer;
+  background:var(--sand2); text-align:center; box-shadow:0 2px 0 var(--line2);
+}
+.chooser .cbtn:active{ transform:translateY(2px); box-shadow:none; }
+.chooser .cbtn .ce{ font-size:22px; }
+.chooser .cbtn .cn{ font-family:var(--font-d); font-weight:600; font-size:14px; margin-top:4px; }
+.chooser .cbtn .cd{ font-family:var(--font-b); font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+.chooser .cbtn.str .cn{ color:var(--str);} .chooser .cbtn.agi .cn{ color:var(--agi);} .chooser .cbtn.vit .cn{ color:var(--vit);}
+
+.empty-note{ text-align:center; font-family:var(--font-b); font-style:italic; color:var(--ink-soft); font-size:13px; padding:30px 20px; }
+
+.reset-link{ text-align:center; margin:18px 0 4px; }
+.reset-link button{ background:none; border:none; font-family:var(--font-sc); font-size:10px; letter-spacing:.1em; color:var(--ink-soft); text-decoration:underline; cursor:pointer; opacity:.7; text-transform:uppercase; }
+
+.toast{
+  position:fixed; left:50%; bottom:96px; transform:translateX(-50%); z-index:60;
+  background:var(--dark); color:var(--sand); font-family:var(--font-b); font-size:13px;
+  padding:10px 16px; border-radius:22px; box-shadow:0 6px 20px rgba(0,0,0,.4);
+  border:1px solid var(--gold); max-width:88%; text-align:center;
+  opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div id="brand">
+      <h1>Ludus <span>· ARENA IDLE</span></h1>
+      <div id="daychip">Day 1</div>
+    </div>
+    <div id="stats">
+      <div class="stat gold"><b id="s-gold">0</b><small>Denarii</small></div>
+      <div class="stat fame"><b id="s-fame">0</b><small>Fame</small></div>
+      <div class="stat pop"><b id="s-pop">0/1</b><small>Ludus</small></div>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- ARENA -->
+    <div class="panel" id="p-arena">
+      <div class="section-h">The Arena</div>
+      <div class="card opp-card" id="opp-card"></div>
+
+      <div class="auto-toggle" id="auto-toggle">
+        <div class="t">Auto-Battle
+          <small>Idle fighters keep entering the arena on their own.</small>
+        </div>
+        <div class="switch" id="auto-switch"></div>
+      </div>
+
+      <div class="section-h">Chronicle</div>
+      <div id="log"></div>
+    </div>
+
+    <!-- LUDUS -->
+    <div class="panel" id="p-ludus">
+      <div class="section-h">Your Gladiators</div>
+      <div id="roster"></div>
+    </div>
+
+    <!-- FACILITIES -->
+    <div class="panel" id="p-fac">
+      <div class="section-h">The Ludus</div>
+      <div id="facilities"></div>
+      <div class="reset-link"><button id="reset-btn">Raze the ludus &amp; start over</button></div>
+    </div>
+  </div>
+
+  <div id="nav">
+    <div class="nav-b" data-tab="arena"><span class="ni">⚔️</span><span class="nl">Arena</span><span class="badge" id="badge-arena" style="display:none"></span></div>
+    <div class="nav-b on" data-tab="ludus"><span class="ni">🛡️</span><span class="nl">Ludus</span></div>
+    <div class="nav-b" data-tab="fac"><span class="ni">🏛️</span><span class="nl">Facilities</span></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+(function(){
+
+/* ============================ CONFIG ============================ */
+const SAVE_KEY = 'ludus.save.v1';
+const TICK_MS = 1000;                 // one game tick
+const MAX_OFFLINE_H = 8;              // cap offline catch-up
+const XP_FOR = lvl => Math.round(60 * Math.pow(1.55, lvl-1));
+
+const NAMES = ['Flamma','Crixus','Verus','Priscus','Spiculus','Hermes','Tetraites','Rutuba',
+  'Celadus','Columbus','Pugnax','Crescens','Triumphus','Draco','Ferox','Glaucus','Marius',
+  'Cassius','Rufus','Varro','Atticus','Brennus','Corvus','Decimus','Faustus','Gallus',
+  'Lupus','Nero','Otho','Quintus','Servius','Tiberius','Urso','Vitus','Barca','Duro'];
+const TITLES = [ // by wins
+  {w:0,t:'Tiro'}, {w:3,t:'Gregarius'}, {w:8,t:'Veteranus'}, {w:16,t:'Primus'},
+  {w:30,t:'Champion'}, {w:55,t:'Legend'}, {w:90,t:'Immortal'} ];
+const PORTRAITS = ['🗡️','⚔️','🛡️','🪓','🔱','🏹','🤺','💪'];
+
+// Arena opponents — power & reward scale up the ladder.
+const OPPONENTS = [
+  {n:'Drunken Brawler',   e:'🥴', d:'Back-alley chancer'},
+  {n:'Condemned Thief',   e:'⛓️', d:'Nothing left to lose'},
+  {n:'Wild Boar',         e:'🐗', d:'Beast hunt · venatio'},
+  {n:'Thracian Novice',   e:'🗡️', d:'Curved sica, light shield'},
+  {n:'Retiarius Veteran', e:'🔱', d:'Net and trident'},
+  {n:'Chained War-Dog',   e:'🐕', d:'Half-starved, all teeth'},
+  {n:'Murmillo Brute',    e:'🛡️', d:'Heavy fish-helm'},
+  {n:'The Iron Gaul',     e:'🪓', d:'Undefeated in Capua'},
+  {n:'Arena Lion',        e:'🦁', d:'Beast hunt · venatio'},
+  {n:'Champion Secutor',  e:'⚔️', d:'The crowd’s favourite'},
+  {n:'Barca the Giant',   e:'🗿', d:'A head taller than any man'},
+  {n:'The Emperor’s Champion', e:'👑', d:'None have bested him'},
+];
+const oppPower  = i => Math.round(16 * Math.pow(1.42, i));      // ~16 → ~900
+const oppReward = i => Math.round(14 * Math.pow(1.5, i));       // denarii for a win
+const oppFame   = i => Math.round(1 + i*1.4);
+const oppXP     = i => Math.round(22 * Math.pow(1.32, i));
+
+// Facilities
+const FAC = {
+  barracks:{ ic:'⛺', name:'Barracks', max:8,
+    desc:l=>`Houses up to <em>${l}</em> gladiator${l>1?'s':''}.`,
+    cost:l=> Math.round(120 * Math.pow(2.15, l-1)) },
+  training:{ ic:'🏋️', name:'Training Grounds', max:10,
+    desc:l=>`Training is <em>${(1+(l-1)*0.35).toFixed(2)}×</em> faster.`,
+    cost:l=> Math.round(80 * Math.pow(1.9, l-1)) },
+  infirmary:{ ic:'⚕️', name:'Infirmary', max:10,
+    desc:l=>`Heals <em>+${(l).toFixed(0)}</em> HP/sec · <em>${Math.round(deathCut(l)*100)}%</em> lower death risk.`,
+    cost:l=> Math.round(100 * Math.pow(1.95, l-1)) },
+  armory:{ ic:'🗡️', name:'Armory', max:12,
+    desc:l=>`Every fighter gains <em>+${(l-1)*8}</em> combat power from gear.`,
+    cost:l=> Math.round(90 * Math.pow(2.0, l-1)) },
+  manager:{ ic:'📜', name:'Lanista’s Contacts', max:12,
+    desc:l=>`Arena purses pay <em>${(1+(l-1)*0.2).toFixed(2)}×</em> more.`,
+    cost:l=> Math.round(150 * Math.pow(2.1, l-1)) },
+};
+const deathCut = l => Math.min(0.75, (l-1)*0.09);   // infirmary death-risk reduction
+
+/* ============================ STATE ============================ */
+let S = null;
+let nextId = 1;
+
+function newGladiator(){
+  const name = NAMES[(Math.random()*NAMES.length)|0];
+  return {
+    id: nextId++, name,
+    portrait: PORTRAITS[(Math.random()*PORTRAITS.length)|0],
+    str: 5 + (Math.random()*3|0),
+    agi: 5 + (Math.random()*3|0),
+    vit: 5 + (Math.random()*3|0),
+    hp: 0, maxHp: 0,
+    level:1, xp:0, wins:0, fights:0,
+    state:'idle',           // idle | fighting | training | injured
+    trainStat:null,
+    progress:0,             // ticks accumulated toward current action
+  };
+}
+function initState(){
+  nextId = 1;
+  const g = newGladiator();
+  recalc(g); g.hp = g.maxHp;
+  return {
+    gold: 60, fame: 0, day: 1, dayT: 0,
+    fac:{ barracks:1, training:1, infirmary:1, armory:1, manager:1 },
+    tier: 0, maxTier: 0, autoFight:false,
+    gladiators:[g],
+    log:[], nextId:2,
+    lastTick: Date.now(),
+  };
+}
+
+/* derived stats */
+function recalc(g){
+  g.maxHp = Math.round(40 + g.vit*9 + g.level*6);
+  if(g.hp > g.maxHp) g.hp = g.maxHp;
+}
+function power(g){
+  const gear = (S.fac.armory-1)*8;
+  return Math.round(g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + gear);
+}
+function titleFor(g){
+  let t = TITLES[0].t;
+  for(const x of TITLES){ if(g.wins >= x.w) t = x.t; }
+  return t;
+}
+const slots = () => S.fac.barracks;
+const alive = () => S.gladiators.length;
+
+/* ============================ SIMULATION ============================ */
+// A single gladiator's tick. Returns array of log events (for offline summary).
+function tickGladiator(g, live){
+  const ev = [];
+  if(g.state === 'injured'){
+    const heal = S.fac.infirmary;                 // hp/sec
+    g.hp = Math.min(g.maxHp, g.hp + heal);
+    if(g.hp >= g.maxHp*0.6){ g.state='idle'; g.progress=0;
+      if(live) ev.push({cls:'', txt:`<b>${g.name}</b> has recovered and returns to the ludus.`});
+    }
+    return ev;
+  }
+  if(g.state === 'training'){
+    const speed = 1 + (S.fac.training-1)*0.35;
+    g.progress += speed;
+    const need = 6 + g.level*0.6;
+    if(g.progress >= need){
+      g.progress = 0;
+      const st = g.trainStat || 'str';
+      g[st] += 1;
+      recalc(g);
+      // small chance to also gain xp from drilling
+      g.xp += 3;
+      maybeLevel(g, ev, live);
+      if(live) ev.push({cls:'level', txt:`<b>${g.name}</b> drilled — ${st.toUpperCase()} raised to ${g[st]}.`});
+    }
+    return ev;
+  }
+  if(g.state === 'fighting'){
+    // faster fighters resolve bouts quicker
+    const cd = Math.max(3, 7 - g.agi*0.12);
+    g.progress += 1;
+    if(g.progress >= cd){
+      g.progress = 0;
+      resolveFight(g, ev, live);
+    }
+    return ev;
+  }
+  // idle: if auto-fight is on and healthy enough, enter the arena
+  if(g.state === 'idle' && S.autoFight && g.hp > g.maxHp*0.45){
+    g.state = 'fighting'; g.progress = 0;
+  }
+  return ev;
+}
+
+function maybeLevel(g, ev, live){
+  let need = XP_FOR(g.level);
+  while(g.xp >= need){
+    g.xp -= need;
+    g.level++;
+    g.str += 1; g.agi += 1; g.vit += 1;    // small automatic growth
+    recalc(g); g.hp = g.maxHp;              // full heal on level up
+    if(live) ev.push({cls:'level', txt:`⭐ <b>${g.name}</b> reached level ${g.level}! Wounds mend, resolve hardens.`});
+    need = XP_FOR(g.level);
+  }
+}
+
+function resolveFight(g, ev, live){
+  const i = S.tier;
+  const opp = OPPONENTS[i];
+  const gp = power(g);
+  const ep = oppPower(i);
+  let wc = gp/(gp+ep);
+  wc = Math.max(0.06, Math.min(0.95, wc));
+  const won = Math.random() < wc;
+  g.fights++;
+
+  // damage taken this bout
+  let dmg = ep * (won ? (0.12+Math.random()*0.22) : (0.45+Math.random()*0.5));
+  dmg = dmg / (1 + g.vit*0.03);
+  g.hp -= dmg;
+
+  if(won){
+    const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2));
+    S.gold += gain;
+    S.fame += oppFame(i);
+    g.xp += oppXP(i);
+    g.wins++;
+    if(i === S.maxTier && S.maxTier < OPPONENTS.length-1){ S.maxTier++; }  // unlock next tier
+    maybeLevel(g, ev, live);
+    if(live) ev.push({cls:'win', txt:`<b>${g.name}</b> defeated the ${opp.n}! <span class="cash">+${gain}◈</span> · +${oppFame(i)} fame`});
+    ev._win = true;
+  } else {
+    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> was bested by the ${opp.n}. The mob jeers.`});
+    ev._lose = true;
+  }
+
+  // downed?
+  if(g.hp <= 0){
+    g.hp = 0;
+    let deathChance = (won ? 0.10 : 0.40) * Math.min(2.2, ep/gp);
+    deathChance *= (1 - deathCut(S.fac.infirmary));
+    deathChance = Math.min(0.9, deathChance);
+    if(Math.random() < deathChance){
+      // death
+      g._dead = true;
+      if(live) ev.push({cls:'death', txt:`💀 <b>${g.name}</b> has fallen in the arena. Habet, hoc habet. The ludus mourns.`});
+      ev._death = true;
+    } else {
+      g.state = 'injured'; g.progress = 0;
+      if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> is carried off gravely wounded — to the infirmary.`});
+    }
+  }
+}
+
+// Master tick — advances the whole world by one second.
+function tick(live){
+  const events = [];
+  let winFlash=false, loseFlash=false;
+  for(const g of S.gladiators){
+    const ev = tickGladiator(g, live);
+    if(ev._win) winFlash = true;
+    if(ev._lose) loseFlash = true;
+    for(const e of ev) events.push(Object.assign({gid:g.id}, e));
+  }
+  // remove the dead
+  const before = S.gladiators.length;
+  S.gladiators = S.gladiators.filter(g => !g._dead);
+  const deaths = before - S.gladiators.length;
+
+  // day passes
+  S.dayT += 1;
+  if(S.dayT >= 20){ S.dayT = 0; S.day++; }
+
+  return { events, deaths, winFlash, loseFlash };
+}
+
+/* ============================ OFFLINE CATCH-UP ============================ */
+function catchUp(){
+  const now = Date.now();
+  let elapsed = Math.floor((now - (S.lastTick||now))/1000);
+  S.lastTick = now;
+  if(elapsed < 3) return null;
+  elapsed = Math.min(elapsed, MAX_OFFLINE_H*3600);
+
+  const goldBefore = S.gold, fameBefore = S.fame;
+  let fights=0, wins=0, deaths=0, levels=0;
+  const lvlBefore = {}; S.gladiators.forEach(g=>lvlBefore[g.id]=g.level);
+
+  for(let t=0; t<elapsed; t++){
+    const before = S.gladiators.map(g=>g.fights).reduce((a,b)=>a+b,0);
+    const wBefore = S.gladiators.map(g=>g.wins).reduce((a,b)=>a+b,0);
+    const r = tick(false);
+    deaths += r.deaths;
+    const after = S.gladiators.map(g=>g.fights).reduce((a,b)=>a+b,0);
+    const wAfter = S.gladiators.map(g=>g.wins).reduce((a,b)=>a+b,0);
+    fights += Math.max(0, after-before);
+    wins   += Math.max(0, wAfter-wBefore);
+    if(S.gladiators.length===0 && !S.autoFight) {} // nothing
+  }
+  S.gladiators.forEach(g=>{ if(lvlBefore[g.id]!==undefined) levels += Math.max(0,g.level-lvlBefore[g.id]); });
+
+  return {
+    secs: elapsed,
+    gold: S.gold-goldBefore,
+    fame: S.fame-fameBefore,
+    fights, wins, deaths, levels,
+  };
+}
+
+/* ============================ PERSISTENCE ============================ */
+function save(){
+  S.lastTick = Date.now();
+  S.nextId = nextId;
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){}
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    S = JSON.parse(raw);
+    nextId = S.nextId || (Math.max(0,...S.gladiators.map(g=>g.id))+1);
+    // safety: recalc derived
+    S.gladiators.forEach(g=>{ if(!g.maxHp) recalc(g); });
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ============================ UI ============================ */
+const $ = s => document.querySelector(s);
+const el = (t,c)=>{ const e=document.createElement(t); if(c) e.className=c; return e; };
+let tab = 'ludus';
+
+function fmt(n){
+  n = Math.round(n);
+  if(n>=1e6) return (n/1e6).toFixed(2)+'M';
+  if(n>=1e4) return (n/1e3).toFixed(1)+'k';
+  return ''+n;
+}
+
+function renderTop(){
+  $('#s-gold').textContent = fmt(S.gold);
+  $('#s-fame').textContent = fmt(S.fame);
+  $('#s-pop').textContent  = alive()+'/'+slots();
+  $('#daychip').textContent = 'Day '+S.day;
+}
+
+function statusLabel(g){
+  const map = { idle:['st-idle','Resting'], fighting:['st-fighting','In the Arena'],
+    training:['st-training','Training'], injured:['st-injured','Wounded'] };
+  const [c,t] = map[g.state]||map.idle;
+  return `<span class="g-status ${c}">${t}</span>`;
+}
+
+function renderRoster(){
+  const wrap = $('#roster'); wrap.innerHTML='';
+  for(const g of S.gladiators){
+    recalc(g);
+    const card = el('div','card');
+    card.dataset.gid = g.id;
+    const need = XP_FOR(g.level);
+    const pow = power(g);
+    card.innerHTML = `
+      ${statusLabel(g)}
+      <div class="g-head">
+        <div class="g-portrait">${g.portrait}</div>
+        <div class="g-meta">
+          <div class="g-name">${g.name}</div>
+          <div class="g-title">${titleFor(g)} · ${g.wins}W / ${g.fights} fights</div>
+        </div>
+        <div class="g-lvl">LVL ${g.level}</div>
+      </div>
+      <div class="barrow"><span class="lab">HP</span><div class="bar hp"><i style="width:${Math.max(0,g.hp/g.maxHp*100)}%"></i></div><span class="num">${Math.round(g.hp)}/${g.maxHp}</span></div>
+      <div class="barrow"><span class="lab">XP</span><div class="bar xp"><i style="width:${Math.min(100,g.xp/need*100)}%"></i></div><span class="num">${Math.round(g.xp)}/${need}</span></div>
+      <div class="g-stats">
+        <div class="pip str"><b>${g.str}</b><small>STR</small></div>
+        <div class="pip agi"><b>${g.agi}</b><small>AGI</small></div>
+        <div class="pip vit"><b>${g.vit}</b><small>VIT</small></div>
+        <div class="pip pow"><b>${pow}</b><small>POWER</small></div>
+      </div>
+      <div class="g-actions"></div>`;
+    const acts = card.querySelector('.g-actions');
+    if(g.state==='injured'){
+      const b = el('div','btn wide rest'); b.innerHTML = `Wounded — Healing in Infirmary`;
+      b.setAttribute('disabled','');
+      acts.appendChild(b);
+    } else if(g.state==='fighting'){
+      const b = el('div','btn wide recall'); b.textContent='Recall from Arena';
+      b.onclick=()=>{ g.state='idle'; g.progress=0; refresh(); save(); };
+      acts.appendChild(b);
+    } else if(g.state==='training'){
+      const b = el('div','btn wide recall'); b.innerHTML=`Stop Training <small>drilling ${(g.trainStat||'str').toUpperCase()}</small>`;
+      b.onclick=()=>{ g.state='idle'; g.progress=0; refresh(); save(); };
+      acts.appendChild(b);
+    } else { // idle
+      const f = el('div','btn fight'); f.innerHTML=`Send to Arena`;
+      f.onclick=()=>{ g.state='fighting'; g.progress=0; goTab('arena'); save(); };
+      const t = el('div','btn train'); t.innerHTML=`Train`;
+      t.onclick=()=> chooseTrain(g);
+      acts.appendChild(f); acts.appendChild(t);
+    }
+    wrap.appendChild(card);
+  }
+
+  // empty slots / recruit
+  const free = slots() - alive();
+  if(free > 0){
+    const cost = recruitCost();
+    const s = el('div','slot-empty');
+    s.innerHTML = `<div class="em">⚱️</div>
+      <p>${alive()===0?'Your ludus stands empty.':'An empty bunk waits.'}<br>Recruit a fresh gladiator from the slave market.</p>`;
+    const b = el('div','btn gold'); b.style.maxWidth='240px'; b.style.margin='0 auto';
+    b.innerHTML = `Recruit Gladiator <small>${fmt(cost)} ◈</small>`;
+    if(S.gold < cost) b.setAttribute('disabled','');
+    b.onclick = ()=> recruit();
+    s.appendChild(b);
+    wrap.appendChild(s);
+  } else if(slots() < FAC.barracks.max){
+    const note = el('div','empty-note');
+    note.innerHTML = `Ludus full (${alive()}/${slots()}). Expand the <b>Barracks</b> in Facilities to house more.`;
+    wrap.appendChild(note);
+  }
+}
+
+function recruitCost(){
+  return Math.round(45 * Math.pow(1.85, alive()));
+}
+function recruit(){
+  if(alive() >= slots()) return;
+  const cost = recruitCost();
+  if(S.gold < cost) return;
+  S.gold -= cost;
+  const g = newGladiator(); recalc(g); g.hp=g.maxHp;
+  S.gladiators.push(g);
+  toast(`${g.name} joins your ludus.`);
+  refresh(); save();
+}
+
+function chooseTrain(g){
+  const ov = el('div','overlay');
+  const m = el('div','modal');
+  m.innerHTML = `<h2>Train ${g.name}</h2><div class="sub">Choose the discipline to drill</div>
+    <div class="chooser">
+      <div class="cbtn str" data-s="str"><div class="ce">💪</div><div class="cn">Strength</div><div class="cd">Harder blows</div></div>
+      <div class="cbtn agi" data-s="agi"><div class="ce">🤸</div><div class="cn">Agility</div><div class="cd">Speed &amp; dodge</div></div>
+      <div class="cbtn vit" data-s="vit"><div class="ce">❤️</div><div class="cn">Vitality</div><div class="cd">More HP</div></div>
+    </div>
+    <div class="m-btns"><div class="btn wide recall" id="tc-cancel">Cancel</div></div>`;
+  ov.appendChild(m); document.body.appendChild(ov);
+  ov.onclick = e=>{ if(e.target===ov) ov.remove(); };
+  m.querySelector('#tc-cancel').onclick=()=>ov.remove();
+  m.querySelectorAll('.cbtn').forEach(b=>{
+    b.onclick=()=>{
+      g.trainStat = b.dataset.s; g.state='training'; g.progress=0;
+      ov.remove(); toast(`${g.name} begins drilling ${b.dataset.s.toUpperCase()}.`);
+      refresh(); save();
+    };
+  });
+}
+
+function renderArena(){
+  const i = S.tier;
+  const opp = OPPONENTS[i];
+  const ep = oppPower(i);
+  const c = $('#opp-card');
+  const fighters = S.gladiators.filter(g=>g.state==='fighting').length;
+  c.innerHTML = `
+    <div class="tier-nav">
+      <button id="tier-prev">‹</button>
+      <div class="tier-lab">Bout ${i+1} of ${OPPONENTS.length}</div>
+      <button id="tier-next">›</button>
+    </div>
+    <div class="opp-portrait">${opp.e}</div>
+    <div class="opp-name">${opp.n}</div>
+    <div class="opp-sub">${opp.d}</div>
+    <div class="opp-row">
+      <div class="kv"><b style="color:var(--blood)">${ep}</b><small>Enemy Power</small></div>
+      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)))}◈</b><small>Purse</small></div>
+      <div class="kv"><b style="color:var(--bronze)">${fighters}</b><small>Fighting</small></div>
+    </div>
+    ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous bout to unlock this foe.</div>` :
+       fighters===0 ? `<div class="locked-note" style="color:var(--ink-soft);font-style:italic">No one is fighting. Send a gladiator from the Ludus, or turn on Auto-Battle.</div>` : '' }
+  `;
+  const prev = c.querySelector('#tier-prev'), next = c.querySelector('#tier-next');
+  if(i<=0) prev.setAttribute('disabled','');
+  if(i>=OPPONENTS.length-1 || i>=S.maxTier) next.setAttribute('disabled','');
+  prev.onclick=()=>{ if(S.tier>0){S.tier--; renderArena(); save();} };
+  next.onclick=()=>{ if(S.tier<S.maxTier && S.tier<OPPONENTS.length-1){S.tier++; renderArena(); save();} };
+
+  $('#auto-switch').classList.toggle('on', S.autoFight);
+}
+
+function renderLog(){
+  const box = $('#log'); box.innerHTML='';
+  const lines = S.log.slice(-40).reverse();
+  if(lines.length===0){
+    box.innerHTML = `<div class="empty-note">The sands are quiet. Send a gladiator to the arena to begin the chronicle.</div>`;
+    return;
+  }
+  for(const l of lines){
+    const d = el('div','log-line '+(l.cls||''));
+    d.innerHTML = l.txt;
+    box.appendChild(d);
+  }
+}
+
+function renderFacilities(){
+  const wrap = $('#facilities'); wrap.innerHTML='';
+  for(const key in FAC){
+    const f = FAC[key];
+    const lvl = S.fac[key];
+    const maxed = lvl >= f.max;
+    const card = el('div','card fac');
+    if(maxed) card.classList.add('maxed');
+    const cost = maxed ? 0 : f.cost(lvl);
+    card.innerHTML = `
+      <div class="ic">${f.ic}</div>
+      <div class="body">
+        <div class="fname">${f.name}</div>
+        <div class="flvl">Level ${lvl}${maxed?' · MAX':''}</div>
+        <div class="fdesc">${f.desc(lvl)}</div>
+      </div>`;
+    const bWrap = el('div'); bWrap.style.flex='none';
+    const b = el('div','btn gold'); b.style.minWidth='92px';
+    if(maxed){ b.classList.remove('gold'); b.classList.add('recall'); b.textContent='Maxed'; b.setAttribute('disabled',''); }
+    else {
+      b.innerHTML = `Upgrade<small>${fmt(cost)} ◈</small>`;
+      if(S.gold < cost) b.setAttribute('disabled','');
+      b.onclick=()=>{
+        if(S.gold < f.cost(S.fac[key])) return;
+        S.gold -= f.cost(S.fac[key]);
+        S.fac[key]++;
+        // recalc hp on vit-independent facilities
+        S.gladiators.forEach(recalc);
+        toast(`${f.name} upgraded to level ${S.fac[key]}.`);
+        refresh(); save();
+      };
+    }
+    bWrap.appendChild(b);
+    card.appendChild(bWrap);
+    wrap.appendChild(card);
+  }
+}
+
+function refresh(){
+  renderTop();
+  if(tab==='ludus') renderRoster();
+  if(tab==='arena'){ renderArena(); renderLog(); }
+  if(tab==='fac') renderFacilities();
+  updateBadges();
+}
+function updateBadges(){
+  // nothing critical for now; could show unlocks
+}
+
+function goTab(t){
+  tab = t;
+  document.querySelectorAll('.nav-b').forEach(b=> b.classList.toggle('on', b.dataset.tab===t));
+  document.querySelectorAll('.panel').forEach(p=> p.classList.remove('on'));
+  $('#p-'+t).classList.add('on');
+  refresh();
+}
+
+let toastT=null;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1900);
+}
+
+/* ============================ MAIN LOOP ============================ */
+function pushLog(events){
+  for(const e of events){
+    S.log.push({cls:e.cls, txt:e.txt});
+  }
+  if(S.log.length>60) S.log = S.log.slice(-60);
+}
+
+let acc = 0, lastFrame = 0;
+function loop(ts){
+  if(!lastFrame) lastFrame = ts;
+  acc += ts - lastFrame; lastFrame = ts;
+  let ran = false, winF=false, loseF=false;
+  const gidsWin = new Set(), gidsLose = new Set();
+  while(acc >= TICK_MS){
+    acc -= TICK_MS;
+    const r = tick(true);
+    if(r.events.length) pushLog(r.events);
+    if(r.winFlash) winF=true;
+    if(r.loseFlash) loseF=true;
+    ran = true;
+  }
+  if(ran){
+    renderTop();
+    if(tab==='ludus') renderRoster();
+    if(tab==='arena'){ renderArena(); renderLog(); }
+    // periodic save
+    save();
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ============================ AWAY MODAL ============================ */
+function showAway(sum){
+  const ov = el('div','overlay');
+  const m = el('div','modal');
+  const hrs = Math.floor(sum.secs/3600), mins = Math.floor((sum.secs%3600)/60);
+  const timeStr = hrs>0 ? `${hrs}h ${mins}m` : `${mins}m ${sum.secs%60}s`;
+  m.innerHTML = `
+    <h2>While You Were Away</h2>
+    <div class="sub">The ludus carried on for ${timeStr}</div>
+    <div class="away-row"><span>⚔️ Bouts fought</span><b>${sum.fights}</b></div>
+    <div class="away-row"><span>🏆 Victories</span><b style="color:var(--green)">${sum.wins}</b></div>
+    <div class="away-row"><span>◈ Denarii earned</span><b class="cash" style="color:var(--gold)">+${fmt(sum.gold)}</b></div>
+    <div class="away-row"><span>✦ Fame gained</span><b style="color:#a9628a">+${fmt(sum.fame)}</b></div>
+    ${sum.levels>0?`<div class="away-row"><span>⭐ Level-ups</span><b>${sum.levels}</b></div>`:''}
+    ${sum.deaths>0?`<div class="away-row"><span>💀 Fallen</span><b style="color:var(--blood)">${sum.deaths}</b></div>`:''}
+    <div class="m-btns"><div class="btn wide gold" id="away-ok">Return to the Ludus</div></div>`;
+  ov.appendChild(m); document.body.appendChild(ov);
+  m.querySelector('#away-ok').onclick=()=>ov.remove();
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+}
+
+/* ============================ INIT ============================ */
+function boot(){
+  const had = load();
+  if(!had){ S = initState(); nextId = S.nextId; }
+  // offline catch-up
+  let away = null;
+  if(had) away = catchUp();
+
+  // nav
+  document.querySelectorAll('.nav-b').forEach(b=>{
+    b.onclick=()=> goTab(b.dataset.tab);
+  });
+  $('#auto-toggle').onclick=()=>{
+    S.autoFight = !S.autoFight;
+    $('#auto-switch').classList.toggle('on', S.autoFight);
+    if(S.autoFight) toast('Auto-Battle on — idle fighters will enter the arena.');
+    else toast('Auto-Battle off.');
+    refresh(); save();
+  };
+  $('#reset-btn').onclick=()=>{
+    const ov = el('div','overlay'); const m = el('div','modal');
+    m.innerHTML = `<h2>Raze the Ludus?</h2><div class="sub">This cannot be undone</div>
+      <p style="font-family:var(--font-b);text-align:center;color:var(--ink-soft);font-size:13px">Every gladiator, coin, and building will be lost to history. Begin anew?</p>
+      <div class="m-btns"><div class="btn recall" id="r-no" style="flex:1">Keep it</div><div class="btn fight" id="r-yes" style="flex:1">Raze it</div></div>`;
+    ov.appendChild(m); document.body.appendChild(ov);
+    m.querySelector('#r-no').onclick=()=>ov.remove();
+    m.querySelector('#r-yes').onclick=()=>{
+      localStorage.removeItem(SAVE_KEY); S = initState(); nextId=S.nextId;
+      ov.remove(); goTab('ludus'); toast('A new ludus rises from the dust.'); save();
+    };
+  };
+
+  goTab('ludus');
+  if(away && (away.fights>0 || away.gold>0 || away.deaths>0)) showAway(away);
+  refresh(); save();
+  requestAnimationFrame(loop);
+
+  // save on hide (mobile background)
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+  window.addEventListener('beforeunload', save);
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
