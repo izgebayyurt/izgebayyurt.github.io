@@ -354,26 +354,26 @@
      map:["#######","App#.##","#_..p.#","#o##._#","#.#..o#","#####B#"]},
     {hint:"", par:17, limit:24,
      map:["#######","App#.##","#_..p##","#o##._#","#.#..o#","#####B#"]},
-    {hint:"<b>Triangles</b> fling you where they point. <b>Bumpers</b> send you back.", par:3, limit:7,
-     map:["######","Aw.oo#","#o..##","#.####","#..y##","######"]},
+    {hint:"<b>Wedges</b> fling you where they point — their flat back bounces you off. <b>Bumpers</b> always send you back.", par:4, limit:8,
+     map:["########","#b##...#","#.##.#.#","#.z.w#o#","#..###zA","#o.#####","########"]},
     {hint:"", par:4, limit:8,
-     map:["#######","#.wo.o#","#...#o#","#.#.w.#","#...w.#","###A###"]},
+     map:["######","A..b.#","#w.o.#","#.o#.#","##..o#","######"]},
     {hint:"", par:5, limit:9,
-     map:["######","Aw#oo#","#o..##","#.####","#..y##","######"]},
+     map:["########","##ob.z.#","##...x.#","#..poo.#","#xp....#","#.....pA","#####B##"]},
     {hint:"", par:6, limit:10,
-     map:["####A#","#.#..#","#o.w##","##.o##","##.x.#","##.o.#","######"]},
+     map:["##A##","##o.#","#oop#","Bppw#","#####"]},
     {hint:"", par:7, limit:11,
-     map:["####A#","#.#..#","#o.w##","#..o##","##.x##","##.o##","######"]},
+     map:["########","##.po..#","#..p.y.#","#...w#o#","Bo..#..#","#......#","######A#"]},
     {hint:"", par:8, limit:12,
-     map:["####A#","#.#..#","#o#w##","#..o##","##.x##","##.o##","######"]},
+     map:["########","B..po..#","#.#..yp#","#....o.#","#....p.#","#x.....#","A....#.#","########"]},
     {hint:"", par:9, limit:13,
-     map:["####A#","#.#..#","#o#z##","#..o##","##.x##","##.o##","######"]},
+     map:["#####","##ooB","Ao.p#","#ppw#","#####"]},
     {hint:"", par:11, limit:15,
-     map:["###B###","#xp...#","#..o#.#","#.##..#","A.pw#.#","#..opw#","#######"]},
-    {hint:"", par:13, limit:18,
-     map:["#######","##..#p#","Bpo#o.#","#...#p#","A.zx..#","#######"]},
+     map:["########","##ob.z.#","##...xo#","##.pop##","#x.....#","#.....pA","#####B##"]},
+    {hint:"", par:12, limit:17,
+     map:["#####","B.x.#","#o.pA","#..##","#..p#","#zoo#","#####"]},
     {hint:"", par:15, limit:21,
-     map:["#######","#...#p#","Bpo#o.#","#...#p#","A.zx..#","#######"]},
+     map:["######","#pp.##","##o..#","#.wpx#","#....#","A.o#.#","#.o.b#","####B#"]},
   ];
 
   let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
@@ -419,6 +419,8 @@
         if(doorCellG===k&&!dOpen) break;
         if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked||ds[j].color!==ds[i].color) break;   // other colour = movable wall
           ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
+        const tv0=triMapG[k]; if(tv0!==undefined&&DIRV[tv0][0]===cdr&&DIRV[tv0][1]===cdc){
+          if(red<6){ cdr=-cdr; cdc=-cdc; red++; ds[i].corners.push({r,c}); continue; } break; }
         r=nr;c=nc;
         const tv=triMapG[k]; if(tv!==undefined&&red<6){ cdr=DIRV[tv][0]; cdc=DIRV[tv][1]; red++; ds[i].corners.push({r,c}); continue; }
         if(bumpSetG.has(k)&&red<6){ cdr=-cdr; cdc=-cdc; red++; ds[i].corners.push({r,c}); continue; } }
@@ -628,16 +630,18 @@
             ctx.beginPath(); ctx.moveTo(cx+px,cy+py); ctx.lineTo(cx-px,cy-py); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill(); ctx.stroke(); }
           ctx.fillStyle='#3a3450'; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
           ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.036); ctx.stroke(); }
-        { const tv=triMapG[r+','+c]; if(tv!==undefined){ const cx=x+S/2, cy=y+S/2, R=S*.27;
-          ctx.save(); ctx.translate(cx,cy); ctx.rotate([0,Math.PI,-Math.PI/2,Math.PI/2][tv]);
-          ctx.fillStyle='#8d85b8'; ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2,S*.045);
-          ctx.beginPath(); ctx.moveTo(0,-R); ctx.lineTo(R*.85,R*.7); ctx.lineTo(-R*.85,R*.7); ctx.closePath(); ctx.fill(); ctx.stroke();
-          ctx.fillStyle='rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(0,-R*.7); ctx.lineTo(R*.4,R*.4); ctx.lineTo(-R*.4,R*.4); ctx.closePath(); ctx.fill();
+        { const tv=triMapG[r+','+c]; if(tv!==undefined){ const m2=Math.round(S*.05);
+          ctx.save(); ctx.translate(x+S/2,y+S/2); ctx.rotate([0,Math.PI,-Math.PI/2,Math.PI/2][tv]);
+          const h2=S/2-m2, b2=S/2-m2;
+          ctx.fillStyle='#7c3b38'; ctx.beginPath(); ctx.moveTo(0,-h2); ctx.lineTo(b2,h2); ctx.lineTo(-b2,h2); ctx.closePath(); ctx.fill();
+          ctx.fillStyle='#a85550'; ctx.beginPath(); ctx.moveTo(0,-h2); ctx.lineTo(b2*.86,h2-S*.13); ctx.lineTo(-b2*.86,h2-S*.13); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.2,S*.045);
+          ctx.beginPath(); ctx.moveTo(0,-h2); ctx.lineTo(b2,h2); ctx.lineTo(-b2,h2); ctx.closePath(); ctx.stroke();
           ctx.restore(); }
-        if(bumpSetG.has(r+','+c)){ const cx=x+S/2, cy=y+S/2;
-          ctx.strokeStyle='#c9c3e6'; ctx.lineWidth=Math.max(2.5,S*.055); ctx.beginPath(); ctx.arc(cx,cy,S*.24,0,7); ctx.stroke();
-          ctx.fillStyle='#8d85b8'; ctx.beginPath(); ctx.arc(cx,cy,S*.11,0,7); ctx.fill();
-          ctx.strokeStyle=INK; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,S*.24,0,7); ctx.stroke(); } }
+        if(bumpSetG.has(r+','+c)){ const cx=x+S/2, cy=y+S/2, R=S*.30;
+          ctx.fillStyle='#7c3b38'; ctx.beginPath(); ctx.arc(cx,cy+S*.055,R,0,7); ctx.fill();
+          ctx.fillStyle='#a85550'; ctx.beginPath(); ctx.arc(cx,cy-S*.015,R*.93,0,7); ctx.fill();
+          ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.2,S*.045); ctx.beginPath(); ctx.arc(cx,cy+S*.01,R,0,7); ctx.stroke(); } }
         if(platesG.includes(r+','+c)){ const lit=state.drops.some(d=>d.r===r&&d.c===c);
           ctx.fillStyle=lit?'rgba(255,210,122,.22)':'rgba(120,112,150,.14)'; ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.fill();
           ctx.strokeStyle=lit?'#ffd27a':'#6f6890'; ctx.lineWidth=Math.max(2,S*.05); ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.stroke();
