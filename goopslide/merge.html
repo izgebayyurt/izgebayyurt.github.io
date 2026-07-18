@@ -35,7 +35,7 @@
     <button class="chip" id="reset" title="Restart (R)">↺</button>
     <div class="chip" id="moves">0</div>
   </div>
-  <div id="hint">One swipe moves <b>every</b> droplet. They <b>merge</b> on contact — fill each mould with a blob of its size.</div>
+  <div id="hint">Swipe moves <b>every</b> goop. Same colour merges; different colours block. One blob per colour wins.</div>
   <div id="win"><div class="card"><h2>Solved! 🎉</h2><button class="chip" id="wnext">Next ▶</button></div></div>
 
 <script>
@@ -43,42 +43,81 @@
   'use strict';
   const cv=document.getElementById('c'), ctx=cv.getContext('2d'); const INK='#3a2f24';
   const GOOP='#4bb39a', GOOPD='#2f8f79';
+  const COLORS=[{main:'#4bb39a',dark:'#2f8f79',lock:'#7fcdb9'},   // mint
+                {main:'#e8836f',dark:'#c25a48',lock:'#f3b0a2'},   // coral
+                {main:'#8f7fd4',dark:'#6a5ab0',lock:'#b8adf0'}];  // violet
 
   // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
   // '1'..'9' mould(need that size) — mould levels win by filling; no moulds → win by merging ALL into one
   const LEVELS=[
-    {name:'All Together', hint:'One swipe moves <b>every</b> goop, and they <b>merge</b> on contact. Merge them all into one!',
-     map:['######','#o..o#','#....#','#.o..#','######']},
-    {name:'First Thorns', hint:'<b>Spikes kill.</b> A goop that slides into them is gone — find the safe order. (↶ undoes.)',
-     map:['######','#o...#','#..^o#','#....#','######']},
-    {name:'Prickly Pair', hint:'Merge all four — the thorns crowd the lanes.',
-     map:['######','####.#','#.#o.#','#^oo##','#^.o^#','######']},
-    {name:'Crossfire', hint:'Five goops, thorns on both flanks.',
-     map:['########','#^o..###','#oo#...#','##..^oo#','#.o.#.##','########']},
-    {name:'Threading', hint:'Use a stopped goop as a <b>shield</b> — friends stop friends before the spikes do.',
-     map:['######','#^^#.#','##^o.#','#oo.##','#o...#','#^#..#','######']},
-    {name:'Thorn Garden', hint:'Six goops. Every lane is trapped.',
-     map:['#######','#^o..##','##o^o^#','#^#..o#','##.o###','#..####','#######']},
-    {name:'Shield Wall', hint:'The optimal path is 14 moves. Take your time.',
-     map:['#######','#.o##.#','#.#^oo#','#..o.##','#.o#^.#','#######']},
-    {name:'The Gauntlet', hint:'16 moves of choreography. The final exam.',
-     map:['#######','#^..#^#','##.o.o#','##.o.##','#.....#','#o^#.o#','#######']},
+    {name:"Oil & Water", hint:"Different colours <b>don’t mix</b> — they stop each other like walls. Merge each colour into <b>one blob per colour</b>. <i>(best: 2)</i>",
+     map:["######","#o..p#","#..p.#","#.o..#","#....#","######"]},
+    {name:"Stay Apart", hint:"A goop of another colour is a <b>movable wall</b>. Use it. <i>(best: 3)</i>",
+     map:["######","#...p#","#....#","#...o#","#op..#","######"]},
+    {name:"Two Herds", hint:"Order is everything. <i>(best: 4)</i>",
+     map:["######","#....#","#.pop#","#o...#","######"]},
+    {name:"Traffic", hint:"Every swipe moves everyone. <i>(best: 4)</i>",
+     map:["######","#p#..#","#..op#","#.#.o#","#...##","######"]},
+    {name:"Sort It Out", hint:"Keep the families apart — and together. <i>(best: 5)</i>",
+     map:["######","#.p..#","#o#..#","#p.o##","######"]},
+    {name:"Body Blocks", hint:"Herd each family home. <i>(best: 5)</i>",
+     map:["######","#.#p.#","#.##o#","#.o..#","#...p#","######"]},
+    {name:"The Bouncer", hint:"Block with one colour, merge with the other. <i>(best: 5)</i>",
+     map:["######","#.opp#","#..#.#","##.#o#","######"]},
+    {name:"Crowded House", hint:"Order is everything. <i>(best: 6)</i>",
+     map:["######","#o#.p#","#p..##","##..o#","######"]},
+    {name:"Thorns Return", hint:"<b>Spikes are back.</b> Nobody dies today — every family arrives whole. <i>(best: 8)</i>",
+     map:["#######","##.#.o#","#.poo##","###...#","#.#p.^#","#######"]},
+    {name:"Prickly Sort", hint:"Keep the families apart — and together. <i>(best: 10)</i>",
+     map:["######","#p..^#","#o...#","#.#..#","#..po#","######"]},
+    {name:"Colour Guard", hint:"Herd each family home. <i>(best: 10)</i>",
+     map:["######","#..p##","##p^.#","#o.#o#","##...#","######"]},
+    {name:"Crossfire", hint:"Block with one colour, merge with the other. <i>(best: 10)</i>",
+     map:["#######","#o.po.#","##..^.#","##o..p#","##....#","#######"]},
+    {name:"Escort", hint:"Order is everything. <i>(best: 11)</i>",
+     map:["#######","#..o.p#","#p#.#o#","##..#.#","##o..^#","#######"]},
+    {name:"Roadblock", hint:"Every swipe moves everyone. <i>(best: 11)</i>",
+     map:["######","##...#","#opo.#","#^.#.#","#^.#p#","######"]},
+    {name:"Shepherd", hint:"Keep the families apart — and together. <i>(best: 11)</i>",
+     map:["#######","##...p#","#o.#.o#","#o#..##","#p^...#","#######"]},
+    {name:"Interference", hint:"<b>Three families</b> now. Same rules, thrice the traffic. <i>(best: 13)</i>",
+     map:["######","##p..#","#pq.o#","#q##^#","#o.#.#","######"]},
+    {name:"The Weave", hint:"Block with one colour, merge with the other. <i>(best: 14)</i>",
+     map:["#######","##o..^#","##.#^o#","##.o#.#","#p...p#","#######"]},
+    {name:"Switchback", hint:"Order is everything. <i>(best: 14)</i>",
+     map:["#######","##...##","#opop.#","#.o##.#","#^#.^.#","#######"]},
+    {name:"Gridlock", hint:"Every swipe moves everyone. <i>(best: 14)</i>",
+     map:["#######","#^..p.#","#.^.o##","#o##.o#","#p...##","#######"]},
+    {name:"Undertow", hint:"Keep the families apart — and together. <i>(best: 15)</i>",
+     map:["######","#poq.#","#.o###","#..pq#","#o.^.#","######"]},
+    {name:"Cat’s Cradle", hint:"Herd each family home. <i>(best: 16)</i>",
+     map:["######","#o.###","##q###","#poqp#","#^#o.#","######"]},
+    {name:"The Braid", hint:"Block with one colour, merge with the other. <i>(best: 18)</i>",
+     map:["######","##qo.#","#.#q.#","#^#p.#","#po..#","######"]},
+    {name:"Loom", hint:"Order is everything. <i>(best: 20)</i>",
+     map:["#######","#.#^.##","#..po.#","###^p##","#..oq.#","#.q..o#","#######"]},
+    {name:"Grand Weave", hint:"Every swipe moves everyone. <i>(best: 20)</i>",
+     map:["#######","#..#.o#","#q.op##","#o#...#","#^p.q##","##^^.##","#######"]},
+    {name:"The Masterknot", hint:"Keep the families apart — and together. <i>(best: 20)</i>",
+     map:["#######","#...###","#o^#..#","#..qp##","#o#..q#","#.#p.^#","#######"]},
   ];
 
-  let gw,gh,grid,spikes,state,undoStack,moves,levelIdx,won,mass0;
+  let gw,gh,grid,spikes,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
     grid=[]; spikes=new Set(); const drops=[], molds=[]; let id=0;
     for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
       if(ch==='#'){ row.push('#'); } else { row.push('.');
-        if(ch==='o') drops.push({id:id++,r,c,size:1,locked:false});
+        if(ch==='o') drops.push({id:id++,r,c,size:1,color:0,locked:false});
+        else if(ch==='p') drops.push({id:id++,r,c,size:1,color:1,locked:false});
+        else if(ch==='q') drops.push({id:id++,r,c,size:1,color:2,locked:false});
         else if(ch==='^') spikes.add(r+','+c);
         else if('123456789'.includes(ch)) molds.push({r,c,size:+ch,filled:false}); } }
       grid.push(row); }
     return {drops,molds}; }
 
   const DIRS={up:[-1,0],down:[1,0],left:[0,-1],right:[0,1]};
-  const sig=(drops,molds)=>drops.map(d=>d.r+','+d.c+','+d.size+','+(d.locked?1:0)).sort().join(';')+'|'+molds.map(m=>m.filled?1:0).join('');
+  const sig=(drops,molds)=>drops.map(d=>d.r+','+d.c+','+d.color+','+d.size+','+(d.locked?1:0)).sort().join(';')+'|'+molds.map(m=>m.filled?1:0).join('');
   function simulate(drops,molds,dir){
     const [dr,dc]=DIRS[dir]; const ds=drops.map(d=>({...d})), ms=molds.map(m=>({...m}));
     const occ={}; ds.forEach((d,i)=>{ if(d.locked) occ[d.r+','+d.c]=i; });
@@ -88,7 +127,7 @@
       while(true){ const nr=r+dr,nc=c+dc,k=nr+','+nc;
         if(!inb(nr,nc)||grid[nr][nc]==='#') break;
         if(spikes.has(k)){ dead={r:nr,c:nc}; break; }
-        if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked) break;
+        if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked||ds[j].color!==ds[i].color) break;   // other colour = movable wall
           ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
         r=nr;c=nc; }
       if(dead){ removed.add(i); deaths.push({id:ds[i].id,r:dead.r,c:dead.c}); continue; }
@@ -98,8 +137,10 @@
       if(d){ d.locked=true; mo.filled=true; locks.push(d.id); } }
     return {drops:nd,molds:ms,merges,locks,deaths};
   }
-  // moulds win by filling; no moulds → win by merging everything into one blob
-  const isWinS=(drops,molds)=>molds.length?molds.every(m=>m.filled):(drops.length===1&&drops[0].size===mass0);
+  // moulds win by filling; no moulds → win when every colour family is one full blob
+  const isWinS=(drops,molds)=>{ if(molds.length) return molds.every(m=>m.filled);
+    const by={}; for(const d of drops){ (by[d.color]=by[d.color]||[]).push(d); }
+    return Object.keys(colorMass0).every(c=>by[c]&&by[c].length===1&&by[c][0].size===colorMass0[c]); };
 
   // BFS oracle (prunes death branches: lost mass can never win)
   function solve(){
@@ -118,6 +159,7 @@
   let renderById={}, ghosts=[], moving=false;
   function loadLevel(i){ levelIdx=(i+LEVELS.length)%LEVELS.length; won=false; moves=0; undoStack=[]; ghosts=[]; renderById={};
     _l0=parse(LEVELS[levelIdx]); mass0=_l0.drops.length;
+    colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; });
     document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
@@ -131,9 +173,11 @@
     const before=sig(state.drops,state.molds); const res=simulate(state.drops,state.molds,dir);
     if(before===sig(res.drops,res.molds)) return;
     undoStack.push(snapshot()); moves++;
-    res.merges.forEach(m=>{ const g=renderById[m.from]; if(g) ghosts.push({px:g.px,py:g.py,tx:cellX(m.c),ty:cellY(m.r),life:1,rr:g.rr}); delete renderById[m.from]; });
+    const pre=undoStack[undoStack.length-1].drops;
+    const colOf=id=>{ const d=pre.find(x=>x.id===id); return d?d.color:0; };
+    res.merges.forEach(m=>{ const g=renderById[m.from]; if(g) ghosts.push({px:g.px,py:g.py,tx:cellX(m.c),ty:cellY(m.r),life:1,rr:g.rr,ci:colOf(m.from)}); delete renderById[m.from]; });
     res.deaths.forEach(dd=>{ const g=renderById[dd.id];
-      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),tx:cellX(dd.c),ty:cellY(dd.r),life:1,rr:g?g.rr:sizeR(1),splat:true});
+      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),tx:cellX(dd.c),ty:cellY(dd.r),life:1,rr:g?g.rr:sizeR(1),splat:true,ci:colOf(dd.id)});
       delete renderById[dd.id]; });
     if(res.deaths.length) document.getElementById('hint').innerHTML='💀 A goop hit the spikes — <b>↶ undo</b> (Z) or <b>↺ restart</b> (R).';
     state.drops=res.drops; state.molds=res.molds;
@@ -190,9 +234,10 @@
     ctx.font='900 '+Math.round(S*.34)+'px ui-rounded,system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(String(mo.size),cx,cy+S*.02); }
   function drawBlob(e,d){ const rad=e.rr*(1+e.pop*.16), cx=e.px, cy=e.py;
+    const C=COLORS[(d&&d.color)||0];
     ctx.fillStyle='rgba(58,47,36,.18)'; ctx.beginPath(); ctx.ellipse(cx,cy+rad*.72,rad*.95,rad*.34,0,0,7); ctx.fill();
-    ctx.fillStyle=GOOPD; ctx.beginPath(); ctx.arc(cx,cy+rad*.10,rad,0,7); ctx.fill();
-    ctx.fillStyle=d&&d.locked?'#7fcdb9':GOOP; ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fill();
+    ctx.fillStyle=C.dark; ctx.beginPath(); ctx.arc(cx,cy+rad*.10,rad,0,7); ctx.fill();
+    ctx.fillStyle=d&&d.locked?C.lock:C.main; ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fill();
     ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.5,S*.05); ctx.stroke();
     ctx.fillStyle='rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(cx-rad*.32,cy-rad*.34,rad*.32,rad*.2,-0.5,0,7); ctx.fill();
     // eyes
@@ -219,9 +264,9 @@
           for(let i=0;i<3;i++){ const bx=x+S*(.24+.26*i), by=y+S*.74, w=S*.17, h=S*.36;
             ctx.beginPath(); ctx.moveTo(bx-w/2,by); ctx.lineTo(bx+w/2,by); ctx.lineTo(bx,by-h); ctx.closePath(); ctx.fill(); ctx.stroke(); } } } }
     state.molds.forEach(drawMold);
-    for(const g of ghosts){ ctx.globalAlpha=g.life;
-      if(g.splat){ ctx.fillStyle=GOOPD; ctx.beginPath(); ctx.ellipse(g.px,g.py,g.rr*(1.5-.5*g.life),g.rr*g.life*.55,0,0,7); ctx.fill(); }
-      else { ctx.fillStyle=GOOP; ctx.beginPath(); ctx.arc(g.px,g.py,g.rr*g.life,0,7); ctx.fill(); }
+    for(const g of ghosts){ ctx.globalAlpha=g.life; const C=COLORS[g.ci||0];
+      if(g.splat){ ctx.fillStyle=C.dark; ctx.beginPath(); ctx.ellipse(g.px,g.py,g.rr*(1.5-.5*g.life),g.rr*g.life*.55,0,0,7); ctx.fill(); }
+      else { ctx.fillStyle=C.main; ctx.beginPath(); ctx.arc(g.px,g.py,g.rr*g.life,0,7); ctx.fill(); }
       ctx.globalAlpha=1; }
     // draw locked first (sit under), then movers
     state.drops.filter(d=>d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
@@ -230,7 +275,7 @@
   }
 
   window.__goop={ state:()=>({level:LEVELS[levelIdx].name,idx:levelIdx,moves,won,
-      drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
+      drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,color:d.color,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
     move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length };
   loadLevel(0); requestAnimationFrame(frame);
 })();
