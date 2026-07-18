@@ -5,24 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Goop — merge (prototype)</title>
 <style>
-  :root{color-scheme:light;}
-  html,body{margin:0;height:100%;overflow:hidden;color:#3a2f24;
-    background:radial-gradient(120% 120% at 50% 18%, #f6efdd 0%, #efe4cb 62%, #e6d8b9 100%);
+  :root{color-scheme:dark;}
+  html,body{margin:0;height:100%;overflow:hidden;color:#d9d4e8;
+    background:radial-gradient(120% 120% at 50% 12%, #2b2737 0%, #201c2b 55%, #151220 100%);
     font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
   #c{position:fixed;inset:0;display:block;}
   #top{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:8px;}
-  .chip{background:#fbf5e6;border:2.5px solid #3a2f24;border-radius:13px;box-shadow:2px 3px 0 #3a2f24;
-    font:800 13px ui-rounded,system-ui;color:#3a2f24;padding:8px 12px;display:flex;align-items:center;gap:6px;}
+  .chip{background:#2c2839;border:2px solid #0d0b14;border-radius:13px;box-shadow:0 3px 0 #0d0b14;
+    font:800 13px ui-rounded,system-ui;color:#e8e3f5;padding:8px 12px;display:flex;align-items:center;gap:6px;}
   button.chip{cursor:pointer;transition:transform .06s,box-shadow .06s;}
-  button.chip:active{transform:translate(1px,2px);box-shadow:1px 1px 0 #3a2f24;}
+  button.chip:active{transform:translateY(2px);box-shadow:0 1px 0 #0d0b14;}
   #lvlname{min-width:120px;justify-content:center;text-align:center;}
-  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#6a5f4c;
-    background:#fbf5e6;border:2px solid #3a2f24;border-radius:12px;padding:7px 14px;box-shadow:2px 2px 0 #3a2f24;max-width:88vw;text-align:center;}
-  #hint b{color:#3a2f24;}
-  #win{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;}
-  #win .card{background:#fbf5e6;border:3px solid #3a2f24;border-radius:20px;box-shadow:4px 6px 0 #3a2f24;
+  #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#9a92b5;
+    background:#2c2839;border:2px solid #0d0b14;border-radius:12px;padding:7px 14px;box-shadow:0 2px 0 #0d0b14;max-width:88vw;text-align:center;}
+  #hint b{color:#e8e3f5;} #hint i{color:#7d75a0;}
+  #win{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.55);}
+  #win .card{background:#2c2839;border:2px solid #0d0b14;border-radius:20px;box-shadow:0 6px 0 #0d0b14,0 18px 50px rgba(0,0,0,.5);
     padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;}
-  #win h2{margin:0;font:900 28px ui-rounded,system-ui;}
+  #win h2{margin:0;font:900 28px ui-rounded,system-ui;color:#e8e3f5;}
 </style>
 </head>
 <body>
@@ -41,65 +41,65 @@
 <script>
 (function(){
   'use strict';
-  const cv=document.getElementById('c'), ctx=cv.getContext('2d'); const INK='#3a2f24';
-  const GOOP='#4bb39a', GOOPD='#2f8f79';
-  const COLORS=[{main:'#4bb39a',dark:'#2f8f79',lock:'#7fcdb9'},   // mint
-                {main:'#e8836f',dark:'#c25a48',lock:'#f3b0a2'},   // coral
-                {main:'#8f7fd4',dark:'#6a5ab0',lock:'#b8adf0'}];  // violet
+  const cv=document.getElementById('c'), ctx=cv.getContext('2d'); const INK='#0d0b14';
+  const GOOP='#3fd6ac', GOOPD='#27997a';
+  const COLORS=[{main:'#3fd6ac',dark:'#27997a',lock:'#8ceccf',glow:'rgba(63,214,172,'},   // mint
+                {main:'#ff8f73',dark:'#cf5f45',lock:'#ffbfae',glow:'rgba(255,143,115,'},  // coral
+                {main:'#a48fff',dark:'#7561d6',lock:'#cabffb',glow:'rgba(164,143,255,'}]; // violet
 
   // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
   // '1'..'9' mould(need that size) — mould levels win by filling; no moulds → win by merging ALL into one
   const LEVELS=[
     {name:"Oil & Water", hint:"Different colours <b>don’t mix</b> — they stop each other like walls. Merge each colour into <b>one blob per colour</b>. <i>(best: 2)</i>",
-     map:["######","#o..p#","#..p.#","#.o..#","#....#","######"]},
+     map:["######","#p.o.#","#..o.#","#..p.#","#...##","######"]},
     {name:"Stay Apart", hint:"A goop of another colour is a <b>movable wall</b>. Use it. <i>(best: 3)</i>",
-     map:["######","#...p#","#....#","#...o#","#op..#","######"]},
+     map:["######","#...##","#.p..#","#o.po#","#....#","######"]},
     {name:"Two Herds", hint:"Order is everything. <i>(best: 4)</i>",
-     map:["######","#....#","#.pop#","#o...#","######"]},
+     map:["######","#....#","#po..#","#o.#.#","#...p#","######"]},
     {name:"Traffic", hint:"Every swipe moves everyone. <i>(best: 4)</i>",
-     map:["######","#p#..#","#..op#","#.#.o#","#...##","######"]},
+     map:["######","#o...#","##.p.#","#o#p.#","#....#","######"]},
     {name:"Sort It Out", hint:"Keep the families apart — and together. <i>(best: 5)</i>",
-     map:["######","#.p..#","#o#..#","#p.o##","######"]},
+     map:["#######","##..p##","#.op.o#","#....##","##....#","#######"]},
     {name:"Body Blocks", hint:"Herd each family home. <i>(best: 5)</i>",
-     map:["######","#.#p.#","#.##o#","#.o..#","#...p#","######"]},
-    {name:"The Bouncer", hint:"Block with one colour, merge with the other. <i>(best: 5)</i>",
-     map:["######","#.opp#","#..#.#","##.#o#","######"]},
+     map:["######","##p#o#","#...p#","#.o..#","######"]},
+    {name:"The Bouncer", hint:"Block with one colour, merge with the other. <i>(best: 6)</i>",
+     map:["######","#..#.#","#.##.#","#o.p.#","#po#.#","######"]},
     {name:"Crowded House", hint:"Order is everything. <i>(best: 6)</i>",
-     map:["######","#o#.p#","#p..##","##..o#","######"]},
-    {name:"Thorns Return", hint:"<b>Spikes are back.</b> Nobody dies today — every family arrives whole. <i>(best: 8)</i>",
-     map:["#######","##.#.o#","#.poo##","###...#","#.#p.^#","#######"]},
-    {name:"Prickly Sort", hint:"Keep the families apart — and together. <i>(best: 10)</i>",
-     map:["######","#p..^#","#o...#","#.#..#","#..po#","######"]},
+     map:["#######","#..p..#","#....o#","#...#.#","#.#o.p#","#######"]},
+    {name:"Thorns Return", hint:"<b>Spikes are back.</b> Nobody dies today — every family arrives whole. <i>(best: 7)</i>",
+     map:["########","###^op.#","####..##","##^^...#","#.p.o..#","#^^o.###","########"]},
+    {name:"Prickly Sort", hint:"Keep the families apart — and together. <i>(best: 9)</i>",
+     map:["#######","#o..#p#","#.p^..#","#.p#.##","##o..o#","#######"]},
     {name:"Colour Guard", hint:"Herd each family home. <i>(best: 10)</i>",
-     map:["######","#..p##","##p^.#","#o.#o#","##...#","######"]},
+     map:["#######","#.#^#p#","#..oo.#","#.^^#o#","#p#..p#","#######"]},
     {name:"Crossfire", hint:"Block with one colour, merge with the other. <i>(best: 10)</i>",
-     map:["#######","#o.po.#","##..^.#","##o..p#","##....#","#######"]},
+     map:["#######","#.po..#","##o.^.#","#..p.##","#..o.p#","#######"]},
     {name:"Escort", hint:"Order is everything. <i>(best: 11)</i>",
-     map:["#######","#..o.p#","#p#.#o#","##..#.#","##o..^#","#######"]},
-    {name:"Roadblock", hint:"Every swipe moves everyone. <i>(best: 11)</i>",
-     map:["######","##...#","#opo.#","#^.#.#","#^.#p#","######"]},
-    {name:"Shepherd", hint:"Keep the families apart — and together. <i>(best: 11)</i>",
-     map:["#######","##...p#","#o.#.o#","#o#..##","#p^...#","#######"]},
-    {name:"Interference", hint:"<b>Three families</b> now. Same rules, thrice the traffic. <i>(best: 13)</i>",
-     map:["######","##p..#","#pq.o#","#q##^#","#o.#.#","######"]},
-    {name:"The Weave", hint:"Block with one colour, merge with the other. <i>(best: 14)</i>",
-     map:["#######","##o..^#","##.#^o#","##.o#.#","#p...p#","#######"]},
-    {name:"Switchback", hint:"Order is everything. <i>(best: 14)</i>",
-     map:["#######","##...##","#opop.#","#.o##.#","#^#.^.#","#######"]},
-    {name:"Gridlock", hint:"Every swipe moves everyone. <i>(best: 14)</i>",
-     map:["#######","#^..p.#","#.^.o##","#o##.o#","#p...##","#######"]},
-    {name:"Undertow", hint:"Keep the families apart — and together. <i>(best: 15)</i>",
-     map:["######","#poq.#","#.o###","#..pq#","#o.^.#","######"]},
-    {name:"Cat’s Cradle", hint:"Herd each family home. <i>(best: 16)</i>",
-     map:["######","#o.###","##q###","#poqp#","#^#o.#","######"]},
-    {name:"The Braid", hint:"Block with one colour, merge with the other. <i>(best: 18)</i>",
-     map:["######","##qo.#","#.#q.#","#^#p.#","#po..#","######"]},
-    {name:"Loom", hint:"Order is everything. <i>(best: 20)</i>",
-     map:["#######","#.#^.##","#..po.#","###^p##","#..oq.#","#.q..o#","#######"]},
-    {name:"Grand Weave", hint:"Every swipe moves everyone. <i>(best: 20)</i>",
-     map:["#######","#..#.o#","#q.op##","#o#...#","#^p.q##","##^^.##","#######"]},
-    {name:"The Masterknot", hint:"Keep the families apart — and together. <i>(best: 20)</i>",
-     map:["#######","#...###","#o^#..#","#..qp##","#o#..q#","#.#p.^#","#######"]},
+     map:["#######","#..po.#","#p^#.p#","#^..oo#","###^.##","#######"]},
+    {name:"Roadblock", hint:"Every swipe moves everyone. <i>(best: 13)</i>",
+     map:["########","#po...p#","#^^##..#","#..o...#","#.^.##.#","#..o####","########"]},
+    {name:"Shepherd", hint:"Keep the families apart — and together. <i>(best: 14)</i>",
+     map:["#######","#.#o^.#","#...p.#","#..#o.#","#.p.op#","#######"]},
+    {name:"Interference", hint:"Herd each family home. <i>(best: 17)</i>",
+     map:["########","#...p#.#","##^o...#","#...#.##","#o.#...#","#o^#^#p#","########"]},
+    {name:"The Weave", hint:"<b>Three families</b> now. Same rules, thrice the traffic. <i>(best: 17)</i>",
+     map:["########","#^^#.p.#","#...q.o#","#.^.#q.#","#.#.#.p#","#o#.^o.#","#...#..#","########"]},
+    {name:"Switchback", hint:"Order is everything. <i>(best: 18)</i>",
+     map:["########","#..#...#","#..#^..#","#.p.o.##","#..p...#","#^.o#^o#","########"]},
+    {name:"Gridlock", hint:"Every swipe moves everyone. <i>(best: 19)</i>",
+     map:["########","#...o#.#","#o..#o.#","##...p##","#^.##^##","#.p....#","########"]},
+    {name:"Undertow", hint:"Keep the families apart — and together. <i>(best: 21)</i>",
+     map:["########","#.#..###","#.q....#","#.p#..^#","#..^o.q#","#.o#...#","#.##..p#","########"]},
+    {name:"Cat’s Cradle", hint:"Herd each family home. <i>(best: 21)</i>",
+     map:["########","#.p..#.#","#..#q^.#","#o#..p.#","#....^.#","#oq....#","########"]},
+    {name:"The Braid", hint:"Block with one colour, merge with the other. <i>(best: 22)</i>",
+     map:["########","#q.p...#","#.#...^#","#.op...#","#......#","#.^....#","#.#.qo##","########"]},
+    {name:"Loom", hint:"Order is everything. <i>(best: 23)</i>",
+     map:["########","#.p#...#","#^.#o#.#","#.....##","#q.#o..#","#^.#q.p#","#......#","########"]},
+    {name:"Grand Weave", hint:"Every swipe moves everyone. <i>(best: 24)</i>",
+     map:["########","#o.#####","#.#..^^#","#..#..p#","#q#q..o#","#p..o..#","########"]},
+    {name:"The Masterknot", hint:"Keep the families apart — and together. <i>(best: 24)</i>",
+     map:["########","###..###","##^...##","#^q#..p#","##.#oqo#","#....#p#","########"]},
   ];
 
   let gw,gh,grid,spikes,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
@@ -221,10 +221,9 @@
   addEventListener('resize',()=>{ layout(); for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d&&!moving){renderById[id].px=cellX(d.c);renderById[id].py=cellY(d.r);} } });
   function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y);
     ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-  function block(x,y,S){ const m=Math.round(S*.055),rad=Math.round(S*.28),d=Math.round(S*.085);
-    ctx.fillStyle='rgba(58,47,36,.16)';rr(x+m,y+m+d*1.3,S-2*m,S-2*m,rad);ctx.fill();
-    ctx.fillStyle='#b09a76';rr(x+m,y+m+d,S-2*m,S-2*m,rad);ctx.fill();
-    ctx.fillStyle='#cbb996';rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.fill();
+  function block(x,y,S){ const m=Math.round(S*.04),rad=Math.round(S*.20);
+    ctx.fillStyle='#454060';rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.fill();
+    ctx.fillStyle='#5f5880';rr(x+m,y+m,S-2*m,S-2*m-S*.14,rad);ctx.fill();
     ctx.strokeStyle=INK;ctx.lineWidth=Math.max(2.2,S*.045);rr(x+m,y+m,S-2*m,S-2*m,rad);ctx.stroke(); }
   function drawMold(mo){ const x=ox+mo.c*S,y=oy+mo.r*S,cx=x+S/2,cy=y+S/2;
     ctx.fillStyle=mo.filled?'rgba(75,179,154,.18)':'rgba(58,47,36,.06)'; rr(x+S*.12,y+S*.12,S*.76,S*.76,S*.22); ctx.fill();
@@ -235,17 +234,16 @@
     ctx.fillText(String(mo.size),cx,cy+S*.02); }
   function drawBlob(e,d){ const rad=e.rr*(1+e.pop*.16), cx=e.px, cy=e.py;
     const C=COLORS[(d&&d.color)||0];
-    ctx.fillStyle='rgba(58,47,36,.18)'; ctx.beginPath(); ctx.ellipse(cx,cy+rad*.72,rad*.95,rad*.34,0,0,7); ctx.fill();
+    const halo=ctx.createRadialGradient(cx,cy,rad*.4,cx,cy,rad*2.0);            // soft glow
+    halo.addColorStop(0,C.glow+'.28)'); halo.addColorStop(1,C.glow+'0)');
+    ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(cx,cy,rad*2.0,0,7); ctx.fill();
     ctx.fillStyle=C.dark; ctx.beginPath(); ctx.arc(cx,cy+rad*.10,rad,0,7); ctx.fill();
     ctx.fillStyle=d&&d.locked?C.lock:C.main; ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fill();
-    ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.5,S*.05); ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(cx-rad*.32,cy-rad*.34,rad*.32,rad*.2,-0.5,0,7); ctx.fill();
-    // eyes
-    const eo=rad*.34, er=Math.max(2,rad*.16);
-    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx-eo,cy-rad*.05,er,0,7); ctx.arc(cx+eo,cy-rad*.05,er,0,7); ctx.fill();
-    ctx.fillStyle=INK; ctx.beginPath(); ctx.arc(cx-eo,cy-rad*.05,er*.55,0,7); ctx.arc(cx+eo,cy-rad*.05,er*.55,0,7); ctx.fill();
-    if(d&&d.size>1){ ctx.fillStyle='#fff'; ctx.strokeStyle=INK; ctx.lineWidth=2.5; ctx.font='900 '+Math.round(rad*.7)+'px ui-rounded,system-ui';
-      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.strokeText(d.size,cx,cy+rad*.42); ctx.fillText(d.size,cx,cy+rad*.42); }
+    ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2,S*.04); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.42)'; ctx.beginPath(); ctx.ellipse(cx-rad*.34,cy-rad*.36,rad*.3,rad*.18,-0.5,0,7); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.arc(cx,cy-rad*.1,rad*.72,0,7); ctx.fill();
+    if(d&&d.size>1){ ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='800 '+Math.round(rad*.78)+'px ui-rounded,system-ui';
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(d.size,cx,cy+rad*.06); }
   }
   function frame(){
     let mx=0; for(const id in renderById){ const e=renderById[id]; const d=state.drops.find(x=>x.id==id); if(!d)continue;
@@ -254,15 +252,17 @@
     for(const g of ghosts){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; g.life-=.06; } ghosts=ghosts.filter(g=>g.life>0);
     if(moving && mx<0.6 && !ghosts.length) moving=false;
     ctx.clearRect(0,0,cv.width,cv.height);
-    ctx.fillStyle='rgba(58,47,36,.13)'; rr(ox-TRAY,oy-TRAY+6,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
-    ctx.fillStyle='#f7f0de'; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
+    ctx.fillStyle='#211d2e'; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
     ctx.strokeStyle=INK; ctx.lineWidth=3; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.stroke();
     for(let r=0;r<gh;r++)for(let c=0;c<gw;c++){ const x=ox+c*S,y=oy+r*S;
-      if(grid[r][c]==='#'){ block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#ece2ca':'#f1e8d2'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
-        if(spikes.has(r+','+c)){ ctx.fillStyle='rgba(176,71,58,.10)'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
-          ctx.fillStyle='#b0473a'; ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.035);
-          for(let i=0;i<3;i++){ const bx=x+S*(.24+.26*i), by=y+S*.74, w=S*.17, h=S*.36;
-            ctx.beginPath(); ctx.moveTo(bx-w/2,by); ctx.lineTo(bx+w/2,by); ctx.lineTo(bx,by-h); ctx.closePath(); ctx.fill(); ctx.stroke(); } } } }
+      if(grid[r][c]==='#'){ block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#2a2539':'#2d283d'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
+        if(spikes.has(r+','+c)){ const cx=x+S/2, cy=y+S/2, R=S*.17;         // urchin mine
+          ctx.fillStyle='#8b84a8'; ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.4,S*.028);
+          for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; const tx=cx+Math.cos(a)*S*.34, ty=cy+Math.sin(a)*S*.34;
+            const px=Math.cos(a+Math.PI/2)*R*.42, py=Math.sin(a+Math.PI/2)*R*.42;
+            ctx.beginPath(); ctx.moveTo(cx+px,cy+py); ctx.lineTo(cx-px,cy-py); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+          ctx.fillStyle='#3a3450'; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
+          ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.036); ctx.stroke(); } } }
     state.molds.forEach(drawMold);
     for(const g of ghosts){ ctx.globalAlpha=g.life; const C=COLORS[g.ci||0];
       if(g.splat){ ctx.fillStyle=C.dark; ctx.beginPath(); ctx.ellipse(g.px,g.py,g.rr*(1.5-.5*g.life),g.rr*g.life*.55,0,0,7); ctx.fill(); }
