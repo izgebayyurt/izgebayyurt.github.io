@@ -17,7 +17,10 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23241a15'/%3E%3Ctext x='50' y='72' font-size='62' text-anchor='middle' fill='%23d9a441'%3E%E2%9A%94%3C/text%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Spectral+SC:wght@500;600&display=swap" rel="stylesheet" />
+<!-- Load fonts non-render-blocking so the game boots instantly even offline / on a blocked
+     network (installable PWA). The CSS font stacks fall back to Georgia until these arrive. -->
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Spectral+SC:wght@500;600&display=swap" />
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Spectral+SC:wght@500;600&display=swap" /></noscript>
 <style>
 :root{
   --sand:#e7d8bd; --sand2:#efe3cb; --parch:#f4ecd8;
@@ -552,6 +555,7 @@ const deathCut = l => Math.min(0.75, (l-1)*0.09);   // infirmary death-risk redu
 /* ============================ STATE ============================ */
 let S = null;
 let nextId = 1;
+let simFights = 0, simWins = 0;   // running tallies, survive gladiator removal (for away summary)
 
 function newGladiator(){
   const name = NAMES[(Math.random()*NAMES.length)|0];
@@ -601,28 +605,29 @@ const alive = () => S.gladiators.length;
 
 /* ============================ SIMULATION ============================ */
 // A single gladiator's tick. Returns array of log events (for offline summary).
-function tickGladiator(g, live){
+// mult = how many seconds this call represents (coarse stepping for offline catch-up);
+// offline = true when catching up while the game was closed/backgrounded.
+function tickGladiator(g, live, mult, offline){
+  mult = mult || 1;
   const ev = [];
   if(g.state === 'dueling') return ev;   // you're controlling this one by hand
   if(g.state === 'injured'){
-    const heal = S.fac.infirmary;                 // hp/sec
-    g.hp = Math.min(g.maxHp, g.hp + heal);
+    g.hp = Math.min(g.maxHp, g.hp + S.fac.infirmary * mult);   // hp/sec
     if(g.hp >= g.maxHp*0.6){ g.state='idle'; g.progress=0;
       if(live) ev.push({cls:'', txt:`<b>${g.name}</b> has recovered and returns to the ludus.`});
     }
     return ev;
   }
   if(g.state === 'training'){
+    if(offline) return ev;               // drilling is hands-on — it pauses while you're away
     const speed = 1 + (S.fac.training-1)*0.35;
-    g.progress += speed;
     const need = 6 + g.level*0.6;
-    if(g.progress >= need){
-      g.progress = 0;
+    g.progress += speed * mult;
+    let guard = 0;
+    while(g.progress >= need && guard++ < 500){
+      g.progress -= need;
       const st = g.trainStat || 'str';
-      g[st] += 1;
-      recalc(g);
-      // small chance to also gain xp from drilling
-      g.xp += 3;
+      g[st] += 1; recalc(g); g.xp += 3;
       maybeLevel(g, ev, live);
       if(live) ev.push({cls:'level', txt:`<b>${g.name}</b> drilled — ${st.toUpperCase()} raised to ${g[st]}.`});
     }
@@ -631,17 +636,19 @@ function tickGladiator(g, live){
   if(g.state === 'fighting'){
     // faster fighters resolve bouts quicker
     const cd = Math.max(3, 7 - g.agi*0.12);
-    g.progress += 1;
-    if(g.progress >= cd){
-      g.progress = 0;
+    g.progress += mult;
+    let guard = 0;
+    while(g.progress >= cd && guard++ < 6000){
+      g.progress -= cd;
       resolveFight(g, ev, live);
+      if(g._dead || g.state !== 'fighting'){ g.progress = 0; break; }   // downed → stop fighting
     }
     return ev;
   }
   // idle: slowly recover between bouts, then auto-fight if enabled & healthy
   if(g.state === 'idle'){
     if(g.hp < g.maxHp){
-      g.hp = Math.min(g.maxHp, g.hp + 0.6 + S.fac.infirmary*0.35);
+      g.hp = Math.min(g.maxHp, g.hp + (0.6 + S.fac.infirmary*0.35) * mult);
     }
     if(S.autoFight && g.hp > g.maxHp*0.45){
       g.state = 'fighting'; g.progress = 0;
@@ -670,6 +677,7 @@ function grantWin(g, i, ev, live){
   g.xp += oppXP(i);
   g.wins++;
   if(i === S.maxTier && S.maxTier < OPPONENTS.length-1){ S.maxTier++; }  // unlock next tier
+  simWins++;
   maybeLevel(g, ev, live);
   return gain;
 }
@@ -692,7 +700,7 @@ function resolveFight(g, ev, live){
   let wc = gp/(gp+ep);
   wc = Math.max(0.06, Math.min(0.95, wc));
   const won = Math.random() < wc;
-  g.fights++;
+  g.fights++; simFights++;
 
   // damage taken this bout
   let dmg = ep * (won ? (0.12+Math.random()*0.22) : (0.45+Math.random()*0.5));
@@ -719,12 +727,13 @@ function resolveFight(g, ev, live){
   }
 }
 
-// Master tick — advances the whole world by one second.
-function tick(live){
+// Master tick — advances the whole world by `mult` seconds (default 1).
+function tick(live, mult, offline){
+  mult = mult || 1;
   const events = [];
   let winFlash=false, loseFlash=false;
   for(const g of S.gladiators){
-    const ev = tickGladiator(g, live);
+    const ev = tickGladiator(g, live, mult, offline);
     if(ev._win) winFlash = true;
     if(ev._lose) loseFlash = true;
     for(const e of ev) events.push(Object.assign({gid:g.id}, e));
@@ -735,13 +744,14 @@ function tick(live){
   const deaths = before - S.gladiators.length;
 
   // day passes
-  S.dayT += 1;
-  if(S.dayT >= 20){ S.dayT = 0; S.day++; }
+  S.dayT += mult;
+  while(S.dayT >= 20){ S.dayT -= 20; S.day++; }
 
   return { events, deaths, winFlash, loseFlash };
 }
 
 /* ============================ OFFLINE CATCH-UP ============================ */
+const MAX_CATCHUP_STEPS = 1200;   // cap iterations so a long absence never freezes the UI
 function catchUp(){
   const now = Date.now();
   let elapsed = Math.floor((now - (S.lastTick||now))/1000);
@@ -749,28 +759,26 @@ function catchUp(){
   if(elapsed < 3) return null;
   elapsed = Math.min(elapsed, MAX_OFFLINE_H*3600);
 
-  const goldBefore = S.gold, fameBefore = S.fame;
-  let fights=0, wins=0, deaths=0, levels=0;
+  // simulate `elapsed` seconds in at most MAX_CATCHUP_STEPS coarse steps
+  const stride = Math.max(1, Math.ceil(elapsed / MAX_CATCHUP_STEPS));
+  const steps  = Math.round(elapsed / stride);
+
+  const goldBefore=S.gold, fameBefore=S.fame, fBefore=simFights, wBefore=simWins;
+  let deaths=0;
   const lvlBefore = {}; S.gladiators.forEach(g=>lvlBefore[g.id]=g.level);
 
-  for(let t=0; t<elapsed; t++){
-    const before = S.gladiators.map(g=>g.fights).reduce((a,b)=>a+b,0);
-    const wBefore = S.gladiators.map(g=>g.wins).reduce((a,b)=>a+b,0);
-    const r = tick(false);
-    deaths += r.deaths;
-    const after = S.gladiators.map(g=>g.fights).reduce((a,b)=>a+b,0);
-    const wAfter = S.gladiators.map(g=>g.wins).reduce((a,b)=>a+b,0);
-    fights += Math.max(0, after-before);
-    wins   += Math.max(0, wAfter-wBefore);
-    if(S.gladiators.length===0 && !S.autoFight) {} // nothing
-  }
-  S.gladiators.forEach(g=>{ if(lvlBefore[g.id]!==undefined) levels += Math.max(0,g.level-lvlBefore[g.id]); });
+  for(let s=0; s<steps; s++){ deaths += tick(false, stride, true).deaths; }
+
+  let levels=0;
+  S.gladiators.forEach(g=>{ if(lvlBefore[g.id]!==undefined) levels += Math.max(0, g.level-lvlBefore[g.id]); });
 
   return {
     secs: elapsed,
     gold: S.gold-goldBefore,
     fame: S.fame-fameBefore,
-    fights, wins, deaths, levels,
+    fights: simFights-fBefore,
+    wins: simWins-wBefore,
+    deaths, levels,
   };
 }
 
@@ -1050,21 +1058,18 @@ let acc = 0, lastFrame = 0;
 function loop(ts){
   if(!lastFrame) lastFrame = ts;
   acc += ts - lastFrame; lastFrame = ts;
-  let ran = false, winF=false, loseF=false;
-  const gidsWin = new Set(), gidsLose = new Set();
+  if(acc > 5000) acc = 5000;   // a long gap (backgrounded tab) is handled by the visibility catch-up, not by grinding here
+  let ran = false;
   while(acc >= TICK_MS){
     acc -= TICK_MS;
-    const r = tick(true);
+    const r = tick(true, 1, false);
     if(r.events.length) pushLog(r.events);
-    if(r.winFlash) winF=true;
-    if(r.loseFlash) loseF=true;
     ran = true;
   }
   if(ran){
     renderTop();
     if(tab==='ludus') renderRoster();
     if(tab==='arena'){ renderArena(); renderLog(); }
-    // periodic save
     save();
   }
   requestAnimationFrame(loop);
@@ -1426,8 +1431,15 @@ function boot(){
   refresh(); save();
   requestAnimationFrame(loop);
 
-  // save on hide (mobile background)
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+  // save on hide; catch up on return (covers backgrounded tabs without freezing)
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){ save(); return; }
+    lastFrame = 0; acc = 0;                 // rebaseline the rAF clock
+    if(D.active) return;                    // an active duel runs its own loop; don't catch up over it
+    const a = catchUp();
+    if(a && a.secs >= 60 && (a.fights>0 || a.gold>0 || a.deaths>0)) showAway(a);
+    refresh();
+  });
   window.addEventListener('pagehide', save);
   window.addEventListener('beforeunload', save);
 }
