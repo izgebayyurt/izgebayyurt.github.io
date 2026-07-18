@@ -106,7 +106,8 @@
     undo:()=>tone(520,330,.07,'sine',.2),
     tick:()=>tone(760,760,.03,'sine',.12),
     oom:()=>{ tone(220,140,.22,'sine',.35); tone(165,110,.24,'sine',.25,.05); },
-    reward:()=>[880,1174,1568].forEach((f,i)=>tone(f,f*1.15,.1,'sine',.25,i*.06)) };
+    reward:()=>[880,1174,1568].forEach((f,i)=>tone(f,f*1.15,.1,'sine',.25,i*.06)),
+    door:o=>o?tone(170,260,.13,'triangle',.35):tone(250,150,.13,'triangle',.35) };
   const muteBtn=()=>{ const b=document.getElementById('mute'); if(b) b.textContent=muted?'🔇':'🔊'; };
 
   // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
@@ -124,182 +125,182 @@
      map:["######","#p...#","#.oo.#","#p...#","#....A","####B#"]},
     {hint:"Line up the lane, then let go. <i>(par: 3)</i>", par:3, limit:7,
      map:["####A#","#.p.oB","#..o.#","##.p.#","######"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 3)</i>", par:3, limit:7,
-     map:["#######","#.#o#.#","#.p...#","Bop..##","#A#####"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 4)</i>", par:4, limit:8,
+     map:["######","##o.p#","B.o..#","#p...#","##A###"]},
     {hint:"Every swipe moves everyone. <i>(par: 3)</i>", par:3, limit:7,
-     map:["#######","B.p...A","#...o##","#.....#","#p.o..#","#######"]},
+     map:["#######","#.#o#.#","#.p...#","Bop..##","#A#####"]},
     {hint:"Who leaves first? <i>(par: 3)</i>", par:3, limit:7,
-     map:["######","####p#","#o...#","Ao.p##","#B####"]},
+     map:["#######","B.p...A","#...o##","#.....#","#p.o..#","#######"]},
     {hint:"Park before you push. <i>(par: 3)</i>", par:3, limit:7,
-     map:["######","#..p##","#.o..#","#.#..#","#.o.pB","####A#"]},
+     map:["######","####p#","#o...#","Ao.p##","#B####"]},
     {hint:"Line up the lane, then let go. <i>(par: 3)</i>", par:3, limit:7,
      map:["######","#.p..B","##p.oA","#...o#","######"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 4)</i>", par:4, limit:8,
+     map:["#####A#","#...o.#","#..p#.#","#.....#","#..o.pB","#######"]},
+    {hint:"Every swipe moves everyone. <i>(par: 4)</i>", par:4, limit:8,
+     map:["######","##...#","#.op.#","#.#poA","###B##"]},
+    {hint:"Who leaves first? <i>(par: 5)</i>", par:5, limit:9,
+     map:["##A###","##...B","#.p.p#","#o##o#","######"]},
+    {hint:"Park before you push. <i>(par: 2)</i>", par:2, limit:6,
+     map:["##B####","#op#..#","#o....#","#.p...#","#.....#","#A#####"]},
+    {hint:"Line up the lane, then let go. <i>(par: 3)</i>", par:3, limit:7,
+     map:["######","#..p##","#.o..#","#.#..#","#.o.pB","####A#"]},
     {hint:"A blocker spent is a wall lost. <i>(par: 3)</i>", par:3, limit:7,
      map:["####A#","#oo..B","###.p#","#p..##","######"]},
     {hint:"Every swipe moves everyone. <i>(par: 4)</i>", par:4, limit:8,
-     map:["######","##o.p#","B.o..#","#p...#","##A###"]},
-    {hint:"Who leaves first? <i>(par: 4)</i>", par:4, limit:8,
-     map:["#####A#","#...o.#","#..p#.#","#.....#","#..o.pB","#######"]},
-    {hint:"Park before you push. <i>(par: 4)</i>", par:4, limit:8,
-     map:["######","##...#","#.op.#","#.#poA","###B##"]},
-    {hint:"Line up the lane, then let go. <i>(par: 4)</i>", par:4, limit:8,
      map:["###A##","B.p.##","##.o##","##.op#","######"]},
+    {hint:"Who leaves first? <i>(par: 5)</i>", par:5, limit:9,
+     map:["####B##","#....oA","#.#p..#","#....##","##p#o.#","#######"]},
+    {hint:"Park before you push. <i>(par: 6)</i>", par:6, limit:10,
+     map:["#B####","#op..A","#..#p#","#o...#","#.#..#","######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 7)</i>", par:7, limit:11,
+     map:["#######","#.....#","#....##","#.op..#","B...poA","#######"]},
     {hint:"A blocker spent is a wall lost. <i>(par: 4)</i>", par:4, limit:8,
      map:["###B##","###po#","##.op#","#....#","####A#"]},
     {hint:"Every swipe moves everyone. <i>(par: 4)</i>", par:4, limit:8,
      map:["#B#####","#p....A","#o..#.#","#p..#o#","##....#","#######"]},
     {hint:"Who leaves first? <i>(par: 4)</i>", par:4, limit:8,
      map:["#######","#oop#.#","#....pA","#..#..#","##B####"]},
-    {hint:"Park before you push. <i>(par: 4)</i>", par:4, limit:8,
-     map:["######","##...#","#o.#p#","##op.#","##AB##"]},
-    {hint:"Line up the lane, then let go. <i>(par: 4)</i>", par:4, limit:8,
-     map:["#######","B....pA","#p...o#","#...#.#","#o....#","#######"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 5)</i>", par:5, limit:9,
-     map:["##A###","##...B","#.p.p#","#o##o#","######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 5)</i>", par:5, limit:9,
-     map:["####B##","#....oA","#.#p..#","#....##","##p#o.#","#######"]},
-    {hint:"Who leaves first? <i>(par: 5)</i>", par:5, limit:9,
+    {hint:"Park before you push. <i>(par: 5)</i>", par:5, limit:9,
      map:["#######","##.oo.#","#..#..B","#.p...#","A....p#","#######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 6)</i>", par:6, limit:10,
+     map:["####B#","Ao...#","##.o##","##pp.#","######"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 7)</i>", par:7, limit:11,
+     map:["#######","###..o#","##...p#","B.p...#","#.o...#","###A###"]},
+    {hint:"Every swipe moves everyone. <i>(par: 8)</i>", par:8, limit:12,
+     map:["##A####","##..###","#...pp#","#o.#o.#","#.....B","#######"]},
+    {hint:"Who leaves first? <i>(par: 4)</i>", par:4, limit:8,
+     map:["######","##...#","#o.#p#","##op.#","##AB##"]},
     {hint:"Park before you push. <i>(par: 5)</i>", par:5, limit:9,
      map:["#######","#.#o..#","#.pp..#","#o.#..#","A...###","#B#####"]},
-    {hint:"Line up the lane, then let go. <i>(par: 5)</i>", par:5, limit:9,
-     map:["######","#p.o.#","#.o..#","#p..##","#....B","#A####"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 6)</i>", par:6, limit:10,
-     map:["#B####","#op..A","#..#p#","#o...#","#.#..#","######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 6)</i>", par:6, limit:10,
-     map:["####B#","Ao...#","##.o##","##pp.#","######"]},
-    {hint:"Who leaves first? <i>(par: 6)</i>", par:6, limit:10,
-     map:["######","A.p.oB","#p#.o#","###.##","######"]},
-    {hint:"Park before you push. <i>(par: 6)</i>", par:6, limit:10,
-     map:["####A#","#....#","#p#.p#","#o.o.#","#B####"]},
     {hint:"Line up the lane, then let go. <i>(par: 6)</i>", par:6, limit:10,
      map:["####B#","#...p#","#.o..#","#op..A","######"]},
     {hint:"A blocker spent is a wall lost. <i>(par: 7)</i>", par:7, limit:11,
-     map:["#######","#.....#","#....##","#.op..#","B...poA","#######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 7)</i>", par:7, limit:11,
-     map:["#######","###..o#","##...p#","B.p...#","#.o...#","###A###"]},
-    {hint:"Who leaves first? <i>(par: 7)</i>", par:7, limit:11,
      map:["####BA#","#op...#","#..o..#","#....p#","#######"]},
-    {hint:"Park before you push. <i>(par: 7)</i>", par:7, limit:11,
-     map:["###B##","##.o##","#op..A","#.##p#","######"]},
-    {hint:"Line up the lane, then let go. <i>(par: 8)</i>", par:8, limit:12,
-     map:["##B####","#.....#","#..o..#","#o#..##","#p..p.#","#####A#"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 8)</i>", par:8, limit:12,
-     map:["##A####","##..###","#...pp#","#o.#o.#","#.....B","#######"]},
     {hint:"Every swipe moves everyone. <i>(par: 8)</i>", par:8, limit:12,
+     map:["##B####","#.....#","#..o..#","#o#..##","#p..p.#","#####A#"]},
+    {hint:"Who leaves first? <i>(par: 9)</i>", par:9, limit:13,
+     map:["#######","Aoo##.#","#.#.p.B","#p.o..#","#.p#.##","#######"]},
+    {hint:"Park before you push. <i>(par: 10)</i>", par:10, limit:14,
+     map:["#######","#..o.##","##o...#","B...###","A...o.#","#.p.p##","#######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 5)</i>", par:5, limit:9,
+     map:["######","#p.o.#","#.o..#","#p..##","#....B","#A####"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 6)</i>", par:6, limit:10,
+     map:["##B###","#....#","#..oo#","#.p.p#","####A#"]},
+    {hint:"Every swipe moves everyone. <i>(par: 7)</i>", par:7, limit:11,
+     map:["###B##","##.o##","#op..A","#.##p#","######"]},
+    {hint:"Who leaves first? <i>(par: 8)</i>", par:8, limit:12,
      map:["#######","Bo#.#.#","A..p..#","#.#op##","#######"]},
+    {hint:"Park before you push. <i>(par: 10)</i>", par:10, limit:14,
+     map:["#B#####","#.p#.##","#..#.oA","##....#","#.###.#","#.p.o.#","#######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 11)</i>", par:11, limit:15,
+     map:["#######","A...o##","#.#.#.B","#..o.p#","#....p#","#.p#o.#","#######"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 12)</i>", par:12, limit:17,
+     map:["##A#B##","#....##","#o..#p#","#...#p#","#....o#","#######"]},
+    {hint:"Every swipe moves everyone. <i>(par: 6)</i>", par:6, limit:10,
+     map:["######","A.p.oB","#p#.o#","###.##","######"]},
     {hint:"Who leaves first? <i>(par: 8)</i>", par:8, limit:12,
      map:["#######","#..#.##","#..#o.#","#...p.#","Bo...p#","##A####"]},
     {hint:"Park before you push. <i>(par: 9)</i>", par:9, limit:13,
-     map:["#######","Aoo##.#","#.#.p.B","#p.o..#","#.p#.##","#######"]},
-    {hint:"Line up the lane, then let go. <i>(par: 9)</i>", par:9, limit:13,
      map:["#A#####","#p.o..#","##oo..#","#...#.#","#.p...#","#..#..#","#B#####"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 9)</i>", par:9, limit:13,
-     map:["#####A#","##p...#","##.po.B","#o...##","##.op.#","#######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 9)</i>", par:9, limit:13,
-     map:["#######","#.....#","#..p..#","#p..#.#","#...#o#","#o....A","##B####"]},
-    {hint:"Who leaves first? <i>(par: 10)</i>", par:10, limit:14,
-     map:["#######","#..o.##","##o...#","B...###","A...o.#","#.p.p##","#######"]},
-    {hint:"Park before you push. <i>(par: 10)</i>", par:10, limit:14,
-     map:["#B#####","#.p#.##","#..#.oA","##....#","#.###.#","#.p.o.#","#######"]},
     {hint:"Line up the lane, then let go. <i>(par: 10)</i>", par:10, limit:14,
-     map:["#######","A...o##","#.#.#.#","#..o.p#","#....pB","#.p#o.#","#######"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 11)</i>", par:11, limit:15,
-     map:["#####A#","##..#p#","###po.B","#op..##","##.o..#","#######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 11)</i>", par:11, limit:15,
-     map:["#######","#...op#","#p.#.##","#o...##","#o#.###","#B#A###"]},
-    {hint:"Who leaves first? <i>(par: 11)</i>", par:11, limit:15,
-     map:["#######","##...##","##..poB","#.o.p##","#.##..#","#A#####"]},
-    {hint:"Park before you push. <i>(par: 11)</i>", par:11, limit:15,
-     map:["#######","#p#..o#","Bo.o..#","#.#..p#","#..#..#","##....#","##A####"]},
-    {hint:"Line up the lane, then let go. <i>(par: 12)</i>", par:12, limit:17,
-     map:["##A#B##","#....##","#o..#p#","#...#p#","#....o#","#######"]},
+     map:["#######","#.o.p.#","B....##","#o.##.#","##.p..A","#######"]},
     {hint:"A blocker spent is a wall lost. <i>(par: 12)</i>", par:12, limit:17,
      map:["##A####","#o.##.#","#.#.poB","#p.o###","#.p####","#######"]},
+    {hint:"Every swipe moves everyone. <i>(par: 13)</i>", par:13, limit:18,
+     map:["#####A#","##..#p#","###po.B","#op..##","##.o###","#######"]},
+    {hint:"Who leaves first? <i>(par: 15)</i>", par:15, limit:21,
+     map:["#######","#.#.o##","A.#.#.B","#....p#","#o...p#","#.p#o.#","#######"]},
+    {hint:"Park before you push. <i>(par: 8)</i>", par:8, limit:12,
+     map:["#######","A..#o.#","#....p#","#..p..#","#..o..B","#######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 9)</i>", par:9, limit:13,
+     map:["#####A#","##p...#","##.po.B","#o...##","##.op.#","#######"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 11)</i>", par:11, limit:15,
+     map:["#######","#....##","#..p..#","#p..#.#","#...#o#","#o....A","##B####"]},
     {hint:"Every swipe moves everyone. <i>(par: 12)</i>", par:12, limit:17,
      map:["#######","#..####","#p.o.##","A.#oo.B","#p....#","#######"]},
-    {hint:"Who leaves first? <i>(par: 13)</i>", par:13, limit:18,
-     map:["#######","A.#.o##","#.#.#.B","#....p#","#o...p#","#.p#o.#","#######"]},
-    {hint:"<b>Three families</b>, three doors. <i>(par: 13)</i>", par:13, limit:18,
-     map:["#####C##","#..qo..A","#o.q..##","#o##...#","B.#.p..#","#.#...p#","########"]},
-    {hint:"Line up the lane, then let go. <i>(par: 13)</i>", par:13, limit:18,
-     map:["####A###","#......#","#p#..q.B","#.p..o.#","#.....q#","#....#.#","#..o####","###C####"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 14)</i>", par:14, limit:20,
-     map:["#C######","#o.#.qo#","##..##.#","#qp..o.#","#....#pB","##.....#","####A###"]},
-    {hint:"Every swipe moves everyone. <i>(par: 14)</i>", par:14, limit:20,
-     map:["########","#####.o#","###..#o#","C..qop.#","#......#","B..#.qp#","####A###"]},
     {hint:"Who leaves first? <i>(par: 14)</i>", par:14, limit:20,
-     map:["########","#o..#..C","#.q...##","#....o.#","#.q....A","#.#....#","##p...pB","########"]},
+     map:["#####A#","##op#pB","###poo#","##...##","##..###","#######"]},
     {hint:"Park before you push. <i>(par: 15)</i>", par:15, limit:21,
-     map:["##C#####","#p..#.q#","#...o..B","####...#","#....#q#","#o.o#p.#","#A######"]},
+     map:["#######","Ap...##","#...p##","#...#.#","#...#o#","#o....#","##B####"]},
+    {hint:"<b>Three families</b>, three doors. <i>(par: 17)</i>", par:17, limit:24,
+     map:["#####C##","##.qo..A","#o...###","#o##...#","B.#.p.q#","###...p#","########"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 10)</i>", par:10, limit:14,
+     map:["##C#####","#p....q#","#...o..B","####...#","#....#q#","#o.o#p.#","#A######"]},
+    {hint:"Every swipe moves everyone. <i>(par: 11)</i>", par:11, limit:15,
+     map:["########","#..qo..A","Co.q..##","#o##...#","B.#.p..#","#.#...p#","########"]},
+    {hint:"Who leaves first? <i>(par: 13)</i>", par:13, limit:18,
+     map:["####A###","#......#","#p#..q.B","#.p..o.#","#.....q#","#....#.#","#..o####","###C####"]},
+    {hint:"Park before you push. <i>(par: 14)</i>", par:14, limit:20,
+     map:["#C######","#o.#.qo#","##..##.#","#qp..o.#","#....#pB","##.....#","####A###"]},
+    {hint:"Line up the lane, then let go. <i>(par: 16)</i>", par:16, limit:22,
+     map:["########","#####.o#","####.#o#","C.q#op.#","#......#","B..#.qp#","####A###"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 18)</i>", par:18, limit:25,
+     map:["####A###","#......#","#p#.#q.B","#.p..o.#","#.#....#","#..q...#","#..o####","###C####"]},
+    {hint:"Every swipe moves everyone. <i>(par: 19)</i>", par:19, limit:27,
+     map:["####C###","##p....#","A......#","#.o#..##","#q.p#.##","Bo...q.#","#......#","########"]},
+    {hint:"Who leaves first? <i>(par: 12)</i>", par:12, limit:17,
+     map:["#C######","B..#.#.#","#po....#","#...o.##","#.#oq.p#","#..q...A","########"]},
+    {hint:"Park before you push. <i>(par: 13)</i>", par:13, limit:18,
+     map:["########","A.p..q.#","##.#...#","#......#","#.....##","#..#.o.#","B..po#q#","###C####"]},
     {hint:"Line up the lane, then let go. <i>(par: 15)</i>", par:15, limit:21,
      map:["####A###","#.....p#","#.q.##p#","#......#","#....#.#","#...#o##","#..q..o#","#B###C##"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 15)</i>", par:15, limit:21,
-     map:["#######","Ap...##","#...p##","#...#.#","#...#o#","#o....#","##B####"]},
-    {hint:"Every swipe moves everyone. <i>(par: 17)</i>", par:17, limit:24,
-     map:["#####C##","##.qo..A","#o...###","#o##...#","B.#.p.q#","###...p#","########"]},
-    {hint:"Who leaves first? <i>(par: 17)</i>", par:17, limit:24,
-     map:["####C###","##p....#","A......#","#.o#..##","#q.p..##","Bo...q.#","##.....#","########"]},
-    {hint:"Park before you push. <i>(par: 17)</i>", par:17, limit:24,
-     map:["####A###","#......#","#p#.#q.B","#.p..o.#","#.#....#","#..q.#.#","#..o####","###C####"]},
-    {hint:"Line up the lane, then let go. <i>(par: 17)</i>", par:17, limit:24,
-     map:["#C######","B..#...#","#po....#","#..#o.##","#.#oq.p#","#.#q...A","########"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 17)</i>", par:17, limit:24,
-     map:["#######","##p#.##","#..#.oA","##....#","#.#.###","#.p.o##","####B##"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 16)</i>", par:16, limit:22,
+     map:["########","#o..#..C","#.q...##","#....o.#","#.q#...A","#.#....#","##p...pB","########"]},
     {hint:"Every swipe moves everyone. <i>(par: 18)</i>", par:18, limit:25,
-     map:["########","A.p..q.#","##.#...#","#......#","#.....##","#..##o.#","B..po#q#","###C####"]},
-    {hint:"Who leaves first? <i>(par: 18)</i>", par:18, limit:25,
      map:["#######","#.#po##","A.#.#.B","#....p#","#..##o#","#.p#o.#","#######"]},
-    {hint:"Park before you push. <i>(par: 18)</i>", par:18, limit:25,
-     map:["#######","B.o.p##","#....##","#o.##.A","##.p..#","#######"]},
-    {hint:"Line up the lane, then let go. <i>(par: 18)</i>", par:18, limit:25,
-     map:["#######","##.o#.#","#.#p.p#","#..#..#","#p..o.#","#.o#..A","##B####"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 19)</i>", par:19, limit:27,
+    {hint:"Who leaves first? <i>(par: 21)</i>", par:21, limit:29,
+     map:["####C###","##p....#","A......#","#oo#..##","#q.p#.##","#.#..q.#","#......#","#B######"]},
+    {hint:"Park before you push. <i>(par: 21)</i>", par:21, limit:29,
+     map:["##C#####","#p..#.q#","#.#.o#.B","####...#","##...#q#","#o.o.p.#","#A######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 12)</i>", par:12, limit:17,
+     map:["########","#####.o#","###..#o#","#..qop.#","#......#","B..#.qp#","####A#C#"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 15)</i>", par:15, limit:21,
+     map:["#######","#...o.#","#p.####","#o.p.##","#o#.###","#B#A###"]},
+    {hint:"Every swipe moves everyone. <i>(par: 17)</i>", par:17, limit:24,
+     map:["#######","##p#.##","#..#.oA","##....#","#.#.###","#.p.o##","####B##"]},
+    {hint:"Who leaves first? <i>(par: 19)</i>", par:19, limit:27,
      map:["#######","#.p####","#p#o###","A.#o..B","#.o...#","#######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 19)</i>", par:19, limit:27,
+    {hint:"Park before you push. <i>(par: 21)</i>", par:21, limit:29,
+     map:["########","######o#","###..#o#","C..#opq#","##.....#","B..#.qp#","####A###"]},
+    {hint:"Line up the lane, then let go. <i>(par: 24)</i>", par:24, limit:34,
+     map:["#####C##","##.qo..A","#o...###","#o##.#.#","#.#.p.q#","#.....p#","#####B##"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 26)</i>", par:26, limit:36,
+     map:["#C######","#..#.qo#","##.o##.#","#qp....#","#o....pB","###...##","####A###"]},
+    {hint:"Every swipe moves everyone. <i>(par: 16)</i>", par:16, limit:22,
+     map:["#######","##o.###","#.#p.p#","#..#..#","#p..o.#","#.o#..A","##B####"]},
+    {hint:"Who leaves first? <i>(par: 18)</i>", par:18, limit:25,
+     map:["#######","B.o.p##","#....##","#o.##.A","##.p..#","#######"]},
+    {hint:"Park before you push. <i>(par: 19)</i>", par:19, limit:27,
      map:["#######","#...o##","#..####","#.ppo##","#o#.###","#B#A###"]},
-    {hint:"Who leaves first? <i>(par: 20)</i>", par:20, limit:28,
-     map:["#######","#..o.##","##o...#","B...#.#","A..#o##","#p..p##","#######"]},
+    {hint:"Line up the lane, then let go. <i>(par: 21)</i>", par:21, limit:29,
+     map:["#######","#..o.##","##....#","B...#o#","A..#o##","#p..p##","#######"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 24)</i>", par:24, limit:34,
+     map:["########","#o.##..C","#.q.#.##","#....o.#","#.q#.#.A","#......#","#.p...pB","########"]},
+    {hint:"Every swipe moves everyone. <i>(par: 24)</i>", par:24, limit:34,
+     map:["##A#B##","#....##","#po...#","##.##p#","#....o#","#######"]},
+    {hint:"Who leaves first? <i>(par: 27)</i>", par:27, limit:38,
+     map:["###A###","##.o..#","#.#p#p#","#..#..#","#p..o.#","#.o#.##","##B####"]},
     {hint:"Park before you push. <i>(par: 20)</i>", par:20, limit:28,
      map:["#######","#o.####","A.#.poB","#.op#.#","#.p####","#######"]},
     {hint:"Line up the lane, then let go. <i>(par: 20)</i>", par:20, limit:28,
      map:["#A#####","#p.o..#","##oo..#","##.##.#","##p..##","#..#..#","#####B#"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 21)</i>", par:21, limit:29,
-     map:["####C###","##p....#","A......#","#oo#..##","#q.p#.##","#.#..q.#","#......#","#B######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 22)</i>", par:22, limit:31,
-     map:["##A#B##","#....##","#po...#","##..#p#","#....o#","#######"]},
-    {hint:"Who leaves first? <i>(par: 22)</i>", par:22, limit:31,
+    {hint:"A blocker spent is a wall lost. <i>(par: 22)</i>", par:22, limit:31,
      map:["#######","#p.o..#","#.p####","#...o##","#o#.###","#B#A###"]},
-    {hint:"Park before you push. <i>(par: 23)</i>", par:23, limit:32,
+    {hint:"Every swipe moves everyone. <i>(par: 23)</i>", par:23, limit:32,
      map:["#######","##...##","##...oB","##o..##","#.p#.p#","#A#####"]},
-    {hint:"Line up the lane, then let go. <i>(par: 24)</i>", par:24, limit:34,
-     map:["#####C##","##.qo..A","#o...###","#o##.#.#","#.#.p.q#","#.....p#","#####B##"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 24)</i>", par:24, limit:34,
-     map:["########","#o.##..C","#.q.#.##","#....o.#","#.q#.#.A","#......#","#.p...pB","########"]},
-    {hint:"Every swipe moves everyone. <i>(par: 24)</i>", par:24, limit:34,
-     map:["#######","#..o.##","##....#","#..##oB","A..#o##","#p..p##","#######"]},
     {hint:"Who leaves first? <i>(par: 26)</i>", par:26, limit:36,
-     map:["##C#####","#p..#.q#","#.#.o#.B","####...#","##.#.#q#","#o.o.p.#","#A######"]},
-    {hint:"Park before you push. <i>(par: 26)</i>", par:26, limit:36,
-     map:["#C######","#..#.qo#","##.o##.#","#qp....#","#o....pB","###...##","####A###"]},
-    {hint:"Line up the lane, then let go. <i>(par: 26)</i>", par:26, limit:36,
      map:["#######","#p#..o#","#o.o..B","#.#..p#","A..#..#","##...##","#######"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 26)</i>", par:26, limit:36,
-     map:["##A#B##","#....##","#po.p.#","##.##.#","#....o#","#######"]},
-    {hint:"Every swipe moves everyone. <i>(par: 27)</i>", par:27, limit:38,
-     map:["###A###","##.o..#","#.#p#p#","#..#..#","#p..o.#","#.o#.##","##B####"]},
-    {hint:"Who leaves first? <i>(par: 27)</i>", par:27, limit:38,
-     map:["########","A.p..q.#","##.#...#","##.##..#","##....##","#..##o.#","B..po#q#","###C####"]},
-    {hint:"Park before you push. <i>(par: 27)</i>", par:27, limit:38,
-     map:["####A###","#.....p#","#.q.##p#","##.....#","#.#.##.#","#...#o##","#....qo#","#B###C##"]},
-    {hint:"Line up the lane, then let go. <i>(par: 28)</i>", par:28, limit:39,
-     map:["########","######o#","###..#o#","C..#opq#","#......#","B.##.qp#","####A###"]},
-    {hint:"A blocker spent is a wall lost. <i>(par: 29)</i>", par:29, limit:41,
+    {hint:"Park before you push. <i>(par: 29)</i>", par:29, limit:41,
      map:["#C######","#..#o..#","#p.....#","#..#o.##","#.#oq#p#","#.#q...A","###B####"]},
+    {hint:"Line up the lane, then let go. <i>(par: 30)</i>", par:30, limit:42,
+     map:["########","A.p..q##","##.#...#","##.##..#","##....##","#..##.o#","B..po#q#","###C####"]},
+    {hint:"A blocker spent is a wall lost. <i>(par: 13)</i>", par:13, limit:18,
+     map:["#######","##...##","##..poB","#.o.p##","#..#..#","#A#####"]},
     {hint:"Every swipe moves everyone. <i>(par: 29)</i>", par:29, limit:41,
      map:["####A###","#.....p#","#..p#..#","##.....#","#.#.##.#","#...#o##","#..q.qo#","#B###C##"]},
-    {hint:"Who leaves first? <i>(par: 30)</i>", par:30, limit:42,
-     map:["########","A.p..q##","##.#...#","##.##..#","##....##","#..##.o#","B..po#q#","###C####"]},
+    {hint:"Who leaves first? <i>(par: 28)</i>", par:28, limit:39,
+     map:["#######","#..o.##","##...o#","#..##oB","A..#.##","#p..p##","#######"]},
     {hint:"Park before you push. <i>(par: 30)</i>", par:30, limit:42,
      map:["####A###","#..#..p#","#..p#.##","##.....#","###..###","#q..#o##","#..qo..#","#B###C##"]},
     {hint:"Line up the lane, then let go. <i>(par: 30)</i>", par:30, limit:42,
@@ -307,11 +308,11 @@
     {hint:"A blocker spent is a wall lost. <i>(par: 30)</i>", par:30, limit:42,
      map:["##C#####","#p..##q#","###.o#.B","####...#","##.###q#","#o.o.p.#","#A######"]},
     {hint:"Every swipe moves everyone. <i>(par: 30)</i>", par:30, limit:42,
-     map:["####A###","#......#","#p#.#q.B","#.p..o.#","#.#....#","#..q..##","#.#o####","###C####"]},
-    {hint:"Who leaves first? <i>(par: 30)</i>", par:30, limit:42,
      map:["#C######","#..#o..#","#p.....#","#..#o.##","#.#oq#p#","###q...#","###BA###"]},
-    {hint:"Park before you push. <i>(par: 30)</i>", par:30, limit:42,
+    {hint:"Who leaves first? <i>(par: 30)</i>", par:30, limit:42,
      map:["########","#o.##..C","#.q##.##","#....o.#","#.q###.A","#...#..#","#.p...pB","########"]},
+    {hint:"Park before you push. <i>(par: 27)</i>", par:27, limit:38,
+     map:["########","A.p..q.#","##.#...#","##.##..#","##....##","#..##o.#","B..po#q#","###C####"]},
     {hint:"<b>Size doors:</b> the number on a door is the exact blob size it takes — <b>merge to fit</b>. <i>(par: 4)</i>", par:4, limit:8,
      map:["######","#.o#oE","#..#.#","#....#","##..o#","D....#","######"]},
     {hint:"Build the right sizes, then send them home. <i>(par: 5)</i>", par:5, limit:9,
@@ -332,9 +333,29 @@
      map:["#D####","#p...#","E.#.o#","G.#o.#","#...##","##.op#","##G###"]},
     {hint:"Build the right sizes, then send them home. <i>(par: 16)</i>", par:16, limit:22,
      map:["###E##","#..#o#","##.o.#","#...o#","###..#","#...##","#D####"]},
+    {hint:"<b>Pressure plates:</b> a goop standing on a plate holds the <b>door</b> open. There is a plate on <b>both sides</b> — nobody gets locked out. <i>(par: 3)</i>", par:3, limit:7,
+     map:["########","#....#_#","#.o.##.#","#..._#o#","#...##=#","A......#","########"]},
+    {hint:"Hold the door for each other. <i>(par: 4)</i>", par:4, limit:8,
+     map:["######","##...#","##o#.#","#....#","###.o#","A_=._#","######"]},
+    {hint:"Hold the door for each other. <i>(par: 5)</i>", par:5, limit:9,
+     map:["######","#...##","#.o###","#o..##","###..#","A_=._#","######"]},
+    {hint:"Hold the door for each other. <i>(par: 6)</i>", par:6, limit:10,
+     map:["####A#","#o...#","#o..##","#.#_##","#..=o#","###._#","######"]},
+    {hint:"Hold the door for each other. <i>(par: 7)</i>", par:7, limit:11,
+     map:["####A#","#....#","#o..##","#.#_##","#..=o#","###.o#","######"]},
+    {hint:"Hold the door for each other. <i>(par: 8)</i>", par:8, limit:12,
+     map:["######","A..###","#o..##","#.#_##","#..=o#","#.#.o#","######"]},
+    {hint:"Hold the door for each other. <i>(par: 9)</i>", par:9, limit:13,
+     map:["########","#.#..#_#","#.o.##.#","#.#._#o#","#.....=#","A..#...#","########"]},
+    {hint:"Hold the door for each other. <i>(par: 11)</i>", par:11, limit:15,
+     map:["########","####oo.#","#.#..#.A","#...=_##","#####o.#","########"]},
+    {hint:"Hold the door for each other. <i>(par: 13)</i>", par:13, limit:18,
+     map:["#######","App#.##","#_..p.#","#o##._#","#.#..o#","#####B#"]},
+    {hint:"Hold the door for each other. <i>(par: 17)</i>", par:17, limit:24,
+     map:["#######","App#.##","#_..p##","#o##._#","#.#..o#","#####B#"]},
   ];
 
-  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
+  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
   let limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0,spawnT0=0,hasSizes=false;
   const PKEY='gm_escape2_v1';
   let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'{"best":{}}'); }catch(e){ prog={best:{}}; }
@@ -342,12 +363,14 @@
   const isUnlocked=i=>i===0||prog.best[i-1]!==undefined;
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
-    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; const drops=[], molds=[]; let id=0;
+    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; const drops=[], molds=[]; let id=0;
     for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
       if(ch==='#'){ row.push('#'); }
       else if('ABC'.includes(ch)){ row.push('#'); const ci='ABC'.indexOf(ch); holes.push({r,c,color:ci}); holeMapG[r+','+c]=ci; }
       else if('DEFGHIJKL'.includes(ch)){ row.push('#'); const ix='DEFGHIJKL'.indexOf(ch); const ci=Math.floor(ix/3), sz=ix%3+1;
         holes.push({r,c,color:ci,size:sz}); holeMapG[r+','+c]=ci; holeSizeG[r+','+c]=sz; }
+      else if(ch==='='){ row.push('.'); doorCellG=r+','+c; }
+      else if(ch==='_'){ row.push('.'); platesG.push(r+','+c); }
       else { row.push('.');
         if(ch==='o') drops.push({id:id++,r,c,size:1,color:0,locked:false});
         else if(ch==='p') drops.push({id:id++,r,c,size:1,color:1,locked:false});
@@ -362,12 +385,14 @@
   function simulate(drops,molds,dir){
     const [dr,dc]=DIRS[dir]; const ds=drops.map(d=>({...d})), ms=molds.map(m=>({...m}));
     const occ={}; ds.forEach((d,i)=>{ if(d.locked) occ[d.r+','+d.c]=i; });
+    const dOpen=doorCellG&&platesG.some(k=>drops.some(d=>d.r+','+d.c===k));
     const order=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*dr+ds[b].c*dc)-(ds[a].r*dr+ds[a].c*dc));
     const removed=new Set(), merges=[], drains=[], corks=[];
     for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c;
       while(true){ const nr=r+dr,nc=c+dc,k=nr+','+nc;
         if(holeMapG[k]!==undefined){ if(holeMapG[k]===ds[i].color&&(!holeSizeG[k]||holeSizeG[k]===ds[i].size)){ removed.add(i); drains.push({id:ds[i].id,r:nr,c:nc,color:ds[i].color}); r=null; } break; }
         if(!inb(nr,nc)||grid[nr][nc]==='#') break;
+        if(doorCellG===k&&!dOpen) break;
         if(occ[k]!==undefined){ const j=occ[k]; if(ds[j].locked||ds[j].color!==ds[i].color) break;   // other colour = movable wall
           ds[j].size+=ds[i].size; removed.add(i); merges.push({from:ds[i].id,to:ds[j].id,r:nr,c:nc}); r=null; break; }
         r=nr;c=nc; }
@@ -400,7 +425,7 @@
     colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); { let si=0; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0,sc:0,sdelay:(si++)*70}; }); spawnT0=performance.now(); }
-    limitNow=LEVELS[levelIdx].limit||99; movesLeft=limitNow; parts=[]; trails=[]; rings=[]; sqA=0;
+    limitNow=LEVELS[levelIdx].limit||99; movesLeft=limitNow; parts=[]; trails=[]; rings=[]; sqA=0; doorAnim=0; doorWasOpen=false;
     document.getElementById('lvlname').textContent='Level '+(levelIdx+1);
     document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
     updateMoves();
@@ -431,6 +456,8 @@
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
     sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir];
     movesLeft=limitNow-moves; updateMoves(); moving=true;
+    if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k));
+      if(o!==doorWasOpen){ SND.door&&SND.door(o); doorWasOpen=o; } }
     if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; } } ghosts=[]; moving=false; }
     if(isWinS(state.drops,state.molds)){ won=true; onWin(); }
     else if(movesLeft<=0){ setTimeout(()=>{ if(!won&&movesLeft<=0){ SND.oom(); document.getElementById('oom').style.display='flex'; } },420); }
@@ -539,6 +566,7 @@
     for(const g of ghosts){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; g.life-=.06; } ghosts=ghosts.filter(g=>g.life>0);
     if(moving && mx<0.6 && !ghosts.length){ moving=false; sqA=1; SND.land(); }
     sqA*=.85;
+    if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k))?1:0; doorAnim+=(o-doorAnim)*.18; }
     for(const t of trails) t.life-=JUICE.trailFade; trails=trails.filter(t=>t.life>0);
     for(const rg of rings) rg.life-=.045; rings=rings.filter(r=>r.life>0);
     for(const p of parts){ p.vy+=.10; p.x+=p.vx; p.y+=p.vy; p.life-=.03; } parts=parts.filter(p=>p.life>0);
@@ -554,6 +582,7 @@
           ctx.fillStyle=COLORS[hj].glow+'.14)'; rr(x+S*.14,y+S*.14,S*.72,S*.72,S*.16); ctx.fill();
           const hs=holeSizeG[r+','+c]; if(hs){ ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='800 '+Math.round(S*.34)+'px ui-rounded,system-ui';
             ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(hs,x+S/2,y+S/2+1); } }
+
         else block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#2a2539':'#2d283d'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
         const hj=holeMapG[r+','+c]; if(hj!==undefined){ const cx=x+S/2,cy=y+S/2;
           ctx.fillStyle='#12101b'; ctx.beginPath(); ctx.arc(cx,cy,S*.30,0,7); ctx.fill();
@@ -567,7 +596,16 @@
             const px=Math.cos(a+Math.PI/2)*R*.42, py=Math.sin(a+Math.PI/2)*R*.42;
             ctx.beginPath(); ctx.moveTo(cx+px,cy+py); ctx.lineTo(cx-px,cy-py); ctx.lineTo(tx,ty); ctx.closePath(); ctx.fill(); ctx.stroke(); }
           ctx.fillStyle='#3a3450'; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
-          ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.036); ctx.stroke(); } } }
+          ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.8,S*.036); ctx.stroke(); }
+        if(platesG.includes(r+','+c)){ const lit=state.drops.some(d=>d.r===r&&d.c===c);
+          ctx.fillStyle=lit?'rgba(255,210,122,.22)':'rgba(120,112,150,.14)'; ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.fill();
+          ctx.strokeStyle=lit?'#ffd27a':'#6f6890'; ctx.lineWidth=Math.max(2,S*.05); ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.08,0,7); ctx.fillStyle=lit?'#ffd27a':'#6f6890'; ctx.fill(); }
+        if((r+','+c)===doorCellG){ const o=doorAnim;
+          ctx.strokeStyle='#ffd27a'; ctx.lineWidth=Math.max(2,S*.045); rr(x+S*.08,y+S*.08,S*.84,S*.84,S*.14); ctx.stroke();
+          ctx.fillStyle='#7d7599';
+          for(let i2=0;i2<4;i2++){ const bx=x+S*(.2+.2*i2); const h=(S*.68)*(1-o)+S*.10;
+            rr(bx-S*.045, y+S*.16, S*.09, h, S*.04); ctx.fill(); } } } }
     state.molds.forEach(drawMold);
     for(const t of trails){ ctx.globalAlpha=t.life*JUICE.trail; ctx.fillStyle=COLORS[t.ci].main;
       ctx.beginPath(); ctx.arc(t.x,t.y,t.r*t.life,0,7); ctx.fill(); } ctx.globalAlpha=1;
