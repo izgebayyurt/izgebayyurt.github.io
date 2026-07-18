@@ -19,10 +19,22 @@
   #hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#9a92b5;
     background:#2c2839;border:2px solid #0d0b14;border-radius:12px;padding:7px 14px;box-shadow:0 2px 0 #0d0b14;max-width:88vw;text-align:center;}
   #hint b{color:#e8e3f5;} #hint i{color:#7d75a0;}
-  #win{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.55);}
-  #win .card{background:#2c2839;border:2px solid #0d0b14;border-radius:20px;box-shadow:0 6px 0 #0d0b14,0 18px 50px rgba(0,0,0,.5);
-    padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;}
-  #win h2{margin:0;font:900 28px ui-rounded,system-ui;color:#e8e3f5;}
+  .modal{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.6);}
+  .modal .card{background:#2c2839;border:2px solid #0d0b14;border-radius:20px;box-shadow:0 6px 0 #0d0b14;
+    padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:86vw;}
+  .modal h2{margin:0;font:900 26px ui-rounded,system-ui;color:#e8e3f5;}
+  .modal .sub{color:#9a91b5;font-size:13.5px;text-align:center;}
+  #moves.low{color:#ff8f73;animation:lowpulse .7s ease-in-out infinite;}
+  @keyframes lowpulse{50%{transform:scale(1.12);}}
+  #pgrid{display:grid;grid-template-columns:repeat(5,52px);gap:9px;}
+  .lvbtn{width:52px;height:52px;border-radius:12px;border:2px solid #0d0b14;background:#39324e;box-shadow:0 3px 0 #0d0b14;
+    font:800 15px ui-rounded,system-ui;color:#e8e3f5;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;}
+  .lvbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0d0b14;}
+  .lvbtn.locked{background:#241f33;color:#5a5375;cursor:default;}
+  .lvbtn.done{background:#2f5e50;}
+  .lvbtn.cur{outline:2px solid #8ceccf;}
+  .lvbtn .st{position:absolute;top:-7px;right:-6px;font-size:13px;}
+  #adcount{font:900 34px ui-rounded,system-ui;color:#8ceccf;}
 </style>
 </head>
 <body>
@@ -33,10 +45,16 @@
     <button class="chip" id="next">▶</button>
     <button class="chip" id="undo" title="Undo (Z)">↶</button>
     <button class="chip" id="reset" title="Restart (R)">↺</button>
-    <div class="chip" id="moves">0</div>
+    <button class="chip" id="grid" title="Levels">▦</button>
+    <div class="chip" title="Moves left"><span id="moves">0</span></div>
   </div>
   <div id="hint">Swipe moves <b>every</b> goop. Same colour merges; different colours block. One blob per colour wins.</div>
-  <div id="win"><div class="card"><h2>Solved! 🎉</h2><button class="chip" id="wnext">Next ▶</button></div></div>
+  <div id="win" class="modal"><div class="card"><h2>Solved! 🎉</h2><div class="sub" id="wintxt"></div><button class="chip" id="wnext">Next ▶</button></div></div>
+  <div id="oom" class="modal"><div class="card"><h2>Out of moves</h2><div class="sub">Undo is always free — or top up and push on.</div>
+    <button class="chip" id="ad">▶ +8 moves <span style="opacity:.6">(watch ad)</span></button>
+    <button class="chip" id="oomres">↺ Restart</button></div></div>
+  <div id="adplay" class="modal"><div class="card"><h2>Ad break</h2><div class="sub">(demo ad — imagine something skippable)</div><div id="adcount">3</div></div></div>
+  <div id="pick" class="modal"><div class="card"><h2>Levels</h2><div id="pgrid"></div><button class="chip" id="pclose">✕ Close</button></div></div>
 
 <script>
 (function(){
@@ -50,59 +68,64 @@
   // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
   // '1'..'9' mould(need that size) — mould levels win by filling; no moulds → win by merging ALL into one
   const LEVELS=[
-    {name:"Oil & Water", hint:"Different colours <b>don’t mix</b> — they stop each other like walls. Merge each colour into <b>one blob per colour</b>. <i>(best: 2)</i>",
+    {name:"Oil & Water", hint:"Different colours <b>don’t mix</b> — they stop each other like walls. Merge each colour into <b>one blob per colour</b>. <i>(par: 2)</i>", par:2, limit:6,
      map:["######","#p.o.#","#..o.#","#..p.#","#...##","######"]},
-    {name:"Stay Apart", hint:"A goop of another colour is a <b>movable wall</b>. Use it. <i>(best: 3)</i>",
+    {name:"Stay Apart", hint:"A goop of another colour is a <b>movable wall</b>. Use it. <i>(par: 3)</i>", par:3, limit:7,
      map:["######","#...##","#.p..#","#o.po#","#....#","######"]},
-    {name:"Two Herds", hint:"Order is everything. <i>(best: 4)</i>",
+    {name:"Two Herds", hint:"Order is everything. <i>(par: 4)</i>", par:4, limit:8,
      map:["######","#....#","#po..#","#o.#.#","#...p#","######"]},
-    {name:"Traffic", hint:"Every swipe moves everyone. <i>(best: 4)</i>",
+    {name:"Traffic", hint:"Every swipe moves everyone. <i>(par: 4)</i>", par:4, limit:8,
      map:["######","#o...#","##.p.#","#o#p.#","#....#","######"]},
-    {name:"Sort It Out", hint:"Keep the families apart — and together. <i>(best: 5)</i>",
+    {name:"Sort It Out", hint:"Keep the families apart — and together. <i>(par: 5)</i>", par:5, limit:9,
      map:["#######","##..p##","#.op.o#","#....##","##....#","#######"]},
-    {name:"Body Blocks", hint:"Herd each family home. <i>(best: 5)</i>",
+    {name:"Body Blocks", hint:"Herd each family home. <i>(par: 5)</i>", par:5, limit:9,
      map:["######","##p#o#","#...p#","#.o..#","######"]},
-    {name:"The Bouncer", hint:"Block with one colour, merge with the other. <i>(best: 6)</i>",
+    {name:"The Bouncer", hint:"Block with one colour, merge with the other. <i>(par: 6)</i>", par:6, limit:10,
      map:["######","#..#.#","#.##.#","#o.p.#","#po#.#","######"]},
-    {name:"Crowded House", hint:"Order is everything. <i>(best: 6)</i>",
+    {name:"Crowded House", hint:"Order is everything. <i>(par: 6)</i>", par:6, limit:10,
      map:["#######","#..p..#","#....o#","#...#.#","#.#o.p#","#######"]},
-    {name:"Thorns Return", hint:"<b>Spikes are back.</b> Nobody dies today — every family arrives whole. <i>(best: 7)</i>",
-     map:["########","###^op.#","####..##","##^^...#","#.p.o..#","#^^o.###","########"]},
-    {name:"Prickly Sort", hint:"Keep the families apart — and together. <i>(best: 9)</i>",
-     map:["#######","#o..#p#","#.p^..#","#.p#.##","##o..o#","#######"]},
-    {name:"Colour Guard", hint:"Herd each family home. <i>(best: 10)</i>",
-     map:["#######","#.#^#p#","#..oo.#","#.^^#o#","#p#..p#","#######"]},
-    {name:"Crossfire", hint:"Block with one colour, merge with the other. <i>(best: 10)</i>",
-     map:["#######","#.po..#","##o.^.#","#..p.##","#..o.p#","#######"]},
-    {name:"Escort", hint:"Order is everything. <i>(best: 11)</i>",
-     map:["#######","#..po.#","#p^#.p#","#^..oo#","###^.##","#######"]},
-    {name:"Roadblock", hint:"Every swipe moves everyone. <i>(best: 13)</i>",
-     map:["########","#po...p#","#^^##..#","#..o...#","#.^.##.#","#..o####","########"]},
-    {name:"Shepherd", hint:"Keep the families apart — and together. <i>(best: 14)</i>",
-     map:["#######","#.#o^.#","#...p.#","#..#o.#","#.p.op#","#######"]},
-    {name:"Interference", hint:"Herd each family home. <i>(best: 17)</i>",
-     map:["########","#...p#.#","##^o...#","#...#.##","#o.#...#","#o^#^#p#","########"]},
-    {name:"The Weave", hint:"<b>Three families</b> now. Same rules, thrice the traffic. <i>(best: 17)</i>",
-     map:["########","#^^#.p.#","#...q.o#","#.^.#q.#","#.#.#.p#","#o#.^o.#","#...#..#","########"]},
-    {name:"Switchback", hint:"Order is everything. <i>(best: 18)</i>",
-     map:["########","#..#...#","#..#^..#","#.p.o.##","#..p...#","#^.o#^o#","########"]},
-    {name:"Gridlock", hint:"Every swipe moves everyone. <i>(best: 19)</i>",
-     map:["########","#...o#.#","#o..#o.#","##...p##","#^.##^##","#.p....#","########"]},
-    {name:"Undertow", hint:"Keep the families apart — and together. <i>(best: 21)</i>",
-     map:["########","#.#..###","#.q....#","#.p#..^#","#..^o.q#","#.o#...#","#.##..p#","########"]},
-    {name:"Cat’s Cradle", hint:"Herd each family home. <i>(best: 21)</i>",
-     map:["########","#.p..#.#","#..#q^.#","#o#..p.#","#....^.#","#oq....#","########"]},
-    {name:"The Braid", hint:"Block with one colour, merge with the other. <i>(best: 22)</i>",
-     map:["########","#q.p...#","#.#...^#","#.op...#","#......#","#.^....#","#.#.qo##","########"]},
-    {name:"Loom", hint:"Order is everything. <i>(best: 23)</i>",
-     map:["########","#.p#...#","#^.#o#.#","#.....##","#q.#o..#","#^.#q.p#","#......#","########"]},
-    {name:"Grand Weave", hint:"Every swipe moves everyone. <i>(best: 24)</i>",
-     map:["########","#o.#####","#.#..^^#","#..#..p#","#q#q..o#","#p..o..#","########"]},
-    {name:"The Masterknot", hint:"Keep the families apart — and together. <i>(best: 24)</i>",
-     map:["########","###..###","##^...##","#^q#..p#","##.#oqo#","#....#p#","########"]},
+    {name:"Squeeze Play", hint:"Every swipe moves everyone. <i>(par: 10)</i>", par:10, limit:14,
+     map:["#######","#p#.#.#","#.o.#.#","#.#opp#","##o.#.#","#######"]},
+    {name:"Corridors", hint:"Keep the families apart — and together. <i>(par: 11)</i>", par:11, limit:15,
+     map:["########","##p#.oo#","#p.##.##","#o.....#","#..#####","########","########"]},
+    {name:"Colour Guard", hint:"Herd each family home. <i>(par: 12)</i>", par:12, limit:17,
+     map:["########","###.o#.#","####p..#","###o#.##","##....o#","###...p#","########"]},
+    {name:"Crossroads", hint:"Block with one colour, merge with the other. <i>(par: 13)</i>", par:13, limit:18,
+     map:["#######","#####p#","###.#o#","###.#p#","#po..o#","#######"]},
+    {name:"Escort", hint:"<b>Three families</b> now. Same rules, thrice the traffic. <i>(par: 14)</i>", par:14, limit:20,
+     map:["########","#o#o..##","#.##o.p#","#.p#q#.#","#.##.###","#..q...#","########"]},
+    {name:"Roadblock", hint:"Every swipe moves everyone. <i>(par: 16)</i>", par:16, limit:22,
+     map:["########","#.o.p###","##...###","#.#..###","#....###","#.#o.op#","########"]},
+    {name:"Shepherd", hint:"Keep the families apart — and together. <i>(par: 17)</i>", par:17, limit:24,
+     map:["#######","###.po#","#p..#.#","#o.####","#po.###","#######"]},
+    {name:"Interference", hint:"Herd each family home. <i>(par: 17)</i>", par:17, limit:24,
+     map:["#######","#.p.op#","#o###.#","#.#.o.#","#p##.##","#######"]},
+    {name:"The Weave", hint:"Block with one colour, merge with the other. <i>(par: 17)</i>", par:17, limit:24,
+     map:["########","#....o.#","#.o.p.##","#.#..#.#","#.q#o..#","##..#q.#","#.p..#.#","########"]},
+    {name:"Switchback", hint:"Order is everything. <i>(par: 18)</i>", par:18, limit:25,
+     map:["########","#...qp.#","#.#.##.#","#.#o####","#..#..##","##.#.#o#","#p...q.#","########"]},
+    {name:"Gridlock", hint:"Every swipe moves everyone. <i>(par: 18)</i>", par:18, limit:25,
+     map:["########","#.##.###","#.p#o#.#","#.o..o.#","#..#p#.#","#....#.#","########"]},
+    {name:"Undertow", hint:"Keep the families apart — and together. <i>(par: 20)</i>", par:20, limit:28,
+     map:["########","#o######","#...####","#q#..#p#","#.##..q#","#.p###o#","########"]},
+    {name:"Cat’s Cradle", hint:"Herd each family home. <i>(par: 23)</i>", par:23, limit:32,
+     map:["########","#p..o..#","#.##.#o#","###q...#","##.#.###","##....p#","#.q.##.#","########"]},
+    {name:"The Braid", hint:"Block with one colour, merge with the other. <i>(par: 23)</i>", par:23, limit:32,
+     map:["########","##.o##.#","#o#o...#","#p###.##","#......#","#.##p#.#","########"]},
+    {name:"Loom", hint:"Order is everything. <i>(par: 23)</i>", par:23, limit:32,
+     map:["#######","#.o#.##","#p#...#","#o###.#","#p..op#","#######"]},
+    {name:"Grand Weave", hint:"Every swipe moves everyone. <i>(par: 24)</i>", par:24, limit:34,
+     map:["#######","###.p.#","#..#..#","#o#.o.#","#pop###","#######"]},
+    {name:"The Masterknot", hint:"Keep the families apart — and together. <i>(par: 27)</i>", par:27, limit:38,
+     map:["########","#.#o#..#","#p..o.##","#q#o#.q#","#..###.#","#..p####","########"]},
   ];
 
   let gw,gh,grid,spikes,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
+  let limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false;
+  const PKEY='gm_merge_v1';
+  let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'{"best":{}}'); }catch(e){ prog={best:{}}; }
+  const saveProg=()=>{ try{ localStorage.setItem(PKEY,JSON.stringify(prog)); }catch(e){} };
+  const isUnlocked=i=>i===0||prog.best[i-1]!==undefined;
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
     grid=[]; spikes=new Set(); const drops=[], molds=[]; let id=0;
@@ -162,10 +185,11 @@
     colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; });
+    limitNow=LEVELS[levelIdx].limit||99; movesLeft=limitNow; parts=[]; sqA=0;
     document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
     document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
-    document.getElementById('moves').textContent='0';
-    document.getElementById('win').style.display='none';
+    updateMoves();
+    ['win','oom','adplay','pick'].forEach(id=>document.getElementById(id).style.display='none');
     if(!solve()) console.warn('[merge] not solvable:',LEVELS[levelIdx].name);
   }
   function snapshot(){ return {drops:state.drops.map(d=>({...d})), molds:state.molds.map(m=>({...m})), moves}; }
@@ -182,16 +206,30 @@
     if(res.deaths.length) document.getElementById('hint').innerHTML='💀 A goop hit the spikes — <b>↶ undo</b> (Z) or <b>↺ restart</b> (R).';
     state.drops=res.drops; state.molds=res.molds;
     state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0}; e.tr=sizeR(d.size); });
-    res.merges.forEach(m=>{ const e=renderById[m.to]; if(e) e.pop=1; });
+    res.merges.forEach(m=>{ const e=renderById[m.to]; if(e) e.pop=1;
+      burst(cellX(m.c),cellY(m.r),COLORS[colOf(m.to)].main,12,S*.11); });
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
-    document.getElementById('moves').textContent=moves; moving=true;
+    sqAxisH=(dir==='left'||dir==='right');
+    movesLeft=limitNow-moves; updateMoves(); moving=true;
     if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; } } ghosts=[]; moving=false; }
-    if(isWinS(state.drops,state.molds)){ won=true; setTimeout(()=>document.getElementById('win').style.display='flex',380); }
+    if(isWinS(state.drops,state.molds)){ won=true; onWin(); }
+    else if(movesLeft<=0){ setTimeout(()=>{ if(!won&&movesLeft<=0) document.getElementById('oom').style.display='flex'; },420); }
   }
+  function updateMoves(){ const el=document.getElementById('moves'); el.textContent=movesLeft;
+    el.classList.toggle('low',movesLeft<=3&&!won); }
+  function onWin(){ const par=LEVELS[levelIdx].par||0; const star=moves<=par;
+    const prev=prog.best[levelIdx]; if(prev===undefined||moves<prev){ prog.best[levelIdx]=moves; saveProg(); }
+    document.getElementById('wintxt').innerHTML=moves+' moves · par '+par+(star?' · ⭐':'');
+    state.drops.forEach(d=>{ burst(cellX(d.c),cellY(d.r),COLORS[d.color].main,22,S*.16); });
+    setTimeout(()=>document.getElementById('win').style.display='flex',430); }
+  function burst(x,y,color,n,spd){ for(let i=0;i<n;i++){ const a=i/n*6.283+(x%1);
+    parts.push({x,y,vx:Math.cos(a)*spd*(.5+(i%3)*.3),vy:Math.sin(a)*spd*(.5+(i%3)*.3)-spd*.35,
+      life:1,color,size:S*(.05+.04*((i*7)%3)/2)}); } if(parts.length>260)parts=parts.slice(-260); }
   function undo(){ if(moving||!undoStack.length) return; const s=undoStack.pop();
     state={drops:s.drops.map(d=>({...d})),molds:s.molds.map(m=>({...m}))}; moves=s.moves; won=false;
+    movesLeft=limitNow-moves; updateMoves();
     document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
-    document.getElementById('win').style.display='none'; document.getElementById('moves').textContent=moves;
+    document.getElementById('win').style.display='none'; document.getElementById('oom').style.display='none';
     renderById={}; ghosts=[]; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; }); }
 
   // ---- input ---------------------------------------------------------------
@@ -209,6 +247,23 @@
   document.getElementById('undo').onclick=undo;
   document.getElementById('reset').onclick=()=>loadLevel(levelIdx);
   document.getElementById('wnext').onclick=()=>loadLevel(levelIdx+1);
+  function buildPicker(){ const g=document.getElementById('pgrid'); g.innerHTML='';
+    LEVELS.forEach((L,i)=>{ const b=document.createElement('button'); b.className='lvbtn';
+      const done=prog.best[i]!==undefined, star=done&&prog.best[i]<=(L.par||0);
+      if(done)b.classList.add('done'); if(!isUnlocked(i))b.classList.add('locked'); if(i===levelIdx)b.classList.add('cur');
+      b.textContent=isUnlocked(i)?(i+1):'🔒';
+      if(star){ const s=document.createElement('span'); s.className='st'; s.textContent='⭐'; b.appendChild(s); }
+      b.onclick=()=>{ if(isUnlocked(i)) loadLevel(i); };
+      g.appendChild(b); }); }
+  document.getElementById('grid').onclick=()=>{ buildPicker(); document.getElementById('pick').style.display='flex'; };
+  document.getElementById('pclose').onclick=()=>document.getElementById('pick').style.display='none';
+  document.getElementById('oomres').onclick=()=>loadLevel(levelIdx);
+  document.getElementById('ad').onclick=()=>{ document.getElementById('oom').style.display='none';
+    const ap=document.getElementById('adplay'); ap.style.display='flex'; let t=3;
+    document.getElementById('adcount').textContent=t;
+    const iv=setInterval(()=>{ t--; if(t<=0){ clearInterval(iv); ap.style.display='none';
+        limitNow+=8; movesLeft=limitNow-moves; updateMoves(); }
+      else document.getElementById('adcount').textContent=t; },1000); };
 
   // ---- layout & draw -------------------------------------------------------
   let S=48,ox=0,oy=0,dpr=1,TRAY=14;
@@ -234,23 +289,23 @@
     ctx.fillText(String(mo.size),cx,cy+S*.02); }
   function drawBlob(e,d){ const rad=e.rr*(1+e.pop*.16), cx=e.px, cy=e.py;
     const C=COLORS[(d&&d.color)||0];
-    const halo=ctx.createRadialGradient(cx,cy,rad*.4,cx,cy,rad*2.0);            // soft glow
-    halo.addColorStop(0,C.glow+'.28)'); halo.addColorStop(1,C.glow+'0)');
-    ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(cx,cy,rad*2.0,0,7); ctx.fill();
-    ctx.fillStyle=C.dark; ctx.beginPath(); ctx.arc(cx,cy+rad*.10,rad,0,7); ctx.fill();
-    ctx.fillStyle=d&&d.locked?C.lock:C.main; ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fill();
+    const rx=rad*(1-(sqAxisH?.15:-.10)*sqA), ry=rad*(1-(sqAxisH?-.10:.15)*sqA);   // squash on arrival
+    const halo=ctx.createRadialGradient(cx,cy,rad*.4,cx,cy,rad*1.9);
+    halo.addColorStop(0,C.glow+'.25)'); halo.addColorStop(1,C.glow+'0)');
+    ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(cx,cy,rad*1.9,0,7); ctx.fill();
+    ctx.fillStyle=d&&d.locked?C.lock:C.main; ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,7); ctx.fill();
     ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2,S*.04); ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,.42)'; ctx.beginPath(); ctx.ellipse(cx-rad*.34,cy-rad*.36,rad*.3,rad*.18,-0.5,0,7); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.arc(cx,cy-rad*.1,rad*.72,0,7); ctx.fill();
     if(d&&d.size>1){ ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='800 '+Math.round(rad*.78)+'px ui-rounded,system-ui';
-      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(d.size,cx,cy+rad*.06); }
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(d.size,cx,cy+rad*.04); }
   }
   function frame(){
     let mx=0; for(const id in renderById){ const e=renderById[id]; const d=state.drops.find(x=>x.id==id); if(!d)continue;
       const tx=cellX(d.c),ty=cellY(d.r); e.px+=(tx-e.px)*.34; e.py+=(ty-e.py)*.34; e.rr+=(e.tr-e.rr)*.3; e.pop*=.86;
       mx=Math.max(mx,Math.abs(tx-e.px),Math.abs(ty-e.py)); }
     for(const g of ghosts){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; g.life-=.06; } ghosts=ghosts.filter(g=>g.life>0);
-    if(moving && mx<0.6 && !ghosts.length) moving=false;
+    if(moving && mx<0.6 && !ghosts.length){ moving=false; sqA=1; }
+    sqA*=.85;
+    for(const p of parts){ p.vy+=.10; p.x+=p.vx; p.y+=p.vy; p.life-=.03; } parts=parts.filter(p=>p.life>0);
     ctx.clearRect(0,0,cv.width,cv.height);
     ctx.fillStyle='#211d2e'; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.fill();
     ctx.strokeStyle=INK; ctx.lineWidth=3; rr(ox-TRAY,oy-TRAY,gw*S+2*TRAY,gh*S+2*TRAY,22); ctx.stroke();
@@ -271,13 +326,16 @@
     // draw locked first (sit under), then movers
     state.drops.filter(d=>d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
     state.drops.filter(d=>!d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
+    for(const p of parts){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size*p.life+1,0,7); ctx.fill(); } ctx.globalAlpha=1;
     requestAnimationFrame(frame);
   }
 
   window.__goop={ state:()=>({level:LEVELS[levelIdx].name,idx:levelIdx,moves,won,
       drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,color:d.color,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
     move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length };
-  loadLevel(0); requestAnimationFrame(frame);
+  let start0=0; while(start0<LEVELS.length-1&&prog.best[start0]!==undefined) start0++;
+  loadLevel(start0); requestAnimationFrame(frame);
 })();
 </script>
 </body>
