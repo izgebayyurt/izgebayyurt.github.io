@@ -170,9 +170,23 @@ body{
 .btn.rest{ background:#8a6a2b; color:var(--sand); border-color:#5f4718; box-shadow:0 2px 0 #5f4718; }
 .btn.recall{ background:var(--sand2); }
 .btn.gold{ background:var(--gold); color:#2a1e08; border-color:#8a611c; box-shadow:0 2px 0 #8a611c; }
+.btn.gearbtn{ background:#5a4a7a; color:var(--sand); border-color:#3a2e52; box-shadow:0 2px 0 #3a2e52; }
 .btn[disabled]{ opacity:.42; pointer-events:none; }
 .btn small{ display:block; font-family:var(--font-b); font-size:9.5px; font-weight:400; opacity:.85; margin-top:1px; letter-spacing:0; }
 .btn.wide{ width:100%; }
+
+/* gear line on card */
+.g-gear{ margin-top:9px; font-family:var(--font-b); font-size:11px; color:var(--ink-soft);
+  background:rgba(36,26,21,.05); border:1px solid rgba(36,26,21,.07); border-radius:8px; padding:5px 9px; text-align:center; }
+
+/* gear modal slots */
+.gslot{ display:flex; align-items:center; gap:10px; text-align:left; padding:9px 2px; border-bottom:1px solid var(--line); }
+.gslot:last-of-type{ border-bottom:none; }
+.gslot-ic{ font-size:24px; width:34px; text-align:center; flex:none; }
+.gslot-body{ flex:1; min-width:0; }
+.gslot-name{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink); }
+.gslot-sub{ font-family:var(--font-b); font-size:10.5px; color:var(--ink-soft); margin-top:1px; }
+.gslot-btn{ flex:none; min-width:78px; }
 
 /* recruit / empty slot card */
 .slot-empty{
@@ -512,6 +526,35 @@ const TITLES = [ // by wins
   {w:30,t:'Champion'}, {w:55,t:'Legend'}, {w:90,t:'Immortal'} ];
 const PORTRAITS = ['🗡️','⚔️','🛡️','🪓','🔱','🏹','🤺','💪'];
 
+// Gladiator classes — each leans the stat roll and gives a distinct duel feel.
+// lean: bonus starting stats · hpMul: max-HP scale · duel knobs (block/dodge/riposte/strike).
+const CLASSES = {
+  murmillo:   { name:'Murmillo',    ic:'🛡️', blurb:'Heavy shield, iron nerve',
+                lean:{str:2,agi:0,vit:4}, hpMul:1.18, block:1.6, dodge:0.9,  riposte:1.0, strikeMul:1.0,  strikeCd:1.12 },
+  thraex:     { name:'Thraex',      ic:'🗡️', blurb:'Curved sica, relentless',
+                lean:{str:4,agi:1,vit:1}, hpMul:1.02, block:1.05, dodge:1.0, riposte:1.0, strikeMul:1.15, strikeCd:0.98 },
+  retiarius:  { name:'Retiarius',   ic:'🔱', blurb:'Net and trident, elusive',
+                lean:{str:1,agi:4,vit:0}, hpMul:0.94, block:0.8, dodge:1.4,  riposte:1.25, strikeMul:1.0, strikeCd:0.9 },
+  secutor:    { name:'Secutor',     ic:'⚔️', blurb:'Patient hunter, deadly counter',
+                lean:{str:2,agi:2,vit:2}, hpMul:1.06, block:1.2, dodge:1.1,  riposte:1.5, strikeMul:1.0,  strikeCd:1.0 },
+  dimachaerus:{ name:'Dimachaerus', ic:'🤺', blurb:'Twin blades, no guard',
+                lean:{str:3,agi:3,vit:0}, hpMul:0.9,  block:0.55, dodge:1.0, riposte:1.0, strikeMul:1.12, strikeCd:0.7 },
+};
+const CLASS_IDS = Object.keys(CLASSES);
+const clsOf = g => CLASSES[g.cls] || CLASSES.thraex;
+
+// Per-gladiator equipment. Weapon lifts damage/power, armor lifts HP/power.
+// Tier you can buy is gated by the Armory facility level.
+const GEAR = {
+  weapon:{ ic:'⚔️', name:'Weapon', tiers:['Bare fists','Wooden rudis','Iron gladius','Steel spatha','Honed falx','Gilded blade','Legend’s edge'] },
+  armor:{  ic:'🛡️', name:'Armor',  tiers:['Loincloth','Leather manica','Bronze scale','Iron cuirass','Steel lorica','Champion’s plate','Aegis of Mars'] },
+};
+const GEAR_MAX = 6;
+const gearCost = t => Math.round(50 * Math.pow(1.9, t));        // cost to go from tier t → t+1
+const maxGearTier = () => Math.min(GEAR_MAX, S.fac.armory);     // Armory level caps gear tier
+const weaponPow = g => (g.gear ? g.gear.weapon : 0) * 7;
+const armorPow  = g => (g.gear ? g.gear.armor  : 0) * 6;
+
 // Arena opponents — power & reward scale up the ladder.
 const OPPONENTS = [
   {n:'Drunken Brawler',   e:'🥴', d:'Back-alley chancer'},
@@ -544,7 +587,7 @@ const FAC = {
     desc:l=>`Heals <em>+${(l).toFixed(0)}</em> HP/sec · <em>${Math.round(deathCut(l)*100)}%</em> lower death risk.`,
     cost:l=> Math.round(100 * Math.pow(1.95, l-1)) },
   armory:{ ic:'🗡️', name:'Armory', max:12,
-    desc:l=>`Every fighter gains <em>+${(l-1)*8}</em> combat power from gear.`,
+    desc:l=>`Forge gear up to <em>Tier ${Math.min(GEAR_MAX,l)}</em> · <em>+${(l-1)*8}</em> power to all fighters.`,
     cost:l=> Math.round(90 * Math.pow(2.0, l-1)) },
   manager:{ ic:'📜', name:'Lanista’s Contacts', max:12,
     desc:l=>`Arena purses pay <em>${(1+(l-1)*0.2).toFixed(2)}×</em> more.`,
@@ -559,15 +602,19 @@ let simFights = 0, simWins = 0;   // running tallies, survive gladiator removal 
 
 function newGladiator(){
   const name = NAMES[(Math.random()*NAMES.length)|0];
+  const clsId = CLASS_IDS[(Math.random()*CLASS_IDS.length)|0];
+  const lean = CLASSES[clsId].lean;
   return {
     id: nextId++, name,
-    portrait: PORTRAITS[(Math.random()*PORTRAITS.length)|0],
-    str: 5 + (Math.random()*3|0),
-    agi: 5 + (Math.random()*3|0),
-    vit: 5 + (Math.random()*3|0),
+    cls: clsId,
+    portrait: CLASSES[clsId].ic,
+    str: 4 + lean.str + (Math.random()*3|0),
+    agi: 4 + lean.agi + (Math.random()*3|0),
+    vit: 4 + lean.vit + (Math.random()*3|0),
     hp: 0, maxHp: 0,
+    gear: { weapon:0, armor:0 },
     level:1, xp:0, wins:0, fights:0,
-    state:'idle',           // idle | fighting | training | injured
+    state:'idle',           // idle | fighting | training | injured | dueling
     trainStat:null,
     progress:0,             // ticks accumulated toward current action
   };
@@ -588,13 +635,16 @@ function initState(){
 
 /* derived stats */
 function recalc(g){
-  g.maxHp = Math.round(40 + g.vit*9 + g.level*6);
+  const base = 40 + g.vit*9 + g.level*6 + armorPow(g)*1.5;
+  g.maxHp = Math.round(base * clsOf(g).hpMul);
   if(g.hp > g.maxHp) g.hp = g.maxHp;
 }
 function power(g){
-  const gear = (S.fac.armory-1)*8;
-  return Math.round(g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + gear);
+  const facGear = (S.fac.armory-1)*8;
+  return Math.round(g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + facGear + weaponPow(g) + armorPow(g));
 }
+// Resting/wounded recovery, scaled to max HP so it stays meaningful at any level.
+function healRate(g){ return 1.5 + g.maxHp*0.03 + S.fac.infirmary*0.7; }   // hp per second
 function titleFor(g){
   let t = TITLES[0].t;
   for(const x of TITLES){ if(g.wins >= x.w) t = x.t; }
@@ -612,7 +662,7 @@ function tickGladiator(g, live, mult, offline){
   const ev = [];
   if(g.state === 'dueling') return ev;   // you're controlling this one by hand
   if(g.state === 'injured'){
-    g.hp = Math.min(g.maxHp, g.hp + S.fac.infirmary * mult);   // hp/sec
+    g.hp = Math.min(g.maxHp, g.hp + healRate(g) * 1.4 * mult);   // in the infirmary — heals a bit faster
     if(g.hp >= g.maxHp*0.6){ g.state='idle'; g.progress=0;
       if(live) ev.push({cls:'', txt:`<b>${g.name}</b> has recovered and returns to the ludus.`});
     }
@@ -648,9 +698,10 @@ function tickGladiator(g, live, mult, offline){
   // idle: slowly recover between bouts, then auto-fight if enabled & healthy
   if(g.state === 'idle'){
     if(g.hp < g.maxHp){
-      g.hp = Math.min(g.maxHp, g.hp + (0.6 + S.fac.infirmary*0.35) * mult);
+      g.hp = Math.min(g.maxHp, g.hp + healRate(g) * mult);
     }
-    if(S.autoFight && g.hp > g.maxHp*0.45){
+    // auto-battle waits until a fighter has recovered a healthy margin before sending them back in
+    if(S.autoFight && g.hp >= g.maxHp*0.7){
       g.state = 'fighting'; g.progress = 0;
     }
   }
@@ -794,8 +845,14 @@ function load(){
     if(!raw) return false;
     S = JSON.parse(raw);
     nextId = S.nextId || (Math.max(0,...S.gladiators.map(g=>g.id))+1);
-    // safety: recalc derived, and free anyone stuck mid-duel from a closed tab
-    S.gladiators.forEach(g=>{ if(!g.maxHp) recalc(g); if(g.state==='dueling') g.state='idle'; });
+    // migrate + heal derived state; free anyone stuck mid-duel from a closed tab
+    S.gladiators.forEach(g=>{
+      if(!g.cls){ g.cls = CLASS_IDS[(Math.random()*CLASS_IDS.length)|0]; g.portrait = CLASSES[g.cls].ic; }
+      if(!g.gear) g.gear = { weapon:0, armor:0 };
+      recalc(g);
+      if(g.hp==null || g.hp>g.maxHp) g.hp = g.maxHp;
+      if(g.state==='dueling') g.state='idle';
+    });
     return true;
   }catch(e){ return false; }
 }
@@ -835,13 +892,14 @@ function renderRoster(){
     card.dataset.gid = g.id;
     const need = XP_FOR(g.level);
     const pow = power(g);
+    const cls = clsOf(g);
     card.innerHTML = `
       ${statusLabel(g)}
       <div class="g-head">
         <div class="g-portrait">${g.portrait}</div>
         <div class="g-meta">
           <div class="g-name">${g.name}</div>
-          <div class="g-title">${titleFor(g)} · ${g.wins}W / ${g.fights} fights</div>
+          <div class="g-title">${cls.name} · ${titleFor(g)} · ${g.wins}W</div>
         </div>
         <div class="g-lvl">LVL ${g.level}</div>
       </div>
@@ -853,6 +911,7 @@ function renderRoster(){
         <div class="pip vit"><b>${g.vit}</b><small>VIT</small></div>
         <div class="pip pow"><b>${pow}</b><small>POWER</small></div>
       </div>
+      <div class="g-gear">${GEAR.weapon.ic} ${GEAR.weapon.tiers[g.gear.weapon]} &nbsp;·&nbsp; ${GEAR.armor.ic} ${GEAR.armor.tiers[g.gear.armor]}</div>
       <div class="g-actions"></div>`;
     const acts = card.querySelector('.g-actions');
     if(g.state==='injured'){
@@ -872,11 +931,13 @@ function renderRoster(){
       b.onclick=()=>{ g.state='idle'; g.progress=0; refresh(); save(); };
       acts.appendChild(b);
     } else { // idle
-      const f = el('div','btn fight'); f.innerHTML=`Fight <small>you take the sand · Bout ${S.tier+1}</small>`;
+      const f = el('div','btn fight'); f.innerHTML=`Fight <small>Bout ${S.tier+1}</small>`;
       f.onclick=()=> startDuel(g);
       const t = el('div','btn train'); t.innerHTML=`Train`;
       t.onclick=()=> chooseTrain(g);
-      acts.appendChild(f); acts.appendChild(t);
+      const gr = el('div','btn gearbtn'); gr.innerHTML=`Gear`;
+      gr.onclick=()=> chooseGear(g);
+      acts.appendChild(f); acts.appendChild(t); acts.appendChild(gr);
     }
     wrap.appendChild(card);
   }
@@ -935,6 +996,52 @@ function chooseTrain(g){
       refresh(); save();
     };
   });
+}
+
+function chooseGear(g){
+  const ov = el('div','overlay');
+  const m = el('div','modal');
+  const cls = clsOf(g);
+  const render = ()=>{
+    const cap = maxGearTier();
+    const rows = Object.keys(GEAR).map(slot=>{
+      const info = GEAR[slot];
+      const t = g.gear[slot];
+      const maxed = t >= GEAR_MAX;
+      const capped = t >= cap && !maxed;
+      const cost = gearCost(t);
+      const eff = slot==='weapon' ? `+${(t+1)*7} power` : `+${(t+1)*6} power · +HP`;
+      let btn;
+      if(maxed) btn = `<div class="btn recall gslot-btn" disabled>Max</div>`;
+      else if(capped) btn = `<div class="btn recall gslot-btn" disabled>🔒 Armory L${t+1}</div>`;
+      else btn = `<div class="btn gold gslot-btn" data-slot="${slot}" ${S.gold<cost?'disabled':''}>Forge<small>${fmt(cost)} ◈ → ${info.tiers[t+1]}</small></div>`;
+      return `<div class="gslot">
+          <div class="gslot-ic">${info.ic}</div>
+          <div class="gslot-body">
+            <div class="gslot-name">${info.tiers[t]}</div>
+            <div class="gslot-sub">${info.name} · Tier ${t}/${GEAR_MAX}${maxed?'':` → ${eff}`}</div>
+          </div>
+          ${btn}
+        </div>`;
+    }).join('');
+    m.innerHTML = `<h2>${g.name}’s Arms</h2>
+      <div class="sub">${cls.ic} ${cls.name} · gear capped by Armory (L${S.fac.armory})</div>
+      ${rows}
+      <div class="m-btns"><div class="btn wide recall" id="gc-close">Done</div></div>`;
+    m.querySelector('#gc-close').onclick=()=>ov.remove();
+    m.querySelectorAll('.gslot-btn[data-slot]').forEach(b=>{
+      b.onclick=()=>{
+        const slot=b.dataset.slot, cost=gearCost(g.gear[slot]);
+        if(S.gold<cost || g.gear[slot]>=maxGearTier()) return;
+        S.gold-=cost; g.gear[slot]++; recalc(g);
+        toast(`${g.name} takes up a ${GEAR[slot].tiers[g.gear[slot]]}.`);
+        render(); renderTop(); if(tab==='ludus') renderRoster(); save();
+      };
+    });
+  };
+  ov.appendChild(m); document.body.appendChild(ov);
+  ov.onclick = e=>{ if(e.target===ov) ov.remove(); };
+  render();
 }
 
 function renderArena(){
@@ -1176,7 +1283,7 @@ function showIntro(){
     <h2>${opp.n}</h2>
     <div class="cs">${opp.d}</div>
     <div class="vs-stats">
-      <div class="kv"><b style="color:#79b356">${pw}</b><small>${g.name} · power</small></div>
+      <div class="kv"><b style="color:#79b356">${pw}</b><small>${clsOf(g).name} · power</small></div>
       <div class="kv"><b style="color:#c0392b">${ew}</b><small>enemy power</small></div>
       <div class="kv"><b style="color:var(--gold2)">${Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2))}◈</b><small>purse</small></div>
     </div>
@@ -1200,18 +1307,25 @@ function beginDuel(){
   // enemy header
   dz.en.textContent = opp.n; dz.es.textContent = opp.d; dz.ef.textContent = opp.e;
   dz.pf.textContent = g.portrait;
-  dz.pn.textContent = g.name; dz.pinfo.textContent = `LVL ${g.level} · ${titleFor(g)}`;
+  dz.pn.textContent = g.name; dz.pinfo.textContent = `LVL ${g.level} · ${clsOf(g).name}`;
   dz.ef.classList.remove('downed','stagger'); dz.pf.classList.remove('downed');
   // combat state
+  const c = clsOf(g);
   D.pmax = g.maxHp; D.php = Math.max(1, g.hp);
   D.emax = enemyHP(i); D.ehp = D.emax;
   D.stam = STAM_MAX; D.riposte = false;
   D.blockUntil = 0; D.dodgeUntil = 0;
   D.cd = {strike:0, heavy:0, block:0, dodge:0};
   D.cdTotal = {strike:1, heavy:1, block:1, dodge:1};
-  D.strikeCd = Math.max(300, 540 - g.agi*12);  D.strikeCost = 16;
-  D.heavyCd  = Math.max(680, 980 - g.agi*10);  D.heavyCost  = 34;
+  D.strikeCd = Math.max(220, (540 - g.agi*12) * c.strikeCd);  D.strikeCost = 16;
+  D.heavyCd  = Math.max(600, (980 - g.agi*10) * c.strikeCd);  D.heavyCost  = 34;
   D.blockCd  = 520; D.dodgeCd = 620;
+  // class-derived duel knobs
+  D.wpn       = weaponPow(g);                                  // weapon damage bonus
+  D.strikeMul = c.strikeMul;                                   // class attack lean
+  D.blockKeep = Math.max(0.05, Math.min(0.6, 0.22 / c.block)); // fraction of a blow that lands through a block
+  D.dodgeWin  = 360 * c.dodge;                                 // dodge i-frame window
+  D.riposteMul= 1 + c.riposte;                                 // riposte damage multiplier
   D.phase = 'idle'; D.phaseEnd = 1e15;    // enemy holds until countdown ends
   D.ended = false; D.locked = true;
   renderDuel(D.now || performance.now());
@@ -1239,8 +1353,8 @@ function dInput(k){
   if(k==='strike'){
     if(D.stam < D.strikeCost){ spawnFloat('player','miss','winded'); return; }
     D.stam -= D.strikeCost;
-    let dmg = (g.str*1.25 + g.level*1.4) * (0.9+Math.random()*0.25), cls='dmg';
-    if(D.riposte){ dmg*=2; D.riposte=false; cls='crit'; spawnFloat('enemy','crit','RIPOSTE!'); }
+    let dmg = (g.str*1.25 + g.level*1.4 + D.wpn*0.6) * D.strikeMul * (0.9+Math.random()*0.25), cls='dmg';
+    if(D.riposte){ dmg*=D.riposteMul; D.riposte=false; cls='crit'; spawnFloat('enemy','crit','RIPOSTE!'); }
     D.ehp -= dmg;
     dAnim(dz.pf,'p-lunge',150); dAnim(dz.ef,'e-hurt',150);
     spawnFloat('enemy', cls, '-'+Math.round(dmg)); vib(10);
@@ -1249,9 +1363,9 @@ function dInput(k){
   } else if(k==='heavy'){
     if(D.stam < D.heavyCost){ spawnFloat('player','miss','winded'); return; }
     D.stam -= D.heavyCost;
-    let dmg = (g.str*2.5 + g.level*1.8) * (0.9+Math.random()*0.2), cls='big';
+    let dmg = (g.str*2.5 + g.level*1.8 + D.wpn*1.1) * D.strikeMul * (0.9+Math.random()*0.2), cls='big';
     if(D.phase==='windup'){ D.phase='recover'; D.phaseEnd=ts+850; teleOff(); dAnim(dz.ef,'stagger',850); spawnFloat('enemy','block','STAGGERED!'); }
-    if(D.riposte){ dmg*=2; D.riposte=false; cls='crit'; spawnFloat('enemy','crit','RIPOSTE!'); }
+    if(D.riposte){ dmg*=D.riposteMul; D.riposte=false; cls='crit'; spawnFloat('enemy','crit','RIPOSTE!'); }
     D.ehp -= dmg;
     dAnim(dz.pf,'p-lunge',190); dAnim(dz.ef,'e-hurt',190);
     spawnFloat('enemy', cls, '-'+Math.round(dmg)); vib(18);
@@ -1260,7 +1374,7 @@ function dInput(k){
   } else if(k==='block'){
     D.blockUntil = ts + 380; D.cd.block = ts + D.blockCd; D.cdTotal.block = D.blockCd;
   } else if(k==='dodge'){
-    D.dodgeUntil = ts + 360; D.cd.dodge = ts + D.dodgeCd; D.cdTotal.dodge = D.dodgeCd;
+    D.dodgeUntil = ts + D.dodgeWin; D.cd.dodge = ts + D.dodgeCd; D.cdTotal.dodge = D.dodgeCd;
   }
 }
 
@@ -1287,7 +1401,7 @@ function resolveEnemyHit(ts){
   dAnim(dz.ef,'e-lunge',180);
   let dmg = oppPower(D.tier) * (0.55 + Math.random()*0.5) * 0.9;
   dmg /= (1 + D.g.vit*0.02);
-  if(ts < D.blockUntil){ dmg*=0.22; spawnFloat('player','block','BLOCK'); vib(8); }
+  if(ts < D.blockUntil){ dmg*=D.blockKeep; spawnFloat('player','block','BLOCK'); vib(8); }
   else if(ts < D.dodgeUntil){ dmg=0; D.riposte=true; spawnFloat('player','miss','DODGE!'); spawnFloat('center','block','RIPOSTE READY'); vib(6); }
   else { dAnim(dz.root,'shake',280); vib(30); }
   if(dmg>0){ D.php -= dmg; dAnim(dz.pf,'p-hurt',160); spawnFloat('player','pd','-'+Math.round(dmg)); }
