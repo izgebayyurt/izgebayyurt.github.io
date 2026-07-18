@@ -255,6 +255,22 @@ body{
 .fac-up{ margin-top:10px; }
 .fac.maxed .fdesc em{ color:var(--bronze); }
 
+/* ---------- legacy / prestige ---------- */
+.leg-hero{ text-align:center; background:linear-gradient(180deg,#2f231b,#241a15); border-color:#000; }
+.leg-glory{ font-family:var(--font-d); font-weight:700; font-size:34px; color:var(--gold2); letter-spacing:.04em; }
+.leg-glory-sub{ font-family:var(--font-sc); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sand); opacity:.8; margin-top:2px; }
+.leg-glory-sub b{ color:var(--gold2); }
+.leg-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:4px; }
+.leg-stat{ display:flex; align-items:center; gap:9px; background:var(--parch); border:1.5px solid var(--line);
+  border-radius:11px; padding:9px 11px; box-shadow:0 2px 0 var(--line2); }
+.leg-stat .li{ font-size:20px; flex:none; }
+.leg-stat b{ display:block; font-family:var(--font-d); font-size:15px; font-weight:600; line-height:1.1; }
+.leg-stat small{ display:block; font-family:var(--font-sc); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-top:1px; }
+.retire-box{ display:flex; align-items:center; justify-content:center; gap:14px; padding:6px 0 2px; }
+.retire-box .rb-num{ font-family:var(--font-d); font-weight:700; font-size:22px; text-align:center; }
+.retire-box .rb-lab{ font-family:var(--font-sc); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); text-align:center; margin-top:1px; }
+.retire-box .rb-arrow{ font-family:var(--font-d); font-size:22px; color:var(--ink-soft); }
+
 /* ---------- bottom nav ---------- */
 #nav{
   position:fixed; bottom:0; left:0; right:0; z-index:30; max-width:520px; margin:0 auto;
@@ -510,12 +526,19 @@ body{
       <div id="facilities"></div>
       <div class="reset-link"><button id="reset-btn">Raze the ludus &amp; start over</button></div>
     </div>
+
+    <!-- LEGACY / PRESTIGE -->
+    <div class="panel" id="p-legacy">
+      <div class="section-h">Legacy</div>
+      <div id="legacy"></div>
+    </div>
   </div>
 
   <div id="nav">
     <div class="nav-b" data-tab="arena"><span class="ni">⚔️</span><span class="nl">Arena</span><span class="badge" id="badge-arena" style="display:none"></span></div>
     <div class="nav-b on" data-tab="ludus"><span class="ni">🛡️</span><span class="nl">Ludus</span></div>
     <div class="nav-b" data-tab="fac"><span class="ni">🏛️</span><span class="nl">Facilities</span></div>
+    <div class="nav-b" data-tab="legacy"><span class="ni">🏆</span><span class="nl">Legacy</span></div>
   </div>
 </div>
 
@@ -528,7 +551,7 @@ body{
 /* ============================ CONFIG ============================ */
 const SAVE_KEY = 'ludus.save.v1';
 const TICK_MS = 1000;                 // one game tick
-const MAX_OFFLINE_H = 8;              // cap offline catch-up
+const MAX_OFFLINE_H = 24;             // cap offline catch-up (daily check-in friendly)
 const XP_FOR = lvl => Math.round(60 * Math.pow(1.55, lvl-1));
 
 const NAMES = ['Flamma','Crixus','Verus','Priscus','Spiculus','Hermes','Tetraites','Rutuba',
@@ -593,8 +616,9 @@ function rollGearDrop(g, i){
   return { slot, tier, name: GEAR[slot].tiers[tier] };
 }
 
-// Arena opponents — power & reward scale up the ladder.
-const OPPONENTS = [
+// Arena opponents — the first bouts are hand-named; beyond them the games are
+// endless, with procedurally-titled foes that scale forever. Every rank is a wall.
+const NAMED = [
   {n:'Drunken Brawler',   e:'🥴', d:'Back-alley chancer'},
   {n:'Condemned Thief',   e:'⛓️', d:'Nothing left to lose'},
   {n:'Wild Boar',         e:'🐗', d:'Beast hunt · venatio'},
@@ -608,9 +632,19 @@ const OPPONENTS = [
   {n:'Barca the Giant',   e:'🗿', d:'A head taller than any man'},
   {n:'The Emperor’s Champion', e:'👑', d:'None have bested him'},
 ];
-const oppPower  = i => Math.round(16 * Math.pow(1.42, i));      // ~16 → ~900
+const RANK_TITLES = ['Challenger','Gladiator','Champion','Myrmidon','Destroyer','Warlord','Titan','Colossus','Demigod','Immortal'];
+const RANK_EMOJI  = ['⚔️','🗡️','🛡️','🪓','🔱','🐺','🦁','🐗','🐉','👹','🗿','☠️','👑','🔥'];
+const MAX_RANK = 120;                 // effectively endless — each rank is a grind wall
+function foe(i){
+  if(i < NAMED.length) return NAMED[i];
+  const k = i - NAMED.length;
+  const title = RANK_TITLES[k % RANK_TITLES.length];
+  const suffix = ['','Redux','Ascendant','Eternal','Apex'][Math.floor(k/RANK_TITLES.length) % 5];
+  return { n:`${title}${suffix?' '+suffix:''} · Rank ${i+1}`, e:RANK_EMOJI[i % RANK_EMOJI.length], d:'The endless games' };
+}
+const oppPower  = i => Math.round(16 * Math.pow(1.42, i));      // 16 → astronomical
 const oppReward = i => Math.round(14 * Math.pow(1.5, i));       // denarii for a win
-const oppFame   = i => Math.round(1 + i*1.4);
+const oppFame   = i => Math.round(1 + i*1.4 + i*i*0.05);        // fame ramps up — feeds Glory
 const oppXP     = i => Math.round(22 * Math.pow(1.32, i));
 
 // Facilities
@@ -667,6 +701,7 @@ function initState(){
     tier: 0, maxTier: 0, autoFight:false,
     gladiators:[g],
     log:[], nextId:2,
+    glory:0, lifeFame:0, retirements:0, bestRank:0,   // prestige / lifetime meta
     lastTick: Date.now(),
   };
 }
@@ -758,15 +793,21 @@ function maybeLevel(g, ev, live){
   }
 }
 
+// Permanent Glory bonus from prestige — multiplies gold, fame and XP.
+const gloryMult = () => 1 + (S.glory||0)*0.05;
+
 // Grant the spoils of a victory. Shared by the auto-sim and the manual duel.
 // Returns { gain, drop } — drop is a gear find or null.
 function grantWin(g, i, ev, live){
-  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2));
+  const gm = gloryMult();
+  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2) * gm);
+  const fame = Math.round(oppFame(i) * gm);
   S.gold += gain;
-  S.fame += oppFame(i);
-  g.xp += oppXP(i);
+  S.fame += fame;
+  S.lifeFame = (S.lifeFame||0) + fame;
+  g.xp += Math.round(oppXP(i) * gm);
   g.wins++;
-  if(i === S.maxTier && S.maxTier < OPPONENTS.length-1){ S.maxTier++; }  // unlock next tier
+  if(i === S.maxTier && S.maxTier < MAX_RANK-1){ S.maxTier++; if(S.maxTier > (S.bestRank||0)) S.bestRank = S.maxTier; }  // unlock next tier
   simWins++;
   const drop = rollGearDrop(g, i);
   maybeLevel(g, ev, live);
@@ -785,7 +826,7 @@ function downedCheck(g, i, won){
 
 function resolveFight(g, ev, live){
   const i = S.tier;
-  const opp = OPPONENTS[i];
+  const opp = foe(i);
   const gp = power(g);
   const ep = oppPower(i);
   let wc = gp/(gp+ep);
@@ -886,6 +927,11 @@ function load(){
     if(!raw) return false;
     S = JSON.parse(raw);
     nextId = S.nextId || (Math.max(0,...S.gladiators.map(g=>g.id))+1);
+    // migrate new meta fields onto older saves
+    if(S.glory==null) S.glory = 0;
+    if(S.lifeFame==null) S.lifeFame = S.fame||0;
+    if(S.retirements==null) S.retirements = 0;
+    if(S.bestRank==null) S.bestRank = S.maxTier||0;
     // migrate + heal derived state; free anyone stuck mid-duel from a closed tab
     S.gladiators.forEach(g=>{
       if(!g.cls){ g.cls = CLASS_IDS[(Math.random()*CLASS_IDS.length)|0]; g.portrait = CLASSES[g.cls].ic; }
@@ -903,11 +949,17 @@ const $ = s => document.querySelector(s);
 const el = (t,c)=>{ const e=document.createElement(t); if(c) e.className=c; return e; };
 let tab = 'ludus';
 
+const SUFFIX = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','UDc','DDc','TDc','QaDc','QiDc','SxDc','SpDc','OcDc','NoDc','Vg'];
 function fmt(n){
   n = Math.round(n);
-  if(n>=1e6) return (n/1e6).toFixed(2)+'M';
-  if(n>=1e4) return (n/1e3).toFixed(1)+'k';
-  return ''+n;
+  if(!isFinite(n)) return '∞';
+  if(Math.abs(n) < 1000) return ''+n;
+  const t = Math.floor(Math.log10(Math.abs(n))/3);
+  if(t < SUFFIX.length){
+    const s = n / Math.pow(10, t*3);
+    return (s<10 ? s.toFixed(2) : s<100 ? s.toFixed(1) : Math.round(s)) + SUFFIX[t];
+  }
+  return n.toExponential(2).replace('+','');
 }
 
 function renderTop(){
@@ -1087,32 +1139,32 @@ function chooseGear(g){
 
 function renderArena(){
   const i = S.tier;
-  const opp = OPPONENTS[i];
+  const opp = foe(i);
   const ep = oppPower(i);
   const c = $('#opp-card');
   const fighters = S.gladiators.filter(g=>g.state==='fighting').length;
   c.innerHTML = `
     <div class="tier-nav">
       <button id="tier-prev">‹</button>
-      <div class="tier-lab">Bout ${i+1} of ${OPPONENTS.length}</div>
+      <div class="tier-lab">Rank ${i+1}${i>=NAMED.length?'':' of '+NAMED.length+'+'}</div>
       <button id="tier-next">›</button>
     </div>
     <div class="opp-portrait">${opp.e}</div>
     <div class="opp-name">${opp.n}</div>
     <div class="opp-sub">${opp.d}</div>
     <div class="opp-row">
-      <div class="kv"><b style="color:var(--blood)">${ep}</b><small>Enemy Power</small></div>
-      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)))}◈</b><small>Purse</small></div>
+      <div class="kv"><b style="color:var(--blood)">${fmt(ep)}</b><small>Enemy Power</small></div>
+      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*gloryMult()))}◈</b><small>Purse</small></div>
       <div class="kv"><b style="color:var(--bronze)">${fighters}</b><small>Fighting</small></div>
     </div>
-    ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous bout to unlock this foe.</div>` :
+    ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous rank to unlock this foe.</div>` :
        fighters===0 ? `<div class="locked-note" style="color:var(--ink-soft);font-style:italic">No one is fighting. Send a gladiator from the Ludus, or turn on Auto-Battle.</div>` : '' }
   `;
   const prev = c.querySelector('#tier-prev'), next = c.querySelector('#tier-next');
   if(i<=0) prev.setAttribute('disabled','');
-  if(i>=OPPONENTS.length-1 || i>=S.maxTier) next.setAttribute('disabled','');
+  if(i>=MAX_RANK-1 || i>=S.maxTier) next.setAttribute('disabled','');
   prev.onclick=()=>{ if(S.tier>0){S.tier--; renderArena(); save();} };
-  next.onclick=()=>{ if(S.tier<S.maxTier && S.tier<OPPONENTS.length-1){S.tier++; renderArena(); save();} };
+  next.onclick=()=>{ if(S.tier<S.maxTier && S.tier<MAX_RANK-1){S.tier++; renderArena(); save();} };
 
   $('#auto-switch').classList.toggle('on', S.autoFight);
 }
@@ -1169,11 +1221,76 @@ function renderFacilities(){
   }
 }
 
+// Prestige: Glory you'd earn by retiring right now (based on this run's fame).
+function gloryReward(){ return Math.floor(Math.pow(Math.max(0,S.fame)/500, 0.55)); }
+
+function renderLegacy(){
+  const wrap = $('#legacy'); wrap.innerHTML='';
+  const reward = gloryReward();
+  const curMult = Math.round((gloryMult()-1)*100);
+  const nextMult = Math.round(((1+(S.glory+reward)*0.05)-1)*100);
+
+  const stat = (ic,lab,val,col)=>`<div class="leg-stat"><div class="li">${ic}</div><div><b style="color:${col||'var(--ink)'}">${val}</b><small>${lab}</small></div></div>`;
+  wrap.innerHTML = `
+    <div class="card leg-hero">
+      <div class="leg-glory">🏆 ${fmt(S.glory)}</div>
+      <div class="leg-glory-sub">Glory · <b>+${curMult}%</b> gold, fame &amp; XP</div>
+    </div>
+    <div class="leg-grid">
+      ${stat('👑','Highest rank', 'Rank '+((S.bestRank||0)+1), 'var(--blood)')}
+      ${stat('✦','Lifetime fame', fmt(S.lifeFame||0), '#a9628a')}
+      ${stat('♻️','Retirements', fmt(S.retirements||0), 'var(--bronze)')}
+      ${stat('⚔️','Current fame', fmt(S.fame), '#a9628a')}
+    </div>
+    <div class="section-h" style="margin-top:14px">Retire the Ludus</div>
+    <div class="card">
+      <div class="fdesc" style="font-family:var(--font-b);font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">
+        Disband your ludus and pass into legend. You lose your gold, gladiators, facilities and rank —
+        but earn permanent <b>Glory</b> that makes every future run stronger. The deeper you got this run,
+        the more Glory you carry forward.
+      </div>
+      <div class="retire-box">
+        <div><div class="rb-num" style="color:var(--gold2)">+${fmt(reward)}</div><div class="rb-lab">Glory earned</div></div>
+        <div class="rb-arrow">→</div>
+        <div><div class="rb-num">+${nextMult}%</div><div class="rb-lab">new bonus</div></div>
+      </div>
+      <div class="btn wide ${reward>0?'fight':'recall'}" id="retire-btn" ${reward>0?'':'disabled'} style="margin-top:12px">
+        ${reward>0 ? 'Retire for '+fmt(reward)+' Glory' : 'Earn more fame to retire'}
+      </div>
+    </div>`;
+  const rb = $('#retire-btn');
+  if(rb && reward>0) rb.onclick = ()=> confirmRetire(reward);
+}
+
+function confirmRetire(reward){
+  const ov = el('div','overlay'); const m = el('div','modal');
+  m.innerHTML = `<h2>Retire the Ludus?</h2><div class="sub">Pass into legend</div>
+    <p style="font-family:var(--font-b);text-align:center;color:var(--ink-soft);font-size:13px;line-height:1.5">
+      You’ll earn <b style="color:var(--gold)">+${fmt(reward)} Glory</b> (permanent +${Math.round(reward*5)}% to gold, fame &amp; XP),
+      but lose all gold, gladiators, facilities and rank. Begin the climb anew, stronger.</p>
+    <div class="m-btns"><div class="btn recall" id="rt-no" style="flex:1">Not yet</div><div class="btn gold" id="rt-yes" style="flex:1">Retire</div></div>`;
+  ov.appendChild(m); document.body.appendChild(ov);
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  $('#rt-no').onclick=()=>ov.remove();
+  $('#rt-yes').onclick=()=>{ ov.remove(); doRetire(reward); };
+}
+
+function doRetire(reward){
+  const keep = { glory:(S.glory||0)+reward, lifeFame:(S.lifeFame||0), retirements:(S.retirements||0)+1, bestRank:(S.bestRank||0) };
+  S = initState();
+  Object.assign(S, keep);
+  nextId = S.nextId;
+  goTab('ludus');
+  toast(`The ludus is reborn. +${fmt(reward)} Glory earned.`);
+  save();
+}
+
 function refresh(){
   renderTop();
   if(tab==='ludus') renderRoster();
   if(tab==='arena'){ renderArena(); renderLog(); }
   if(tab==='fac') renderFacilities();
+  if(tab==='legacy') renderLegacy();
   updateBadges();
 }
 function updateBadges(){
@@ -1314,22 +1431,22 @@ function startDuel(g){
 }
 
 function showIntro(){
-  const i = D.tier, opp = OPPONENTS[i], g = D.g;
+  const i = D.tier, opp = foe(i), g = D.g;
   const pw = power(g), ew = oppPower(i);
   dz.cover.style.display = 'flex';
   dz.cover.innerHTML = `
     <div class="tier-nav" style="margin-bottom:12px">
       <button id="di-prev">‹</button>
-      <div class="tier-lab">Bout ${i+1} of ${OPPONENTS.length}</div>
+      <div class="tier-lab">Rank ${i+1}</div>
       <button id="di-next">›</button>
     </div>
     <div class="big-em">${opp.e}</div>
     <h2>${opp.n}</h2>
     <div class="cs">${opp.d}</div>
     <div class="vs-stats">
-      <div class="kv"><b style="color:#79b356">${pw}</b><small>${clsOf(g).name} · power</small></div>
-      <div class="kv"><b style="color:#c0392b">${ew}</b><small>enemy power</small></div>
-      <div class="kv"><b style="color:var(--gold2)">${Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2))}◈</b><small>purse</small></div>
+      <div class="kv"><b style="color:#79b356">${fmt(pw)}</b><small>${clsOf(g).name} · power</small></div>
+      <div class="kv"><b style="color:#c0392b">${fmt(ew)}</b><small>enemy power</small></div>
+      <div class="kv"><b style="color:var(--gold2)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*gloryMult()))}◈</b><small>purse</small></div>
     </div>
     <div class="btn-col">
       <div class="dcbtn go" id="di-go">Enter the Sand</div>
@@ -1338,15 +1455,15 @@ function showIntro(){
     <div class="hint"><b style="color:var(--blood2)">A duel is to the death — lose and ${g.name} dies.</b> Land hits and take them to charge your <b>${specOf(g).ic} ${specOf(g).name}</b>. When the enemy flashes <b>⚠️</b>, <b>Block</b> or <b>Dodge</b> — a well-timed Dodge sets up a <b>Riposte</b>.</div>`;
   const prev=$('#di-prev'), next=$('#di-next');
   if(i<=0) prev.setAttribute('disabled','');
-  if(i>=S.maxTier || i>=OPPONENTS.length-1) next.setAttribute('disabled','');
+  if(i>=S.maxTier || i>=MAX_RANK-1) next.setAttribute('disabled','');
   prev.onclick=()=>{ if(D.tier>0){ D.tier--; showIntro(); } };
-  next.onclick=()=>{ if(D.tier<S.maxTier && D.tier<OPPONENTS.length-1){ D.tier++; showIntro(); } };
+  next.onclick=()=>{ if(D.tier<S.maxTier && D.tier<MAX_RANK-1){ D.tier++; showIntro(); } };
   $('#di-go').onclick=()=> beginDuel();
   $('#di-leave').onclick=()=> closeDuel();
 }
 
 function beginDuel(){
-  const g = D.g, i = D.tier, opp = OPPONENTS[i];
+  const g = D.g, i = D.tier, opp = foe(i);
   dz.cover.style.display = 'none';
   // enemy header
   dz.en.textContent = opp.n; dz.es.textContent = opp.d; dz.ef.textContent = opp.e;
@@ -1566,20 +1683,20 @@ function endDuel(won){
   const g = D.g, i = D.tier;
   g.fights++;
   g.hp = Math.max(0, Math.round(D.php));
-  const data = { won, name:g.name, opp:OPPONENTS[i].n, gain:0, fame:0, xp:0, leveled:0, death:false, drop:null };
+  const data = { won, name:g.name, opp:foe(i).n, gain:0, fame:0, xp:0, leveled:0, death:false, drop:null };
   if(won){
-    const lvlB = g.level, ev = [];
+    const lvlB = g.level, ev = [], gm = gloryMult();
     const r = grantWin(g, i, ev, false);
     data.gain = r.gain; data.drop = r.drop;
-    data.fame = oppFame(i); data.xp = oppXP(i); data.leveled = g.level - lvlB;
+    data.fame = Math.round(oppFame(i)*gm); data.xp = Math.round(oppXP(i)*gm); data.leveled = g.level - lvlB;
     if(g.hp <= 0) g.hp = 1;                     // a victor lives
-    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested the ${OPPONENTS[i].n} in single combat! <span class="cash">+${data.gain}◈</span> · +${oppFame(i)} fame`});
+    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested the ${foe(i).n} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
     if(data.drop) S.log.push({cls:'level', txt:`🎁 <b>${g.name}</b> claimed a <b>${data.drop.name}</b> as spoils.`});
     dAnim(dz.ef,'downed',1400); vib([20,40,30]);
   } else {
     // a duel is to the death — you had control, so a loss here is final
     g._dead = true; data.death = true;
-    S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to the ${OPPONENTS[i].n} in single combat. The ludus mourns.`});
+    S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to the ${foe(i).n} in single combat. The ludus mourns.`});
     dAnim(dz.pf,'downed',1400); vib(90);
   }
   if(S.log.length>60) S.log = S.log.slice(-60);
@@ -1593,13 +1710,13 @@ function showResult(data){
   if(data.won){
     emoji='🏆'; title='VICTORY'; sub='The crowd roars your name';
     rows += row('◈ Purse', '+'+fmt(data.gain), 'var(--gold2)');
-    rows += row('✦ Fame', '+'+data.fame, '#cf9fb6');
-    rows += row('✧ Experience', '+'+data.xp, '#8fe08a');
+    rows += row('✦ Fame', '+'+fmt(data.fame), '#cf9fb6');
+    rows += row('✧ Experience', '+'+fmt(data.xp), '#8fe08a');
     if(data.leveled>0) rows += row('⭐ Levels gained', '+'+data.leveled, '#fff');
     if(data.drop) rows += row('🎁 Looted', GEAR[data.drop.slot].ic+' '+data.drop.name, '#c8a0e0');
     btns += `<div class="dcbtn again" id="dr-again">Fight Again</div>`;
-    if(D.tier < S.maxTier && D.tier < OPPONENTS.length-1)
-      btns += `<div class="dcbtn go" id="dr-next">Next foe: ${OPPONENTS[D.tier+1].n}</div>`;
+    if(D.tier < S.maxTier && D.tier < MAX_RANK-1)
+      btns += `<div class="dcbtn go" id="dr-next">Next foe: ${foe(D.tier+1).n}</div>`;
     btns += `<div class="dcbtn leave" id="dr-leave">Return to Ludus</div>`;
   } else if(data.death){
     emoji='💀'; title='DEATH'; sub=`${data.name} dies on the sand`;
