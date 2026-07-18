@@ -169,7 +169,7 @@
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; });
     limitNow=LEVELS[levelIdx].limit||99; movesLeft=limitNow; parts=[]; trails=[]; rings=[]; sqA=0;
-    document.getElementById('lvlname').textContent=LEVELS[levelIdx].name;
+    document.getElementById('lvlname').textContent='Level '+(levelIdx+1);
     document.getElementById('hint').innerHTML=LEVELS[levelIdx].hint;
     updateMoves();
     ['win','oom','adplay','pick'].forEach(id=>document.getElementById(id).style.display='none');
@@ -349,7 +349,7 @@
     requestAnimationFrame(frame);
   }
 
-  window.__goop={ state:()=>({level:LEVELS[levelIdx].name,idx:levelIdx,moves,won,
+  window.__goop={ state:()=>({level:'L'+(levelIdx+1),idx:levelIdx,moves,won,
       drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,color:d.color,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
     move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length };
   let start0=0; while(start0<LEVELS.length-1&&prog.best[start0]!==undefined) start0++;
