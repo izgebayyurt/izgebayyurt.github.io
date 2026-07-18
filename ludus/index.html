@@ -270,6 +270,9 @@ body{
 .retire-box .rb-num{ font-family:var(--font-d); font-weight:700; font-size:22px; text-align:center; }
 .retire-box .rb-lab{ font-family:var(--font-sc); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); text-align:center; margin-top:1px; }
 .retire-box .rb-arrow{ font-family:var(--font-d); font-size:22px; color:var(--ink-soft); }
+.perk .perk-lv{ font-family:var(--font-sc); font-size:10px; letter-spacing:.06em; color:var(--bronze); text-transform:uppercase; }
+.perk .perk-next{ color:var(--green); }
+.btn.glory{ background:linear-gradient(180deg,#6a4f9c,#4a3672); color:#f4ecd8; border-color:#2f2352; box-shadow:0 2px 0 #2f2352; min-width:78px; }
 
 /* ---------- bottom nav ---------- */
 #nav{
@@ -701,7 +704,7 @@ function initState(){
     tier: 0, maxTier: 0, autoFight:false,
     gladiators:[g],
     log:[], nextId:2,
-    glory:0, lifeFame:0, retirements:0, bestRank:0,   // prestige / lifetime meta
+    glory:0, lifeFame:0, retirements:0, bestRank:0, perks:{},   // prestige / lifetime meta
     lastTick: Date.now(),
   };
 }
@@ -793,19 +796,44 @@ function maybeLevel(g, ev, live){
   }
 }
 
-// Permanent Glory bonus from prestige — multiplies gold, fame and XP.
-const gloryMult = () => 1 + (S.glory||0)*0.05;
+// ---- Prestige perks: spend Glory on permanent, run-spanning bonuses ----
+const PERKS = {
+  purse:   { ic:'💰', name:'Patron’s Purse',    max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> denarii from every victory.` },
+  renown:  { ic:'✦',  name:'Champion’s Renown', max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> fame from every victory.` },
+  instinct:{ ic:'✧',  name:'Veteran Instinct',  max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> experience from every victory.` },
+  blood:   { ic:'🩸', name:'Noble Blood',        max:8,  base:3, growth:1.7, desc:l=>`New gladiators are born at level <em>${1+l}</em>.` },
+  armed:   { ic:'⚔️', name:'Well-Armed',         max:6,  base:3, growth:1.7, desc:l=>`New gladiators start with tier-<em>${l}</em> weapon &amp; armor.` },
+  will:    { ic:'🩹', name:'Iron Will',          max:5,  base:4, growth:1.8, desc:l=>`<em>−${l*12}%</em> death risk in auto-battle.` },
+  reserves:{ ic:'⏳', name:'Endless Reserves',    max:6,  base:3, growth:1.6, desc:l=>`Offline earnings last <em>${24+l*4}h</em>.` },
+  legacy:  { ic:'🏛️', name:'Ludus Legacy',       max:4,  base:5, growth:2.0, desc:l=>`Every new run opens with <em>${1+l}</em> barracks slots.` },
+};
+const perkLvl  = id => (S.perks && S.perks[id]) || 0;
+const perkCost = (id,l) => Math.round(PERKS[id].base * Math.pow(PERKS[id].growth, l));
+const goldMult = () => 1 + perkLvl('purse')*0.20;
+const fameMult = () => 1 + perkLvl('renown')*0.20;
+const xpMult   = () => 1 + perkLvl('instinct')*0.20;
+const maxOfflineH = () => MAX_OFFLINE_H + perkLvl('reserves')*4;
+
+// Apply run-start perks to a freshly-made gladiator (Noble Blood, Well-Armed).
+function applyRecruitPerks(g){
+  const blood = perkLvl('blood');
+  if(blood > 0 && g.level < 1+blood){
+    const add = (1+blood) - g.level;
+    g.level = 1+blood; g.str += add; g.agi += add; g.vit += add;
+  }
+  const armed = Math.min(GEAR_MAX, perkLvl('armed'));
+  if(armed > 0){ g.gear.weapon = Math.max(g.gear.weapon, armed); g.gear.armor = Math.max(g.gear.armor, armed); }
+}
 
 // Grant the spoils of a victory. Shared by the auto-sim and the manual duel.
 // Returns { gain, drop } — drop is a gear find or null.
 function grantWin(g, i, ev, live){
-  const gm = gloryMult();
-  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2) * gm);
-  const fame = Math.round(oppFame(i) * gm);
+  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2) * goldMult());
+  const fame = Math.round(oppFame(i) * fameMult());
   S.gold += gain;
   S.fame += fame;
   S.lifeFame = (S.lifeFame||0) + fame;
-  g.xp += Math.round(oppXP(i) * gm);
+  g.xp += Math.round(oppXP(i) * xpMult());
   g.wins++;
   if(i === S.maxTier && S.maxTier < MAX_RANK-1){ S.maxTier++; if(S.maxTier > (S.bestRank||0)) S.bestRank = S.maxTier; }  // unlock next tier
   simWins++;
@@ -819,6 +847,7 @@ function downedCheck(g, i, won){
   const gp = power(g), ep = oppPower(i);
   let deathChance = (won ? 0.10 : 0.40) * Math.min(2.2, ep/gp);
   deathChance *= (1 - deathCut(S.fac.infirmary));
+  deathChance *= (1 - Math.min(0.6, perkLvl('will')*0.12));   // Iron Will prestige perk
   deathChance = Math.min(0.9, deathChance);
   if(Math.random() < deathChance){ g._dead = true; return 'dead'; }
   g.state = 'injured'; g.progress = 0; return 'injured';
@@ -890,7 +919,7 @@ function catchUp(){
   let elapsed = Math.floor((now - (S.lastTick||now))/1000);
   S.lastTick = now;
   if(elapsed < 3) return null;
-  elapsed = Math.min(elapsed, MAX_OFFLINE_H*3600);
+  elapsed = Math.min(elapsed, maxOfflineH()*3600);
 
   // simulate `elapsed` seconds in at most MAX_CATCHUP_STEPS coarse steps
   const stride = Math.max(1, Math.ceil(elapsed / MAX_CATCHUP_STEPS));
@@ -932,6 +961,7 @@ function load(){
     if(S.lifeFame==null) S.lifeFame = S.fame||0;
     if(S.retirements==null) S.retirements = 0;
     if(S.bestRank==null) S.bestRank = S.maxTier||0;
+    if(S.perks==null) S.perks = {};
     // migrate + heal derived state; free anyone stuck mid-duel from a closed tab
     S.gladiators.forEach(g=>{
       if(!g.cls){ g.cls = CLASS_IDS[(Math.random()*CLASS_IDS.length)|0]; g.portrait = CLASSES[g.cls].ic; }
@@ -1063,7 +1093,7 @@ function recruit(){
   const cost = recruitCost();
   if(S.gold < cost) return;
   S.gold -= cost;
-  const g = newGladiator(); recalc(g); g.hp=g.maxHp;
+  const g = newGladiator(); applyRecruitPerks(g); recalc(g); g.hp=g.maxHp;
   S.gladiators.push(g);
   toast(`${g.name} joins your ludus.`);
   refresh(); save();
@@ -1154,7 +1184,7 @@ function renderArena(){
     <div class="opp-sub">${opp.d}</div>
     <div class="opp-row">
       <div class="kv"><b style="color:var(--blood)">${fmt(ep)}</b><small>Enemy Power</small></div>
-      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*gloryMult()))}◈</b><small>Purse</small></div>
+      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*goldMult()))}◈</b><small>Purse</small></div>
       <div class="kv"><b style="color:var(--bronze)">${fighters}</b><small>Fighting</small></div>
     </div>
     ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous rank to unlock this foe.</div>` :
@@ -1227,46 +1257,86 @@ function gloryReward(){ return Math.floor(Math.pow(Math.max(0,S.fame)/500, 0.55)
 function renderLegacy(){
   const wrap = $('#legacy'); wrap.innerHTML='';
   const reward = gloryReward();
-  const curMult = Math.round((gloryMult()-1)*100);
-  const nextMult = Math.round(((1+(S.glory+reward)*0.05)-1)*100);
 
   const stat = (ic,lab,val,col)=>`<div class="leg-stat"><div class="li">${ic}</div><div><b style="color:${col||'var(--ink)'}">${val}</b><small>${lab}</small></div></div>`;
+
+  // perk shop rows
+  const perkRows = Object.keys(PERKS).map(id=>{
+    const p = PERKS[id], lvl = perkLvl(id), maxed = lvl>=p.max;
+    const cost = maxed ? 0 : perkCost(id, lvl);
+    const afford = S.glory >= cost;
+    let btn;
+    if(maxed) btn = `<div class="btn recall perk-buy" disabled>MAX</div>`;
+    else btn = `<div class="btn glory perk-buy" data-perk="${id}" ${afford?'':'disabled'}>Buy<small>🏆 ${fmt(cost)}</small></div>`;
+    return `<div class="card fac perk">
+        <div class="ic">${p.ic}</div>
+        <div class="body">
+          <div class="fname">${p.name} <span class="perk-lv">Lv ${lvl}/${p.max}</span></div>
+          <div class="fdesc">${maxed ? p.desc(lvl) : `Next: ${p.desc(lvl+1)}`}</div>
+        </div>
+        <div style="flex:none">${btn}</div>
+      </div>`;
+  }).join('');
+
   wrap.innerHTML = `
     <div class="card leg-hero">
       <div class="leg-glory">🏆 ${fmt(S.glory)}</div>
-      <div class="leg-glory-sub">Glory · <b>+${curMult}%</b> gold, fame &amp; XP</div>
+      <div class="leg-glory-sub">Glory to spend</div>
     </div>
+
+    <div class="section-h">Retire the Ludus</div>
+    <div class="card">
+      <div class="fdesc" style="font-family:var(--font-b);font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">
+        Disband your ludus and pass into legend — you lose your gold, gladiators, facilities and rank, but
+        bank <b>Glory</b> to spend on permanent perks below. The deeper you climbed this run, the more you earn.
+      </div>
+      <div class="retire-box">
+        <div><div class="rb-num" style="color:var(--gold2)">+${fmt(reward)}</div><div class="rb-lab">Glory earned</div></div>
+        <div class="rb-arrow">→</div>
+        <div><div class="rb-num">🏆 ${fmt(S.glory+reward)}</div><div class="rb-lab">to spend</div></div>
+      </div>
+      <div class="btn wide ${reward>0?'fight':'recall'}" id="retire-btn" ${reward>0?'':'disabled'} style="margin-top:12px">
+        ${reward>0 ? 'Retire for '+fmt(reward)+' Glory' : 'Earn more fame to retire'}
+      </div>
+    </div>
+
+    <div class="section-h">Glory Perks</div>
+    ${perkRows}
+
+    <div class="section-h">Records</div>
     <div class="leg-grid">
       ${stat('👑','Highest rank', 'Rank '+((S.bestRank||0)+1), 'var(--blood)')}
       ${stat('✦','Lifetime fame', fmt(S.lifeFame||0), '#a9628a')}
       ${stat('♻️','Retirements', fmt(S.retirements||0), 'var(--bronze)')}
       ${stat('⚔️','Current fame', fmt(S.fame), '#a9628a')}
-    </div>
-    <div class="section-h" style="margin-top:14px">Retire the Ludus</div>
-    <div class="card">
-      <div class="fdesc" style="font-family:var(--font-b);font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">
-        Disband your ludus and pass into legend. You lose your gold, gladiators, facilities and rank —
-        but earn permanent <b>Glory</b> that makes every future run stronger. The deeper you got this run,
-        the more Glory you carry forward.
-      </div>
-      <div class="retire-box">
-        <div><div class="rb-num" style="color:var(--gold2)">+${fmt(reward)}</div><div class="rb-lab">Glory earned</div></div>
-        <div class="rb-arrow">→</div>
-        <div><div class="rb-num">+${nextMult}%</div><div class="rb-lab">new bonus</div></div>
-      </div>
-      <div class="btn wide ${reward>0?'fight':'recall'}" id="retire-btn" ${reward>0?'':'disabled'} style="margin-top:12px">
-        ${reward>0 ? 'Retire for '+fmt(reward)+' Glory' : 'Earn more fame to retire'}
-      </div>
     </div>`;
+
   const rb = $('#retire-btn');
   if(rb && reward>0) rb.onclick = ()=> confirmRetire(reward);
+  wrap.querySelectorAll('.perk-buy[data-perk]').forEach(b=>{
+    b.onclick=()=> buyPerk(b.dataset.perk);
+  });
+}
+
+function buyPerk(id){
+  const lvl = perkLvl(id);
+  if(lvl >= PERKS[id].max) return;
+  const cost = perkCost(id, lvl);
+  if(S.glory < cost) return;
+  S.glory -= cost;
+  S.perks[id] = lvl + 1;
+  // perks that affect the live roster immediately
+  if(id==='will' || id==='reserves'){ /* passive — nothing to recompute */ }
+  S.gladiators.forEach(recalc);
+  toast(`${PERKS[id].name} raised to level ${S.perks[id]}.`);
+  renderLegacy(); renderTop(); save();
 }
 
 function confirmRetire(reward){
   const ov = el('div','overlay'); const m = el('div','modal');
   m.innerHTML = `<h2>Retire the Ludus?</h2><div class="sub">Pass into legend</div>
     <p style="font-family:var(--font-b);text-align:center;color:var(--ink-soft);font-size:13px;line-height:1.5">
-      You’ll earn <b style="color:var(--gold)">+${fmt(reward)} Glory</b> (permanent +${Math.round(reward*5)}% to gold, fame &amp; XP),
+      You’ll bank <b style="color:var(--gold)">+${fmt(reward)} Glory</b> to spend on permanent perks,
       but lose all gold, gladiators, facilities and rank. Begin the climb anew, stronger.</p>
     <div class="m-btns"><div class="btn recall" id="rt-no" style="flex:1">Not yet</div><div class="btn gold" id="rt-yes" style="flex:1">Retire</div></div>`;
   ov.appendChild(m); document.body.appendChild(ov);
@@ -1276,13 +1346,23 @@ function confirmRetire(reward){
 }
 
 function doRetire(reward){
-  const keep = { glory:(S.glory||0)+reward, lifeFame:(S.lifeFame||0), retirements:(S.retirements||0)+1, bestRank:(S.bestRank||0) };
+  const keep = {
+    glory:(S.glory||0)+reward, perks:S.perks||{},
+    lifeFame:(S.lifeFame||0), retirements:(S.retirements||0)+1, bestRank:(S.bestRank||0),
+  };
   S = initState();
   Object.assign(S, keep);
+  applyStartPerks();
   nextId = S.nextId;
   goTab('ludus');
   toast(`The ludus is reborn. +${fmt(reward)} Glory earned.`);
   save();
+}
+
+// Apply run-start perks after a retire: barracks slots (Ludus Legacy) + upgrade the founding gladiator.
+function applyStartPerks(){
+  S.fac.barracks = Math.max(S.fac.barracks, 1 + perkLvl('legacy'));
+  S.gladiators.forEach(g=>{ applyRecruitPerks(g); recalc(g); g.hp = g.maxHp; });
 }
 
 function refresh(){
@@ -1446,7 +1526,7 @@ function showIntro(){
     <div class="vs-stats">
       <div class="kv"><b style="color:#79b356">${fmt(pw)}</b><small>${clsOf(g).name} · power</small></div>
       <div class="kv"><b style="color:#c0392b">${fmt(ew)}</b><small>enemy power</small></div>
-      <div class="kv"><b style="color:var(--gold2)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*gloryMult()))}◈</b><small>purse</small></div>
+      <div class="kv"><b style="color:var(--gold2)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*goldMult()))}◈</b><small>purse</small></div>
     </div>
     <div class="btn-col">
       <div class="dcbtn go" id="di-go">Enter the Sand</div>
@@ -1685,10 +1765,10 @@ function endDuel(won){
   g.hp = Math.max(0, Math.round(D.php));
   const data = { won, name:g.name, opp:foe(i).n, gain:0, fame:0, xp:0, leveled:0, death:false, drop:null };
   if(won){
-    const lvlB = g.level, ev = [], gm = gloryMult();
+    const lvlB = g.level, ev = [];
     const r = grantWin(g, i, ev, false);
     data.gain = r.gain; data.drop = r.drop;
-    data.fame = Math.round(oppFame(i)*gm); data.xp = Math.round(oppXP(i)*gm); data.leveled = g.level - lvlB;
+    data.fame = Math.round(oppFame(i)*fameMult()); data.xp = Math.round(oppXP(i)*xpMult()); data.leveled = g.level - lvlB;
     if(g.hp <= 0) g.hp = 1;                     // a victor lives
     S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested the ${foe(i).n} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
     if(data.drop) S.log.push({cls:'level', txt:`🎁 <b>${g.name}</b> claimed a <b>${data.drop.name}</b> as spoils.`});
