@@ -303,6 +303,137 @@ body{
   opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
 }
 .toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px); }
+
+/* ============================ DUEL (interactive fight) ============================ */
+#duel{
+  position:fixed; inset:0; z-index:100; display:none;
+  max-width:520px; margin:0 auto;
+  flex-direction:column;
+  background:
+    radial-gradient(120% 60% at 50% 0%, #3a2418 0%, #221510 55%, #170f0a 100%);
+  color:var(--sand);
+  padding:calc(env(safe-area-inset-top) + 6px) 12px calc(env(safe-area-inset-bottom) + 10px);
+  overflow:hidden; touch-action:none;
+}
+#duel.on{ display:flex; animation:fade .3s var(--calm); }
+#duel.shake{ animation:shake .3s; }
+@keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-7px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(3px);} }
+
+/* enemy header */
+.duel-ehead{ text-align:center; }
+.duel-ehead .en{ font-family:var(--font-d); font-weight:700; font-size:16px; color:#f0c98a; letter-spacing:.06em; }
+.duel-ehead .es{ font-family:var(--font-sc); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#c98a5a; }
+.hpbar{ height:15px; border-radius:9px; background:rgba(0,0,0,.4); border:1.5px solid rgba(230,216,189,.2); overflow:hidden; position:relative; margin-top:5px; }
+.hpbar > i{ display:block; height:100%; transition:width .18s var(--calm); }
+.hpbar.enemy > i{ background:linear-gradient(90deg,#7a241a,#c0392b); }
+.hpbar.player > i{ background:linear-gradient(90deg,#3f7a3c,#79b356); }
+.hpbar .lab{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-d); font-size:10px; font-weight:600; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.7); letter-spacing:.04em; }
+
+/* stage */
+.duel-stage{ flex:1; position:relative; margin:6px 0; min-height:150px; overflow:hidden; }
+.floor{ position:absolute; left:0; right:0; bottom:26px; height:2px;
+  background:linear-gradient(90deg,transparent,rgba(200,145,47,.5),transparent); }
+.floor::after{ content:""; position:absolute; left:6%; right:6%; bottom:-30px; height:34px;
+  background:radial-gradient(60% 100% at 50% 0%, rgba(0,0,0,.4), transparent); }
+.fighter{
+  position:absolute; bottom:26px; width:78px; height:78px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center; font-size:42px;
+  transition:transform .12s var(--pop), filter .12s; will-change:transform;
+}
+.fighter.player{ left:8%; background:radial-gradient(circle at 40% 30%, #3a2c22, #1c1410);
+  border:2px solid var(--bronze); box-shadow:inset 0 0 0 3px rgba(200,145,47,.25), 0 6px 14px rgba(0,0,0,.5); transform:scaleX(1); }
+.fighter.enemy{ right:8%; background:radial-gradient(circle at 40% 30%, #4a2620, #241210);
+  border:2px solid var(--blood); box-shadow:inset 0 0 0 3px rgba(147,47,34,.3), 0 6px 14px rgba(0,0,0,.5); transform:scaleX(-1); }
+.fighter.p-lunge{ transform:translateX(46px); }
+.fighter.e-lunge{ transform:scaleX(-1) translateX(46px); }
+.fighter.p-hurt{ filter:brightness(2.2) sepia(1) hue-rotate(-35deg) saturate(4); }
+.fighter.e-hurt{ filter:brightness(2.2) sepia(1) hue-rotate(-35deg) saturate(4); }
+.fighter.p-block{ box-shadow:inset 0 0 0 3px rgba(90,160,220,.9), 0 0 22px rgba(90,160,220,.6), 0 6px 14px rgba(0,0,0,.5); }
+.fighter.p-dodge{ opacity:.35; }
+.fighter.stagger{ transform:scaleX(-1) rotate(-14deg) translateY(6px); filter:grayscale(.4) brightness(.8); }
+.fighter.player.downed{ transform:scaleX(1) rotate(16deg) translateY(10px); filter:grayscale(1) brightness(.45); opacity:.7; }
+.fighter.enemy.downed{ transform:scaleX(-1) rotate(16deg) translateY(10px); filter:grayscale(1) brightness(.45); opacity:.7; }
+
+/* enemy telegraph */
+.tele{
+  position:absolute; right:8%; bottom:26px; width:78px; height:78px; pointer-events:none;
+  display:flex; align-items:flex-start; justify-content:center;
+}
+.tele .ring{
+  position:absolute; inset:-8px; border-radius:22px; border:3px solid #ff5a3c;
+  opacity:0; transform:scale(1.35);
+}
+.tele.on .ring{ animation:tele var(--tdur,0.7s) linear forwards; }
+@keyframes tele{ from{opacity:.15; transform:scale(1.45);} to{opacity:.95; transform:scale(1);} }
+.tele .bang{ position:absolute; top:-26px; font-size:26px; opacity:0; }
+.tele.on .bang{ animation:bang var(--tdur,0.7s) ease-out forwards; }
+@keyframes bang{ 0%{opacity:0; transform:translateY(6px) scale(.6);} 30%{opacity:1;} 100%{opacity:1; transform:translateY(-2px) scale(1.1);} }
+
+/* floating combat text */
+.float{ position:absolute; font-family:var(--font-d); font-weight:700; font-size:22px; pointer-events:none;
+  text-shadow:0 2px 4px rgba(0,0,0,.7); animation:floatUp 0.85s var(--calm) forwards; z-index:5; white-space:nowrap; }
+.float.dmg{ color:#ffdf7a; }
+.float.pd{ color:#ff6a4a; }
+.float.big{ font-size:30px; color:#ff8f5a; }
+.float.crit{ color:#ffd15c; font-size:30px; }
+.float.miss{ color:#8fd0ff; font-size:18px; }
+.float.block{ color:#8fd0ff; font-size:20px; }
+.float.heal{ color:#8fe08a; }
+@keyframes floatUp{ 0%{opacity:0; transform:translateY(4px) scale(.7);} 20%{opacity:1; transform:translateY(-6px) scale(1.1);} 100%{opacity:0; transform:translateY(-46px) scale(1);} }
+
+/* player HUD */
+.duel-phud{ margin-top:2px; }
+.duel-phud .pn{ font-family:var(--font-d); font-weight:600; font-size:13px; color:#f4ecd8; display:flex; justify-content:space-between; align-items:baseline; }
+.duel-phud .pn small{ font-family:var(--font-sc); font-size:9px; letter-spacing:.12em; color:#c8a05a; }
+.stambar{ height:9px; border-radius:6px; background:rgba(0,0,0,.4); border:1px solid rgba(230,216,189,.16); overflow:hidden; margin-top:4px; }
+.stambar > i{ display:block; height:100%; background:linear-gradient(90deg,#c8912f,#e6c25a); transition:width .1s linear; }
+.stambar.low > i{ background:linear-gradient(90deg,#8a4a24,#b2402f); }
+
+/* control pad */
+.duel-pad{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.dbtn{
+  border:2px solid rgba(0,0,0,.5); border-radius:13px; padding:13px 8px; text-align:center; cursor:pointer;
+  font-family:var(--font-d); font-weight:600; font-size:15px; color:var(--sand);
+  box-shadow:0 3px 0 rgba(0,0,0,.45); transition:transform .05s, box-shadow .05s, filter .1s; position:relative; overflow:hidden;
+  -webkit-user-select:none; user-select:none;
+}
+.dbtn:active{ transform:translateY(3px); box-shadow:0 0 0 rgba(0,0,0,.45); }
+.dbtn small{ display:block; font-family:var(--font-b); font-size:9.5px; font-weight:400; opacity:.85; margin-top:1px; }
+.dbtn.strike{ background:linear-gradient(180deg,#b2402f,#8a2e22); }
+.dbtn.heavy{ background:linear-gradient(180deg,#9c6b3f,#734b28); }
+.dbtn.block{ background:linear-gradient(180deg,#3a6f9c,#2a5478); }
+.dbtn.dodge{ background:linear-gradient(180deg,#3f7a5c,#2a5540); }
+.dbtn.cooling{ filter:grayscale(.6) brightness(.7); pointer-events:none; }
+.dbtn.nostam{ filter:grayscale(.7) brightness(.55); }
+.dbtn .cd{ position:absolute; left:0; bottom:0; height:3px; background:rgba(255,255,255,.55); width:0%; }
+
+/* banner (countdown / FIGHT) */
+.duel-banner{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:8; }
+.duel-banner span{ font-family:var(--font-d); font-weight:700; font-size:64px; color:var(--gold2);
+  text-shadow:0 4px 14px rgba(0,0,0,.7); animation:pop .35s var(--pop); letter-spacing:.05em; }
+
+/* intro + result covers */
+.duel-cover{ position:absolute; inset:0; z-index:12; background:rgba(23,15,10,.9);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:26px; }
+.duel-cover .big-em{ font-size:66px; margin-bottom:6px; filter:drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+.duel-cover h2{ font-family:var(--font-d); font-weight:700; font-size:26px; margin:0 0 4px; color:var(--gold2); letter-spacing:.06em; }
+.duel-cover .cs{ font-family:var(--font-sc); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#c98a5a; margin-bottom:16px; }
+.duel-cover .vs-stats{ display:flex; gap:22px; justify-content:center; margin:6px 0 16px; }
+.duel-cover .vs-stats .kv b{ display:block; font-family:var(--font-d); font-size:20px; }
+.duel-cover .vs-stats .kv small{ display:block; font-family:var(--font-sc); font-size:9px; letter-spacing:.1em; text-transform:uppercase; opacity:.7; }
+.duel-cover .tier-nav .tier-lab{ color:#e7d8bd; }
+.duel-cover .tier-nav button{ background:#2f231b; color:var(--sand); border-color:#000; }
+.duel-cover .reward-list{ width:100%; max-width:260px; margin:2px 0 14px; }
+.duel-cover .away-row{ color:var(--sand); border-color:rgba(230,216,189,.18); }
+.dcbtn{ font-family:var(--font-d); font-weight:600; font-size:16px; padding:13px 20px; border-radius:12px; cursor:pointer;
+  border:2px solid rgba(0,0,0,.5); box-shadow:0 3px 0 rgba(0,0,0,.4); color:var(--sand); min-width:150px; }
+.dcbtn:active{ transform:translateY(3px); box-shadow:none; }
+.dcbtn.go{ background:linear-gradient(180deg,#b2402f,#8a2e22); }
+.dcbtn.again{ background:linear-gradient(180deg,#3f7a5c,#2a5540); }
+.dcbtn.leave{ background:#2f231b; }
+.duel-cover .btn-col{ display:flex; flex-direction:column; gap:9px; align-items:center; }
+.hint{ font-family:var(--font-b); font-style:italic; font-size:11.5px; color:#b89a72; margin-top:12px; max-width:280px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -472,6 +603,7 @@ const alive = () => S.gladiators.length;
 // A single gladiator's tick. Returns array of log events (for offline summary).
 function tickGladiator(g, live){
   const ev = [];
+  if(g.state === 'dueling') return ev;   // you're controlling this one by hand
   if(g.state === 'injured'){
     const heal = S.fac.infirmary;                 // hp/sec
     g.hp = Math.min(g.maxHp, g.hp + heal);
@@ -506,9 +638,14 @@ function tickGladiator(g, live){
     }
     return ev;
   }
-  // idle: if auto-fight is on and healthy enough, enter the arena
-  if(g.state === 'idle' && S.autoFight && g.hp > g.maxHp*0.45){
-    g.state = 'fighting'; g.progress = 0;
+  // idle: slowly recover between bouts, then auto-fight if enabled & healthy
+  if(g.state === 'idle'){
+    if(g.hp < g.maxHp){
+      g.hp = Math.min(g.maxHp, g.hp + 0.6 + S.fac.infirmary*0.35);
+    }
+    if(S.autoFight && g.hp > g.maxHp*0.45){
+      g.state = 'fighting'; g.progress = 0;
+    }
   }
   return ev;
 }
@@ -523,6 +660,28 @@ function maybeLevel(g, ev, live){
     if(live) ev.push({cls:'level', txt:`⭐ <b>${g.name}</b> reached level ${g.level}! Wounds mend, resolve hardens.`});
     need = XP_FOR(g.level);
   }
+}
+
+// Grant the spoils of a victory. Shared by the auto-sim and the manual duel.
+function grantWin(g, i, ev, live){
+  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2));
+  S.gold += gain;
+  S.fame += oppFame(i);
+  g.xp += oppXP(i);
+  g.wins++;
+  if(i === S.maxTier && S.maxTier < OPPONENTS.length-1){ S.maxTier++; }  // unlock next tier
+  maybeLevel(g, ev, live);
+  return gain;
+}
+// Roll for death vs injury when a fighter is downed. Returns 'dead' | 'injured'.
+function downedCheck(g, i, won){
+  g.hp = 0;
+  const gp = power(g), ep = oppPower(i);
+  let deathChance = (won ? 0.10 : 0.40) * Math.min(2.2, ep/gp);
+  deathChance *= (1 - deathCut(S.fac.infirmary));
+  deathChance = Math.min(0.9, deathChance);
+  if(Math.random() < deathChance){ g._dead = true; return 'dead'; }
+  g.state = 'injured'; g.progress = 0; return 'injured';
 }
 
 function resolveFight(g, ev, live){
@@ -541,13 +700,7 @@ function resolveFight(g, ev, live){
   g.hp -= dmg;
 
   if(won){
-    const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2));
-    S.gold += gain;
-    S.fame += oppFame(i);
-    g.xp += oppXP(i);
-    g.wins++;
-    if(i === S.maxTier && S.maxTier < OPPONENTS.length-1){ S.maxTier++; }  // unlock next tier
-    maybeLevel(g, ev, live);
+    const gain = grantWin(g, i, ev, live);
     if(live) ev.push({cls:'win', txt:`<b>${g.name}</b> defeated the ${opp.n}! <span class="cash">+${gain}◈</span> · +${oppFame(i)} fame`});
     ev._win = true;
   } else {
@@ -557,17 +710,10 @@ function resolveFight(g, ev, live){
 
   // downed?
   if(g.hp <= 0){
-    g.hp = 0;
-    let deathChance = (won ? 0.10 : 0.40) * Math.min(2.2, ep/gp);
-    deathChance *= (1 - deathCut(S.fac.infirmary));
-    deathChance = Math.min(0.9, deathChance);
-    if(Math.random() < deathChance){
-      // death
-      g._dead = true;
+    if(downedCheck(g, i, won) === 'dead'){
       if(live) ev.push({cls:'death', txt:`💀 <b>${g.name}</b> has fallen in the arena. Habet, hoc habet. The ludus mourns.`});
       ev._death = true;
     } else {
-      g.state = 'injured'; g.progress = 0;
       if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> is carried off gravely wounded — to the infirmary.`});
     }
   }
@@ -640,8 +786,8 @@ function load(){
     if(!raw) return false;
     S = JSON.parse(raw);
     nextId = S.nextId || (Math.max(0,...S.gladiators.map(g=>g.id))+1);
-    // safety: recalc derived
-    S.gladiators.forEach(g=>{ if(!g.maxHp) recalc(g); });
+    // safety: recalc derived, and free anyone stuck mid-duel from a closed tab
+    S.gladiators.forEach(g=>{ if(!g.maxHp) recalc(g); if(g.state==='dueling') g.state='idle'; });
     return true;
   }catch(e){ return false; }
 }
@@ -667,7 +813,8 @@ function renderTop(){
 
 function statusLabel(g){
   const map = { idle:['st-idle','Resting'], fighting:['st-fighting','In the Arena'],
-    training:['st-training','Training'], injured:['st-injured','Wounded'] };
+    training:['st-training','Training'], injured:['st-injured','Wounded'],
+    dueling:['st-fighting','Dueling'] };
   const [c,t] = map[g.state]||map.idle;
   return `<span class="g-status ${c}">${t}</span>`;
 }
@@ -704,6 +851,10 @@ function renderRoster(){
       const b = el('div','btn wide rest'); b.innerHTML = `Wounded — Healing in Infirmary`;
       b.setAttribute('disabled','');
       acts.appendChild(b);
+    } else if(g.state==='dueling'){
+      const b = el('div','btn wide recall'); b.innerHTML=`In a Duel…`;
+      b.setAttribute('disabled','');
+      acts.appendChild(b);
     } else if(g.state==='fighting'){
       const b = el('div','btn wide recall'); b.textContent='Recall from Arena';
       b.onclick=()=>{ g.state='idle'; g.progress=0; refresh(); save(); };
@@ -713,8 +864,8 @@ function renderRoster(){
       b.onclick=()=>{ g.state='idle'; g.progress=0; refresh(); save(); };
       acts.appendChild(b);
     } else { // idle
-      const f = el('div','btn fight'); f.innerHTML=`Send to Arena`;
-      f.onclick=()=>{ g.state='fighting'; g.progress=0; goTab('arena'); save(); };
+      const f = el('div','btn fight'); f.innerHTML=`Fight <small>you take the sand · Bout ${S.tier+1}</small>`;
+      f.onclick=()=> startDuel(g);
       const t = el('div','btn train'); t.innerHTML=`Train`;
       t.onclick=()=> chooseTrain(g);
       acts.appendChild(f); acts.appendChild(t);
@@ -938,6 +1089,304 @@ function showAway(sum){
   ov.appendChild(m); document.body.appendChild(ov);
   m.querySelector('#away-ok').onclick=()=>ov.remove();
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+}
+
+/* ============================ DUEL — interactive combat ============================ */
+const STAM_MAX = 100;
+const enemyHP = i => Math.round(Math.max(42, oppPower(i)*3.2));
+const vib = p => { try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} };
+
+let D = { active:false };   // live combat state
+let dz = null;              // cached DOM refs
+
+function buildDuelDOM(){
+  if(dz) return;
+  const d = el('div'); d.id = 'duel';
+  d.innerHTML = `
+    <div class="duel-ehead">
+      <div class="en" id="d-en"></div><div class="es" id="d-es"></div>
+      <div class="hpbar enemy"><i id="d-ehp"></i><span class="lab" id="d-ehpl"></span></div>
+    </div>
+    <div class="duel-stage" id="d-stage">
+      <div class="floor"></div>
+      <div class="fighter player" id="d-pf"></div>
+      <div class="fighter enemy" id="d-ef"></div>
+      <div class="tele" id="d-tele"><div class="ring"></div><div class="bang">⚠️</div></div>
+      <div class="duel-banner" id="d-banner"></div>
+    </div>
+    <div class="duel-phud">
+      <div class="pn"><span id="d-pn"></span><small id="d-pinfo"></small></div>
+      <div class="hpbar player"><i id="d-php"></i><span class="lab" id="d-phpl"></span></div>
+      <div class="stambar" id="d-stamwrap"><i id="d-stam"></i></div>
+    </div>
+    <div class="duel-pad">
+      <div class="dbtn strike" id="d-b-strike">Strike<small>fast · cheap</small><div class="cd"></div></div>
+      <div class="dbtn heavy" id="d-b-heavy">Heavy<small>slow · staggers</small><div class="cd"></div></div>
+      <div class="dbtn block" id="d-b-block">Block<small>brace a blow</small><div class="cd"></div></div>
+      <div class="dbtn dodge" id="d-b-dodge">Dodge<small>evade → riposte</small><div class="cd"></div></div>
+    </div>
+    <div class="duel-cover" id="d-cover" style="display:none"></div>`;
+  document.body.appendChild(d);
+  dz = {
+    root:d, en:$('#d-en'), es:$('#d-es'), ehp:$('#d-ehp'), ehpl:$('#d-ehpl'),
+    stage:$('#d-stage'), pf:$('#d-pf'), ef:$('#d-ef'), tele:$('#d-tele'), banner:$('#d-banner'),
+    pn:$('#d-pn'), pinfo:$('#d-pinfo'), php:$('#d-php'), phpl:$('#d-phpl'),
+    stam:$('#d-stam'), stamwrap:$('#d-stamwrap'), cover:$('#d-cover'),
+    bStrike:$('#d-b-strike'), bHeavy:$('#d-b-heavy'), bBlock:$('#d-b-block'), bDodge:$('#d-b-dodge'),
+  };
+  const bind=(elm,k)=> elm.addEventListener('pointerdown', e=>{ e.preventDefault(); dInput(k); });
+  bind(dz.bStrike,'strike'); bind(dz.bHeavy,'heavy'); bind(dz.bBlock,'block'); bind(dz.bDodge,'dodge');
+}
+
+function dAnim(elm, cls, dur){ elm.classList.add(cls); setTimeout(()=>elm.classList.remove(cls), dur); }
+function teleOn(dur){ const t=dz.tele; t.classList.remove('on'); t.style.setProperty('--tdur', dur+'ms'); void t.offsetWidth; t.classList.add('on'); }
+function teleOff(){ dz.tele.classList.remove('on'); }
+function spawnFloat(where, cls, text){
+  const f = el('div','float '+cls); f.textContent = text;
+  const left = where==='enemy' ? (60+Math.random()*10) : where==='player' ? (13+Math.random()*10) : (40+Math.random()*8);
+  f.style.left = left+'%'; f.style.top = (22+Math.random()*20)+'%';
+  dz.stage.appendChild(f); setTimeout(()=>f.remove(), 850);
+}
+
+function startDuel(g){
+  buildDuelDOM();
+  D.g = g; D.tier = S.tier; D.active = true; D.raf = null; D.last = 0; D.now = performance.now();
+  g.state = 'dueling';
+  dz.root.classList.add('on');
+  showIntro();
+  save(); renderTop(); renderRoster();
+}
+
+function showIntro(){
+  const i = D.tier, opp = OPPONENTS[i], g = D.g;
+  const pw = power(g), ew = oppPower(i);
+  dz.cover.style.display = 'flex';
+  dz.cover.innerHTML = `
+    <div class="tier-nav" style="margin-bottom:12px">
+      <button id="di-prev">‹</button>
+      <div class="tier-lab">Bout ${i+1} of ${OPPONENTS.length}</div>
+      <button id="di-next">›</button>
+    </div>
+    <div class="big-em">${opp.e}</div>
+    <h2>${opp.n}</h2>
+    <div class="cs">${opp.d}</div>
+    <div class="vs-stats">
+      <div class="kv"><b style="color:#79b356">${pw}</b><small>${g.name} · power</small></div>
+      <div class="kv"><b style="color:#c0392b">${ew}</b><small>enemy power</small></div>
+      <div class="kv"><b style="color:var(--gold2)">${Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2))}◈</b><small>purse</small></div>
+    </div>
+    <div class="btn-col">
+      <div class="dcbtn go" id="di-go">Enter the Sand</div>
+      <div class="dcbtn leave" id="di-leave">Not yet</div>
+    </div>
+    <div class="hint">Tap <b>Strike</b> to attack; <b>Heavy</b> hits hard and interrupts a winding-up foe. When the enemy flashes <b>⚠️</b>, <b>Block</b> or <b>Dodge</b> — a well-timed Dodge sets up a double-damage <b>Riposte</b>.</div>`;
+  const prev=$('#di-prev'), next=$('#di-next');
+  if(i<=0) prev.setAttribute('disabled','');
+  if(i>=S.maxTier || i>=OPPONENTS.length-1) next.setAttribute('disabled','');
+  prev.onclick=()=>{ if(D.tier>0){ D.tier--; showIntro(); } };
+  next.onclick=()=>{ if(D.tier<S.maxTier && D.tier<OPPONENTS.length-1){ D.tier++; showIntro(); } };
+  $('#di-go').onclick=()=> beginDuel();
+  $('#di-leave').onclick=()=> closeDuel();
+}
+
+function beginDuel(){
+  const g = D.g, i = D.tier, opp = OPPONENTS[i];
+  dz.cover.style.display = 'none';
+  // enemy header
+  dz.en.textContent = opp.n; dz.es.textContent = opp.d; dz.ef.textContent = opp.e;
+  dz.pf.textContent = g.portrait;
+  dz.pn.textContent = g.name; dz.pinfo.textContent = `LVL ${g.level} · ${titleFor(g)}`;
+  dz.ef.classList.remove('downed','stagger'); dz.pf.classList.remove('downed');
+  // combat state
+  D.pmax = g.maxHp; D.php = Math.max(1, g.hp);
+  D.emax = enemyHP(i); D.ehp = D.emax;
+  D.stam = STAM_MAX; D.riposte = false;
+  D.blockUntil = 0; D.dodgeUntil = 0;
+  D.cd = {strike:0, heavy:0, block:0, dodge:0};
+  D.cdTotal = {strike:1, heavy:1, block:1, dodge:1};
+  D.strikeCd = Math.max(300, 540 - g.agi*12);  D.strikeCost = 16;
+  D.heavyCd  = Math.max(680, 980 - g.agi*10);  D.heavyCost  = 34;
+  D.blockCd  = 520; D.dodgeCd = 620;
+  D.phase = 'idle'; D.phaseEnd = 1e15;    // enemy holds until countdown ends
+  D.ended = false; D.locked = true;
+  renderDuel(D.now || performance.now());
+  if(!D.raf) D.raf = requestAnimationFrame(duelFrame);
+  // 3-2-1 FIGHT
+  const seq = ['III','II','I','FIGHT!']; let k = 0;
+  const step = ()=>{
+    if(!D.active || D.ended) return;
+    if(k >= seq.length){
+      dz.banner.innerHTML = '';
+      D.locked = false; D.phase = 'idle';
+      D.phaseEnd = (D.now || performance.now()) + 650;
+      return;
+    }
+    dz.banner.innerHTML = '<span>'+seq[k]+'</span>'; k++;
+    setTimeout(step, 430);
+  };
+  step();
+}
+
+function dInput(k){
+  if(!D.active || D.ended || D.locked) return;
+  const ts = D.now, g = D.g;
+  if(D.cd[k] > ts) return;
+  if(k==='strike'){
+    if(D.stam < D.strikeCost){ spawnFloat('player','miss','winded'); return; }
+    D.stam -= D.strikeCost;
+    let dmg = (g.str*1.25 + g.level*1.4) * (0.9+Math.random()*0.25), cls='dmg';
+    if(D.riposte){ dmg*=2; D.riposte=false; cls='crit'; spawnFloat('enemy','crit','RIPOSTE!'); }
+    D.ehp -= dmg;
+    dAnim(dz.pf,'p-lunge',150); dAnim(dz.ef,'e-hurt',150);
+    spawnFloat('enemy', cls, '-'+Math.round(dmg)); vib(10);
+    D.cd.strike = ts + D.strikeCd; D.cdTotal.strike = D.strikeCd;
+    if(D.ehp<=0){ D.ehp=0; endDuel(true); }
+  } else if(k==='heavy'){
+    if(D.stam < D.heavyCost){ spawnFloat('player','miss','winded'); return; }
+    D.stam -= D.heavyCost;
+    let dmg = (g.str*2.5 + g.level*1.8) * (0.9+Math.random()*0.2), cls='big';
+    if(D.phase==='windup'){ D.phase='recover'; D.phaseEnd=ts+850; teleOff(); dAnim(dz.ef,'stagger',850); spawnFloat('enemy','block','STAGGERED!'); }
+    if(D.riposte){ dmg*=2; D.riposte=false; cls='crit'; spawnFloat('enemy','crit','RIPOSTE!'); }
+    D.ehp -= dmg;
+    dAnim(dz.pf,'p-lunge',190); dAnim(dz.ef,'e-hurt',190);
+    spawnFloat('enemy', cls, '-'+Math.round(dmg)); vib(18);
+    D.cd.heavy = ts + D.heavyCd; D.cdTotal.heavy = D.heavyCd;
+    if(D.ehp<=0){ D.ehp=0; endDuel(true); }
+  } else if(k==='block'){
+    D.blockUntil = ts + 380; D.cd.block = ts + D.blockCd; D.cdTotal.block = D.blockCd;
+  } else if(k==='dodge'){
+    D.dodgeUntil = ts + 360; D.cd.dodge = ts + D.dodgeCd; D.cdTotal.dodge = D.dodgeCd;
+  }
+}
+
+function updateEnemy(ts){
+  if(D.phase==='idle'){
+    if(ts >= D.phaseEnd){
+      D.phase='windup';
+      D.windupDur = Math.max(460, 820 - D.tier*22);
+      D.phaseEnd = ts + D.windupDur;
+      teleOn(D.windupDur);
+    }
+  } else if(D.phase==='windup'){
+    if(ts >= D.phaseEnd) resolveEnemyHit(ts);
+  } else if(D.phase==='recover'){
+    if(ts >= D.phaseEnd){
+      D.phase='idle';
+      D.phaseEnd = ts + Math.max(450, 700 + Math.random()*650 - D.tier*20);
+    }
+  }
+}
+
+function resolveEnemyHit(ts){
+  D.phase='recover'; D.phaseEnd = ts + 430; teleOff();
+  dAnim(dz.ef,'e-lunge',180);
+  let dmg = oppPower(D.tier) * (0.55 + Math.random()*0.5) * 0.9;
+  dmg /= (1 + D.g.vit*0.02);
+  if(ts < D.blockUntil){ dmg*=0.22; spawnFloat('player','block','BLOCK'); vib(8); }
+  else if(ts < D.dodgeUntil){ dmg=0; D.riposte=true; spawnFloat('player','miss','DODGE!'); spawnFloat('center','block','RIPOSTE READY'); vib(6); }
+  else { dAnim(dz.root,'shake',280); vib(30); }
+  if(dmg>0){ D.php -= dmg; dAnim(dz.pf,'p-hurt',160); spawnFloat('player','pd','-'+Math.round(dmg)); }
+  if(D.php<=0){ D.php=0; endDuel(false); }
+}
+
+function renderDuel(ts){
+  dz.ehp.style.width = Math.max(0, D.ehp/D.emax*100)+'%';
+  dz.ehpl.textContent = Math.ceil(Math.max(0,D.ehp))+' / '+D.emax;
+  dz.php.style.width = Math.max(0, D.php/D.pmax*100)+'%';
+  dz.phpl.textContent = Math.ceil(Math.max(0,D.php))+' / '+D.pmax;
+  dz.stam.style.width = (D.stam/STAM_MAX*100)+'%';
+  dz.stamwrap.classList.toggle('low', D.stam < 30);
+  dz.pf.classList.toggle('p-block', ts < D.blockUntil);
+  dz.pf.classList.toggle('p-dodge', ts < D.dodgeUntil);
+  const cds = [['strike',dz.bStrike,D.strikeCost],['heavy',dz.bHeavy,D.heavyCost],['block',dz.bBlock,0],['dodge',dz.bDodge,0]];
+  for(const [k,btn,cost] of cds){
+    const rem = D.cd[k]-ts, tot = D.cdTotal[k]||1;
+    btn.querySelector('.cd').style.width = rem>0 ? Math.min(100, rem/tot*100)+'%' : '0%';
+    btn.classList.toggle('cooling', rem>0);
+    btn.classList.toggle('nostam', cost>0 && D.stam<cost && rem<=0);
+  }
+}
+
+function duelFrame(ts){
+  if(!D.active){ D.raf=null; return; }
+  const dt = D.last ? Math.min(100, ts-D.last) : 16;
+  D.last = ts; D.now = ts;
+  if(!D.ended && !D.locked){
+    D.stam = Math.min(STAM_MAX, D.stam + (16 + D.g.agi*0.8)*dt/1000);
+    updateEnemy(ts);
+  }
+  renderDuel(ts);
+  D.raf = requestAnimationFrame(duelFrame);
+}
+
+function endDuel(won){
+  if(D.ended) return;
+  D.ended = true; D.locked = true; teleOff();
+  const g = D.g, i = D.tier;
+  g.fights++;
+  g.hp = Math.max(0, Math.round(D.php));
+  const data = { won, name:g.name, opp:OPPONENTS[i].n, gain:0, fame:0, xp:0, leveled:0, death:false, injured:false };
+  if(won){
+    const lvlB = g.level, ev = [];
+    data.gain = grantWin(g, i, ev, false);
+    data.fame = oppFame(i); data.xp = oppXP(i); data.leveled = g.level - lvlB;
+    if(g.hp <= 0) g.hp = 1;                     // a victor lives
+    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested the ${OPPONENTS[i].n} in single combat! <span class="cash">+${data.gain}◈</span> · +${oppFame(i)} fame`});
+    dAnim(dz.ef,'downed',1400); vib([20,40,30]);
+  } else {
+    const res = downedCheck(g, i, false);
+    data.death = (res==='dead'); data.injured = (res==='injured');
+    if(data.death) S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to the ${OPPONENTS[i].n} in single combat. The ludus mourns.`});
+    else S.log.push({cls:'lose', txt:`<b>${g.name}</b> was beaten down by the ${OPPONENTS[i].n} — carried to the infirmary.`});
+    dAnim(dz.pf,'downed',1400); vib(70);
+  }
+  if(S.log.length>60) S.log = S.log.slice(-60);
+  save();
+  setTimeout(()=>{ if(D.active) showResult(data); }, 750);
+}
+
+function showResult(data){
+  const row = (l,v,c)=>`<div class="away-row"><span>${l}</span><b style="color:${c||'#fff'}">${v}</b></div>`;
+  let emoji, title, sub, rows='', btns='';
+  if(data.won){
+    emoji='🏆'; title='VICTORY'; sub='The crowd roars your name';
+    rows += row('◈ Purse', '+'+fmt(data.gain), 'var(--gold2)');
+    rows += row('✦ Fame', '+'+data.fame, '#cf9fb6');
+    rows += row('✧ Experience', '+'+data.xp, '#8fe08a');
+    if(data.leveled>0) rows += row('⭐ Levels gained', '+'+data.leveled, '#fff');
+    btns += `<div class="dcbtn again" id="dr-again">Fight Again</div>`;
+    if(D.tier < S.maxTier && D.tier < OPPONENTS.length-1)
+      btns += `<div class="dcbtn go" id="dr-next">Next foe: ${OPPONENTS[D.tier+1].n}</div>`;
+    btns += `<div class="dcbtn leave" id="dr-leave">Return to Ludus</div>`;
+  } else if(data.death){
+    emoji='💀'; title='DEATH'; sub=`${data.name} dies on the sand`;
+    rows = `<div style="font-family:var(--font-b);font-style:italic;color:#c9a074;text-align:center;padding:8px 4px;line-height:1.5">Sic transit gloria. Their name joins the fallen. Recruit another and begin anew.</div>`;
+    btns = `<div class="dcbtn leave" id="dr-leave">Return to Ludus</div>`;
+  } else {
+    emoji='🩸'; title='DEFEAT'; sub=`${data.name} is carried off, gravely wounded`;
+    rows = `<div style="font-family:var(--font-b);font-style:italic;color:#c9a074;text-align:center;padding:8px 4px;line-height:1.5">They will mend in the infirmary. Upgrade it to heal faster — and to cheat death when a bout goes wrong.</div>`;
+    btns = `<div class="dcbtn leave" id="dr-leave">Return to Ludus</div>`;
+  }
+  dz.cover.style.display = 'flex';
+  dz.cover.innerHTML = `<div class="big-em">${emoji}</div><h2>${title}</h2><div class="cs">${sub}</div>
+    <div class="reward-list">${rows}</div><div class="btn-col">${btns}</div>`;
+  const again=$('#dr-again'), next=$('#dr-next'), leave=$('#dr-leave');
+  if(again) again.onclick=()=> beginDuel();
+  if(next) next.onclick=()=>{ D.tier++; S.tier=D.tier; beginDuel(); };
+  if(leave) leave.onclick=()=> closeDuel();
+}
+
+function closeDuel(){
+  D.active = false;
+  if(D.raf){ cancelAnimationFrame(D.raf); D.raf=null; }
+  if(dz) dz.root.classList.remove('on');
+  const g = D.g;
+  if(g){
+    if(g._dead) S.gladiators = S.gladiators.filter(x=>x!==g);
+    else if(g.state==='dueling') g.state='idle';
+  }
+  D.g = null; D.last = 0;
+  save(); goTab('ludus');
 }
 
 /* ============================ INIT ============================ */
