@@ -82,6 +82,11 @@ body{
 .stat.gold b{ color:var(--gold2); }
 .stat.fame b{ color:#cf9fb6; }
 .stat.pop b{ color:var(--sand); }
+#goal{ display:flex; align-items:center; gap:7px; margin-top:8px; padding:6px 11px;
+  background:rgba(200,145,47,.14); border:1px solid rgba(200,145,47,.3); border-radius:9px; }
+#goal .goal-ic{ color:var(--gold2); font-size:12px; }
+#goal #goal-txt{ font-family:var(--font-b); font-size:12.5px; color:var(--sand); opacity:.92; }
+#goal #goal-txt b{ color:var(--gold2); font-weight:600; }
 
 /* ---------- main scroll area ---------- */
 #main{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 12px 92px; }
@@ -496,8 +501,9 @@ body{
     <div id="stats">
       <div class="stat gold"><b id="s-gold">0</b><small>Denarii</small></div>
       <div class="stat fame"><b id="s-fame">0</b><small>Fame</small></div>
-      <div class="stat pop"><b id="s-pop">0/1</b><small>Ludus</small></div>
+      <div class="stat pop"><b id="s-pop">0/1</b><small>Stable</small></div>
     </div>
+    <div id="goal"><span class="goal-ic">◗</span><span id="goal-txt">—</span></div>
   </div>
 
   <div id="main">
@@ -645,28 +651,32 @@ function foe(i){
   const suffix = ['','Redux','Ascendant','Eternal','Apex'][Math.floor(k/RANK_TITLES.length) % 5];
   return { n:`${title}${suffix?' '+suffix:''} · Rank ${i+1}`, e:RANK_EMOJI[i % RANK_EMOJI.length], d:'The endless games' };
 }
-const oppPower  = i => Math.round(16 * Math.pow(1.42, i));      // 16 → astronomical
+// foe name with a correct article: "the Drunken Brawler" but "The Emperor's Champion" (no double "the")
+const theFoe = i => { const n = foe(i).n; return /^the\s/i.test(n) ? n : 'the '+n; };
+const oppPower  = i => Math.round(16 * Math.pow(1.30, i));      // gentler curve — champions can chase it
 const oppReward = i => Math.round(14 * Math.pow(1.5, i));       // denarii for a win
 const oppFame   = i => Math.round(1 + i*1.4 + i*i*0.05);        // fame ramps up — feeds Glory
 const oppXP     = i => Math.round(22 * Math.pow(1.32, i));
+// enemy HP for duels — tapers from 3.2× down to ~2.0× so high-rank duels aren't unwinnable DPS races
+const MANAGER_MULT = l => 1 + (l-1)*0.12;                        // gold multiplier from Lanista's Contacts
 
-// Facilities
+// Facilities — high caps so they stay a gold sink for weeks, not days
 const FAC = {
-  barracks:{ ic:'⛺', name:'Barracks', max:8,
+  barracks:{ ic:'⛺', name:'Barracks', max:10,
     desc:l=>`Houses up to <em>${l}</em> gladiator${l>1?'s':''}.`,
     cost:l=> Math.round(120 * Math.pow(2.15, l-1)) },
-  training:{ ic:'🏋️', name:'Training Grounds', max:10,
+  training:{ ic:'🏋️', name:'Training Grounds', max:30,
     desc:l=>`Training is <em>${(1+(l-1)*0.35).toFixed(2)}×</em> faster.`,
-    cost:l=> Math.round(80 * Math.pow(1.9, l-1)) },
-  infirmary:{ ic:'⚕️', name:'Infirmary', max:10,
-    desc:l=>`Heals <em>+${(l).toFixed(0)}</em> HP/sec · <em>${Math.round(deathCut(l)*100)}%</em> lower death risk.`,
-    cost:l=> Math.round(100 * Math.pow(1.95, l-1)) },
-  armory:{ ic:'🗡️', name:'Armory', max:12,
+    cost:l=> Math.round(80 * Math.pow(1.85, l-1)) },
+  infirmary:{ ic:'⚕️', name:'Infirmary', max:30,
+    desc:l=>`Heals <em>+${(l).toFixed(0)}</em> HP/sec · <em>${Math.round(deathCut(l)*100)}%</em> safer duels.`,
+    cost:l=> Math.round(100 * Math.pow(1.9, l-1)) },
+  armory:{ ic:'🗡️', name:'Armory', max:24,
     desc:l=>`Forge gear up to <em>Tier ${Math.min(GEAR_MAX,l)}</em> · <em>+${(l-1)*8}</em> power to all fighters.`,
-    cost:l=> Math.round(90 * Math.pow(2.0, l-1)) },
-  manager:{ ic:'📜', name:'Lanista’s Contacts', max:12,
-    desc:l=>`Arena purses pay <em>${(1+(l-1)*0.2).toFixed(2)}×</em> more.`,
-    cost:l=> Math.round(150 * Math.pow(2.1, l-1)) },
+    cost:l=> Math.round(90 * Math.pow(1.95, l-1)) },
+  manager:{ ic:'📜', name:'Lanista’s Contacts', max:20,
+    desc:l=>`Arena purses pay <em>${MANAGER_MULT(l).toFixed(2)}×</em> more.`,
+    cost:l=> Math.round(150 * Math.pow(2.05, l-1)) },
 };
 const deathCut = l => Math.min(0.75, (l-1)*0.09);   // infirmary death-risk reduction
 
@@ -717,7 +727,8 @@ function recalc(g){
 }
 function power(g){
   const facGear = (S.fac.armory-1)*8;
-  return Math.round(g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + facGear + weaponPow(g) + armorPow(g));
+  const raw = g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + facGear + weaponPow(g) + armorPow(g);
+  return Math.round(raw * (1 + perkLvl('might')*0.08));   // Ludus Renown prestige perk
 }
 // Resting/wounded recovery, scaled to max HP so it stays meaningful at any level.
 function healRate(g){ return 1.5 + g.maxHp*0.03 + S.fac.infirmary*0.7; }   // hp per second
@@ -738,7 +749,7 @@ function tickGladiator(g, live, mult, offline){
   const ev = [];
   if(g.state === 'dueling') return ev;   // you're controlling this one by hand
   if(g.state === 'injured'){
-    g.hp = Math.min(g.maxHp, g.hp + healRate(g) * 1.4 * mult);   // in the infirmary — heals a bit faster
+    g.hp = Math.min(g.maxHp, g.hp + healRate(g) * 1.4 * (1 + perkLvl('will')*0.25) * mult);   // infirmary + Field Medicine
     if(g.hp >= g.maxHp*0.6){ g.state='idle'; g.progress=0;
       if(live) ev.push({cls:'', txt:`<b>${g.name}</b> has recovered and returns to the ludus.`});
     }
@@ -798,12 +809,13 @@ function maybeLevel(g, ev, live){
 
 // ---- Prestige perks: spend Glory on permanent, run-spanning bonuses ----
 const PERKS = {
+  might:   { ic:'💪', name:'Ludus Renown',      max:10, base:3, growth:1.6, desc:l=>`Every gladiator fights with +<em>${l*8}%</em> power.` },
   purse:   { ic:'💰', name:'Patron’s Purse',    max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> denarii from every victory.` },
   renown:  { ic:'✦',  name:'Champion’s Renown', max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> fame from every victory.` },
   instinct:{ ic:'✧',  name:'Veteran Instinct',  max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> experience from every victory.` },
   blood:   { ic:'🩸', name:'Noble Blood',        max:8,  base:3, growth:1.7, desc:l=>`New gladiators are born at level <em>${1+l}</em>.` },
   armed:   { ic:'⚔️', name:'Well-Armed',         max:6,  base:3, growth:1.7, desc:l=>`New gladiators start with tier-<em>${l}</em> weapon &amp; armor.` },
-  will:    { ic:'🩹', name:'Iron Will',          max:5,  base:4, growth:1.8, desc:l=>`<em>−${l*12}%</em> death risk in auto-battle.` },
+  will:    { ic:'🩹', name:'Field Medicine',     max:6,  base:3, growth:1.7, desc:l=>`Wounded fighters recover <em>+${l*25}%</em> faster.` },
   reserves:{ ic:'⏳', name:'Endless Reserves',    max:6,  base:3, growth:1.6, desc:l=>`Offline earnings last <em>${24+l*4}h</em>.` },
   legacy:  { ic:'🏛️', name:'Ludus Legacy',       max:4,  base:5, growth:2.0, desc:l=>`Every new run opens with <em>${1+l}</em> barracks slots.` },
 };
@@ -828,7 +840,7 @@ function applyRecruitPerks(g){
 // Grant the spoils of a victory. Shared by the auto-sim and the manual duel.
 // Returns { gain, drop } — drop is a gear find or null.
 function grantWin(g, i, ev, live){
-  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2) * goldMult());
+  const gain = Math.round(oppReward(i) * MANAGER_MULT(S.fac.manager) * goldMult());
   const fame = Math.round(oppFame(i) * fameMult());
   S.gold += gain;
   S.fame += fame;
@@ -870,22 +882,18 @@ function resolveFight(g, ev, live){
 
   if(won){
     const { gain, drop } = grantWin(g, i, ev, live);
-    if(live) ev.push({cls:'win', txt:`<b>${g.name}</b> defeated the ${opp.n}! <span class="cash">+${gain}◈</span> · +${oppFame(i)} fame`});
-    if(live && drop) ev.push({cls:'level', txt:`🎁 <b>${g.name}</b> looted a <b>${drop.name}</b> from the ${opp.n}.`});
+    if(live) ev.push({cls:'win', txt:`<b>${g.name}</b> defeated ${theFoe(i)}! <span class="cash">+${gain}◈</span> · +${oppFame(i)} fame`});
+    if(live && drop) ev.push({cls:'level', txt:`🎁 <b>${g.name}</b> looted a <b>${drop.name}</b> from ${theFoe(i)}.`});
     ev._win = true;
   } else {
-    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> was bested by the ${opp.n}. The mob jeers.`});
+    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> was bested by ${theFoe(i)}. The mob jeers.`});
     ev._lose = true;
   }
 
-  // downed?
+  // downed — auto-battle never kills; the arena only wounds. Death is reserved for manual duels.
   if(g.hp <= 0){
-    if(downedCheck(g, i, won) === 'dead'){
-      if(live) ev.push({cls:'death', txt:`💀 <b>${g.name}</b> has fallen in the arena. Habet, hoc habet. The ludus mourns.`});
-      ev._death = true;
-    } else {
-      if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> is carried off gravely wounded — to the infirmary.`});
-    }
+    g.hp = 0; g.state = 'injured'; g.progress = 0;
+    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> is carried off gravely wounded — to the infirmary.`});
   }
 }
 
@@ -997,6 +1005,22 @@ function renderTop(){
   $('#s-fame').textContent = fmt(S.fame);
   $('#s-pop').textContent  = alive()+'/'+slots();
   $('#daychip').textContent = 'Day '+S.day;
+  $('#goal-txt').innerHTML = nextGoal();
+}
+
+// The single most relevant "what to do next", always visible under the stats.
+function nextGoal(){
+  if(alive() === 0) return `Recruit a <b>free</b> gladiator to rebuild your ludus`;
+  const injured = S.gladiators.filter(g=>g.state==='injured').length;
+  const fighting = S.gladiators.filter(g=>g.state==='fighting'||g.state==='dueling').length;
+  // cheapest affordable facility upgrade as a spend hint
+  let cheapFac=null, cheapCost=Infinity;
+  for(const k in FAC){ if(S.fac[k]<FAC[k].max){ const c=FAC[k].cost(S.fac[k]+1); if(c<cheapCost){cheapCost=c; cheapFac=FAC[k].name;} } }
+  if(alive() < slots() && S.gold >= recruitCost()) return `Recruit another fighter — you have an empty bunk`;
+  if(!S.autoFight && fighting===0 && injured<alive()) return `Send a gladiator to the <b>Arena</b>, or switch on Auto-Battle`;
+  if(cheapFac && S.gold >= cheapCost) return `Upgrade <b>${cheapFac}</b> for ${fmt(cheapCost)}◈`;
+  if(S.maxTier < MAX_RANK-1) return `Grow stronger to clear <b>Rank ${S.maxTier+2}</b> (enemy power ${fmt(oppPower(S.maxTier+1))})`;
+  return `Keep climbing the endless ranks`;
 }
 
 function statusLabel(g){
@@ -1086,6 +1110,7 @@ function renderRoster(){
 }
 
 function recruitCost(){
+  if(alive() === 0) return 0;        // an empty ludus always gets a free fighter — never a dead end
   return Math.round(45 * Math.pow(1.85, alive()));
 }
 function recruit(){
@@ -1184,7 +1209,7 @@ function renderArena(){
     <div class="opp-sub">${opp.d}</div>
     <div class="opp-row">
       <div class="kv"><b style="color:var(--blood)">${fmt(ep)}</b><small>Enemy Power</small></div>
-      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*goldMult()))}◈</b><small>Purse</small></div>
+      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*MANAGER_MULT(S.fac.manager)*goldMult()))}◈</b><small>Purse</small></div>
       <div class="kv"><b style="color:var(--bronze)">${fighters}</b><small>Fighting</small></div>
     </div>
     ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous rank to unlock this foe.</div>` :
@@ -1252,7 +1277,7 @@ function renderFacilities(){
 }
 
 // Prestige: Glory you'd earn by retiring right now (based on this run's fame).
-function gloryReward(){ return Math.floor(Math.pow(Math.max(0,S.fame)/500, 0.55)); }
+function gloryReward(){ return Math.floor(Math.pow(Math.max(0,S.fame)/300, 0.62)); }   // steeper — retiring at a wall is worth it
 
 function renderLegacy(){
   const wrap = $('#legacy'); wrap.innerHTML='';
@@ -1443,7 +1468,7 @@ function showAway(sum){
 
 /* ============================ DUEL — interactive combat ============================ */
 const STAM_MAX = 100;
-const enemyHP = i => Math.round(Math.max(42, oppPower(i)*3.2));
+const enemyHP = i => Math.round(Math.max(42, oppPower(i) * Math.max(2.0, 3.2 - i*0.03)));  // taper 3.2x -> 2.0x
 const vib = p => { try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} };
 
 let D = { active:false };   // live combat state
@@ -1526,7 +1551,7 @@ function showIntro(){
     <div class="vs-stats">
       <div class="kv"><b style="color:#79b356">${fmt(pw)}</b><small>${clsOf(g).name} · power</small></div>
       <div class="kv"><b style="color:#c0392b">${fmt(ew)}</b><small>enemy power</small></div>
-      <div class="kv"><b style="color:var(--gold2)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)*goldMult()))}◈</b><small>purse</small></div>
+      <div class="kv"><b style="color:var(--gold2)">${fmt(Math.round(oppReward(i)*MANAGER_MULT(S.fac.manager)*goldMult()))}◈</b><small>purse</small></div>
     </div>
     <div class="btn-col">
       <div class="dcbtn go" id="di-go">Enter the Sand</div>
@@ -1770,13 +1795,13 @@ function endDuel(won){
     data.gain = r.gain; data.drop = r.drop;
     data.fame = Math.round(oppFame(i)*fameMult()); data.xp = Math.round(oppXP(i)*xpMult()); data.leveled = g.level - lvlB;
     if(g.hp <= 0) g.hp = 1;                     // a victor lives
-    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested the ${foe(i).n} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
+    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested ${theFoe(i)} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
     if(data.drop) S.log.push({cls:'level', txt:`🎁 <b>${g.name}</b> claimed a <b>${data.drop.name}</b> as spoils.`});
     dAnim(dz.ef,'downed',1400); vib([20,40,30]);
   } else {
     // a duel is to the death — you had control, so a loss here is final
     g._dead = true; data.death = true;
-    S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to the ${foe(i).n} in single combat. The ludus mourns.`});
+    S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to ${theFoe(i)} in single combat. The ludus mourns.`});
     dAnim(dz.pf,'downed',1400); vib(90);
   }
   if(S.log.length>60) S.log = S.log.slice(-60);
