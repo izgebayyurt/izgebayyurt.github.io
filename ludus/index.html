@@ -201,6 +201,44 @@ body{
 .slot-empty .em{ font-size:26px; opacity:.5; }
 .slot-empty p{ font-family:var(--font-b); font-size:13px; color:var(--ink-soft); margin:6px 0 11px; }
 
+/* slave market */
+.market{ border:1.5px dashed var(--line-2); background:rgba(244,236,216,.45); border-radius:13px; padding:12px; margin-bottom:11px; }
+.mk-head{ font-family:var(--font-sc); font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); margin-bottom:10px; }
+.mk-head small{ display:block; font-family:var(--font-b); font-size:11px; text-transform:none; letter-spacing:0; color:var(--ink-soft); margin-top:2px; }
+.mk-empty{ font-family:var(--font-b); font-style:italic; font-size:12.5px; color:var(--ink-soft); text-align:center; padding:14px 6px; }
+.cand{ position:relative; background:var(--parch); border:1.5px solid var(--line); border-radius:11px; padding:11px 12px; margin-bottom:9px; }
+.cand-top{ display:flex; gap:9px; align-items:center; }
+.g-portrait.csm{ width:38px; height:38px; font-size:20px; border-radius:9px; }
+.cand-name{ font-family:var(--font-d); font-weight:600; font-size:15px; color:var(--ink); }
+.cand-cls{ font-family:var(--font-sc); font-size:10px; letter-spacing:.08em; color:var(--bronze); text-transform:uppercase; }
+.cand-tier{ position:absolute; top:-8px; right:10px; font-family:var(--font-sc); font-size:9px; letter-spacing:.1em;
+  text-transform:uppercase; padding:2px 8px; border-radius:20px; font-weight:600; }
+.t-raw{ background:var(--sand2); color:var(--ink-soft); border:1px solid var(--line-2); }
+.t-promising{ background:#3f7a5c; color:var(--sand); }
+.t-exceptional{ background:var(--gold); color:#241a08; box-shadow:0 0 10px rgba(224,176,74,.5); }
+.cand-origin{ font-family:var(--font-b); font-style:italic; font-size:11px; color:var(--ink-soft); margin-top:7px; line-height:1.35; }
+.cand-stats{ font-family:var(--font-sc); font-size:10.5px; letter-spacing:.05em; color:var(--ink-soft); margin-top:6px; }
+.cand-stats b{ font-family:var(--font-d); color:var(--ink); }
+.cand .cand-buy{ margin-top:9px; }
+.mk-reroll{ width:100%; margin-top:2px; }
+
+/* daily games */
+.daily{ background:var(--parch); border:1.5px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:11px;
+  box-shadow:0 2px 0 var(--line2); }
+.d-head{ font-family:var(--font-sc); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink);
+  display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px; }
+.d-streak{ font-family:var(--font-b); font-size:11px; text-transform:none; letter-spacing:0; color:var(--bronze); }
+.d-ob{ display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px dashed var(--line); font-family:var(--font-b); font-size:13px; color:var(--ink); }
+.d-ob:last-of-type{ border-bottom:none; }
+.d-ob .d-check{ font-family:var(--font-d); color:var(--ink-soft); width:16px; text-align:center; flex:none; }
+.d-ob.done{ color:var(--ink-soft); }
+.d-ob.done .d-check{ color:var(--green); }
+.d-ob.done .d-txt{ text-decoration:line-through; opacity:.75; }
+.d-ob .d-txt{ flex:1; }
+.d-ob .d-prog{ font-family:var(--font-sc); font-size:10.5px; color:var(--ink-soft); letter-spacing:.04em; }
+.d-cleared{ font-family:var(--font-b); font-size:12px; color:var(--green); background:rgba(90,125,60,.1);
+  border:1px dashed var(--green); border-radius:9px; padding:7px 10px; margin-top:8px; text-align:center; }
+
 /* ---------- arena ---------- */
 .opp-card{ text-align:center; }
 .opp-portrait{
@@ -548,6 +586,8 @@ body{
         <div class="switch" id="auto-switch"></div>
       </div>
 
+      <div id="daily-card"></div>
+
       <div class="section-h">Chronicle</div>
       <div id="log"></div>
     </div>
@@ -787,6 +827,7 @@ function initState(){
     log:[], nextId:2,
     glory:0, lifeFame:0, retirements:0, bestRank:0, perks:{},   // prestige / lifetime meta
     fallen:[], vendetta:null, stats:{}, ach:{},                 // legacy: the Hall, vendettas, laurels
+    market:null, daily:null, streak:{count:0,last:null},        // slave market stock · daily games
     lastTick: Date.now(),
   };
 }
@@ -982,6 +1023,8 @@ function grantWin(g, i, ev, live, manual){
     S.vendetta = null;
   }
   const drop = rollGearDrop(g, i);
+  bumpDaily('wins', 1); bumpDaily('gold', gain);
+  if(drop) bumpDaily('forge', 1);
   maybeLevel(g, ev, live);
   return { gain, fame, xp, drop, avenged };
 }
@@ -1113,6 +1156,9 @@ function load(){
     if(S.vendetta===undefined) S.vendetta = null;
     if(S.stats==null) S.stats = {};
     if(S.ach==null) S.ach = {};
+    if(S.market===undefined) S.market = null;
+    if(S.daily===undefined) S.daily = null;
+    if(S.streak==null) S.streak = {count:0,last:null};
     // migrate + heal derived state; free anyone stuck mid-duel from a closed tab
     S.gladiators.forEach(g=>{
       if(!g.cls){ g.cls = CLASS_IDS[(Math.random()*CLASS_IDS.length)|0]; g.portrait = CLASSES[g.cls].ic; }
@@ -1237,19 +1283,36 @@ function renderRoster(){
     wrap.appendChild(card);
   }
 
-  // empty slots / recruit
+  // the slave market — visible whenever a bunk is free
   const free = slots() - alive();
   if(free > 0){
-    const cost = recruitCost();
-    const s = el('div','slot-empty');
-    s.innerHTML = `<div class="em">⚱️</div>
-      <p>${alive()===0?'Your ludus stands empty.':'An empty bunk waits.'}<br>Recruit a fresh gladiator from the slave market.</p>`;
-    const b = el('div','btn gold'); b.style.maxWidth='240px'; b.style.margin='0 auto';
-    b.innerHTML = `Recruit Gladiator <small>${fmt(cost)} ◈</small>`;
-    if(S.gold < cost) b.setAttribute('disabled','');
-    b.onclick = ()=> recruit();
-    s.appendChild(b);
-    wrap.appendChild(s);
+    ensureMarket();
+    const mk = el('div','market');
+    const rows = S.market.cands.map((c,ix)=>{
+      const ask = candAsk(c);
+      const cls = clsOf(c.g);
+      const chips = (c.g.traits||[]).map(t=>{const tr=TRAITS[t];return tr?`<span class="tchip" title="${tr.desc}">${tr.ic} ${tr.name}</span>`:'';}).join('');
+      return `<div class="cand">
+        <span class="cand-tier t-${c.tier}">${PROMISE[c.tier].name}</span>
+        <div class="cand-top">
+          <div class="g-portrait csm">${c.g.portrait}</div>
+          <div class="cand-meta">
+            <div class="cand-name">${c.g.name} <span class="cand-cls">${cls.name}${c.g.level>1?' · LVL '+c.g.level:''}</span></div>
+            <div class="g-traits" style="margin-top:4px">${chips}</div>
+          </div>
+        </div>
+        <div class="cand-origin">${c.g.origin}</div>
+        <div class="cand-stats">STR <b>${c.g.str}</b> · AGI <b>${c.g.agi}</b> · VIT <b>${c.g.vit}</b> · POWER <b>${power(c.g)}</b></div>
+        <div class="btn gold cand-buy" data-ix="${ix}" ${S.gold<ask?'disabled':''}>${ask===0?'Claim — the trader owes you':'Buy'} ${ask?`<small>${fmt(ask)} ◈</small>`:''}</div>
+      </div>`;
+    }).join('');
+    mk.innerHTML = `
+      <div class="mk-head">🏛️ The Slave Market <small>fresh stock at dawn · ${free} bunk${free>1?'s':''} free</small></div>
+      ${ rows || `<div class="mk-empty">The pens stand empty. Return at dawn — or pay the trader to scout again.</div>` }
+      <div class="btn recall mk-reroll" ${S.gold<rerollCost()?'disabled':''}>Pay the trader to scout again <small>${fmt(rerollCost())} ◈</small></div>`;
+    mk.querySelectorAll('.cand-buy').forEach(b=>{ b.onclick=()=> buyCandidate(+b.dataset.ix); });
+    mk.querySelector('.mk-reroll').onclick = ()=> rerollMarket();
+    wrap.appendChild(mk);
   } else if(slots() < FAC.barracks.max){
     const note = el('div','empty-note');
     note.innerHTML = `Ludus full (${alive()}/${slots()}). Expand the <b>Barracks</b> in Facilities to house more.`;
@@ -1261,17 +1324,120 @@ function recruitCost(){
   if(alive() === 0) return 0;        // an empty ludus always gets a free fighter — never a dead end
   return Math.round(45 * Math.pow(1.85, alive()));
 }
-function recruit(){
-  if(alive() >= slots()) return;
-  const cost = recruitCost();
-  if(S.gold < cost) return;
-  S.gold -= cost;
-  const g = newGladiator(); applyRecruitPerks(g); recalc(g); g.hp=g.maxHp;
-  S.gladiators.push(g);
+
+/* ---- The Slave Market: scout before you buy. Fresh stock each dawn; the trader
+        can be paid to parade more (a gold sink that scales with your rank). ---- */
+const PROMISE = {
+  raw:        { name:'Raw',         mult:1   },
+  promising:  { name:'Promising',   mult:2.4 },
+  exceptional:{ name:'Exceptional', mult:5.5 },
+};
+function makeCandidate(){
+  const r = Math.random()*100;
+  const tier = r<12 ? 'exceptional' : r<45 ? 'promising' : 'raw';
+  const g = newGladiator(); g.id = 0;                   // a real id is stamped when bought
+  if(tier==='promising'){ g.str+=3; g.agi+=3; g.vit+=3; }
+  if(tier==='exceptional'){ g.str+=6; g.agi+=6; g.vit+=6; g.level=3; }
+  applyRecruitPerks(g); recalc(g); g.hp = g.maxHp;
+  return { g, tier };
+}
+function candAsk(c){
+  // an empty ludus always finds one free Raw fighter — never a dead end
+  const base = alive()===0 ? (c.tier==='raw' ? 0 : 60) : 45*Math.pow(1.85, alive());
+  return Math.round(base * PROMISE[c.tier].mult);
+}
+function ensureMarket(){
+  if(!S.market || S.market.day !== S.day){
+    S.market = { day:S.day, cands:[makeCandidate(), makeCandidate(), makeCandidate()] };
+  }
+}
+const rerollCost = () => Math.max(40, Math.round(oppReward(S.maxTier)*0.75));
+function rerollMarket(){
+  const c = rerollCost();
+  if(S.gold < c) return;
+  S.gold -= c;
+  S.market = { day:S.day, cands:[makeCandidate(), makeCandidate(), makeCandidate()] };
+  toast('The trader parades new stock.');
+  refresh(); save();
+}
+function buyCandidate(ix){
+  ensureMarket();
+  const c = S.market.cands[ix];
+  if(!c || alive() >= slots()) return;
+  const ask = candAsk(c);
+  if(S.gold < ask) return;
+  S.gold -= ask;
+  c.g.id = nextId++;
+  S.gladiators.push(c.g);
+  S.market.cands.splice(ix,1);
   S.stats.recruits = (S.stats.recruits||0) + 1;
-  toast(`${g.name} joins your ludus — ${TRAITS[g.traits[0]].name} · ${TRAITS[g.traits[1]].name}.`);
+  bumpDaily('recruit', 1);
+  toast(`${c.g.name} joins your ludus — ${TRAITS[c.g.traits[0]].name} · ${TRAITS[c.g.traits[1]].name}.`);
   checkAch(true);
   refresh(); save();
+}
+
+/* ---- Daily Games: three objectives rolled from the real date, a streak for
+        clearing all three, and a Glory coin for the day's purse. Server-free. ---- */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const todayStr = () => new Date().toISOString().slice(0,10);
+function yesterdayStr(){ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+function ensureDaily(){
+  const today = todayStr();
+  if(S.daily && S.daily.date === today) return;
+  // a lapsed streak dies at dawn
+  if(S.streak && S.streak.last && S.streak.last !== today && S.streak.last !== yesterdayStr()) S.streak.count = 0;
+  let seed = 0; for(const ch of today) seed = (seed*31 + ch.charCodeAt(0))|0;
+  const rng = mulberry32(seed);
+  const winN  = 8 + Math.floor(rng()*3)*4;                             // 8 / 12 / 16
+  const goldN = Math.max(200, Math.round(oppReward(S.maxTier) * (10 + Math.floor(rng()*10))));
+  const pool = [
+    {id:'wins',    txt:`Win ${winN} bouts`,                    n:winN},
+    {id:'gold',    txt:`Earn ${fmt(goldN)} denarii`,           n:goldN},
+    {id:'duel',    txt:`Win a duel by your own hand`,          n:1},
+    {id:'forge',   txt:`Forge or loot a piece of gear`,        n:1},
+    {id:'recruit', txt:`Buy a fighter from the market`,        n:1},
+    {id:'upgrade', txt:`Upgrade a facility`,                   n:1},
+  ];
+  // pick 3 distinct, seeded by the date so everyone’s day matches
+  const obs = [];
+  while(obs.length < 3){ const p = pool[Math.floor(rng()*pool.length)]; if(!obs.some(o=>o.id===p.id)) obs.push({id:p.id, txt:p.txt, n:p.n, p:0, done:false}); }
+  S.daily = { date:today, obs, cleared:false };
+}
+function bumpDaily(id, amt){
+  ensureDaily();
+  const ob = S.daily.obs.find(o=>o.id===id && !o.done);
+  if(!ob) return;
+  ob.p += amt;
+  if(ob.p >= ob.n){
+    ob.p = ob.n; ob.done = true;
+    S.log.push({cls:'level', txt:`🎯 Daily objective met — <b>${ob.txt}</b>.`});
+    if(!S.daily.cleared && S.daily.obs.every(o=>o.done)){
+      S.daily.cleared = true;
+      const today = todayStr();
+      S.streak.count = (S.streak.last === yesterdayStr()) ? (S.streak.count||0)+1 : 1;
+      S.streak.last = today;
+      const purse = Math.round(oppReward(S.maxTier) * 8 * (1 + 0.15*Math.min(7, S.streak.count)));
+      S.gold += purse; S.glory = (S.glory||0) + 1;
+      S.log.push({cls:'win', txt:`🎉 <b>The Daily Games are yours!</b> <span class="cash">+${fmt(purse)}◈</span> · +1 🏆 Glory · streak ${S.streak.count}`});
+      toast(`Daily Games cleared — +${fmt(purse)}◈ and +1 Glory!`);
+    }
+  }
+}
+function renderDaily(){
+  const box = $('#daily-card'); if(!box) return;
+  ensureDaily();
+  const d = S.daily;
+  box.innerHTML = `<div class="daily">
+    <div class="d-head">🎯 Daily Games <span class="d-streak">${S.streak.count>0?`🔥 ${S.streak.count}-day streak`:'no streak yet'}</span></div>
+    ${d.obs.map(o=>`
+      <div class="d-ob${o.done?' done':''}">
+        <span class="d-check">${o.done?'✓':'○'}</span>
+        <span class="d-txt">${o.txt}</span>
+        <span class="d-prog">${o.n>1 ? fmt(Math.min(o.p,o.n))+'/'+fmt(o.n) : (o.done?'done':'—')}</span>
+      </div>`).join('')}
+    ${d.cleared?`<div class="d-cleared">🎉 Cleared — the purse and a Glory coin are yours. Fresh games at midnight.</div>`:''}
+  </div>`;
 }
 
 function chooseTrain(g){
@@ -1331,7 +1497,7 @@ function chooseGear(g){
       b.onclick=()=>{
         const slot=b.dataset.slot, cost=gearCost(g.gear[slot]);
         if(S.gold<cost || g.gear[slot]>=maxGearTier()) return;
-        S.gold-=cost; g.gear[slot]++; recalc(g);
+        S.gold-=cost; g.gear[slot]++; recalc(g); bumpDaily('forge',1);
         toast(`${g.name} takes up a ${GEAR[slot].tiers[g.gear[slot]]}.`);
         render(); renderTop(); if(tab==='ludus') renderRoster(); save();
       };
@@ -1373,6 +1539,7 @@ function renderArena(){
   next.onclick=()=>{ if(S.tier<S.maxTier && S.tier<MAX_RANK-1){S.tier++; renderArena(); save();} };
 
   $('#auto-switch').classList.toggle('on', S.autoFight);
+  renderDaily();
 }
 
 function renderLog(){
@@ -1415,6 +1582,7 @@ function renderFacilities(){
         if(S.gold < f.cost(S.fac[key])) return;
         S.gold -= f.cost(S.fac[key]);
         S.fac[key]++;
+        bumpDaily('upgrade',1);
         // recalc hp on vit-independent facilities
         S.gladiators.forEach(recalc);
         toast(`${f.name} upgraded to level ${S.fac[key]}.`);
@@ -1550,8 +1718,9 @@ function doRetire(reward){
   const keep = {
     glory:(S.glory||0)+reward, perks:S.perks||{},
     lifeFame:(S.lifeFame||0), retirements:(S.retirements||0)+1, bestRank:(S.bestRank||0),
-    // the Hall, laurels and lifetime deeds outlive any single ludus
+    // the Hall, laurels, lifetime deeds and the daily habit outlive any single ludus
     fallen:S.fallen||[], stats:S.stats||{}, ach:S.ach||{}, vendetta:S.vendetta||null,
+    daily:S.daily||null, streak:S.streak||{count:0,last:null},
   };
   S = initState();
   Object.assign(S, keep);
@@ -1976,6 +2145,7 @@ function endDuel(won){
     if(g.hp <= 0) g.hp = 1;                     // a victor lives
     S.stats.duelWins = (S.stats.duelWins||0) + 1;
     if(D.php / D.pmax < 0.12) S.stats.closeCall = (S.stats.closeCall||0) + 1;   // won by a thread
+    bumpDaily('duel', 1);
     S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested ${theFoe(i)} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
     if(data.drop) S.log.push({cls:'level', txt:`🎁 <b>${g.name}</b> claimed a <b>${data.drop.name}</b> as spoils.`});
     dAnim(dz.ef,'downed',1400); vib([20,40,30]);
