@@ -5,41 +5,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Goop — escape II (wall gaps)</title>
 <style>
-  :root{color-scheme:dark;}
-  html,body{margin:0;height:100%;overflow:hidden;color:#d9d4e8;
+  :root{color-scheme:dark;
+    --ink:#0d0b14; --face:#5f5880; --band:#454060; --floor:#221e2e;
+    --text:#e8e3f5; --dim:#9a92b5; --mint:#3fd6ac; --mintglow:rgba(63,214,172,.45);}
+  html,body{margin:0;height:100%;overflow:hidden;color:var(--text);
     background:radial-gradient(120% 120% at 50% 12%, #2b2737 0%, #201c2b 55%, #151220 100%);
     font:14px/1.4 ui-rounded,"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;touch-action:none;}
   #c{position:fixed;inset:0;display:block;}
-  #top{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:7px;flex-wrap:wrap;justify-content:center;max-width:96vw;}
-  .chip{background:#2c2839;border:2px solid #0d0b14;border-radius:13px;box-shadow:0 3px 0 #0d0b14;
-    font:800 13px ui-rounded,system-ui;color:#e8e3f5;padding:8px 12px;display:flex;align-items:center;gap:6px;}
-  button.chip{cursor:pointer;transition:transform .06s,box-shadow .06s;}
-  button.chip:active{transform:translateY(2px);box-shadow:0 1px 0 #0d0b14;}
-  #lvlname{min-width:120px;justify-content:center;text-align:center;}
-  #hint{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;font-size:12.5px;color:#9a92b5;
-    background:#2c2839;border:2px solid #0d0b14;border-radius:12px;padding:7px 14px;box-shadow:0 2px 0 #0d0b14;max-width:88vw;text-align:center;}
-  #hint b{color:#e8e3f5;} #hint i{color:#7d75a0;}
-  .modal{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.6);}
-  .modal .card{background:#2c2839;border:2px solid #0d0b14;border-radius:20px;box-shadow:0 6px 0 #0d0b14;
-    padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:86vw;}
-  .modal h2{margin:0;font:900 26px ui-rounded,system-ui;color:#e8e3f5;}
-  .modal .sub{color:#9a91b5;font-size:13.5px;text-align:center;}
-  #moves.low{color:#ff8f73;animation:lowpulse .7s ease-in-out infinite;}
-  @keyframes lowpulse{50%{transform:scale(1.12);}}
-  #pgrid{display:grid;grid-template-columns:repeat(5,52px);gap:9px;max-height:56vh;overflow-y:auto;padding:4px;}
-  .lvbtn{width:52px;height:52px;border-radius:12px;border:2px solid #0d0b14;background:#39324e;box-shadow:0 3px 0 #0d0b14;
-    font:800 15px ui-rounded,system-ui;color:#e8e3f5;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;}
-  .lvbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0d0b14;}
-  .lvbtn.locked{background:#241f33;color:#5a5375;cursor:default;}
-  .lvbtn.done{background:#2f5e50;}
-  .lvbtn.cur{outline:2px solid #8ceccf;}
-  .lvbtn .st{position:absolute;top:-7px;right:-6px;font-size:13px;}
-  #adcount{font:900 34px ui-rounded,system-ui;color:#8ceccf;}
-  .modal .card{animation:cardpop .18s ease-out;}
-  @keyframes cardpop{from{transform:scale(.92);opacity:.5;}}
+  #top{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:5;
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:96vw;}
+  .chip{border:2px solid var(--ink);border-radius:12px;font:800 13px ui-rounded,system-ui;color:var(--text);
+    padding:8px 13px;display:flex;align-items:center;gap:6px;}
+  div.chip{background:var(--floor);box-shadow:inset 0 3px 7px rgba(0,0,0,.55);color:#cfc8e8;}
+  button.chip{background:var(--face);box-shadow:0 4px 0 var(--band),0 6px 0 var(--ink);cursor:pointer;
+    transition:transform .06s,box-shadow .06s;}
+  button.chip:active{transform:translateY(3px);box-shadow:0 1px 0 var(--band),0 3px 0 var(--ink);}
+  #mute.off{opacity:.45;text-decoration:line-through;}
+  #lvlname{min-width:70px;justify-content:center;text-align:center;}
+  #moves{color:var(--mint);text-shadow:0 0 9px var(--mintglow);min-width:16px;text-align:center;}
   #moves.tickA{animation:tickpop .22s ease-out;}
   @keyframes tickpop{from{transform:scale(1.3);}}
-  @media(max-width:430px){ .chip{padding:7px 9px;font-size:12px;border-radius:11px;} #lvlname{min-width:62px;} #hint{font-size:11.5px;padding:6px 10px;} }
+  #hint{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;
+    font-size:12.5px;color:var(--dim);background:var(--floor);border:2px solid var(--ink);border-radius:12px;
+    padding:7px 14px;box-shadow:inset 0 3px 7px rgba(0,0,0,.5);max-width:88vw;text-align:center;}
+  #hint b{color:var(--text);} #hint i{color:#7d75a0;}
+  .modal{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.65);}
+  .modal .card{background:#38324c;border:2px solid var(--ink);border-radius:20px;
+    box-shadow:0 7px 0 #262133,0 10px 0 var(--ink),0 22px 60px rgba(0,0,0,.55);
+    padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:86vw;
+    animation:cardpop .18s ease-out;}
+  @keyframes cardpop{from{transform:scale(.92);opacity:.5;}}
+  .modal h2{margin:0;font:900 26px ui-rounded,system-ui;color:var(--text);text-shadow:0 0 14px rgba(63,214,172,.25);}
+  .modal .sub{color:var(--dim);font-size:13.5px;text-align:center;}
+  #pgrid{display:grid;grid-template-columns:repeat(5,52px);gap:9px;max-height:56vh;overflow-y:auto;padding:6px;}
+  .lvbtn{width:52px;height:52px;border-radius:12px;border:2px solid var(--ink);background:var(--face);
+    box-shadow:0 3px 0 var(--band),0 5px 0 var(--ink);font:800 15px ui-rounded,system-ui;color:var(--text);
+    cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;}
+  .lvbtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--band),0 3px 0 var(--ink);}
+  .lvbtn.locked{background:var(--floor);box-shadow:inset 0 3px 6px rgba(0,0,0,.5);color:#5a5375;cursor:default;}
+  .lvbtn.done{background:#37806b;box-shadow:0 3px 0 #235c4c,0 5px 0 var(--ink);}
+  .lvbtn.cur{outline:2px solid var(--mint);outline-offset:1px;box-shadow:0 3px 0 var(--band),0 5px 0 var(--ink),0 0 12px var(--mintglow);}
+  .lvbtn .st{position:absolute;top:-5px;right:-5px;width:11px;height:11px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #8ceccf, var(--mint));border:1.5px solid var(--ink);
+    box-shadow:0 0 8px var(--mintglow);}
+  #buildid{font-size:10.5px;color:#6a6288;}
+  @media(max-width:430px){ .chip{padding:7px 10px;font-size:12px;border-radius:11px;} #lvlname{min-width:58px;}
+    #hint{font-size:11.5px;padding:6px 10px;} }
 </style>
 </head>
 <body>
@@ -49,7 +60,7 @@
     <button class="chip" id="undo" title="Undo (Z)">↶</button>
     <button class="chip" id="reset" title="Restart (R)">↺</button>
     <button class="chip" id="grid" title="Levels">▦</button>
-    <button class="chip" id="mute" title="Sound">🔊</button>
+    <button class="chip" id="mute" title="Sound">♪</button>
     <div class="chip" title="Moves"><span id="moves">0</span></div>
   </div>
   <div id="hint">Swipe moves <b>every</b> goop. Escape through the <b>gap in the wall</b> that matches your colour.</div>
@@ -105,7 +116,7 @@
     reward:()=>[880,1174,1568].forEach((f,i)=>tone(f,f*1.15,.1,'sine',.25,i*.06)),
     door:o=>o?tone(170,260,.13,'triangle',.35):tone(250,150,.13,'triangle',.35),
     boing:n=>{ for(let i=0;i<n;i++) tone(300,540,.09,'triangle',.3,i*.06); } };
-  const muteBtn=()=>{ const b=document.getElementById('mute'); if(b) b.textContent=muted?'🔇':'🔊'; };
+  const muteBtn=()=>{ const b=document.getElementById('mute'); if(b){ b.textContent='♪'; b.classList.toggle('off',muted); } };
 
   // '#'wall  '.'/' 'floor  'o'droplet(size1)  '^'spikes(lethal)
   // '1'..'9' mould(need that size) — mould levels win by filling; no moulds → win by merging ALL into one
@@ -350,29 +361,109 @@
      map:["######","#.p###","A_.=##","#o#_.#","##..oB","#p.o.#","######"]},
     {hint:"", par:15, limit:21,
      map:["#######","App#.##","#_..=p#","#o##._#","#.#..o#","#####B#"]},
-    {hint:"<b>Mirrors</b> deflect you along their diagonal; their flat sides bounce you back. <b>Bumpers</b> always send you back.", par:5, limit:9,
-     map:["######","#....#","#.#..#","#...##","###.z#","#o...#","A.#o.#","######"]},
+    {hint:"<b>Mirrors</b> deflect you along their diagonal; their flat sides bounce you back. <b>Bumpers</b> always send you back.", par:3, limit:7,
+     map:["###A##","#...##","#.p..#","#.z.##","#....B","#y...#","##...#","#.o.x#","#....#","######"]},
+    {hint:"", par:4, limit:8,
+     map:["#########","#.o.z.###","#..#.####","#.......#","##.####.#","#.......#","#..####.#","#.....b.#","#######A#"]},
+    {hint:"", par:4, limit:8,
+     map:["######A#","#......#","#.###.x#","#.####.#","#.....o#","#o.....#","#.####.#","#......#","########"]},
     {hint:"", par:5, limit:9,
-     map:["#######","#.....#","#o..z.#","#.z...A","##o.o##","#######"]},
+     map:["######","###.w#","#.##.A","#.#..#","#o.o##","######"]},
+    {hint:"", par:4, limit:8,
+     map:["####B#","###.b#","##.o.#","#..p.#","#.yp.A","###.b#","######"]},
     {hint:"", par:5, limit:9,
-     map:["#######","#....##","#o....#","#.#...#","#.#...#","#.w.oz#","###A###"]},
+     map:["#########","##..b#..#","#.#.o..##","#.......#","#....#..#","#.x.....#","#A#######"]},
+    {hint:"<b>Sticky pads</b> catch you as you pass. Your next swipe moves a <b>single tile</b>.", par:4, limit:8,
+     map:["#####AB#","#####..#","###.#op#","#b.p.w.#","#.....s#","########"]},
+    {hint:"", par:5, limit:9,
+     map:["######","##s.b#","#..x##","#o...A","#o####","######"]},
+    {hint:"", par:5, limit:9,
+     map:["###AB#","###.b#","##.o.#","##zp.#","##.p.#","###.b#","######"]},
+    {hint:"", par:5, limit:9,
+     map:["########","#....z.A","#z.....#","#.....##","#.#.z..#","#.#...o#","#..#..##","########"]},
     {hint:"", par:6, limit:10,
-     map:["######","#.o..#","##...#","#...##","#....A","#o.#.#","#w.o.#","######"]},
+     map:["#######","#.ws..#","#b.o..#","##.#..#","##.s.s#","#.....#","##A####"]},
     {hint:"", par:7, limit:11,
-     map:["#######","##o...#","#...w.#","#.y.#.A","#.o.o##","#######"]},
+     map:["#########","#.#.....#","#.....o##","#...##.##","##..#.w##","##......#","#.......#","#.....b.#","#######A#"]},
     {hint:"", par:8, limit:12,
-     map:["######","#.o..#","###..#","#o..##","#....A","#..###","#z.o.#","######"]},
+     map:["######","##s.b#","#.ox.#","#....#","#o##.A","######"]},
     {hint:"", par:9, limit:13,
-     map:["#A#####","#.xp..#","#o.b..#","#.....#","#p..###","#.w.x.#","#o...p#","#####B#"]},
+     map:["#######","#.ws###","#b.o.##","#..#..#","#..s.s#","A..#..#","#######"]},
+    {hint:"", par:7, limit:11,
+     map:["########","#..o.w.A","#.#.#..#","#.....##","###.z..#","#....#.#","#y....##","########"]},
+    {hint:"", par:7, limit:11,
+     map:["#######","#..#..#","#s#s..#","#p.o#sA","#..b..#","#y.o..#","#...y.#","##B####"]},
+    {hint:"", par:8, limit:12,
+     map:["#B######","#....#.#","#.##...#","#s..o.x#","#......#","#...p.o#","#..s...#","#y.#...#","##A#####"]},
+    {hint:"", par:9, limit:13,
+     map:["###A##","#...bB","##.o.#","#.y..#","#.p..#","##.pb#","######"]},
+    {hint:"", par:10, limit:14,
+     map:["######","#p.so#","#z.###","Ap..s#","##...#","###B##"]},
     {hint:"", par:11, limit:15,
-     map:["#######","B..b..A","#..p.##","#.....#","#y..o.#","#p.##o#","#######"]},
+     map:["#######","##zs###","#b.o.##","#..#..#","#..s#s#","A.#...#","#######"]},
+    {hint:"", par:12, limit:17,
+     map:["#####A#","#.....#","#.###.#","#...#.#","#.#.wb#","##.s.b#","#s..#o#","#.....#","#######"]},
+    {hint:"", par:9, limit:13,
+     map:["#########","#.##....#","#.....o##","#.......#","##y....##","###.#...#","#.......#","#.....b.#","#######A#"]},
+    {hint:"", par:10, limit:14,
+     map:["#####A#","#.....#","#..#..#","#.x..##","#.#..b#","##..sb#","#s..#o#","#.....#","#######"]},
+    {hint:"", par:12, limit:17,
+     map:["#######","##zo.s#","#b...##","##.#..#","#..s#s#","A.#...#","#######"]},
     {hint:"", par:13, limit:18,
-     map:["#####","##w.#","B.#pA","#..o#","#o.p#","#zo.#","#####"]},
+     map:["########","#..#####","#..q...B","#..o..s#","##.#.#.#","#..pxs.C","#A######"]},
     {hint:"", par:14, limit:20,
-     map:["#######","#...#x#","#.p...B","##.o..#","#.o##.#","#o#xp##","#.....#","#####A#"]},
+     map:["######","Aqwb.#","#.ops#","##o#.#","#qs.##","#C#B##"]},
+    {hint:"", par:15, limit:21,
+     map:["#####A##","#......#","C.s..b.#","#..pyos#","#..#.#q#","Bo.....#","########"]},
+    {hint:"", par:16, limit:22,
+     map:["######A#","#..#...#","#.....w#","##.###.#","#..##.o#","#o##..##","#....###","##...###","########"]},
+    {hint:"", par:13, limit:18,
+     map:["#####AB#","####...#","###.#.p#","#b.p.w.#","#o..s..#","########"]},
+    {hint:"", par:14, limit:20,
+     map:["#########","#..#..#.#","#.....o.#","#....#..#","#.y....##","##..#...#","#..#....#","#....#b.A","#########"]},
+    {hint:"", par:15, limit:21,
+     map:["######","#p.soA","#z.###","#s.###","#.p..#","###B##"]},
+    {hint:"", par:16, limit:22,
+     map:["#B######","#.#p...#","#..#...#","#s#.o.x#","#...#..#","##..s.o#","#......#","#y.#...#","##A#####"]},
+    {hint:"", par:17, limit:24,
+     map:["########","C.#.qs.A","#.#zp###","B.#.so.#","#...##.#","########"]},
+    {hint:"", par:19, limit:27,
+     map:["#######","A..#..#","#.#s..#","#po.#s#","###bo.#","#z..s.#","#..#y.#","#B#####"]},
+    {hint:"", par:20, limit:28,
+     map:["####A#","#p.so#","#zs#p#","#..###","#....#","###B##"]},
+    {hint:"", par:16, limit:22,
+     map:["####B#C#","#.....q#","#......#","#..##.p#","#.#.w.o#","#.#.qp.#","###A####"]},
+    {hint:"", par:17, limit:24,
+     map:["#######","##....#","#..#o.B","#.p.bp#","#.x...#","####b.#","#####A#"]},
+    {hint:"", par:19, limit:27,
+     map:["#####AB#","####p..#","#####p.#","#b.#.w.#","#..so..#","########"]},
+    {hint:"", par:20, limit:28,
+     map:["##C##A###","#.......#","#.....z.B","#.......#","#.p..#..#","#......o#","#.......#","#...#...#","##.qo#..#","#########"]},
+    {hint:"", par:21, limit:29,
+     map:["###A####","#z...q.#","#....#.#","#...o..#","#.p..p.#","#......#","##.....#","#..o...#","##....q#","####CB##"]},
+    {hint:"", par:24, limit:34,
+     map:["########","C.##.s.A","#..zs###","B.#..o.#","#q..##p#","########"]},
+    {hint:"", par:24, limit:34,
+     map:["#B###A##","#.#...##","C....b.#","#..pwoq#","#.s#s#.#","#o.....#","########"]},
+    {hint:"", par:20, limit:28,
+     map:["##A####","#..##.#","#.#s.o#","#po.#s#","###b..#","#z..s.#","#..#y.#","#B#####"]},
+    {hint:"", par:21, limit:29,
+     map:["#########","#..#o#..#","##.w....#","#o..#...#","A.bs#b..#","#.#...s.#","#p.#..x.B","#########"]},
+    {hint:"", par:22, limit:31,
+     map:["######","A...o#","#..w.#","#p#.x#","#....#","#.#..#","#.#..#","B.#..#","#...##","######"]},
+    {hint:"", par:26, limit:36,
+     map:["######","#..#.#","C.yp.#","#..q.#","##y..#","#.##.#","#pqo.#","#....A","##B###"]},
+    {hint:"", par:25, limit:35,
+     map:["########","#..#.###","#..q.#.B","#..o.#s#","##.#...#","C..pxs.#","#A######"]},
+    {hint:"", par:27, limit:38,
+     map:["##C##A###","#.......#","#.......B","#....#..#","##p..#..#","#...#..o#","#.......#","#y..#...#","##.qo...#","#########"]},
+    {hint:"", par:28, limit:39,
+     map:["########","#..#.###","#..q.#.B","#s...#s#","##.#o..#","C..py..#","#A######"]},
+    {hint:"", par:28, limit:39,
+     map:["###BC####","#o.....o#","#s#.#..##","#p.#...w#","#s.#..x.#","Aq..#..b#","#########"]},
   ];
 
-  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
+  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,stickyG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
   const DIRV=[[-1,0],[1,0],[0,-1],[0,1]];
   const DEFL=[{3:1,0:2,2:'b',1:'b'},{3:0,1:2,2:'b',0:'b'},{2:0,1:3,3:'b',0:'b'},{2:1,0:3,3:'b',1:'b'}];
   const DIRI=(dr,dc)=>dr===-1?0:dr===1?1:dc===-1?2:3;
@@ -403,7 +494,7 @@
   const isUnlocked=i=>true;   // all levels open (playtest mode)
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
-    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; triMapG={}; bumpSetG=new Set(); const drops=[], molds=[]; let id=0;
+    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; triMapG={}; bumpSetG=new Set(); stickyG=new Set(); const drops=[], molds=[]; let id=0;
     for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
       if(ch==='#'){ row.push('#'); }
       else if('ABC'.includes(ch)){ row.push('#'); const ci='ABC'.indexOf(ch); holes.push({r,c,color:ci}); holeMapG[r+','+c]=ci; }
@@ -412,6 +503,7 @@
       else if(ch==='='){ row.push('.'); doorCellG=r+','+c; }
       else if('wxyz'.includes(ch)){ row.push('.'); triMapG[r+','+c]='wxyz'.indexOf(ch); }
       else if(ch==='b'){ row.push('.'); bumpSetG.add(r+','+c); }
+      else if(ch==='s'){ row.push('.'); stickyG.add(r+','+c); }
       else if(ch==='_'){ row.push('.'); platesG.push(r+','+c); }
       else { row.push('.');
         if(ch==='o') drops.push({id:id++,r,c,size:1,color:0,locked:false});
@@ -430,7 +522,7 @@
     const dOpen=doorCellG&&platesG.some(k=>drops.some(d=>d.r+','+d.c===k));
     const order=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*dr+ds[b].c*dc)-(ds[a].r*dr+ds[a].c*dc));
     const removed=new Set(), merges=[], drains=[], corks=[];
-    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c,cdr=dr,cdc=dc,red=0; ds[i].corners=[];
+    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c,cdr=dr,cdc=dc,red=0; ds[i].corners=[]; const one=stickyG.has(r+','+c);
       while(true){ const nr=r+cdr,nc=c+cdc,k=nr+','+nc;
         if(holeMapG[k]!==undefined){ if(holeMapG[k]===ds[i].color&&(!holeSizeG[k]||holeSizeG[k]===ds[i].size)){ removed.add(i); drains.push({id:ds[i].id,r:nr,c:nc,color:ds[i].color}); r=null; } break; }
         if(!inb(nr,nc)||grid[nr][nc]==='#') break;
@@ -443,7 +535,9 @@
           if(out==='b'){ cdr=-cdr; cdc=-cdc; } else { cdr=DIRV[out][0]; cdc=DIRV[out][1]; }
           continue; }
         r=nr;c=nc;
-        if(bumpSetG.has(k)&&red<6){ cdr=-cdr; cdc=-cdc; red++; ds[i].corners.push({r,c}); continue; } }
+        if(bumpSetG.has(k)&&red<6){ cdr=-cdr; cdc=-cdc; red++; ds[i].corners.push({r,c}); continue; }
+        if(stickyG.has(k)) break;   // glue catches passers-by
+        if(one) break; }            // launched off glue: a single tile
       if(r===null||removed.has(i))continue; ds[i].r=r; ds[i].c=c; occ[r+','+c]=i; }
     const nd=ds.filter((d,i)=>!removed.has(i)); const locks=[];
     for(const mo of ms){ if(mo.filled)continue; const d=nd.find(d=>!d.locked&&d.r===mo.r&&d.c===mo.c&&d.size===mo.size);
@@ -482,7 +576,11 @@
   function snapshot(){ return {drops:state.drops.map(d=>({...d})), molds:state.molds.map(m=>({...m})), moves}; }
   function applyMove(dir,instant){ if((moving&&!instant)||won) return;
     const before=sig(state.drops,state.molds); const res=simulate(state.drops,state.molds,dir);
-    if(before===sig(res.drops,res.molds)){ SND.bump(); return; }
+    if(before===sig(res.drops,res.molds)){ SND.bump();
+      res.drops.forEach(d=>{ if(d.locked) return; const e=renderById[d.id]; if(!e) return;
+        if(d.corners&&d.corners.length) e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r)}));
+        else e.wp=[{x:e.px+DIRS[dir][1]*S*.20,y:e.py+DIRS[dir][0]*S*.20}]; });
+      sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir]; moving=true; return; }
     undoStack.push(snapshot()); moves++; SND.swipe();
     const pre=undoStack[undoStack.length-1].drops;
     const colOf=id=>{ const d=pre.find(x=>x.id===id); return d?d.color:0; };
@@ -549,8 +647,8 @@
     LEVELS.forEach((L,i)=>{ const b=document.createElement('button'); b.className='lvbtn';
       const done=prog.best[i]!==undefined, star=done&&prog.best[i]<=(L.par||0);
       if(done)b.classList.add('done'); if(!isUnlocked(i))b.classList.add('locked'); if(i===levelIdx)b.classList.add('cur');
-      b.textContent=isUnlocked(i)?(i+1):'🔒';
-      if(star){ const s=document.createElement('span'); s.className='st'; s.textContent='⭐'; b.appendChild(s); }
+      b.textContent=(i+1);
+      if(star){ const s=document.createElement('span'); s.className='st'; b.appendChild(s); }
       b.onclick=()=>{ if(isUnlocked(i)) loadLevel(i); };
       g.appendChild(b); }); }
   document.getElementById('grid').onclick=()=>{ buildPicker(); document.getElementById('pick').style.display='flex'; };
@@ -658,6 +756,11 @@
           ctx.fillStyle='#7c3b38'; ctx.beginPath(); ctx.arc(cx,cy+S*.055,R,0,7); ctx.fill();
           ctx.fillStyle='#a85550'; ctx.beginPath(); ctx.arc(cx,cy-S*.015,R*.93,0,7); ctx.fill();
           ctx.strokeStyle=INK; ctx.lineWidth=Math.max(2.2,S*.045); ctx.beginPath(); ctx.arc(cx,cy+S*.01,R,0,7); ctx.stroke(); } }
+        if(stickyG.has(r+','+c)){ const cx=x+S/2,cy=y+S/2;
+          ctx.fillStyle='rgba(168,201,106,.14)'; rr(x+S*.16,y+S*.16,S*.68,S*.68,S*.24); ctx.fill();
+          ctx.strokeStyle='#a8c96a'; ctx.lineWidth=Math.max(2,S*.045); rr(x+S*.16,y+S*.16,S*.68,S*.68,S*.24); ctx.stroke();
+          ctx.fillStyle='rgba(168,201,106,.6)';
+          [[-.13,-.09],[.12,.01],[-.03,.14]].forEach(o2=>{ ctx.beginPath(); ctx.arc(cx+o2[0]*S,cy+o2[1]*S,S*.05,0,7); ctx.fill(); }); }
         if(platesG.includes(r+','+c)){ const lit=state.drops.some(d=>d.r===r&&d.c===c);
           ctx.fillStyle=lit?'rgba(255,210,122,.22)':'rgba(120,112,150,.14)'; ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.fill();
           ctx.strokeStyle=lit?'#ffd27a':'#6f6890'; ctx.lineWidth=Math.max(2,S*.05); ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.stroke();
@@ -691,7 +794,9 @@
 
   window.__goop={ state:()=>({level:'L'+(levelIdx+1),idx:levelIdx,moves,won,
       drops:state.drops.map(d=>({r:d.r,c:d.c,size:d.size,color:d.color,locked:d.locked})), molds:state.molds.map(m=>({size:m.size,filled:m.filled}))}),
-    move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length };
+    move:d=>applyMove(d,true), undo:()=>undo(), solve:()=>solve(), load:i=>loadLevel(i), count:()=>LEVELS.length,
+    anim:()=>{ let m=0; for(const id in renderById){ const d=state.drops.find(x=>x.id==id);
+      if(d){ m=Math.max(m,Math.abs(renderById[id].px-cellX(d.c)),Math.abs(renderById[id].py-cellY(d.r))); } } return m; } };
   { let hsh=2166136261; const str=JSON.stringify(LEVELS.map(l=>l.map));
     for(let i=0;i<str.length;i++){ hsh^=str.charCodeAt(i); hsh=Math.imul(hsh,16777619); }
     document.getElementById('buildid').textContent='build '+(hsh>>>0).toString(36); }
