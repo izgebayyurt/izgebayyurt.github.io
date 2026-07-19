@@ -839,7 +839,9 @@ function applyRecruitPerks(g){
 
 // Grant the spoils of a victory. Shared by the auto-sim and the manual duel.
 // Returns { gain, drop } — drop is a gear find or null.
-function grantWin(g, i, ev, live){
+// manual=true (a duel you fought yourself) always unlocks the next rank — skill earned it.
+// Auto-battle needs a CONVINCING win (power ≥ 40% of the foe's) so a 6%-fluke can't brute-force the ladder.
+function grantWin(g, i, ev, live, manual){
   const gain = Math.round(oppReward(i) * MANAGER_MULT(S.fac.manager) * goldMult());
   const fame = Math.round(oppFame(i) * fameMult());
   S.gold += gain;
@@ -847,7 +849,8 @@ function grantWin(g, i, ev, live){
   S.lifeFame = (S.lifeFame||0) + fame;
   g.xp += Math.round(oppXP(i) * xpMult());
   g.wins++;
-  if(i === S.maxTier && S.maxTier < MAX_RANK-1){ S.maxTier++; if(S.maxTier > (S.bestRank||0)) S.bestRank = S.maxTier; }  // unlock next tier
+  const convincing = manual || power(g) >= oppPower(i)*0.4;
+  if(convincing && i === S.maxTier && S.maxTier < MAX_RANK-1){ S.maxTier++; if(S.maxTier > (S.bestRank||0)) S.bestRank = S.maxTier; }  // unlock next tier
   simWins++;
   const drop = rollGearDrop(g, i);
   maybeLevel(g, ev, live);
@@ -1791,7 +1794,7 @@ function endDuel(won){
   const data = { won, name:g.name, opp:foe(i).n, gain:0, fame:0, xp:0, leveled:0, death:false, drop:null };
   if(won){
     const lvlB = g.level, ev = [];
-    const r = grantWin(g, i, ev, false);
+    const r = grantWin(g, i, ev, false, true);
     data.gain = r.gain; data.drop = r.drop;
     data.fame = Math.round(oppFame(i)*fameMult()); data.xp = Math.round(oppXP(i)*xpMult()); data.leveled = g.level - lvlB;
     if(g.hp <= 0) g.hp = 1;                     // a victor lives
