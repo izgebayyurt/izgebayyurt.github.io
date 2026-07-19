@@ -492,26 +492,6 @@
   const DEFL=[{3:1,0:2,2:'b',1:'b'},{3:0,1:2,2:'b',0:'b'},{2:0,1:3,3:'b',0:'b'},{2:1,0:3,3:'b',1:'b'}];
   const DIRI=(dr,dc)=>dr===-1?0:dr===1?1:dc===-1?2:3;
   let limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0,spawnT0=0,hasSizes=false;
-  let deadPend=0,deadShown=false;
-  function solveFrom(drops0,molds0,capStates,capDepth){
-    const s0={drops:drops0.map(d=>({...d})),molds:molds0.map(m=>({...m}))};
-    const key2=st=>sig(st.drops,st.molds); const q=[{s:s0,p:0}]; const seen=new Set([key2(s0)]);
-    while(q.length){ const {s:st,p:pl}=q.shift();
-      if(isWinS(st.drops,st.molds)) return {win:true,capped:false};
-      if(pl>=(capDepth||36)) continue;
-      for(const dir of ['up','down','left','right']){ const r=simulate(st.drops,st.molds,dir);
-        if(r.drops.some(d=>d.locked)) continue;
-        const ns={drops:r.drops,molds:r.molds}; if(sig(st.drops,st.molds)===key2(ns))continue;
-        const k=key2(ns); if(seen.has(k))continue; seen.add(k);
-        if(seen.size>40000) return {win:false,capped:true};
-        q.push({s:ns,p:pl+1}); } }
-    return {win:false,capped:false}; }
-  function scheduleDeadCheck(){ clearTimeout(deadPend); if(won||deadShown) return;
-    deadPend=setTimeout(()=>{ if(won||deadShown) return;
-      const res=solveFrom(state.drops,state.molds);
-      if(!res.win&&!res.capped){ deadShown=true; SND.oom();
-        const he=document.getElementById('hint'); he.style.display='';
-        he.innerHTML='⚠️ <b>No way to finish from here.</b> ↶ Undo (Z) is free — or ↺ restart.'; } },260); }
   const PKEY='gm_escape2_v1';
   let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'{"best":{}}'); }catch(e){ prog={best:{}}; }
   const saveProg=()=>{ try{ localStorage.setItem(PKEY,JSON.stringify(prog)); }catch(e){} };
@@ -648,7 +628,7 @@
     colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); { let si=0; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0,sc:0,sdelay:(si++)*70}; }); spawnT0=performance.now(); }
-    parts=[]; trails=[]; rings=[]; sqA=0; doorAnim=0; doorWasOpen=false; deadShown=false; clearTimeout(deadPend);
+    parts=[]; trails=[]; rings=[]; sqA=0; doorAnim=0; doorWasOpen=false;
     document.getElementById('lvlname').textContent='Level '+(levelIdx+1);
     { const h=LEVELS[levelIdx].hint||''; const he=document.getElementById('hint'); he.innerHTML=h; he.style.display=h?'':'none'; }
     updateMoves();
@@ -704,7 +684,7 @@
       life:1,color,size:S*(.05+.04*((i*7)%3)/2)}); } if(parts.length>260)parts=parts.slice(-260); }
   function undo(){ if(moving||!undoStack.length) return; SND.undo(); const s=undoStack.pop();
     state={drops:s.drops.map(d=>({...d})),molds:s.molds.map(m=>({...m}))}; moves=s.moves; won=false;
-    updateMoves(); deadShown=false; clearTimeout(deadPend);
+    updateMoves();
     { const h=LEVELS[levelIdx].hint||''; const he=document.getElementById('hint'); he.innerHTML=h; he.style.display=h?'':'none'; }
     document.getElementById('win').style.display='none';
     renderById={}; ghosts=[]; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; }); }
