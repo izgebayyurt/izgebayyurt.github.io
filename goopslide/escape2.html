@@ -50,14 +50,10 @@
     <button class="chip" id="reset" title="Restart (R)">↺</button>
     <button class="chip" id="grid" title="Levels">▦</button>
     <button class="chip" id="mute" title="Sound">🔊</button>
-    <div class="chip" title="Moves left"><span id="moves">0</span></div>
+    <div class="chip" title="Moves"><span id="moves">0</span></div>
   </div>
   <div id="hint">Swipe moves <b>every</b> goop. Escape through the <b>gap in the wall</b> that matches your colour.</div>
   <div id="win" class="modal"><div class="card"><h2>Solved! 🎉</h2><div class="sub" id="wintxt"></div><button class="chip" id="wnext">Next ▶</button></div></div>
-  <div id="oom" class="modal"><div class="card"><h2>Out of moves</h2><div class="sub">Undo is always free — or top up and push on.</div>
-    <button class="chip" id="ad">▶ +8 moves <span style="opacity:.6">(watch ad)</span></button>
-    <button class="chip" id="oomres">↺ Restart</button></div></div>
-  <div id="adplay" class="modal"><div class="card"><h2>Ad break</h2><div class="sub">(demo ad — imagine something skippable)</div><div id="adcount">3</div></div></div>
   <div id="pick" class="modal"><div class="card"><h2>Levels</h2><div class="sub" id="buildid"></div><div id="pgrid"></div><button class="chip" id="pclose">✕ Close</button></div></div>
 
 <script>
@@ -323,7 +319,7 @@
     {hint:"", par:7, limit:11,
      map:["####E###","#.....p#","###....#","#....#.#","#.p..oo#","#.....p#","#I######"]},
     {hint:"", par:8, limit:12,
-     map:["######","#.###E","#o##oD","#....#","#..o##","######"]},
+     map:["#######","#.o##.#","#...#o#","#.#...#","#..#..#","#E#####"]},
     {hint:"", par:9, limit:13,
      map:["####E##","#..#..#","#...p##","##....#","#.#..p#","#..oo.#","####H##"]},
     {hint:"", par:10, limit:14,
@@ -361,17 +357,17 @@
     {hint:"", par:5, limit:9,
      map:["########","##ob.z.#","##...x.#","#..poo.#","#xp....#","#.....pA","#####B##"]},
     {hint:"", par:6, limit:10,
-     map:["##A##","##o.#","#oop#","Bppw#","#####"]},
+     map:["#####","##x.#","#o.pA","#..##","#..pB","#zoo#","#####"]},
     {hint:"", par:7, limit:11,
      map:["########","##.po..#","#..p.y.#","#...w#o#","Bo..#..#","#......#","######A#"]},
     {hint:"", par:8, limit:12,
      map:["########","B..po..#","#.#..yp#","#....o.#","#....p.#","#x.....#","A....#.#","########"]},
-    {hint:"", par:9, limit:13,
-     map:["#####","##ooB","Ao.p#","#ppw#","#####"]},
+    {hint:"", par:8, limit:12,
+     map:["####A##","#..#..#","#..#z.#","#..o.##","##oo..#","#######"]},
     {hint:"", par:11, limit:15,
      map:["########","##ob.z.#","##...xo#","##.pop##","#x.....#","#.....pA","#####B##"]},
-    {hint:"", par:12, limit:17,
-     map:["#####","B.x.#","#o.pA","#..##","#..p#","#zoo#","#####"]},
+    {hint:"", par:14, limit:20,
+     map:["#####","B.x.#","#o..A","#..##","#p.p#","#zoo#","#####"]},
     {hint:"", par:15, limit:21,
      map:["######","#pp.##","##o..#","#.wpx#","#....#","A.o#.#","#.o.b#","####B#"]},
   ];
@@ -379,6 +375,26 @@
   let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
   const DIRV=[[-1,0],[1,0],[0,-1],[0,1]];
   let limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0,spawnT0=0,hasSizes=false;
+  let deadPend=0,deadShown=false;
+  function solveFrom(drops0,molds0,capStates,capDepth){
+    const s0={drops:drops0.map(d=>({...d})),molds:molds0.map(m=>({...m}))};
+    const key2=st=>sig(st.drops,st.molds); const q=[{s:s0,p:0}]; const seen=new Set([key2(s0)]);
+    while(q.length){ const {s:st,p:pl}=q.shift();
+      if(isWinS(st.drops,st.molds)) return {win:true,capped:false};
+      if(pl>=(capDepth||36)) continue;
+      for(const dir of ['up','down','left','right']){ const r=simulate(st.drops,st.molds,dir);
+        if(r.drops.some(d=>d.locked)) continue;
+        const ns={drops:r.drops,molds:r.molds}; if(sig(st.drops,st.molds)===key2(ns))continue;
+        const k=key2(ns); if(seen.has(k))continue; seen.add(k);
+        if(seen.size>40000) return {win:false,capped:true};
+        q.push({s:ns,p:pl+1}); } }
+    return {win:false,capped:false}; }
+  function scheduleDeadCheck(){ clearTimeout(deadPend); if(won||deadShown) return;
+    deadPend=setTimeout(()=>{ if(won||deadShown) return;
+      const res=solveFrom(state.drops,state.molds);
+      if(!res.win&&!res.capped){ deadShown=true; SND.oom();
+        const he=document.getElementById('hint'); he.style.display='';
+        he.innerHTML='⚠️ <b>No way to finish from here.</b> ↶ Undo (Z) is free — or ↺ restart.'; } },260); }
   const PKEY='gm_escape2_v1';
   let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'{"best":{}}'); }catch(e){ prog={best:{}}; }
   const saveProg=()=>{ try{ localStorage.setItem(PKEY,JSON.stringify(prog)); }catch(e){} };
@@ -453,11 +469,11 @@
     colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); { let si=0; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0,sc:0,sdelay:(si++)*70}; }); spawnT0=performance.now(); }
-    limitNow=LEVELS[levelIdx].limit||99; movesLeft=limitNow; parts=[]; trails=[]; rings=[]; sqA=0; doorAnim=0; doorWasOpen=false;
+    parts=[]; trails=[]; rings=[]; sqA=0; doorAnim=0; doorWasOpen=false; deadShown=false; clearTimeout(deadPend);
     document.getElementById('lvlname').textContent='Level '+(levelIdx+1);
     { const h=LEVELS[levelIdx].hint||''; const he=document.getElementById('hint'); he.innerHTML=h; he.style.display=h?'':'none'; }
     updateMoves();
-    ['win','oom','adplay','pick'].forEach(id=>document.getElementById(id).style.display='none');
+    ['win','pick'].forEach(id=>document.getElementById(id).style.display='none');
   }
   function snapshot(){ return {drops:state.drops.map(d=>({...d})), molds:state.molds.map(m=>({...m})), moves}; }
   function applyMove(dir,instant){ if((moving&&!instant)||won) return;
@@ -486,16 +502,15 @@
       if(JUICE.ripple) rings.push({x:cellX(m.c),y:cellY(m.r),ci:colOf(m.to),life:1}); });
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
     sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir];
-    movesLeft=limitNow-moves; updateMoves(); moving=true;
+    updateMoves(); moving=true;
     if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k));
       if(o!==doorWasOpen){ SND.door&&SND.door(o); doorWasOpen=o; } }
     if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; renderById[id].wp=null; } } ghosts=[]; moving=false; }
     if(isWinS(state.drops,state.molds)){ won=true; onWin(); }
-    else if(movesLeft<=0){ setTimeout(()=>{ if(!won&&movesLeft<=0){ SND.oom(); document.getElementById('oom').style.display='flex'; } },420); }
+    else if(!instant){ scheduleDeadCheck(); }
   }
-  function updateMoves(){ const el=document.getElementById('moves'); el.textContent=movesLeft;
-    el.classList.remove('tickA'); void el.offsetWidth; el.classList.add('tickA');
-    el.classList.toggle('low',movesLeft<=3&&!won); }
+  function updateMoves(){ const el=document.getElementById('moves'); el.textContent=moves;
+    el.classList.remove('tickA'); void el.offsetWidth; el.classList.add('tickA'); }
   function onWin(){ SND.win(); const par=LEVELS[levelIdx].par||0; const star=moves<=par;
     const prev=prog.best[levelIdx]; if(prev===undefined||moves<prev){ prog.best[levelIdx]=moves; saveProg(); }
     document.getElementById('wintxt').innerHTML=moves+' moves · par '+par+(star?' · ⭐':'');
@@ -508,9 +523,9 @@
       life:1,color,size:S*(.05+.04*((i*7)%3)/2)}); } if(parts.length>260)parts=parts.slice(-260); }
   function undo(){ if(moving||!undoStack.length) return; SND.undo(); const s=undoStack.pop();
     state={drops:s.drops.map(d=>({...d})),molds:s.molds.map(m=>({...m}))}; moves=s.moves; won=false;
-    movesLeft=limitNow-moves; updateMoves();
+    updateMoves(); deadShown=false; clearTimeout(deadPend);
     { const h=LEVELS[levelIdx].hint||''; const he=document.getElementById('hint'); he.innerHTML=h; he.style.display=h?'':'none'; }
-    document.getElementById('win').style.display='none'; document.getElementById('oom').style.display='none';
+    document.getElementById('win').style.display='none';
     renderById={}; ghosts=[]; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0}; }); }
 
   // ---- input ---------------------------------------------------------------
@@ -536,13 +551,7 @@
       g.appendChild(b); }); }
   document.getElementById('grid').onclick=()=>{ buildPicker(); document.getElementById('pick').style.display='flex'; };
   document.getElementById('pclose').onclick=()=>document.getElementById('pick').style.display='none';
-  document.getElementById('oomres').onclick=()=>loadLevel(levelIdx);
-  document.getElementById('ad').onclick=()=>{ document.getElementById('oom').style.display='none';
-    const ap=document.getElementById('adplay'); ap.style.display='flex'; let t=3;
-    document.getElementById('adcount').textContent=t;
-    const iv=setInterval(()=>{ t--; if(t<=0){ clearInterval(iv); ap.style.display='none';
-        limitNow+=8; movesLeft=limitNow-moves; updateMoves(); SND.reward(); }
-      else document.getElementById('adcount').textContent=t; },1000); };
+
   document.getElementById('mute').onclick=()=>{ muted=!muted; try{localStorage.setItem('gm_mute',muted?'1':'0');}catch(e){} muteBtn(); SND.tick(); }; muteBtn();
 
   // ---- layout & draw -------------------------------------------------------
