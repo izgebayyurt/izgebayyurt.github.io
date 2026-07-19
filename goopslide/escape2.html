@@ -463,9 +463,9 @@
      map:["###BC####","#o.....o#","#s#.#..##","#p.#...w#","#s.#..x.#","Aq..#..b#","#########"]},
   ];
 
-  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,stickyG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
+  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,bumpSetG,stickyG,wstickyG,wadjG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
   const DIRV=[[-1,0],[1,0],[0,-1],[0,1]];
-  const DEFL=[{3:1,0:2,2:'b',1:'b'},{3:0,1:2,2:'b',0:'b'},{2:0,1:3,3:'b',0:'b'},{2:1,0:3,3:'b',1:'b'}];
+  const DEFL=[{3:1,2:0,0:2,1:3},{3:0,2:1,0:3,1:2},{3:1,2:0,0:2,1:3},{3:0,2:1,0:3,1:2}];
   const DIRI=(dr,dc)=>dr===-1?0:dr===1?1:dc===-1?2:3;
   let limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0,spawnT0=0,hasSizes=false;
   let deadPend=0,deadShown=false;
@@ -494,7 +494,7 @@
   const isUnlocked=i=>true;   // all levels open (playtest mode)
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
-    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; triMapG={}; bumpSetG=new Set(); stickyG=new Set(); const drops=[], molds=[]; let id=0;
+    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; triMapG={}; bumpSetG=new Set(); stickyG=new Set(); wstickyG=new Set(); wadjG=new Set(); const drops=[], molds=[]; let id=0;
     for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
       if(ch==='#'){ row.push('#'); }
       else if('ABC'.includes(ch)){ row.push('#'); const ci='ABC'.indexOf(ch); holes.push({r,c,color:ci}); holeMapG[r+','+c]=ci; }
@@ -504,6 +504,7 @@
       else if('wxyz'.includes(ch)){ row.push('.'); triMapG[r+','+c]='wxyz'.indexOf(ch); }
       else if(ch==='b'){ row.push('.'); bumpSetG.add(r+','+c); }
       else if(ch==='s'){ row.push('.'); stickyG.add(r+','+c); }
+      else if(ch==='S'){ row.push('#'); wstickyG.add(r+','+c); }
       else if(ch==='_'){ row.push('.'); platesG.push(r+','+c); }
       else { row.push('.');
         if(ch==='o') drops.push({id:id++,r,c,size:1,color:0,locked:false});
@@ -512,6 +513,8 @@
         else if(ch==='^') spikes.add(r+','+c);
         else if('123456789'.includes(ch)) molds.push({r,c,size:+ch,filled:false}); } }
       grid.push(row); }
+    for(const k of wstickyG){ const[wr,wc]=k.split(',').map(Number);
+      [[wr-1,wc],[wr+1,wc],[wr,wc-1],[wr,wc+1]].forEach(([ar,ac])=>{ if(inb(ar,ac)&&grid[ar][ac]!=='#') wadjG.add(ar+','+ac); }); }
     return {drops,molds}; }
 
   const DIRS={up:[-1,0],down:[1,0],left:[0,-1],right:[0,1]};
@@ -522,7 +525,7 @@
     const dOpen=doorCellG&&platesG.some(k=>drops.some(d=>d.r+','+d.c===k));
     const order=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*dr+ds[b].c*dc)-(ds[a].r*dr+ds[a].c*dc));
     const removed=new Set(), merges=[], drains=[], corks=[];
-    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c,cdr=dr,cdc=dc,red=0; ds[i].corners=[]; const one=stickyG.has(r+','+c);
+    for(const i of order){ if(removed.has(i))continue; let r=ds[i].r,c=ds[i].c,cdr=dr,cdc=dc,red=0; ds[i].corners=[]; const one=stickyG.has(r+','+c)||wadjG.has(r+','+c);
       while(true){ const nr=r+cdr,nc=c+cdc,k=nr+','+nc;
         if(holeMapG[k]!==undefined){ if(holeMapG[k]===ds[i].color&&(!holeSizeG[k]||holeSizeG[k]===ds[i].size)){ removed.add(i); drains.push({id:ds[i].id,r:nr,c:nc,color:ds[i].color}); r=null; } break; }
         if(!inb(nr,nc)||grid[nr][nc]==='#') break;
@@ -727,7 +730,13 @@
           const hs=holeSizeG[r+','+c]; if(hs){ ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='800 '+Math.round(S*.34)+'px ui-rounded,system-ui';
             ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(hs,x+S/2,y+S/2+1); } }
 
-        else block(x,y,S); } else { ctx.fillStyle=((r+c)&1)?'#2a2539':'#2d283d'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
+        else { block(x,y,S);
+          if(wstickyG.has(r+','+c)){ ctx.fillStyle='#a8c96a';
+            rr(x+S*.28,y+S*.16,S*.44,S*.30,S*.15); ctx.fill();
+            ctx.beginPath(); ctx.arc(x+S*.38,y+S*.55,S*.07,0,7); ctx.fill();
+            ctx.beginPath(); ctx.arc(x+S*.60,y+S*.63,S*.055,0,7); ctx.fill();
+            ctx.strokeStyle=INK; ctx.lineWidth=Math.max(1.6,S*.03);
+            rr(x+S*.28,y+S*.16,S*.44,S*.30,S*.15); ctx.stroke(); } } } else { ctx.fillStyle=((r+c)&1)?'#2a2539':'#2d283d'; rr(x+2,y+2,S-4,S-4,S*.16); ctx.fill();
         const hj=holeMapG[r+','+c]; if(hj!==undefined){ const cx=x+S/2,cy=y+S/2;
           ctx.fillStyle='#12101b'; ctx.beginPath(); ctx.arc(cx,cy,S*.30,0,7); ctx.fill();
           ctx.strokeStyle=COLORS[hj].glow+'.25)'; ctx.lineWidth=Math.max(5,S*.11);
