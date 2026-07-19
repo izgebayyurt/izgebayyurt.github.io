@@ -82,6 +82,11 @@ body{
 .stat.gold b{ color:var(--gold2); }
 .stat.fame b{ color:#cf9fb6; }
 .stat.pop b{ color:var(--sand); }
+#goal{ display:flex; align-items:center; gap:7px; margin-top:8px; padding:6px 11px;
+  background:rgba(200,145,47,.14); border:1px solid rgba(200,145,47,.3); border-radius:9px; }
+#goal .goal-ic{ color:var(--gold2); font-size:12px; }
+#goal #goal-txt{ font-family:var(--font-b); font-size:12.5px; color:var(--sand); opacity:.92; }
+#goal #goal-txt b{ color:var(--gold2); font-weight:600; }
 
 /* ---------- main scroll area ---------- */
 #main{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 12px 92px; }
@@ -196,6 +201,44 @@ body{
 .slot-empty .em{ font-size:26px; opacity:.5; }
 .slot-empty p{ font-family:var(--font-b); font-size:13px; color:var(--ink-soft); margin:6px 0 11px; }
 
+/* slave market */
+.market{ border:1.5px dashed var(--line-2); background:rgba(244,236,216,.45); border-radius:13px; padding:12px; margin-bottom:11px; }
+.mk-head{ font-family:var(--font-sc); font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); margin-bottom:10px; }
+.mk-head small{ display:block; font-family:var(--font-b); font-size:11px; text-transform:none; letter-spacing:0; color:var(--ink-soft); margin-top:2px; }
+.mk-empty{ font-family:var(--font-b); font-style:italic; font-size:12.5px; color:var(--ink-soft); text-align:center; padding:14px 6px; }
+.cand{ position:relative; background:var(--parch); border:1.5px solid var(--line); border-radius:11px; padding:11px 12px; margin-bottom:9px; }
+.cand-top{ display:flex; gap:9px; align-items:center; }
+.g-portrait.csm{ width:38px; height:38px; font-size:20px; border-radius:9px; }
+.cand-name{ font-family:var(--font-d); font-weight:600; font-size:15px; color:var(--ink); }
+.cand-cls{ font-family:var(--font-sc); font-size:10px; letter-spacing:.08em; color:var(--bronze); text-transform:uppercase; }
+.cand-tier{ position:absolute; top:-8px; right:10px; font-family:var(--font-sc); font-size:9px; letter-spacing:.1em;
+  text-transform:uppercase; padding:2px 8px; border-radius:20px; font-weight:600; }
+.t-raw{ background:var(--sand2); color:var(--ink-soft); border:1px solid var(--line-2); }
+.t-promising{ background:#3f7a5c; color:var(--sand); }
+.t-exceptional{ background:var(--gold); color:#241a08; box-shadow:0 0 10px rgba(224,176,74,.5); }
+.cand-origin{ font-family:var(--font-b); font-style:italic; font-size:11px; color:var(--ink-soft); margin-top:7px; line-height:1.35; }
+.cand-stats{ font-family:var(--font-sc); font-size:10.5px; letter-spacing:.05em; color:var(--ink-soft); margin-top:6px; }
+.cand-stats b{ font-family:var(--font-d); color:var(--ink); }
+.cand .cand-buy{ margin-top:9px; }
+.mk-reroll{ width:100%; margin-top:2px; }
+
+/* daily games */
+.daily{ background:var(--parch); border:1.5px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:11px;
+  box-shadow:0 2px 0 var(--line2); }
+.d-head{ font-family:var(--font-sc); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink);
+  display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px; }
+.d-streak{ font-family:var(--font-b); font-size:11px; text-transform:none; letter-spacing:0; color:var(--bronze); }
+.d-ob{ display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px dashed var(--line); font-family:var(--font-b); font-size:13px; color:var(--ink); }
+.d-ob:last-of-type{ border-bottom:none; }
+.d-ob .d-check{ font-family:var(--font-d); color:var(--ink-soft); width:16px; text-align:center; flex:none; }
+.d-ob.done{ color:var(--ink-soft); }
+.d-ob.done .d-check{ color:var(--green); }
+.d-ob.done .d-txt{ text-decoration:line-through; opacity:.75; }
+.d-ob .d-txt{ flex:1; }
+.d-ob .d-prog{ font-family:var(--font-sc); font-size:10.5px; color:var(--ink-soft); letter-spacing:.04em; }
+.d-cleared{ font-family:var(--font-b); font-size:12px; color:var(--green); background:rgba(90,125,60,.1);
+  border:1px dashed var(--green); border-radius:9px; padding:7px 10px; margin-top:8px; text-align:center; }
+
 /* ---------- arena ---------- */
 .opp-card{ text-align:center; }
 .opp-portrait{
@@ -219,6 +262,35 @@ body{
 .tier-nav button[disabled]{ opacity:.3; pointer-events:none; }
 .tier-lab{ font-family:var(--font-sc); font-size:11px; letter-spacing:.14em; color:var(--ink-soft); min-width:96px; text-align:center; text-transform:uppercase;}
 .locked-note{ font-family:var(--font-b); font-style:italic; font-size:12px; color:var(--blood); margin-top:6px;}
+.vendetta-note{ font-family:var(--font-sc); font-size:12px; letter-spacing:.06em; color:var(--blood);
+  background:rgba(147,47,34,.10); border:1px dashed var(--blood2); border-radius:9px; padding:7px 10px; margin-top:8px; }
+
+/* traits & origin on the roster card */
+.g-origin{ font-family:var(--font-b); font-style:italic; font-size:11.5px; color:var(--ink-soft); margin-top:8px; line-height:1.35; }
+.g-traits{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.tchip{ font-family:var(--font-sc); font-size:10px; letter-spacing:.05em; color:var(--bronze);
+  background:rgba(156,107,63,.10); border:1px solid rgba(156,107,63,.35); border-radius:20px; padding:2px 8px; }
+
+/* laurels (achievements) */
+.ach-grid{ display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:11px; }
+.ach{ display:flex; gap:8px; align-items:center; background:var(--parch); border:1.5px solid var(--line);
+  border-radius:10px; padding:7px 9px; }
+.ach .a-ic{ font-size:17px; flex:none; }
+.ach .a-body b{ display:block; font-family:var(--font-d); font-size:11.5px; font-weight:600; color:var(--ink); line-height:1.15; }
+.ach .a-body small{ display:block; font-family:var(--font-b); font-size:9.5px; color:var(--ink-soft); margin-top:1px; line-height:1.2; }
+.ach.locked{ opacity:.45; filter:grayscale(.6); }
+
+/* hall of the fallen */
+.hall{ margin-bottom:11px; }
+.fallen-row{ display:flex; gap:10px; align-items:flex-start; background:var(--parch); border:1.5px solid var(--line);
+  border-left:4px solid var(--blood); border-radius:10px; padding:9px 11px; margin-bottom:7px; }
+.fallen-row .f-ic{ font-size:20px; flex:none; filter:grayscale(.7); opacity:.8; }
+.f-name{ font-family:var(--font-d); font-weight:600; font-size:14px; color:var(--ink); }
+.f-sub{ font-family:var(--font-sc); font-size:10px; letter-spacing:.06em; color:var(--bronze); text-transform:uppercase; }
+.f-slain{ font-family:var(--font-b); font-size:11.5px; color:var(--ink-soft); margin-top:2px; line-height:1.35; }
+.f-slain em{ color:var(--ink-soft); opacity:.85; }
+.vendetta-card{ font-family:var(--font-b); font-size:12.5px; color:var(--ink); line-height:1.45;
+  background:rgba(147,47,34,.09); border:1.5px dashed var(--blood2); border-radius:11px; padding:10px 13px; margin-bottom:11px; }
 
 .auto-toggle{ display:flex; align-items:center; justify-content:space-between; gap:10px;
   background:var(--parch); border:1.5px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:11px; }
@@ -254,6 +326,25 @@ body{
 .fac .fdesc em{ color:var(--green); font-style:normal; font-weight:600; }
 .fac-up{ margin-top:10px; }
 .fac.maxed .fdesc em{ color:var(--bronze); }
+
+/* ---------- legacy / prestige ---------- */
+.leg-hero{ text-align:center; background:linear-gradient(180deg,#2f231b,#241a15); border-color:#000; }
+.leg-glory{ font-family:var(--font-d); font-weight:700; font-size:34px; color:var(--gold2); letter-spacing:.04em; }
+.leg-glory-sub{ font-family:var(--font-sc); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sand); opacity:.8; margin-top:2px; }
+.leg-glory-sub b{ color:var(--gold2); }
+.leg-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:4px; }
+.leg-stat{ display:flex; align-items:center; gap:9px; background:var(--parch); border:1.5px solid var(--line);
+  border-radius:11px; padding:9px 11px; box-shadow:0 2px 0 var(--line2); }
+.leg-stat .li{ font-size:20px; flex:none; }
+.leg-stat b{ display:block; font-family:var(--font-d); font-size:15px; font-weight:600; line-height:1.1; }
+.leg-stat small{ display:block; font-family:var(--font-sc); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-top:1px; }
+.retire-box{ display:flex; align-items:center; justify-content:center; gap:14px; padding:6px 0 2px; }
+.retire-box .rb-num{ font-family:var(--font-d); font-weight:700; font-size:22px; text-align:center; }
+.retire-box .rb-lab{ font-family:var(--font-sc); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); text-align:center; margin-top:1px; }
+.retire-box .rb-arrow{ font-family:var(--font-d); font-size:22px; color:var(--ink-soft); }
+.perk .perk-lv{ font-family:var(--font-sc); font-size:10px; letter-spacing:.06em; color:var(--bronze); text-transform:uppercase; }
+.perk .perk-next{ color:var(--green); }
+.btn.glory{ background:linear-gradient(180deg,#6a4f9c,#4a3672); color:#f4ecd8; border-color:#2f2352; box-shadow:0 2px 0 #2f2352; min-width:78px; }
 
 /* ---------- bottom nav ---------- */
 #nav{
@@ -477,8 +568,9 @@ body{
     <div id="stats">
       <div class="stat gold"><b id="s-gold">0</b><small>Denarii</small></div>
       <div class="stat fame"><b id="s-fame">0</b><small>Fame</small></div>
-      <div class="stat pop"><b id="s-pop">0/1</b><small>Ludus</small></div>
+      <div class="stat pop"><b id="s-pop">0/1</b><small>Stable</small></div>
     </div>
+    <div id="goal"><span class="goal-ic">◗</span><span id="goal-txt">—</span></div>
   </div>
 
   <div id="main">
@@ -493,6 +585,8 @@ body{
         </div>
         <div class="switch" id="auto-switch"></div>
       </div>
+
+      <div id="daily-card"></div>
 
       <div class="section-h">Chronicle</div>
       <div id="log"></div>
@@ -510,12 +604,19 @@ body{
       <div id="facilities"></div>
       <div class="reset-link"><button id="reset-btn">Raze the ludus &amp; start over</button></div>
     </div>
+
+    <!-- LEGACY / PRESTIGE -->
+    <div class="panel" id="p-legacy">
+      <div class="section-h">Legacy</div>
+      <div id="legacy"></div>
+    </div>
   </div>
 
   <div id="nav">
     <div class="nav-b" data-tab="arena"><span class="ni">⚔️</span><span class="nl">Arena</span><span class="badge" id="badge-arena" style="display:none"></span></div>
     <div class="nav-b on" data-tab="ludus"><span class="ni">🛡️</span><span class="nl">Ludus</span></div>
     <div class="nav-b" data-tab="fac"><span class="ni">🏛️</span><span class="nl">Facilities</span></div>
+    <div class="nav-b" data-tab="legacy"><span class="ni">🏆</span><span class="nl">Legacy</span></div>
   </div>
 </div>
 
@@ -528,7 +629,7 @@ body{
 /* ============================ CONFIG ============================ */
 const SAVE_KEY = 'ludus.save.v1';
 const TICK_MS = 1000;                 // one game tick
-const MAX_OFFLINE_H = 8;              // cap offline catch-up
+const MAX_OFFLINE_H = 24;             // cap offline catch-up (daily check-in friendly)
 const XP_FOR = lvl => Math.round(60 * Math.pow(1.55, lvl-1));
 
 const NAMES = ['Flamma','Crixus','Verus','Priscus','Spiculus','Hermes','Tetraites','Rutuba',
@@ -567,6 +668,45 @@ const SPECIALS = {
 };
 const specOf = g => SPECIALS[g.cls] || SPECIALS.thraex;
 
+// Traits — every gladiator rolls two. Each touches one lever, so a fighter's
+// personality is mechanical, not just flavor. `mods` are multipliers (default 1).
+const TRAITS = {
+  bloodthirsty:{ ic:'🔥', name:'Bloodthirsty', desc:'+12% power — lives for the kill',            mods:{pow:1.12} },
+  reckless:    { ic:'💢', name:'Reckless',     desc:'+20% power, −12% max HP — no guard, all fury', mods:{pow:1.20, hp:0.88} },
+  ironhide:    { ic:'🪨', name:'Ironhide',     desc:'+18% max HP — shrugs off blows',              mods:{hp:1.18} },
+  swift:       { ic:'🦵', name:'Swift',        desc:'15% faster strikes in the duel',              mods:{spd:1.15} },
+  oldscars:    { ic:'🩹', name:'Old Scars',    desc:'Blocks 40% stronger in the duel',             mods:{guard:1.4} },
+  showman:     { ic:'🎭', name:'Showman',      desc:'+25% denarii from victories',                 mods:{gold:1.25} },
+  darling:     { ic:'🌟', name:'Crowd-Darling',desc:'+30% fame from victories',                    mods:{fame:1.30} },
+  student:     { ic:'📖', name:'Quick Study',  desc:'+25% experience from victories',              mods:{xp:1.25} },
+  stoic:       { ic:'🗿', name:'Stoic',        desc:'Heals 50% faster',                            mods:{heal:1.5} },
+  lucky:       { ic:'🍀', name:'Lucky',        desc:'Better odds of looting gear',                 mods:{drop:1} },
+};
+const TRAIT_IDS = Object.keys(TRAITS);
+function rollTraits(){
+  const a = TRAIT_IDS[(Math.random()*TRAIT_IDS.length)|0];
+  let b = a; while(b===a) b = TRAIT_IDS[(Math.random()*TRAIT_IDS.length)|0];
+  return [a,b];
+}
+// product of a mod across a gladiator's traits (1 if none)
+function tmod(g, key){
+  let m = 1;
+  for(const t of (g.traits||[])){ const tr = TRAITS[t]; if(tr && tr.mods[key]) m *= tr.mods[key]; }
+  return m;
+}
+const hasTrait = (g,id) => (g.traits||[]).includes(id);
+
+// Origins — a one-line past, assembled at recruitment. Pure story; free attachment.
+const ORIGIN_WHO = ['a debtor from Capua','a captured Thracian spearman','a fallen legionnaire','a Numidian horse-thief',
+  'a volunteer chasing glory','a condemned poisoner','a shepherd who strangled a wolf','a bankrupt merchant’s son',
+  'a deserter from the German frontier','a pit-fighter from the docks','a temple guard who struck a senator','a farmhand sold for taxes'];
+const ORIGIN_HOW = ['sold to the sand for a handful of denarii','dragged to the ludus in chains','who signed the oath willingly',
+  'bought cheap at the Capua market','spared the cross for the arena','traded for two oxen and a debt'];
+function rollOrigin(){
+  const s = ORIGIN_WHO[(Math.random()*ORIGIN_WHO.length)|0] + ', ' + ORIGIN_HOW[(Math.random()*ORIGIN_HOW.length)|0];
+  return s.charAt(0).toUpperCase() + s.slice(1) + '.';
+}
+
 // Per-gladiator equipment. Weapon lifts damage/power, armor lifts HP/power.
 // Tier you can buy is gated by the Armory facility level.
 const GEAR = {
@@ -583,7 +723,8 @@ const armorPow  = g => (g.gear ? g.gear.armor  : 0) * 6;
 // Returns {slot, tier, name} if the drop beats what's equipped, else null.
 function rollGearDrop(g, i){
   if(!g.gear) g.gear = { weapon:0, armor:0 };
-  const chance = Math.min(0.5, 0.12 + i*0.03);        // ~12% at bout 1 → 50% at the top
+  let chance = Math.min(0.5, 0.12 + i*0.03);          // ~12% at bout 1 → 50% at the top
+  if(hasTrait(g,'lucky')) chance = Math.min(0.62, chance + 0.10);   // Lucky trait
   if(Math.random() >= chance) return null;
   const slot = Math.random() < 0.5 ? 'weapon' : 'armor';
   // dropped tier hovers around the opponent's rung, never above the gear ceiling
@@ -593,8 +734,9 @@ function rollGearDrop(g, i){
   return { slot, tier, name: GEAR[slot].tiers[tier] };
 }
 
-// Arena opponents — power & reward scale up the ladder.
-const OPPONENTS = [
+// Arena opponents — the first bouts are hand-named; beyond them the games are
+// endless, with procedurally-titled foes that scale forever. Every rank is a wall.
+const NAMED = [
   {n:'Drunken Brawler',   e:'🥴', d:'Back-alley chancer'},
   {n:'Condemned Thief',   e:'⛓️', d:'Nothing left to lose'},
   {n:'Wild Boar',         e:'🐗', d:'Beast hunt · venatio'},
@@ -608,30 +750,44 @@ const OPPONENTS = [
   {n:'Barca the Giant',   e:'🗿', d:'A head taller than any man'},
   {n:'The Emperor’s Champion', e:'👑', d:'None have bested him'},
 ];
-const oppPower  = i => Math.round(16 * Math.pow(1.42, i));      // ~16 → ~900
+const RANK_TITLES = ['Challenger','Gladiator','Champion','Myrmidon','Destroyer','Warlord','Titan','Colossus','Demigod','Immortal'];
+const RANK_EMOJI  = ['⚔️','🗡️','🛡️','🪓','🔱','🐺','🦁','🐗','🐉','👹','🗿','☠️','👑','🔥'];
+const MAX_RANK = 120;                 // effectively endless — each rank is a grind wall
+function foe(i){
+  if(i < NAMED.length) return NAMED[i];
+  const k = i - NAMED.length;
+  const title = RANK_TITLES[k % RANK_TITLES.length];
+  const suffix = ['','Redux','Ascendant','Eternal','Apex'][Math.floor(k/RANK_TITLES.length) % 5];
+  return { n:`${title}${suffix?' '+suffix:''} · Rank ${i+1}`, e:RANK_EMOJI[i % RANK_EMOJI.length], d:'The endless games' };
+}
+// foe name with a correct article: "the Drunken Brawler" but "The Emperor's Champion" (no double "the")
+const theFoe = i => { const n = foe(i).n; return /^the\s/i.test(n) ? n : 'the '+n; };
+const oppPower  = i => Math.round(16 * Math.pow(1.30, i));      // gentler curve — champions can chase it
 const oppReward = i => Math.round(14 * Math.pow(1.5, i));       // denarii for a win
-const oppFame   = i => Math.round(1 + i*1.4);
+const oppFame   = i => Math.round(1 + i*1.4 + i*i*0.05);        // fame ramps up — feeds Glory
 const oppXP     = i => Math.round(22 * Math.pow(1.32, i));
+// enemy HP for duels — tapers from 3.2× down to ~2.0× so high-rank duels aren't unwinnable DPS races
+const MANAGER_MULT = l => 1 + (l-1)*0.12;                        // gold multiplier from Lanista's Contacts
 
-// Facilities
+// Facilities — high caps so they stay a gold sink for weeks, not days
 const FAC = {
-  barracks:{ ic:'⛺', name:'Barracks', max:8,
+  barracks:{ ic:'⛺', name:'Barracks', max:10,
     desc:l=>`Houses up to <em>${l}</em> gladiator${l>1?'s':''}.`,
     cost:l=> Math.round(120 * Math.pow(2.15, l-1)) },
-  training:{ ic:'🏋️', name:'Training Grounds', max:10,
+  training:{ ic:'🏋️', name:'Training Grounds', max:30,
     desc:l=>`Training is <em>${(1+(l-1)*0.35).toFixed(2)}×</em> faster.`,
-    cost:l=> Math.round(80 * Math.pow(1.9, l-1)) },
-  infirmary:{ ic:'⚕️', name:'Infirmary', max:10,
-    desc:l=>`Heals <em>+${(l).toFixed(0)}</em> HP/sec · <em>${Math.round(deathCut(l)*100)}%</em> lower death risk.`,
-    cost:l=> Math.round(100 * Math.pow(1.95, l-1)) },
-  armory:{ ic:'🗡️', name:'Armory', max:12,
+    cost:l=> Math.round(80 * Math.pow(1.85, l-1)) },
+  infirmary:{ ic:'⚕️', name:'Infirmary', max:30,
+    desc:l=>`Heals <em>+${(l).toFixed(0)}</em> HP/sec · <em>${Math.round(deathCut(l)*100)}%</em> odds the Medicus saves a dying duelist.`,
+    cost:l=> Math.round(100 * Math.pow(1.9, l-1)) },
+  armory:{ ic:'🗡️', name:'Armory', max:24,
     desc:l=>`Forge gear up to <em>Tier ${Math.min(GEAR_MAX,l)}</em> · <em>+${(l-1)*8}</em> power to all fighters.`,
-    cost:l=> Math.round(90 * Math.pow(2.0, l-1)) },
-  manager:{ ic:'📜', name:'Lanista’s Contacts', max:12,
-    desc:l=>`Arena purses pay <em>${(1+(l-1)*0.2).toFixed(2)}×</em> more.`,
-    cost:l=> Math.round(150 * Math.pow(2.1, l-1)) },
+    cost:l=> Math.round(90 * Math.pow(1.95, l-1)) },
+  manager:{ ic:'📜', name:'Lanista’s Contacts', max:20,
+    desc:l=>`Arena purses pay <em>${MANAGER_MULT(l).toFixed(2)}×</em> more.`,
+    cost:l=> Math.round(150 * Math.pow(2.05, l-1)) },
 };
-const deathCut = l => Math.min(0.75, (l-1)*0.09);   // infirmary death-risk reduction
+const deathCut = l => Math.min(0.75, (l-1)*0.09);   // Medicus revive odds when a duelist falls (by Infirmary level)
 
 /* ============================ STATE ============================ */
 let S = null;
@@ -646,6 +802,8 @@ function newGladiator(){
     id: nextId++, name,
     cls: clsId,
     portrait: CLASSES[clsId].ic,
+    traits: rollTraits(),
+    origin: rollOrigin(),
     str: 4 + lean.str + (Math.random()*3|0),
     agi: 4 + lean.agi + (Math.random()*3|0),
     vit: 4 + lean.vit + (Math.random()*3|0),
@@ -667,6 +825,9 @@ function initState(){
     tier: 0, maxTier: 0, autoFight:false,
     gladiators:[g],
     log:[], nextId:2,
+    glory:0, lifeFame:0, retirements:0, bestRank:0, perks:{},   // prestige / lifetime meta
+    fallen:[], vendetta:null, stats:{}, ach:{},                 // legacy: the Hall, vendettas, laurels
+    market:null, daily:null, streak:{count:0,last:null},        // slave market stock · daily games
     lastTick: Date.now(),
   };
 }
@@ -674,15 +835,16 @@ function initState(){
 /* derived stats */
 function recalc(g){
   const base = 40 + g.vit*9 + g.level*6 + armorPow(g)*1.5;
-  g.maxHp = Math.round(base * clsOf(g).hpMul);
+  g.maxHp = Math.round(base * clsOf(g).hpMul * tmod(g,'hp'));
   if(g.hp > g.maxHp) g.hp = g.maxHp;
 }
 function power(g){
   const facGear = (S.fac.armory-1)*8;
-  return Math.round(g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + facGear + weaponPow(g) + armorPow(g));
+  const raw = g.str*2.4 + g.agi*1.7 + g.vit*1.5 + g.level*4 + facGear + weaponPow(g) + armorPow(g);
+  return Math.round(raw * (1 + perkLvl('might')*0.08) * tmod(g,'pow'));   // Ludus Renown perk + traits
 }
 // Resting/wounded recovery, scaled to max HP so it stays meaningful at any level.
-function healRate(g){ return 1.5 + g.maxHp*0.03 + S.fac.infirmary*0.7; }   // hp per second
+function healRate(g){ return (1.5 + g.maxHp*0.03 + S.fac.infirmary*0.7) * tmod(g,'heal'); }   // hp per second
 function titleFor(g){
   let t = TITLES[0].t;
   for(const x of TITLES){ if(g.wins >= x.w) t = x.t; }
@@ -700,7 +862,7 @@ function tickGladiator(g, live, mult, offline){
   const ev = [];
   if(g.state === 'dueling') return ev;   // you're controlling this one by hand
   if(g.state === 'injured'){
-    g.hp = Math.min(g.maxHp, g.hp + healRate(g) * 1.4 * mult);   // in the infirmary — heals a bit faster
+    g.hp = Math.min(g.maxHp, g.hp + healRate(g) * 1.4 * (1 + perkLvl('will')*0.25) * mult);   // infirmary + Field Medicine
     if(g.hp >= g.maxHp*0.6){ g.state='idle'; g.progress=0;
       if(live) ev.push({cls:'', txt:`<b>${g.name}</b> has recovered and returns to the ludus.`});
     }
@@ -758,34 +920,135 @@ function maybeLevel(g, ev, live){
   }
 }
 
+// ---- Prestige perks: spend Glory on permanent, run-spanning bonuses ----
+const PERKS = {
+  might:   { ic:'💪', name:'Ludus Renown',      max:10, base:3, growth:1.6, desc:l=>`Every gladiator fights with +<em>${l*8}%</em> power.` },
+  purse:   { ic:'💰', name:'Patron’s Purse',    max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> denarii from every victory.` },
+  renown:  { ic:'✦',  name:'Champion’s Renown', max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> fame from every victory.` },
+  instinct:{ ic:'✧',  name:'Veteran Instinct',  max:10, base:2, growth:1.5, desc:l=>`+<em>${l*20}%</em> experience from every victory.` },
+  blood:   { ic:'🩸', name:'Noble Blood',        max:8,  base:3, growth:1.7, desc:l=>`New gladiators are born at level <em>${1+l}</em>.` },
+  armed:   { ic:'⚔️', name:'Well-Armed',         max:6,  base:3, growth:1.7, desc:l=>`New gladiators start with tier-<em>${l}</em> weapon &amp; armor.` },
+  will:    { ic:'🩹', name:'Field Medicine',     max:6,  base:3, growth:1.7, desc:l=>`Wounded fighters recover <em>+${l*25}%</em> faster.` },
+  reserves:{ ic:'⏳', name:'Endless Reserves',    max:6,  base:3, growth:1.6, desc:l=>`Offline earnings last <em>${24+l*4}h</em>.` },
+  legacy:  { ic:'🏛️', name:'Ludus Legacy',       max:4,  base:5, growth:2.0, desc:l=>`Every new run opens with <em>${1+l}</em> barracks slots.` },
+};
+const perkLvl  = id => (S.perks && S.perks[id]) || 0;
+const perkCost = (id,l) => Math.round(PERKS[id].base * Math.pow(PERKS[id].growth, l));
+// Laurels — permanent achievements. Each one earned adds +2% to all payouts, forever
+// (survives retirement). The Cookie Clicker "milk" model: milestones ARE progression.
+const ACH = [
+  {id:'first-blood', ic:'🩸', name:'First Blood',      desc:'Win a bout',                    test:s=>(s.stats.wins||0)>=1},
+  {id:'ten-wins',    ic:'⚔️', name:'Blooded',           desc:'Win 10 bouts',                  test:s=>(s.stats.wins||0)>=10},
+  {id:'century',     ic:'💯', name:'Centurion',         desc:'Win 100 bouts',                 test:s=>(s.stats.wins||0)>=100},
+  {id:'legion',      ic:'🦅', name:'A Legion Felled',   desc:'Win 1,000 bouts',               test:s=>(s.stats.wins||0)>=1000},
+  {id:'myriad',      ic:'🌋', name:'Myriad',            desc:'Win 10,000 bouts',              test:s=>(s.stats.wins||0)>=10000},
+  {id:'first-duel',  ic:'🤺', name:'By My Own Hand',    desc:'Win a duel yourself',           test:s=>(s.stats.duelWins||0)>=1},
+  {id:'duelist',     ic:'🗡️', name:'Duelist',           desc:'Win 25 duels',                  test:s=>(s.stats.duelWins||0)>=25},
+  {id:'thread',      ic:'🫀', name:'By a Thread',       desc:'Win a duel below 12% HP',       test:s=>(s.stats.closeCall||0)>=1},
+  {id:'rank5',       ic:'🥉', name:'Rising Name',       desc:'Reach Rank 5',                  test:s=>(s.bestRank||0)>=4},
+  {id:'rank10',      ic:'🥈', name:'Talk of the Town',  desc:'Reach Rank 10',                 test:s=>(s.bestRank||0)>=9},
+  {id:'rank15',      ic:'🥇', name:'Provincial Terror', desc:'Reach Rank 15',                 test:s=>(s.bestRank||0)>=14},
+  {id:'rank20',      ic:'👑', name:'Feared in Rome',    desc:'Reach Rank 20',                 test:s=>(s.bestRank||0)>=19},
+  {id:'full-house',  ic:'⛺', name:'Full Barracks',     desc:'House 5 gladiators at once',    test:s=>s.gladiators.length>=5},
+  {id:'veteran',     ic:'🎖️', name:'Veteran',           desc:'A gladiator reaches level 20',  test:s=>s.gladiators.some(g=>g.level>=20)},
+  {id:'favorite',    ic:'🏟️', name:'Crowd’s Favorite',  desc:'One fighter wins 100 bouts',    test:s=>s.gladiators.some(g=>g.wins>=100)},
+  {id:'varied',      ic:'🎭', name:'A Varied School',   desc:'Field 4 classes at once',       test:s=>new Set(s.gladiators.map(g=>g.cls)).size>=4},
+  {id:'geared',      ic:'🛡️', name:'Battle-Ready',      desc:'Max a fighter’s weapon & armor',test:s=>s.gladiators.some(g=>g.gear&&g.gear.weapon>=6&&g.gear.armor>=6)},
+  {id:'first-fall',  ic:'⚱️', name:'The Sand Takes',    desc:'Lose a gladiator',              test:s=>(s.stats.deaths||0)>=1},
+  {id:'memorial',    ic:'🏛️', name:'Hall of Memory',    desc:'Ten names among the fallen',    test:s=>(s.stats.deaths||0)>=10},
+  {id:'avenger',     ic:'⚖️', name:'Vengeance Served',  desc:'Avenge a fallen brother',       test:s=>(s.stats.avenged||0)>=1},
+  {id:'retire1',     ic:'🏆', name:'Pass Into Legend',  desc:'Retire the ludus once',         test:s=>(s.retirements||0)>=1},
+  {id:'dynast',      ic:'🏺', name:'Dynast',            desc:'Retire three times',            test:s=>(s.retirements||0)>=3},
+  {id:'rich',        ic:'💰', name:'Croesus of the Sand',desc:'Hold 1M denarii',              test:s=>s.gold>=1e6},
+  {id:'famous',      ic:'✦',  name:'Name on Every Wall',desc:'Earn 1M lifetime fame',         test:s=>(s.lifeFame||0)>=1e6},
+];
+const achCount = () => Object.keys(S.ach||{}).length;
+const laurelMult = () => 1 + achCount()*0.02;
+// Sweep for newly-earned laurels. Cheap tests; called once per tick + after key events.
+function checkAch(live){
+  if(!S.ach) S.ach = {};
+  for(const a of ACH){
+    if(S.ach[a.id]) continue;
+    let hit = false;
+    try{ hit = a.test(S); }catch(e){}
+    if(hit){
+      S.ach[a.id] = 1;
+      S.log.push({cls:'level', txt:`🏅 Laurel earned — <b>${a.name}</b>: ${a.desc}. All payouts +2%.`});
+      if(live) toast(`🏅 Laurel earned: ${a.name}`);
+    }
+  }
+}
+
+const goldMult = () => (1 + perkLvl('purse')*0.20) * laurelMult();
+const fameMult = () => (1 + perkLvl('renown')*0.20) * laurelMult();
+const xpMult   = () => (1 + perkLvl('instinct')*0.20) * laurelMult();
+const maxOfflineH = () => MAX_OFFLINE_H + perkLvl('reserves')*4;
+
+// Apply run-start perks to a freshly-made gladiator (Noble Blood, Well-Armed).
+function applyRecruitPerks(g){
+  const blood = perkLvl('blood');
+  if(blood > 0 && g.level < 1+blood){
+    const add = (1+blood) - g.level;
+    g.level = 1+blood; g.str += add; g.agi += add; g.vit += add;
+  }
+  const armed = Math.min(GEAR_MAX, perkLvl('armed'));
+  if(armed > 0){ g.gear.weapon = Math.max(g.gear.weapon, armed); g.gear.armor = Math.max(g.gear.armor, armed); }
+}
+
 // Grant the spoils of a victory. Shared by the auto-sim and the manual duel.
 // Returns { gain, drop } — drop is a gear find or null.
-function grantWin(g, i, ev, live){
-  const gain = Math.round(oppReward(i) * (1+(S.fac.manager-1)*0.2));
+// manual=true (a duel you fought yourself) always unlocks the next rank — skill earned it.
+// Auto-battle needs a CONVINCING win (power ≥ 40% of the foe's) so a 6%-fluke can't brute-force the ladder.
+function grantWin(g, i, ev, live, manual){
+  const gain = Math.round(oppReward(i) * MANAGER_MULT(S.fac.manager) * goldMult() * tmod(g,'gold'));
+  const fame = Math.round(oppFame(i) * fameMult() * tmod(g,'fame'));
+  const xp   = Math.round(oppXP(i) * xpMult() * tmod(g,'xp'));
   S.gold += gain;
-  S.fame += oppFame(i);
-  g.xp += oppXP(i);
+  S.fame += fame;
+  S.lifeFame = (S.lifeFame||0) + fame;
+  g.xp += xp;
   g.wins++;
-  if(i === S.maxTier && S.maxTier < OPPONENTS.length-1){ S.maxTier++; }  // unlock next tier
+  S.stats.wins = (S.stats.wins||0) + 1;
+  const convincing = manual || power(g) >= oppPower(i)*0.4;
+  if(convincing && i === S.maxTier && S.maxTier < MAX_RANK-1){ S.maxTier++; if(S.maxTier > (S.bestRank||0)) S.bestRank = S.maxTier; }  // unlock next tier
   simWins++;
+  // a fallen brother avenged — settle the vendetta for a fame windfall
+  let avenged = null;
+  if(S.vendetta && i === S.vendetta.rank){
+    const bonus = Math.round((fame*3 + 50) * (manual?2:1));
+    S.fame += bonus; S.lifeFame += bonus;
+    avenged = { victim:S.vendetta.victim, bonus };
+    S.stats.avenged = (S.stats.avenged||0) + 1;
+    S.log.push({cls:'win', txt:`⚖️ <b>${g.name}</b> avenged <b>${S.vendetta.victim}</b> — ${S.vendetta.foe} lies beaten! <span class="cash">+${fmt(bonus)} fame</span>`});
+    S.vendetta = null;
+  }
   const drop = rollGearDrop(g, i);
+  bumpDaily('wins', 1); bumpDaily('gold', gain);
+  if(drop) bumpDaily('forge', 1);
   maybeLevel(g, ev, live);
-  return { gain, drop };
+  return { gain, fame, xp, drop, avenged };
 }
-// Roll for death vs injury when a fighter is downed. Returns 'dead' | 'injured'.
-function downedCheck(g, i, won){
-  g.hp = 0;
-  const gp = power(g), ep = oppPower(i);
-  let deathChance = (won ? 0.10 : 0.40) * Math.min(2.2, ep/gp);
-  deathChance *= (1 - deathCut(S.fac.infirmary));
-  deathChance = Math.min(0.9, deathChance);
-  if(Math.random() < deathChance){ g._dead = true; return 'dead'; }
-  g.state = 'injured'; g.progress = 0; return 'injured';
+// A gladiator has died. Carve their name into the Hall of the Fallen and open a vendetta
+// against their killer — settling it (beating that rank) pays a fame windfall.
+function recordDeath(g, i){
+  S.fallen = S.fallen || [];
+  S.fallen.unshift({ name:g.name, cls:g.cls, level:g.level, wins:g.wins, fights:g.fights,
+    day:S.day, killer:foe(i).n, rank:i, traits:g.traits||[], origin:g.origin||'' });
+  if(S.fallen.length > 50) S.fallen.length = 50;    // the Hall keeps the last fifty names
+  S.stats.deaths = (S.stats.deaths||0) + 1;
+  S.vendetta = { rank:i, foe:foe(i).n, victim:g.name };
+}
+function epitaph(f){
+  if(f.wins === 0)  return 'The sand keeps even the briefest names.';
+  if(f.wins < 10)   return 'He fought; it is enough.';
+  if(f.wins < 50)   return 'The crowd knew his name.';
+  if(f.wins < 150)  return 'Taverns still argue about his final bout.';
+  return 'A legend, cut down at his peak.';
 }
 
 function resolveFight(g, ev, live){
   const i = S.tier;
-  const opp = OPPONENTS[i];
+  const opp = foe(i);
   const gp = power(g);
   const ep = oppPower(i);
   let wc = gp/(gp+ep);
@@ -799,23 +1062,19 @@ function resolveFight(g, ev, live){
   g.hp -= dmg;
 
   if(won){
-    const { gain, drop } = grantWin(g, i, ev, live);
-    if(live) ev.push({cls:'win', txt:`<b>${g.name}</b> defeated the ${opp.n}! <span class="cash">+${gain}◈</span> · +${oppFame(i)} fame`});
-    if(live && drop) ev.push({cls:'level', txt:`🎁 <b>${g.name}</b> looted a <b>${drop.name}</b> from the ${opp.n}.`});
+    const { gain, fame, drop } = grantWin(g, i, ev, live);
+    if(live) ev.push({cls:'win', txt:`<b>${g.name}</b> defeated ${theFoe(i)}! <span class="cash">+${fmt(gain)}◈</span> · +${fmt(fame)} fame`});
+    if(live && drop) ev.push({cls:'level', txt:`🎁 <b>${g.name}</b> looted a <b>${drop.name}</b> from ${theFoe(i)}.`});
     ev._win = true;
   } else {
-    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> was bested by the ${opp.n}. The mob jeers.`});
+    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> was bested by ${theFoe(i)}. The mob jeers.`});
     ev._lose = true;
   }
 
-  // downed?
+  // downed — auto-battle never kills; the arena only wounds. Death is reserved for manual duels.
   if(g.hp <= 0){
-    if(downedCheck(g, i, won) === 'dead'){
-      if(live) ev.push({cls:'death', txt:`💀 <b>${g.name}</b> has fallen in the arena. Habet, hoc habet. The ludus mourns.`});
-      ev._death = true;
-    } else {
-      if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> is carried off gravely wounded — to the infirmary.`});
-    }
+    g.hp = 0; g.state = 'injured'; g.progress = 0;
+    if(live) ev.push({cls:'lose', txt:`<b>${g.name}</b> is carried off gravely wounded — to the infirmary.`});
   }
 }
 
@@ -839,6 +1098,7 @@ function tick(live, mult, offline){
   S.dayT += mult;
   while(S.dayT >= 20){ S.dayT -= 20; S.day++; }
 
+  checkAch(live);
   return { events, deaths, winFlash, loseFlash };
 }
 
@@ -849,7 +1109,7 @@ function catchUp(){
   let elapsed = Math.floor((now - (S.lastTick||now))/1000);
   S.lastTick = now;
   if(elapsed < 3) return null;
-  elapsed = Math.min(elapsed, MAX_OFFLINE_H*3600);
+  elapsed = Math.min(elapsed, maxOfflineH()*3600);
 
   // simulate `elapsed` seconds in at most MAX_CATCHUP_STEPS coarse steps
   const stride = Math.max(1, Math.ceil(elapsed / MAX_CATCHUP_STEPS));
@@ -886,10 +1146,25 @@ function load(){
     if(!raw) return false;
     S = JSON.parse(raw);
     nextId = S.nextId || (Math.max(0,...S.gladiators.map(g=>g.id))+1);
+    // migrate new meta fields onto older saves
+    if(S.glory==null) S.glory = 0;
+    if(S.lifeFame==null) S.lifeFame = S.fame||0;
+    if(S.retirements==null) S.retirements = 0;
+    if(S.bestRank==null) S.bestRank = S.maxTier||0;
+    if(S.perks==null) S.perks = {};
+    if(S.fallen==null) S.fallen = [];
+    if(S.vendetta===undefined) S.vendetta = null;
+    if(S.stats==null) S.stats = {};
+    if(S.ach==null) S.ach = {};
+    if(S.market===undefined) S.market = null;
+    if(S.daily===undefined) S.daily = null;
+    if(S.streak==null) S.streak = {count:0,last:null};
     // migrate + heal derived state; free anyone stuck mid-duel from a closed tab
     S.gladiators.forEach(g=>{
       if(!g.cls){ g.cls = CLASS_IDS[(Math.random()*CLASS_IDS.length)|0]; g.portrait = CLASSES[g.cls].ic; }
       if(!g.gear) g.gear = { weapon:0, armor:0 };
+      if(!g.traits) g.traits = rollTraits();
+      if(!g.origin) g.origin = rollOrigin();
       recalc(g);
       if(g.hp==null || g.hp>g.maxHp) g.hp = g.maxHp;
       if(g.state==='dueling') g.state='idle';
@@ -903,11 +1178,17 @@ const $ = s => document.querySelector(s);
 const el = (t,c)=>{ const e=document.createElement(t); if(c) e.className=c; return e; };
 let tab = 'ludus';
 
+const SUFFIX = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','UDc','DDc','TDc','QaDc','QiDc','SxDc','SpDc','OcDc','NoDc','Vg'];
 function fmt(n){
   n = Math.round(n);
-  if(n>=1e6) return (n/1e6).toFixed(2)+'M';
-  if(n>=1e4) return (n/1e3).toFixed(1)+'k';
-  return ''+n;
+  if(!isFinite(n)) return '∞';
+  if(Math.abs(n) < 1000) return ''+n;
+  const t = Math.floor(Math.log10(Math.abs(n))/3);
+  if(t < SUFFIX.length){
+    const s = n / Math.pow(10, t*3);
+    return (s<10 ? s.toFixed(2) : s<100 ? s.toFixed(1) : Math.round(s)) + SUFFIX[t];
+  }
+  return n.toExponential(2).replace('+','');
 }
 
 function renderTop(){
@@ -915,6 +1196,23 @@ function renderTop(){
   $('#s-fame').textContent = fmt(S.fame);
   $('#s-pop').textContent  = alive()+'/'+slots();
   $('#daychip').textContent = 'Day '+S.day;
+  $('#goal-txt').innerHTML = nextGoal();
+}
+
+// The single most relevant "what to do next", always visible under the stats.
+function nextGoal(){
+  if(alive() === 0) return `Recruit a <b>free</b> gladiator to rebuild your ludus`;
+  if(S.vendetta && S.maxTier >= S.vendetta.rank) return `⚖️ Avenge <b>${S.vendetta.victim}</b> — defeat ${S.vendetta.foe} at Rank ${S.vendetta.rank+1}`;
+  const injured = S.gladiators.filter(g=>g.state==='injured').length;
+  const fighting = S.gladiators.filter(g=>g.state==='fighting'||g.state==='dueling').length;
+  // cheapest affordable facility upgrade as a spend hint
+  let cheapFac=null, cheapCost=Infinity;
+  for(const k in FAC){ if(S.fac[k]<FAC[k].max){ const c=FAC[k].cost(S.fac[k]+1); if(c<cheapCost){cheapCost=c; cheapFac=FAC[k].name;} } }
+  if(alive() < slots() && S.gold >= recruitCost()) return `Recruit another fighter — you have an empty bunk`;
+  if(!S.autoFight && fighting===0 && injured<alive()) return `Send a gladiator to the <b>Arena</b>, or switch on Auto-Battle`;
+  if(cheapFac && S.gold >= cheapCost) return `Upgrade <b>${cheapFac}</b> for ${fmt(cheapCost)}◈`;
+  if(S.maxTier < MAX_RANK-1) return `Grow stronger to clear <b>Rank ${S.maxTier+2}</b> (enemy power ${fmt(oppPower(S.maxTier+1))})`;
+  return `Keep climbing the endless ranks`;
 }
 
 function statusLabel(g){
@@ -944,6 +1242,8 @@ function renderRoster(){
         </div>
         <div class="g-lvl">LVL ${g.level}</div>
       </div>
+      <div class="g-origin">${g.origin||''}</div>
+      <div class="g-traits">${(g.traits||[]).map(t=>{const tr=TRAITS[t];return tr?`<span class="tchip" title="${tr.desc}">${tr.ic} ${tr.name}</span>`:'';}).join('')}</div>
       <div class="barrow"><span class="lab">HP</span><div class="bar hp"><i style="width:${Math.max(0,g.hp/g.maxHp*100)}%"></i></div><span class="num">${Math.round(g.hp)}/${g.maxHp}</span></div>
       <div class="barrow"><span class="lab">XP</span><div class="bar xp"><i style="width:${Math.min(100,g.xp/need*100)}%"></i></div><span class="num">${Math.round(g.xp)}/${need}</span></div>
       <div class="g-stats">
@@ -983,19 +1283,36 @@ function renderRoster(){
     wrap.appendChild(card);
   }
 
-  // empty slots / recruit
+  // the slave market — visible whenever a bunk is free
   const free = slots() - alive();
   if(free > 0){
-    const cost = recruitCost();
-    const s = el('div','slot-empty');
-    s.innerHTML = `<div class="em">⚱️</div>
-      <p>${alive()===0?'Your ludus stands empty.':'An empty bunk waits.'}<br>Recruit a fresh gladiator from the slave market.</p>`;
-    const b = el('div','btn gold'); b.style.maxWidth='240px'; b.style.margin='0 auto';
-    b.innerHTML = `Recruit Gladiator <small>${fmt(cost)} ◈</small>`;
-    if(S.gold < cost) b.setAttribute('disabled','');
-    b.onclick = ()=> recruit();
-    s.appendChild(b);
-    wrap.appendChild(s);
+    ensureMarket();
+    const mk = el('div','market');
+    const rows = S.market.cands.map((c,ix)=>{
+      const ask = candAsk(c);
+      const cls = clsOf(c.g);
+      const chips = (c.g.traits||[]).map(t=>{const tr=TRAITS[t];return tr?`<span class="tchip" title="${tr.desc}">${tr.ic} ${tr.name}</span>`:'';}).join('');
+      return `<div class="cand">
+        <span class="cand-tier t-${c.tier}">${PROMISE[c.tier].name}</span>
+        <div class="cand-top">
+          <div class="g-portrait csm">${c.g.portrait}</div>
+          <div class="cand-meta">
+            <div class="cand-name">${c.g.name} <span class="cand-cls">${cls.name}${c.g.level>1?' · LVL '+c.g.level:''}</span></div>
+            <div class="g-traits" style="margin-top:4px">${chips}</div>
+          </div>
+        </div>
+        <div class="cand-origin">${c.g.origin}</div>
+        <div class="cand-stats">STR <b>${c.g.str}</b> · AGI <b>${c.g.agi}</b> · VIT <b>${c.g.vit}</b> · POWER <b>${power(c.g)}</b></div>
+        <div class="btn gold cand-buy" data-ix="${ix}" ${S.gold<ask?'disabled':''}>${ask===0?'Claim — the trader owes you':'Buy'} ${ask?`<small>${fmt(ask)} ◈</small>`:''}</div>
+      </div>`;
+    }).join('');
+    mk.innerHTML = `
+      <div class="mk-head">🏛️ The Slave Market <small>fresh stock at dawn · ${free} bunk${free>1?'s':''} free</small></div>
+      ${ rows || `<div class="mk-empty">The pens stand empty. Return at dawn — or pay the trader to scout again.</div>` }
+      <div class="btn recall mk-reroll" ${S.gold<rerollCost()?'disabled':''}>Pay the trader to scout again <small>${fmt(rerollCost())} ◈</small></div>`;
+    mk.querySelectorAll('.cand-buy').forEach(b=>{ b.onclick=()=> buyCandidate(+b.dataset.ix); });
+    mk.querySelector('.mk-reroll').onclick = ()=> rerollMarket();
+    wrap.appendChild(mk);
   } else if(slots() < FAC.barracks.max){
     const note = el('div','empty-note');
     note.innerHTML = `Ludus full (${alive()}/${slots()}). Expand the <b>Barracks</b> in Facilities to house more.`;
@@ -1004,17 +1321,123 @@ function renderRoster(){
 }
 
 function recruitCost(){
+  if(alive() === 0) return 0;        // an empty ludus always gets a free fighter — never a dead end
   return Math.round(45 * Math.pow(1.85, alive()));
 }
-function recruit(){
-  if(alive() >= slots()) return;
-  const cost = recruitCost();
-  if(S.gold < cost) return;
-  S.gold -= cost;
-  const g = newGladiator(); recalc(g); g.hp=g.maxHp;
-  S.gladiators.push(g);
-  toast(`${g.name} joins your ludus.`);
+
+/* ---- The Slave Market: scout before you buy. Fresh stock each dawn; the trader
+        can be paid to parade more (a gold sink that scales with your rank). ---- */
+const PROMISE = {
+  raw:        { name:'Raw',         mult:1   },
+  promising:  { name:'Promising',   mult:2.4 },
+  exceptional:{ name:'Exceptional', mult:5.5 },
+};
+function makeCandidate(){
+  const r = Math.random()*100;
+  const tier = r<12 ? 'exceptional' : r<45 ? 'promising' : 'raw';
+  const g = newGladiator(); g.id = 0;                   // a real id is stamped when bought
+  if(tier==='promising'){ g.str+=3; g.agi+=3; g.vit+=3; }
+  if(tier==='exceptional'){ g.str+=6; g.agi+=6; g.vit+=6; g.level=3; }
+  applyRecruitPerks(g); recalc(g); g.hp = g.maxHp;
+  return { g, tier };
+}
+function candAsk(c){
+  // an empty ludus always finds one free Raw fighter — never a dead end
+  const base = alive()===0 ? (c.tier==='raw' ? 0 : 60) : 45*Math.pow(1.85, alive());
+  return Math.round(base * PROMISE[c.tier].mult);
+}
+function ensureMarket(){
+  if(!S.market || S.market.day !== S.day){
+    S.market = { day:S.day, cands:[makeCandidate(), makeCandidate(), makeCandidate()] };
+  }
+}
+const rerollCost = () => Math.max(40, Math.round(oppReward(S.maxTier)*0.75));
+function rerollMarket(){
+  const c = rerollCost();
+  if(S.gold < c) return;
+  S.gold -= c;
+  S.market = { day:S.day, cands:[makeCandidate(), makeCandidate(), makeCandidate()] };
+  toast('The trader parades new stock.');
   refresh(); save();
+}
+function buyCandidate(ix){
+  ensureMarket();
+  const c = S.market.cands[ix];
+  if(!c || alive() >= slots()) return;
+  const ask = candAsk(c);
+  if(S.gold < ask) return;
+  S.gold -= ask;
+  c.g.id = nextId++;
+  S.gladiators.push(c.g);
+  S.market.cands.splice(ix,1);
+  S.stats.recruits = (S.stats.recruits||0) + 1;
+  bumpDaily('recruit', 1);
+  toast(`${c.g.name} joins your ludus — ${TRAITS[c.g.traits[0]].name} · ${TRAITS[c.g.traits[1]].name}.`);
+  checkAch(true);
+  refresh(); save();
+}
+
+/* ---- Daily Games: three objectives rolled from the real date, a streak for
+        clearing all three, and a Glory coin for the day's purse. Server-free. ---- */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const todayStr = () => new Date().toISOString().slice(0,10);
+function yesterdayStr(){ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+function ensureDaily(){
+  const today = todayStr();
+  if(S.daily && S.daily.date === today) return;
+  // a lapsed streak dies at dawn
+  if(S.streak && S.streak.last && S.streak.last !== today && S.streak.last !== yesterdayStr()) S.streak.count = 0;
+  let seed = 0; for(const ch of today) seed = (seed*31 + ch.charCodeAt(0))|0;
+  const rng = mulberry32(seed);
+  const winN  = 8 + Math.floor(rng()*3)*4;                             // 8 / 12 / 16
+  const goldN = Math.max(200, Math.round(oppReward(S.maxTier) * (10 + Math.floor(rng()*10))));
+  const pool = [
+    {id:'wins',    txt:`Win ${winN} bouts`,                    n:winN},
+    {id:'gold',    txt:`Earn ${fmt(goldN)} denarii`,           n:goldN},
+    {id:'duel',    txt:`Win a duel by your own hand`,          n:1},
+    {id:'forge',   txt:`Forge or loot a piece of gear`,        n:1},
+    {id:'recruit', txt:`Buy a fighter from the market`,        n:1},
+    {id:'upgrade', txt:`Upgrade a facility`,                   n:1},
+  ];
+  // pick 3 distinct, seeded by the date so everyone’s day matches
+  const obs = [];
+  while(obs.length < 3){ const p = pool[Math.floor(rng()*pool.length)]; if(!obs.some(o=>o.id===p.id)) obs.push({id:p.id, txt:p.txt, n:p.n, p:0, done:false}); }
+  S.daily = { date:today, obs, cleared:false };
+}
+function bumpDaily(id, amt){
+  ensureDaily();
+  const ob = S.daily.obs.find(o=>o.id===id && !o.done);
+  if(!ob) return;
+  ob.p += amt;
+  if(ob.p >= ob.n){
+    ob.p = ob.n; ob.done = true;
+    S.log.push({cls:'level', txt:`🎯 Daily objective met — <b>${ob.txt}</b>.`});
+    if(!S.daily.cleared && S.daily.obs.every(o=>o.done)){
+      S.daily.cleared = true;
+      const today = todayStr();
+      S.streak.count = (S.streak.last === yesterdayStr()) ? (S.streak.count||0)+1 : 1;
+      S.streak.last = today;
+      const purse = Math.round(oppReward(S.maxTier) * 8 * (1 + 0.15*Math.min(7, S.streak.count)));
+      S.gold += purse; S.glory = (S.glory||0) + 1;
+      S.log.push({cls:'win', txt:`🎉 <b>The Daily Games are yours!</b> <span class="cash">+${fmt(purse)}◈</span> · +1 🏆 Glory · streak ${S.streak.count}`});
+      toast(`Daily Games cleared — +${fmt(purse)}◈ and +1 Glory!`);
+    }
+  }
+}
+function renderDaily(){
+  const box = $('#daily-card'); if(!box) return;
+  ensureDaily();
+  const d = S.daily;
+  box.innerHTML = `<div class="daily">
+    <div class="d-head">🎯 Daily Games <span class="d-streak">${S.streak.count>0?`🔥 ${S.streak.count}-day streak`:'no streak yet'}</span></div>
+    ${d.obs.map(o=>`
+      <div class="d-ob${o.done?' done':''}">
+        <span class="d-check">${o.done?'✓':'○'}</span>
+        <span class="d-txt">${o.txt}</span>
+        <span class="d-prog">${o.n>1 ? fmt(Math.min(o.p,o.n))+'/'+fmt(o.n) : (o.done?'done':'—')}</span>
+      </div>`).join('')}
+    ${d.cleared?`<div class="d-cleared">🎉 Cleared — the purse and a Glory coin are yours. Fresh games at midnight.</div>`:''}
+  </div>`;
 }
 
 function chooseTrain(g){
@@ -1074,7 +1497,7 @@ function chooseGear(g){
       b.onclick=()=>{
         const slot=b.dataset.slot, cost=gearCost(g.gear[slot]);
         if(S.gold<cost || g.gear[slot]>=maxGearTier()) return;
-        S.gold-=cost; g.gear[slot]++; recalc(g);
+        S.gold-=cost; g.gear[slot]++; recalc(g); bumpDaily('forge',1);
         toast(`${g.name} takes up a ${GEAR[slot].tiers[g.gear[slot]]}.`);
         render(); renderTop(); if(tab==='ludus') renderRoster(); save();
       };
@@ -1087,34 +1510,36 @@ function chooseGear(g){
 
 function renderArena(){
   const i = S.tier;
-  const opp = OPPONENTS[i];
+  const opp = foe(i);
   const ep = oppPower(i);
   const c = $('#opp-card');
   const fighters = S.gladiators.filter(g=>g.state==='fighting').length;
   c.innerHTML = `
     <div class="tier-nav">
       <button id="tier-prev">‹</button>
-      <div class="tier-lab">Bout ${i+1} of ${OPPONENTS.length}</div>
+      <div class="tier-lab">Rank ${i+1}${i>=NAMED.length?'':' of '+NAMED.length+'+'}</div>
       <button id="tier-next">›</button>
     </div>
     <div class="opp-portrait">${opp.e}</div>
     <div class="opp-name">${opp.n}</div>
     <div class="opp-sub">${opp.d}</div>
     <div class="opp-row">
-      <div class="kv"><b style="color:var(--blood)">${ep}</b><small>Enemy Power</small></div>
-      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2)))}◈</b><small>Purse</small></div>
+      <div class="kv"><b style="color:var(--blood)">${fmt(ep)}</b><small>Enemy Power</small></div>
+      <div class="kv"><b class="cash" style="color:var(--gold)">${fmt(Math.round(oppReward(i)*MANAGER_MULT(S.fac.manager)*goldMult()))}◈</b><small>Purse</small></div>
       <div class="kv"><b style="color:var(--bronze)">${fighters}</b><small>Fighting</small></div>
     </div>
-    ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous bout to unlock this foe.</div>` :
+    ${ S.vendetta && i===S.vendetta.rank ? `<div class="vendetta-note">⚖️ Avenge <b>${S.vendetta.victim}</b>! Defeat this foe for a fame windfall.</div>` : '' }
+    ${ i>S.maxTier ? `<div class="locked-note">🔒 Win the previous rank to unlock this foe.</div>` :
        fighters===0 ? `<div class="locked-note" style="color:var(--ink-soft);font-style:italic">No one is fighting. Send a gladiator from the Ludus, or turn on Auto-Battle.</div>` : '' }
   `;
   const prev = c.querySelector('#tier-prev'), next = c.querySelector('#tier-next');
   if(i<=0) prev.setAttribute('disabled','');
-  if(i>=OPPONENTS.length-1 || i>=S.maxTier) next.setAttribute('disabled','');
+  if(i>=MAX_RANK-1 || i>=S.maxTier) next.setAttribute('disabled','');
   prev.onclick=()=>{ if(S.tier>0){S.tier--; renderArena(); save();} };
-  next.onclick=()=>{ if(S.tier<S.maxTier && S.tier<OPPONENTS.length-1){S.tier++; renderArena(); save();} };
+  next.onclick=()=>{ if(S.tier<S.maxTier && S.tier<MAX_RANK-1){S.tier++; renderArena(); save();} };
 
   $('#auto-switch').classList.toggle('on', S.autoFight);
+  renderDaily();
 }
 
 function renderLog(){
@@ -1157,6 +1582,7 @@ function renderFacilities(){
         if(S.gold < f.cost(S.fac[key])) return;
         S.gold -= f.cost(S.fac[key]);
         S.fac[key]++;
+        bumpDaily('upgrade',1);
         // recalc hp on vit-independent facilities
         S.gladiators.forEach(recalc);
         toast(`${f.name} upgraded to level ${S.fac[key]}.`);
@@ -1169,11 +1595,155 @@ function renderFacilities(){
   }
 }
 
+// Prestige: Glory you'd earn by retiring right now (based on this run's fame).
+function gloryReward(){ return Math.floor(Math.pow(Math.max(0,S.fame)/300, 0.62)); }   // steeper — retiring at a wall is worth it
+
+function renderLegacy(){
+  const wrap = $('#legacy'); wrap.innerHTML='';
+  const reward = gloryReward();
+
+  const stat = (ic,lab,val,col)=>`<div class="leg-stat"><div class="li">${ic}</div><div><b style="color:${col||'var(--ink)'}">${val}</b><small>${lab}</small></div></div>`;
+
+  // perk shop rows
+  const perkRows = Object.keys(PERKS).map(id=>{
+    const p = PERKS[id], lvl = perkLvl(id), maxed = lvl>=p.max;
+    const cost = maxed ? 0 : perkCost(id, lvl);
+    const afford = S.glory >= cost;
+    let btn;
+    if(maxed) btn = `<div class="btn recall perk-buy" disabled>MAX</div>`;
+    else btn = `<div class="btn glory perk-buy" data-perk="${id}" ${afford?'':'disabled'}>Buy<small>🏆 ${fmt(cost)}</small></div>`;
+    return `<div class="card fac perk">
+        <div class="ic">${p.ic}</div>
+        <div class="body">
+          <div class="fname">${p.name} <span class="perk-lv">Lv ${lvl}/${p.max}</span></div>
+          <div class="fdesc">${maxed ? p.desc(lvl) : `Next: ${p.desc(lvl+1)}`}</div>
+        </div>
+        <div style="flex:none">${btn}</div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="card leg-hero">
+      <div class="leg-glory">🏆 ${fmt(S.glory)}</div>
+      <div class="leg-glory-sub">Glory to spend</div>
+    </div>
+
+    <div class="section-h">Retire the Ludus</div>
+    <div class="card">
+      <div class="fdesc" style="font-family:var(--font-b);font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">
+        Disband your ludus and pass into legend — you lose your gold, gladiators, facilities and rank, but
+        bank <b>Glory</b> to spend on permanent perks below. The deeper you climbed this run, the more you earn.
+      </div>
+      <div class="retire-box">
+        <div><div class="rb-num" style="color:var(--gold2)">+${fmt(reward)}</div><div class="rb-lab">Glory earned</div></div>
+        <div class="rb-arrow">→</div>
+        <div><div class="rb-num">🏆 ${fmt(S.glory+reward)}</div><div class="rb-lab">to spend</div></div>
+      </div>
+      <div class="btn wide ${reward>0?'fight':'recall'}" id="retire-btn" ${reward>0?'':'disabled'} style="margin-top:12px">
+        ${reward>0 ? 'Retire for '+fmt(reward)+' Glory' : 'Earn more fame to retire'}
+      </div>
+    </div>
+
+    <div class="section-h">Glory Perks</div>
+    ${perkRows}
+
+    <div class="section-h">Laurels — ${achCount()}/${ACH.length} · all payouts +${achCount()*2}%</div>
+    <div class="ach-grid">
+      ${ACH.map(a=>{
+        const got = !!(S.ach&&S.ach[a.id]);
+        return `<div class="ach${got?'':' locked'}" title="${a.desc}">
+          <span class="a-ic">${got?a.ic:'🔒'}</span>
+          <span class="a-body"><b>${a.name}</b><small>${a.desc}</small></span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-h">Hall of the Fallen — ${fmt((S.stats&&S.stats.deaths)||0)} taken by the sand</div>
+    ${(S.fallen&&S.fallen.length) ? `<div class="hall">`+S.fallen.slice(0,20).map(f=>{
+        const c = CLASSES[f.cls]||{};
+        return `<div class="fallen-row">
+          <div class="f-ic">${c.ic||'⚱️'}</div>
+          <div class="f-body">
+            <div class="f-name">${f.name} <span class="f-sub">${c.name||''} · LVL ${f.level} · ${f.wins}W</span></div>
+            <div class="f-slain">Slain by ${f.killer}, Day ${f.day} — <em>${epitaph(f)}</em></div>
+          </div>
+        </div>`;
+      }).join('')+`</div>`
+      : `<div class="empty-note">No names yet. May it stay so — but the sand is patient.</div>`}
+    ${S.vendetta ? `<div class="vendetta-card">⚖️ <b>Vendetta:</b> avenge <b>${S.vendetta.victim}</b> — defeat ${S.vendetta.foe} at Rank ${S.vendetta.rank+1} for a fame windfall (doubled in a duel).</div>` : ''}
+
+    <div class="section-h">Records</div>
+    <div class="leg-grid">
+      ${stat('👑','Highest rank', 'Rank '+((S.bestRank||0)+1), 'var(--blood)')}
+      ${stat('✦','Lifetime fame', fmt(S.lifeFame||0), '#a9628a')}
+      ${stat('♻️','Retirements', fmt(S.retirements||0), 'var(--bronze)')}
+      ${stat('⚔️','Lifetime wins', fmt((S.stats&&S.stats.wins)||0), 'var(--green)')}
+    </div>`;
+
+  const rb = $('#retire-btn');
+  if(rb && reward>0) rb.onclick = ()=> confirmRetire(reward);
+  wrap.querySelectorAll('.perk-buy[data-perk]').forEach(b=>{
+    b.onclick=()=> buyPerk(b.dataset.perk);
+  });
+}
+
+function buyPerk(id){
+  const lvl = perkLvl(id);
+  if(lvl >= PERKS[id].max) return;
+  const cost = perkCost(id, lvl);
+  if(S.glory < cost) return;
+  S.glory -= cost;
+  S.perks[id] = lvl + 1;
+  // perks that affect the live roster immediately
+  if(id==='will' || id==='reserves'){ /* passive — nothing to recompute */ }
+  S.gladiators.forEach(recalc);
+  toast(`${PERKS[id].name} raised to level ${S.perks[id]}.`);
+  renderLegacy(); renderTop(); save();
+}
+
+function confirmRetire(reward){
+  const ov = el('div','overlay'); const m = el('div','modal');
+  m.innerHTML = `<h2>Retire the Ludus?</h2><div class="sub">Pass into legend</div>
+    <p style="font-family:var(--font-b);text-align:center;color:var(--ink-soft);font-size:13px;line-height:1.5">
+      You’ll bank <b style="color:var(--gold)">+${fmt(reward)} Glory</b> to spend on permanent perks,
+      but lose all gold, gladiators, facilities and rank. Begin the climb anew, stronger.</p>
+    <div class="m-btns"><div class="btn recall" id="rt-no" style="flex:1">Not yet</div><div class="btn gold" id="rt-yes" style="flex:1">Retire</div></div>`;
+  ov.appendChild(m); document.body.appendChild(ov);
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  $('#rt-no').onclick=()=>ov.remove();
+  $('#rt-yes').onclick=()=>{ ov.remove(); doRetire(reward); };
+}
+
+function doRetire(reward){
+  const keep = {
+    glory:(S.glory||0)+reward, perks:S.perks||{},
+    lifeFame:(S.lifeFame||0), retirements:(S.retirements||0)+1, bestRank:(S.bestRank||0),
+    // the Hall, laurels, lifetime deeds and the daily habit outlive any single ludus
+    fallen:S.fallen||[], stats:S.stats||{}, ach:S.ach||{}, vendetta:S.vendetta||null,
+    daily:S.daily||null, streak:S.streak||{count:0,last:null},
+  };
+  S = initState();
+  Object.assign(S, keep);
+  applyStartPerks();
+  nextId = S.nextId;
+  checkAch(true);
+  goTab('ludus');
+  toast(`The ludus is reborn. +${fmt(reward)} Glory earned.`);
+  save();
+}
+
+// Apply run-start perks after a retire: barracks slots (Ludus Legacy) + upgrade the founding gladiator.
+function applyStartPerks(){
+  S.fac.barracks = Math.max(S.fac.barracks, 1 + perkLvl('legacy'));
+  S.gladiators.forEach(g=>{ applyRecruitPerks(g); recalc(g); g.hp = g.maxHp; });
+}
+
 function refresh(){
   renderTop();
   if(tab==='ludus') renderRoster();
   if(tab==='arena'){ renderArena(); renderLog(); }
   if(tab==='fac') renderFacilities();
+  if(tab==='legacy') renderLegacy();
   updateBadges();
 }
 function updateBadges(){
@@ -1246,7 +1816,7 @@ function showAway(sum){
 
 /* ============================ DUEL — interactive combat ============================ */
 const STAM_MAX = 100;
-const enemyHP = i => Math.round(Math.max(42, oppPower(i)*3.2));
+const enemyHP = i => Math.round(Math.max(42, oppPower(i) * Math.max(2.0, 3.2 - i*0.03)));  // taper 3.2x -> 2.0x
 const vib = p => { try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} };
 
 let D = { active:false };   // live combat state
@@ -1314,22 +1884,22 @@ function startDuel(g){
 }
 
 function showIntro(){
-  const i = D.tier, opp = OPPONENTS[i], g = D.g;
+  const i = D.tier, opp = foe(i), g = D.g;
   const pw = power(g), ew = oppPower(i);
   dz.cover.style.display = 'flex';
   dz.cover.innerHTML = `
     <div class="tier-nav" style="margin-bottom:12px">
       <button id="di-prev">‹</button>
-      <div class="tier-lab">Bout ${i+1} of ${OPPONENTS.length}</div>
+      <div class="tier-lab">Rank ${i+1}</div>
       <button id="di-next">›</button>
     </div>
     <div class="big-em">${opp.e}</div>
     <h2>${opp.n}</h2>
     <div class="cs">${opp.d}</div>
     <div class="vs-stats">
-      <div class="kv"><b style="color:#79b356">${pw}</b><small>${clsOf(g).name} · power</small></div>
-      <div class="kv"><b style="color:#c0392b">${ew}</b><small>enemy power</small></div>
-      <div class="kv"><b style="color:var(--gold2)">${Math.round(oppReward(i)*(1+(S.fac.manager-1)*0.2))}◈</b><small>purse</small></div>
+      <div class="kv"><b style="color:#79b356">${fmt(pw)}</b><small>${clsOf(g).name} · power</small></div>
+      <div class="kv"><b style="color:#c0392b">${fmt(ew)}</b><small>enemy power</small></div>
+      <div class="kv"><b style="color:var(--gold2)">${fmt(Math.round(oppReward(i)*MANAGER_MULT(S.fac.manager)*goldMult()))}◈</b><small>purse</small></div>
     </div>
     <div class="btn-col">
       <div class="dcbtn go" id="di-go">Enter the Sand</div>
@@ -1338,15 +1908,15 @@ function showIntro(){
     <div class="hint"><b style="color:var(--blood2)">A duel is to the death — lose and ${g.name} dies.</b> Land hits and take them to charge your <b>${specOf(g).ic} ${specOf(g).name}</b>. When the enemy flashes <b>⚠️</b>, <b>Block</b> or <b>Dodge</b> — a well-timed Dodge sets up a <b>Riposte</b>.</div>`;
   const prev=$('#di-prev'), next=$('#di-next');
   if(i<=0) prev.setAttribute('disabled','');
-  if(i>=S.maxTier || i>=OPPONENTS.length-1) next.setAttribute('disabled','');
+  if(i>=S.maxTier || i>=MAX_RANK-1) next.setAttribute('disabled','');
   prev.onclick=()=>{ if(D.tier>0){ D.tier--; showIntro(); } };
-  next.onclick=()=>{ if(D.tier<S.maxTier && D.tier<OPPONENTS.length-1){ D.tier++; showIntro(); } };
+  next.onclick=()=>{ if(D.tier<S.maxTier && D.tier<MAX_RANK-1){ D.tier++; showIntro(); } };
   $('#di-go').onclick=()=> beginDuel();
   $('#di-leave').onclick=()=> closeDuel();
 }
 
 function beginDuel(){
-  const g = D.g, i = D.tier, opp = OPPONENTS[i];
+  const g = D.g, i = D.tier, opp = foe(i);
   dz.cover.style.display = 'none';
   // enemy header
   dz.en.textContent = opp.n; dz.es.textContent = opp.d; dz.ef.textContent = opp.e;
@@ -1361,13 +1931,13 @@ function beginDuel(){
   D.blockUntil = 0; D.dodgeUntil = 0;
   D.cd = {strike:0, heavy:0, block:0, dodge:0};
   D.cdTotal = {strike:1, heavy:1, block:1, dodge:1};
-  D.strikeCd = Math.max(220, (540 - g.agi*12) * c.strikeCd);  D.strikeCost = 16;
-  D.heavyCd  = Math.max(600, (980 - g.agi*10) * c.strikeCd);  D.heavyCost  = 34;
+  D.strikeCd = Math.max(220, (540 - g.agi*12) * c.strikeCd / tmod(g,'spd'));  D.strikeCost = 16;
+  D.heavyCd  = Math.max(600, (980 - g.agi*10) * c.strikeCd / tmod(g,'spd'));  D.heavyCost  = 34;
   D.blockCd  = 520; D.dodgeCd = 620;
-  // class-derived duel knobs
+  // class-derived duel knobs (traits fold in: Swift → speed, Bloodthirsty/Reckless → damage, Old Scars → block)
   D.wpn       = weaponPow(g);                                  // weapon damage bonus
-  D.strikeMul = c.strikeMul;                                   // class attack lean
-  D.blockKeep = Math.max(0.05, Math.min(0.6, 0.22 / c.block)); // fraction of a blow that lands through a block
+  D.strikeMul = c.strikeMul * tmod(g,'pow');                   // class attack lean × trait fury
+  D.blockKeep = Math.max(0.05, Math.min(0.6, 0.22 / (c.block * tmod(g,'guard')) )); // blow fraction through a block
   D.dodgeWin  = 360 * c.dodge;                                 // dodge i-frame window
   D.riposteMul= 1 + c.riposte;                                 // riposte damage multiplier
   // signature move
@@ -1566,20 +2136,29 @@ function endDuel(won){
   const g = D.g, i = D.tier;
   g.fights++;
   g.hp = Math.max(0, Math.round(D.php));
-  const data = { won, name:g.name, opp:OPPONENTS[i].n, gain:0, fame:0, xp:0, leveled:0, death:false, drop:null };
+  const data = { won, name:g.name, opp:foe(i).n, gain:0, fame:0, xp:0, leveled:0, death:false, drop:null, avenged:null };
   if(won){
     const lvlB = g.level, ev = [];
-    const r = grantWin(g, i, ev, false);
-    data.gain = r.gain; data.drop = r.drop;
-    data.fame = oppFame(i); data.xp = oppXP(i); data.leveled = g.level - lvlB;
+    const r = grantWin(g, i, ev, false, true);
+    data.gain = r.gain; data.drop = r.drop; data.avenged = r.avenged;
+    data.fame = r.fame; data.xp = r.xp; data.leveled = g.level - lvlB;
     if(g.hp <= 0) g.hp = 1;                     // a victor lives
-    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested the ${OPPONENTS[i].n} in single combat! <span class="cash">+${data.gain}◈</span> · +${oppFame(i)} fame`});
+    S.stats.duelWins = (S.stats.duelWins||0) + 1;
+    if(D.php / D.pmax < 0.12) S.stats.closeCall = (S.stats.closeCall||0) + 1;   // won by a thread
+    bumpDaily('duel', 1);
+    S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested ${theFoe(i)} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
     if(data.drop) S.log.push({cls:'level', txt:`🎁 <b>${g.name}</b> claimed a <b>${data.drop.name}</b> as spoils.`});
     dAnim(dz.ef,'downed',1400); vib([20,40,30]);
+  } else if(Math.random() < deathCut(S.fac.infirmary)){
+    // the Medicus drags a dying man from the sand — Infirmary level sets the odds
+    g.state = 'injured'; g.progress = 0; g.hp = 0;
+    S.log.push({cls:'lose', txt:`⚕️ The Medicus drags <b>${g.name}</b> from the sand — barely alive. The crowd exhales.`});
+    dAnim(dz.pf,'downed',1400); vib(70);
   } else {
     // a duel is to the death — you had control, so a loss here is final
     g._dead = true; data.death = true;
-    S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to the ${OPPONENTS[i].n} in single combat. The ludus mourns.`});
+    recordDeath(g, i);
+    S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to ${theFoe(i)} in single combat. The ludus mourns.`});
     dAnim(dz.pf,'downed',1400); vib(90);
   }
   if(S.log.length>60) S.log = S.log.slice(-60);
@@ -1593,13 +2172,13 @@ function showResult(data){
   if(data.won){
     emoji='🏆'; title='VICTORY'; sub='The crowd roars your name';
     rows += row('◈ Purse', '+'+fmt(data.gain), 'var(--gold2)');
-    rows += row('✦ Fame', '+'+data.fame, '#cf9fb6');
-    rows += row('✧ Experience', '+'+data.xp, '#8fe08a');
+    rows += row('✦ Fame', '+'+fmt(data.fame), '#cf9fb6');
+    rows += row('✧ Experience', '+'+fmt(data.xp), '#8fe08a');
     if(data.leveled>0) rows += row('⭐ Levels gained', '+'+data.leveled, '#fff');
     if(data.drop) rows += row('🎁 Looted', GEAR[data.drop.slot].ic+' '+data.drop.name, '#c8a0e0');
     btns += `<div class="dcbtn again" id="dr-again">Fight Again</div>`;
-    if(D.tier < S.maxTier && D.tier < OPPONENTS.length-1)
-      btns += `<div class="dcbtn go" id="dr-next">Next foe: ${OPPONENTS[D.tier+1].n}</div>`;
+    if(D.tier < S.maxTier && D.tier < MAX_RANK-1)
+      btns += `<div class="dcbtn go" id="dr-next">Next foe: ${foe(D.tier+1).n}</div>`;
     btns += `<div class="dcbtn leave" id="dr-leave">Return to Ludus</div>`;
   } else if(data.death){
     emoji='💀'; title='DEATH'; sub=`${data.name} dies on the sand`;
