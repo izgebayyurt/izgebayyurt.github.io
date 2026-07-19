@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>sway</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0c1418; overflow: hidden;
+    font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; touch-action: none; cursor: crosshair; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+
+// ============================================================ setup
+
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  layout();
+}
+window.addEventListener('resize', resize);
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const len = (x, y) => Math.hypot(x, y);
+
+// One knob per effect. 0 = off, 1 = shipped feel.
+const JUICE = { shake: 1, particles: 1, flash: 1, trail: 1 };
+
+const COLORS = {
+  bg: '#0c1418', pitch: '#12262a', line: 'rgba(255,255,255,0.10)',
+  ball: '#f5f0e6', you: '#4fd1c5', foe: '#ff5d73',
+  net: 'rgba(255,255,255,0.06)', heat: '#ffcc4d', over: '#ff5d73',
+};
+
+// ============================================================ pitch geometry
+// Player defends one goal, attacks the other. Landscape -> goals left/right.
+// Portrait -> goals bottom(you)/top(foe). Attack axis = long axis of screen.
+
+const M = 0;            // outer margin (filled below in layout)
+const pitch = { x: 0, y: 0, w: 0, h: 0 };
+let vertical = false;   // true => goals on top/bottom
+let goalFrac = 0.34;    // goal-mouth as fraction of the goal-line length
+// goal lines: {you:..., foe:...} store the line + gap span
+let youGoal = null, foeGoal = null;
+
+function layout() {
+  const m = Math.round(Math.min(W, H) * 0.045) + 8;
+  pitch.x = m; pitch.y = m; pitch.w = W - 2 * m; pitch.h = H - 2 * m;
+  vertical = H >= W;
+  if (vertical) {
+    const span = pitch.w * goalFrac;
+    const cxp = pitch.x + pitch.w / 2;
+    foeGoal = { axis: 'v', line: pitch.y, a: cxp - span / 2, b: cxp + span / 2, dir: -1 }; // top
+    youGoal = { axis: 'v', line: pitch.y + pitch.h, a: cxp - span / 2, b: cxp + span / 2, dir: 1 }; // bottom
+  } else {
+    const span = pitch.h * goalFrac;
+    const cyp = pitch.y + pitch.h / 2;
+    youGoal = { axis: 'h', line: pitch.x, a: cyp - span / 2, b: cyp + span / 2, dir: -1 }; // left
+    foeGoal = { axis: 'h', line: pitch.x + pitch.w, a: cyp - span / 2, b: cyp + span / 2, dir: 1 }; // right
+  }
+}
+
+function goalCenter(g) {
+  const mid = (g.a + g.b) / 2;
+  return g.axis === 'v' ? { x: mid, y: g.line } : { x: g.line, y: mid };
+}
+
+// ============================================================ entities
+
+const BALL_R = 0;
+let ball = { x: 0, y: 0, vx: 0, vy: 0, r: 13 };
+
+// An attractor: a force field the player/AI plants on the pitch.
+function makeField(color, isYou) {
+  return {
+    color, isYou, active: false,
+    x: 0, y: 0, px: 0, py: 0,   // current + previous pos (for flick velocity)
+    fvx: 0, fvy: 0,             // smoothed finger velocity
+    heat: 0, over: false,       // overheat meter [0..1]
+  };
+}
+const you = makeField(COLORS.you, true);
+const foe = makeField(COLORS.foe, false);
+
+// tuning
+const PULL = 2600;        // base attraction accel
+const PULL_R = 190;       // falloff radius (px)
+const FRICTION = 0.988;   // per-frame ball damping
+const MAXV = 1250;        // ball speed clamp
+const HOLD_DAMP = 0.86;   // extra damping when ball sits inside your field (lets you "carry")
+const HEAT_RATE = 0.85;   // heat gained per second holding
+const COOL_RATE = 1.35;   // heat lost per second released
+const FLICK_K = 3.4;      // release-impulse scaling
+const WALL_E = 0.72;      // wall restitution
+
+// ============================================================ state
+
+let score = { you: 0, foe: 0 };
+const WIN = 5;
+let phase = 'kick';       // 'kick' | 'play' | 'goal' | 'over'
+let phaseT = 0;
+let msg = '';
+let shake = 0;
+let flash = 0, flashCol = '#fff';
+const parts = [];
+const trail = [];
+
+function kickoff(dir) {
+  ball.x = pitch.x + pitch.w / 2;
+  ball.y = pitch.y + pitch.h / 2;
+  ball.vx = 0; ball.vy = 0;
+  trail.length = 0;
+  phase = 'kick'; phaseT = 0.9;
+  msg = '';
+}
+
+function newMatch() {
+  score.you = 0; score.foe = 0;
+  phase = 'kick'; msg = '';
+  kickoff();
+}
+
+// ============================================================ input (single pointer for the human)
+
+let pointerId = null;
+cv.addEventListener('pointerdown', e => {
+  if (phase === 'over') { newMatch(); return; }
+  if (pointerId !== null) return;
+  pointerId = e.pointerId;
+  you.active = true;
+  you.x = you.px = e.clientX; you.y = you.py = e.clientY;
+  you.fvx = 0; you.fvy = 0;
+  cv.setPointerCapture(e.pointerId);
+  ensureAudio();
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerId !== pointerId) return;
+  you.x = e.clientX; you.y = e.clientY;
+});
+function release(e) {
+  if (e.pointerId !== pointerId) return;
+  pointerId = null;
+  // convert finger velocity into a flick impulse on release
+  applyFlick(you);
+  you.active = false;
+}
+cv.addEventListener('pointerup', release);
+cv.addEventListener('pointercancel', release);
+
+function applyFlick(f) {
+  const d = len(ball.x - f.x, ball.y - f.y);
+  const prox = clamp(1 - d / (PULL_R * 0.9), 0, 1); // only a tight ball shoots hard
+  ball.vx += f.fvx * FLICK_K * prox;
+  ball.vy += f.fvy * FLICK_K * prox;
+  if (prox > 0.25 && len(f.fvx, f.fvy) > 4) blip(360 + prox * 300, 0.05, 0.18);
+}
+
+// ============================================================ audio (tiny WebAudio)
+
+let AC = null, master = null;
+let muted = localStorage.getItem('sway.mute') === '1';
+function ensureAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(AC.destination);
+  } catch (_) { AC = null; }
+}
+function blip(freq, dur, vol) {
+  if (!AC || muted) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'triangle'; o.frequency.value = freq;
+  g.gain.value = 0; g.gain.setValueAtTime(0, AC.currentTime);
+  g.gain.linearRampToValueAtTime(vol, AC.currentTime + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+  o.connect(g); g.connect(master); o.start(); o.stop(AC.currentTime + dur + 0.02);
+}
+function goalSfx() { blip(180, 0.5, 0.35); setTimeout(() => blip(300, 0.4, 0.3), 90); setTimeout(() => blip(450, 0.5, 0.28), 190); }
+
+// ============================================================ update
+
+let last = 0;
+function frame(t) {
+  const dt = last ? Math.min((t - last) / 1000, 0.033) : 0.016;
+  last = t;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+function update(dt) {
+  phaseT -= dt;
+  shake = Math.max(0, shake - dt * 4);
+  flash = Math.max(0, flash - dt * 3);
+
+  if (phase === 'kick' && phaseT <= 0) phase = 'play';
+  if (phase === 'goal' && phaseT <= 0) {
+    if (score.you >= WIN || score.foe >= WIN) { phase = 'over'; msg = score.you > score.foe ? 'you win' : 'you lose'; }
+    else kickoff();
+  }
+
+  // ---- field smoothed velocity (for flick) ----
+  updateFieldVel(you, dt);
+  aiControl(dt);
+  updateFieldVel(foe, dt);
+
+  // ---- heat ----
+  heatTick(you, dt);
+  heatTick(foe, dt);
+
+  if (phase === 'play' || phase === 'kick') {
+    applyField(you, dt);
+    applyField(foe, dt);
+
+    // integrate ball
+    ball.vx *= FRICTION; ball.vy *= FRICTION;
+    const sp = len(ball.vx, ball.vy);
+    if (sp > MAXV) { ball.vx *= MAXV / sp; ball.vy *= MAXV / sp; }
+    if (phase === 'play') { ball.x += ball.vx * dt; ball.y += ball.vy * dt; }
+
+    walls();
+    if (phase === 'play') goals();
+  }
+
+  // trail
+  if (JUICE.trail) {
+    trail.push({ x: ball.x, y: ball.y });
+    if (trail.length > 16) trail.shift();
+  }
+  // particles
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+}
+
+function updateFieldVel(f, dt) {
+  if (!f.active) { f.fvx *= 0.5; f.fvy *= 0.5; return; }
+  const ivx = (f.x - f.px) / Math.max(dt, 0.001);
+  const ivy = (f.y - f.py) / Math.max(dt, 0.001);
+  f.fvx = lerp(f.fvx, ivx, 0.4);
+  f.fvy = lerp(f.fvy, ivy, 0.4);
+  f.px = f.x; f.py = f.y;
+}
+
+function heatTick(f, dt) {
+  if (f.active && !f.over) {
+    f.heat += HEAT_RATE * dt;
+    if (f.heat >= 1) { f.heat = 1; f.over = true; blip(140, 0.12, 0.16); }
+  } else {
+    f.heat = Math.max(0, f.heat - COOL_RATE * dt);
+    if (f.heat <= 0.02) f.over = false;
+  }
+}
+
+function applyField(f, dt) {
+  if (!f.active || f.over) return;
+  const dx = f.x - ball.x, dy = f.y - ball.y;
+  const d = len(dx, dy) || 0.001;
+  // falloff: strong near, fades past PULL_R (smooth, capped)
+  const fall = 1 / (1 + (d / PULL_R) * (d / PULL_R));
+  const a = PULL * fall;
+  ball.vx += (dx / d) * a * dt;
+  ball.vy += (dy / d) * a * dt;
+  // when the ball is inside the field core, damp so you can "carry" it
+  if (d < ball.r + 26) { ball.vx *= HOLD_DAMP; ball.vy *= HOLD_DAMP; }
+}
+
+function walls() {
+  const L = pitch.x + ball.r, R = pitch.x + pitch.w - ball.r;
+  const T = pitch.y + ball.r, B = pitch.y + pitch.h - ball.r;
+  // horizontal walls skip the goal mouths
+  if (ball.x < L) { if (!inGap('h', ball.y, youGoal, foeGoal, 'left')) { ball.x = L; ball.vx = -ball.vx * WALL_E; wallHit(); } }
+  if (ball.x > R) { if (!inGap('h', ball.y, youGoal, foeGoal, 'right')) { ball.x = R; ball.vx = -ball.vx * WALL_E; wallHit(); } }
+  if (ball.y < T) { if (!inGap('v', ball.x, youGoal, foeGoal, 'top')) { ball.y = T; ball.vy = -ball.vy * WALL_E; wallHit(); } }
+  if (ball.y > B) { if (!inGap('v', ball.x, youGoal, foeGoal, 'bottom')) { ball.y = B; ball.vy = -ball.vy * WALL_E; wallHit(); } }
+}
+
+// is the ball within a goal gap on the given side?
+function inGap(axis, coord, g1, g2, side) {
+  for (const g of [g1, g2]) {
+    if (g.axis !== axis) continue;
+    if (axis === 'h' && g.axis === 'h') {
+      // vertical goal line at g.line; check side matches
+      const onLeft = g.line < pitch.x + pitch.w / 2;
+      if (side === 'left' && !onLeft) continue;
+      if (side === 'right' && onLeft) continue;
+      if (coord > g.a && coord < g.b) return true;
+    } else if (axis === 'v' && g.axis === 'v') {
+      const onTop = g.line < pitch.y + pitch.h / 2;
+      if (side === 'top' && !onTop) continue;
+      if (side === 'bottom' && onTop) continue;
+      if (coord > g.a && coord < g.b) return true;
+    }
+  }
+  return false;
+}
+
+function wallHit() {
+  const sp = len(ball.vx, ball.vy);
+  if (sp > 120) { blip(200 + Math.min(sp, 800) * 0.2, 0.05, 0.1); shake = Math.min(1, shake + sp / 4000 * JUICE.shake); }
+}
+
+function goals() {
+  // ball crosses a goal line within the gap -> score for the attacker
+  checkGoal(foeGoal, 'you');  // you attack foe's goal
+  checkGoal(youGoal, 'foe');  // foe attacks your goal
+}
+function checkGoal(g, scorer) {
+  let crossed = false, within = false;
+  if (g.axis === 'v') {
+    within = ball.x > g.a && ball.x < g.b;
+    crossed = g.dir < 0 ? ball.y < g.line - ball.r : ball.y > g.line + ball.r;
+  } else {
+    within = ball.y > g.a && ball.y < g.b;
+    crossed = g.dir < 0 ? ball.x < g.line - ball.r : ball.x > g.line + ball.r;
+  }
+  if (crossed && within) doGoal(scorer, g);
+}
+function doGoal(scorer, g) {
+  score[scorer]++;
+  phase = 'goal'; phaseT = 1.4;
+  msg = scorer === 'you' ? 'goal' : 'conceded';
+  shake = 1; flash = 1; flashCol = scorer === 'you' ? COLORS.you : COLORS.foe;
+  goalSfx();
+  const c = goalCenter(g);
+  burst(c.x, c.y, scorer === 'you' ? COLORS.you : COLORS.foe, 34);
+}
+
+function burst(x, y, col, n) {
+  if (!JUICE.particles) return;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + Math.random() * 0.4, s = 120 + Math.random() * 340;
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5 + Math.random() * 0.5, col });
+  }
+}
+
+// ============================================================ AI foe
+
+let aiTargetX = 0, aiTargetY = 0, aiThink = 0;
+function aiControl(dt) {
+  if (phase !== 'play') { foe.active = false; return; }
+  aiThink -= dt;
+  const yg = goalCenter(youGoal);     // the goal the AI attacks
+  const fg = goalCenter(foeGoal);     // the goal the AI defends
+  // decide: attack if ball is on AI's half-ish or moving toward AI goal; else defend
+  const distFoeGoal = len(ball.x - fg.x, ball.y - fg.y);
+  const defend = distFoeGoal < Math.min(pitch.w, pitch.h) * 0.55;
+
+  if (aiThink <= 0) {
+    aiThink = 0.06 + Math.random() * 0.05;
+    if (defend) {
+      // sit between ball and own goal, pulling ball away from goal
+      const dx = ball.x - fg.x, dy = ball.y - fg.y, d = len(dx, dy) || 1;
+      aiTargetX = ball.x + (dx / d) * 70;
+      aiTargetY = ball.y + (dy / d) * 70;
+    } else {
+      // stand beyond the ball on the goal side, so attraction sends it goalward
+      const dx = yg.x - ball.x, dy = yg.y - ball.y, d = len(dx, dy) || 1;
+      aiTargetX = ball.x + (dx / d) * 95;
+      aiTargetY = ball.y + (dy / d) * 95;
+    }
+    // reaction noise (keeps it beatable)
+    aiTargetX += (Math.random() - 0.5) * 60;
+    aiTargetY += (Math.random() - 0.5) * 60;
+  }
+
+  // move AI field toward target at limited speed
+  if (!foe.active) { foe.active = true; foe.x = foe.px = aiTargetX; foe.y = foe.py = aiTargetY; }
+  const spd = 720; // px/s
+  const dx = aiTargetX - foe.x, dy = aiTargetY - foe.y, d = len(dx, dy);
+  if (d > 1) { const step = Math.min(spd * dt, d); foe.x += dx / d * step; foe.y += dy / d * step; }
+  foe.x = clamp(foe.x, pitch.x - 20, pitch.x + pitch.w + 20);
+  foe.y = clamp(foe.y, pitch.y - 20, pitch.y + pitch.h + 20);
+  // occasionally "release" to reset heat if overheating
+  if (foe.over) foe.active = Math.random() > 0.3 ? foe.active : false;
+}
+
+// ============================================================ render
+
+function render() {
+  let ox = 0, oy = 0;
+  if (shake > 0 && JUICE.shake) { ox = (Math.random() - 0.5) * shake * 14; oy = (Math.random() - 0.5) * shake * 14; }
+  cx.save(); cx.translate(ox, oy);
+
+  cx.fillStyle = COLORS.bg; cx.fillRect(-20, -20, W + 40, H + 40);
+
+  // pitch
+  roundRect(pitch.x, pitch.y, pitch.w, pitch.h, 14); cx.fillStyle = COLORS.pitch; cx.fill();
+  // markings
+  cx.strokeStyle = COLORS.line; cx.lineWidth = 2;
+  cx.beginPath();
+  if (vertical) { cx.moveTo(pitch.x, pitch.y + pitch.h / 2); cx.lineTo(pitch.x + pitch.w, pitch.y + pitch.h / 2); }
+  else { cx.moveTo(pitch.x + pitch.w / 2, pitch.y); cx.lineTo(pitch.x + pitch.w / 2, pitch.y + pitch.h); }
+  cx.stroke();
+  cx.beginPath(); cx.arc(pitch.x + pitch.w / 2, pitch.y + pitch.h / 2, Math.min(pitch.w, pitch.h) * 0.13, 0, TAU); cx.stroke();
+
+  drawGoal(youGoal, COLORS.you);
+  drawGoal(foeGoal, COLORS.foe);
+
+  // particles
+  for (const p of parts) {
+    cx.globalAlpha = clamp(p.life, 0, 1); cx.fillStyle = p.col;
+    cx.beginPath(); cx.arc(p.x, p.y, 3, 0, TAU); cx.fill();
+  }
+  cx.globalAlpha = 1;
+
+  drawField(foe);
+  drawField(you);
+
+  // ball trail
+  if (JUICE.trail) {
+    for (let i = 0; i < trail.length; i++) {
+      const a = i / trail.length;
+      cx.globalAlpha = a * 0.5; cx.fillStyle = COLORS.ball;
+      cx.beginPath(); cx.arc(trail[i].x, trail[i].y, ball.r * (0.3 + a * 0.6), 0, TAU); cx.fill();
+    }
+    cx.globalAlpha = 1;
+  }
+  // ball
+  cx.fillStyle = COLORS.ball;
+  cx.beginPath(); cx.arc(ball.x, ball.y, ball.r, 0, TAU); cx.fill();
+  cx.fillStyle = 'rgba(0,0,0,0.18)';
+  cx.beginPath(); cx.arc(ball.x + 3, ball.y + 3, ball.r * 0.55, 0, TAU); cx.fill();
+
+  cx.restore();
+
+  drawHUD();
+
+  if (flash > 0 && JUICE.flash) {
+    cx.globalAlpha = flash * 0.35; cx.fillStyle = flashCol; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1;
+  }
+}
+
+function drawField(f) {
+  if (!f.active) return;
+  const over = f.over;
+  const baseCol = over ? COLORS.over : f.color;
+  // pull rings
+  for (let i = 1; i <= 3; i++) {
+    const r = PULL_R * (i / 3) * (over ? 0.5 : 1);
+    cx.globalAlpha = (over ? 0.10 : 0.16) * (1 - i / 4);
+    cx.strokeStyle = baseCol; cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(f.x, f.y, r, 0, TAU); cx.stroke();
+  }
+  cx.globalAlpha = 1;
+  // core
+  const grd = cx.createRadialGradient(f.x, f.y, 2, f.x, f.y, 34);
+  grd.addColorStop(0, over ? 'rgba(255,93,115,0.9)' : hexA(f.color, 0.9));
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  cx.fillStyle = grd; cx.beginPath(); cx.arc(f.x, f.y, 34, 0, TAU); cx.fill();
+  cx.fillStyle = baseCol; cx.beginPath(); cx.arc(f.x, f.y, 7, 0, TAU); cx.fill();
+}
+
+function drawGoal(g, col) {
+  cx.strokeStyle = col; cx.lineWidth = 4; cx.globalAlpha = 0.9;
+  cx.beginPath();
+  if (g.axis === 'v') { cx.moveTo(g.a, g.line); cx.lineTo(g.b, g.line); }
+  else { cx.moveTo(g.line, g.a); cx.lineTo(g.line, g.b); }
+  cx.stroke();
+  // net glow
+  cx.globalAlpha = 0.12; cx.fillStyle = col;
+  const d = 16 * g.dir;
+  if (g.axis === 'v') cx.fillRect(g.a, g.line + Math.min(0, d), g.b - g.a, Math.abs(d));
+  else cx.fillRect(g.line + Math.min(0, d), g.a, Math.abs(d), g.b - g.a);
+  cx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  // score
+  cx.font = '600 34px -apple-system, system-ui, sans-serif';
+  cx.fillStyle = COLORS.you; cx.fillText(score.you, W / 2 - 34, 40);
+  cx.fillStyle = 'rgba(255,255,255,0.4)'; cx.fillText('–', W / 2, 40);
+  cx.fillStyle = COLORS.foe; cx.fillText(score.foe, W / 2 + 34, 40);
+
+  // heat bars (yours bottom-center-ish)
+  heatBar(you, W / 2 - 90, H - 26, 180);
+
+  if (phase === 'kick' && phaseT > 0) {
+    banner(Math.ceil(phaseT).toString(), 0.8);
+  } else if (phase === 'goal') {
+    banner(msg, 1);
+  } else if (phase === 'over') {
+    banner(msg + '  ·  tap to play again', 1);
+  } else if (score.you === 0 && score.foe === 0 && phase === 'play') {
+    cx.font = '500 15px -apple-system, system-ui, sans-serif';
+    cx.fillStyle = 'rgba(255,255,255,0.45)';
+    cx.fillText('hold to pull the ball · flick to shoot · don’t overheat', W / 2, H / 2 - Math.min(pitch.w, pitch.h) * 0.13 - 26);
+  }
+}
+
+function heatBar(f, x, y, w) {
+  cx.fillStyle = 'rgba(255,255,255,0.10)'; roundRect(x, y, w, 6, 3); cx.fill();
+  cx.fillStyle = f.over ? COLORS.over : COLORS.heat;
+  roundRect(x, y, w * clamp(f.heat, 0, 1), 6, 3); cx.fill();
+}
+
+function banner(text, a) {
+  cx.globalAlpha = a;
+  cx.font = '600 42px -apple-system, system-ui, sans-serif';
+  cx.fillStyle = 'rgba(0,0,0,0.4)'; cx.fillText(text, W / 2 + 2, H / 2 + 2);
+  cx.fillStyle = '#f5f0e6'; cx.fillText(text, W / 2, H / 2);
+  cx.globalAlpha = 1;
+}
+
+// ============================================================ helpers
+
+function roundRect(x, y, w, h, r) {
+  cx.beginPath();
+  cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
+  cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath();
+}
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// mute toggle (top-right)
+cv.addEventListener('dblclick', () => {
+  muted = !muted; localStorage.setItem('sway.mute', muted ? '1' : '0');
+  if (master) master.gain.value = muted ? 0 : 0.5;
+});
+
+// ============================================================ go
+resize();
+newMatch();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
