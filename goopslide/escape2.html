@@ -551,7 +551,7 @@
           const bFwd=(mb.dr===SDR&&mb.dc===SDC), aFwd=(ma.dr===SDR&&ma.dc===SDC);
           const win=(bFwd&&!aFwd)?j:a, lose=(win===a)?j:a;
           ds[win].size+=ds[lose].size; removed.add(lose); occ.delete(key(ds[lose].r,ds[lose].c));
-          merges.push({from:ds[lose].id,to:ds[win].id,r:ds[win].r,c:ds[win].c});
+          merges.push({from:ds[lose].id,to:ds[win].id,r:ds[win].r,c:ds[win].c,trail:[...M[lose].trail,[ds[win].r,ds[win].c]]});
           M[win].active=false; M[lose].active=false;      // momenta cancel
         } else { ma.active=false; mb.active=false; } }
       let advanced=false;
@@ -560,7 +560,7 @@
         if(holeMapG[k]!==undefined){
           if(holeMapG[k]===d.color&&(!holeSizeG[k]||holeSizeG[k]===d.size)){
             m.trail.push([nr,nc]); removed.add(idx); occ.delete(key(d.r,d.c)); m.active=false;
-            drains.push({id:d.id,r:nr,c:nc,color:d.color}); continue; }
+            drains.push({id:d.id,r:nr,c:nc,color:d.color,trail:m.trail}); continue; }
           m.active=false; continue; }
         if(!inb(nr,nc)||grid[nr][nc]==='#'){ if(wstickyG.has(k)) m.hitGoo=true; m.active=false; continue; }
         if(doorCellG===k&&!dOpen){ m.active=false; continue; }
@@ -584,7 +584,7 @@
         const j=occ.get(k);
         if(j!==undefined){ if(M[j].active&&!removed.has(j)) continue;   // moving ball ahead: wait
           if(!ds[j].locked&&ds[j].color===d.color){ ds[j].size+=d.size; m.trail.push([nr,nc]);
-            removed.add(idx); occ.delete(key(d.r,d.c)); merges.push({from:d.id,to:ds[j].id,r:nr,c:nc}); }
+            removed.add(idx); occ.delete(key(d.r,d.c)); merges.push({from:d.id,to:ds[j].id,r:nr,c:nc,trail:m.trail}); }
           m.active=false; continue; }
         occ.delete(key(d.r,d.c)); d.r=nr; d.c=nc; occ.set(k,idx); m.trail.push([nr,nc]);
         if(stickyG.has(k)){ m.active=false; continue; }
@@ -649,23 +649,25 @@
     undoStack.push(snapshot()); moves++; SND.swipe();
     const pre=undoStack[undoStack.length-1].drops;
     const colOf=id=>{ const d=pre.find(x=>x.id===id); return d?d.color:0; };
-    res.merges.forEach(m=>{ const g=renderById[m.from]; if(g) ghosts.push({px:g.px,py:g.py,tx:cellX(m.c),ty:cellY(m.r),life:1,rr:g.rr,ci:colOf(m.from)}); delete renderById[m.from]; });
-    res.drains.forEach(dd=>{ const g=renderById[dd.id];
+    const pathOf=t=>t&&t.length>1?t.slice(1).map(cc=>({x:cellX(cc[1]),y:cellY(cc[0])})):null;
+    res.merges.forEach(m=>{ const g=renderById[m.from]; const wp=pathOf(m.trail);
+      ghosts.push({px:g?g.px:cellX(m.c),py:g?g.py:cellY(m.r),wp:wp||[{x:cellX(m.c),y:cellY(m.r)}],life:1,rr:g?g.rr:sizeR(1),ci:colOf(m.from),
+        onEnd:()=>{ const e=renderById[m.to]; if(e) e.pop=1; SND.merge();
+          burst(cellX(m.c),cellY(m.r),COLORS[colOf(m.to)].main,12,S*.11);
+          if(JUICE.ripple) rings.push({x:cellX(m.c),y:cellY(m.r),ci:colOf(m.to),life:1}); }});
+      delete renderById[m.from]; });
+    res.drains.forEach((dd,i)=>{ const g=renderById[dd.id]; const wp=pathOf(dd.trail);
       let ox2=0,oy2=0; if(dd.r===0)oy2=-S*.9; else if(dd.r===gh-1)oy2=S*.9; else if(dd.c===0)ox2=-S*.9; else if(dd.c===gw-1)ox2=S*.9;
-      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),tx:cellX(dd.c)+ox2,ty:cellY(dd.r)+oy2,life:1,rr:g?g.rr:sizeR(1),ci:dd.color,drain:true});
-      burst(cellX(dd.c),cellY(dd.r),COLORS[dd.color].main,16,S*.13);
-      if(JUICE.ripple) rings.push({x:cellX(dd.c),y:cellY(dd.r),ci:dd.color,life:1});
+      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),wp:wp||[{x:cellX(dd.c),y:cellY(dd.r)}],life:1,rr:g?g.rr:sizeR(1),ci:dd.color,
+        onEnd:function(){ this.drain=true; this.tx=cellX(dd.c)+ox2; this.ty=cellY(dd.r)+oy2; SND.drain(i);
+          burst(cellX(dd.c),cellY(dd.r),COLORS[dd.color].main,16,S*.13);
+          if(JUICE.ripple) rings.push({x:cellX(dd.c),y:cellY(dd.r),ci:dd.color,life:1}); }});
       delete renderById[dd.id]; });
-    if(res.merges.length) SND.merge();
-    res.drains.forEach((dd,i)=>SND.drain(i));
     if(res.corks.length){ document.getElementById('hint').style.display=''; } if(res.corks.length) document.getElementById('hint').innerHTML='🫙 Corked! A goop is stuck in the wrong hole — <b>↶ undo</b> (Z) is free.';
     state.drops=res.drops; state.molds=res.molds;
     state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0,sc:1}; e.tr=sizeR(d.size);
       if(d.corners&&d.corners.length){ e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r)})); d.corners=[]; } });
     if(res.redirs) SND.boing&&SND.boing(Math.min(res.redirs,2));
-    res.merges.forEach(m=>{ const e=renderById[m.to]; if(e) e.pop=1;
-      burst(cellX(m.c),cellY(m.r),COLORS[colOf(m.to)].main,12,S*.11);
-      if(JUICE.ripple) rings.push({x:cellX(m.c),y:cellY(m.r),ci:colOf(m.to),life:1}); });
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
     sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir];
     updateMoves(); moving=true;
@@ -776,7 +778,12 @@
       if(e.sp>1.4&&JUICE.trail>0){ trails.push({x:e.px,y:e.py,r:e.rr*.72,ci:d.color,life:1});
         if(trails.length>300)trails=trails.slice(-300); }
       mx=Math.max(mx,Math.abs(tx-e.px),Math.abs(ty-e.py)); }
-    for(const g of ghosts){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; g.life-=.06; } ghosts=ghosts.filter(g=>g.life>0);
+    for(const g of ghosts){
+      if(g.wp&&g.wp.length){ const t=g.wp[0]; g.px+=(t.x-g.px)*.34; g.py+=(t.y-g.py)*.34;
+        if(Math.abs(t.x-g.px)<3&&Math.abs(t.y-g.py)<3){ g.wp.shift();
+          if(!g.wp.length&&g.onEnd){ g.onEnd(); g.onEnd=null; } } }
+      else { if(g.tx!==undefined){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; } g.life-=.06; } }
+    ghosts=ghosts.filter(g=>g.life>0);
     if(moving && mx<0.6 && !ghosts.length){ moving=false; sqA=1; SND.land(); }
     sqA*=.85;
     if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k))?1:0; doorAnim+=(o-doorAnim)*.18; }
