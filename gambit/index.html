@@ -4,278 +4,246 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="theme-color" content="#14121b" />
-<title>Gambit · star puzzles</title>
+<meta name="theme-color" content="#f0e6cf" />
+<title>Gambit</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f0e6cf'/%3E%3Cpath d='M16 5 L19 12 L27 12 L21 17 L23 25 L16 20 L9 25 L11 17 L5 12 L13 12 Z' fill='%23ffd15c' stroke='%232c2733' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <style>
-  :root{
-    --bg0:#16141d; --bg1:#0f0e15; --ink:#ece7dc; --dim:rgba(236,231,220,.6);
-    --faint:rgba(236,231,220,.34); --acc:#e0714a; --acc-soft:rgba(224,113,74,.16);
-    --gold:#f6c445; --panel:#211e2a; --panel2:#2a2635; --rule:rgba(236,231,220,.12);
-    --sq-l:#d3c4a6; --sq-d:#a58c6c; --piece:#211b15; --piece-hi:rgba(255,255,255,.42);
-  }
-  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body{ margin:0; height:100%; }
-  body{
-    background:
-      radial-gradient(120% 80% at 50% -10%, #221f2b 0%, var(--bg0) 42%, var(--bg1) 100%);
-    color:var(--ink);
-    font-family:"Geist",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",sans-serif;
-    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    -webkit-user-select:none; user-select:none;
-    display:flex; flex-direction:column; align-items:center;
-    min-height:100dvh; overflow-x:hidden;
-  }
-  .wrap{ width:100%; max-width:560px; padding:16px 16px 28px; display:flex; flex-direction:column; gap:14px; }
+:root{
+  --paper:#f0e6cf; --paper2:#fbf5e6; --card:#fffdf6;
+  --ink:#2c2733; --ink-soft:#6b6472; --line:#2c2733;
+  --shadow:rgba(44,39,51,.9);
+  --sq-l:#fbf5e6; --sq-d:#ecd9b3;
+  --red:#ef4a5a; --blue:#3d8bdf; --green:#57c268; --purple:#9b62d6; --amber:#f0a92c; --gold:#ffd15c;
+  --font-d:"Fredoka", system-ui, sans-serif;
+  --font-u:"Nunito", system-ui, sans-serif;
+  --pop:cubic-bezier(.34,1.7,.6,1); --calm:cubic-bezier(.4,0,.2,1);
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; }
+body{
+  min-height:100dvh; color:var(--ink); font-family:var(--font-u); font-weight:700;
+  background:var(--paper);
+  background-image:radial-gradient(rgba(44,39,51,.05) 1px, transparent 1.4px);
+  background-size:7px 7px;
+  -webkit-font-smoothing:antialiased; -webkit-user-select:none; user-select:none;
+  display:flex; flex-direction:column; align-items:center;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 14px);
+}
+.app{ width:100%; max-width:460px; display:flex; flex-direction:column; gap:14px; }
+h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 
-  /* ── header ─────────────────────────────────────────── */
-  header{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
-  .brand{ display:flex; align-items:baseline; gap:10px; }
-  .brand h1{
-    font-family:"Instrument Serif","Newsreader",Georgia,serif; font-weight:400; font-style:italic;
-    font-size:30px; letter-spacing:.01em; margin:0; line-height:1;
-  }
-  .brand .glyph{ color:var(--acc); font-size:26px; line-height:1; }
-  .tag{ font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--faint); }
-  .lvltag{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); text-align:right; }
-  .lvltag b{ color:var(--ink); font-weight:600; letter-spacing:.02em; text-transform:none; font-size:14px; display:block; }
+/* ---- marker button ---- */
+.mk{
+  font-family:var(--font-d); font-weight:600; cursor:pointer; color:var(--ink);
+  background:var(--card); border:2.5px solid var(--line); border-radius:14px;
+  box-shadow:0 3px 0 var(--shadow); transition:transform .08s var(--calm), box-shadow .08s var(--calm);
+  touch-action:manipulation;
+}
+.mk:active{ transform:translateY(3px); box-shadow:0 0 0 var(--shadow); }
+.mk:disabled{ opacity:.4; cursor:default; }
+.mk:disabled:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.icobtn{ width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:20px; padding:0; flex:none; }
 
-  /* ── stat strip ─────────────────────────────────────── */
-  .stats{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-  .stat{
-    background:linear-gradient(180deg,var(--panel2),var(--panel));
-    border:1px solid var(--rule); border-radius:12px; padding:10px 12px; text-align:center;
-  }
-  .stat .k{ font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--faint); }
-  .stat .v{ font-size:22px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums; letter-spacing:.01em; }
-  .stat .v small{ font-size:13px; color:var(--dim); font-weight:500; }
-  .stat.moves .v.warn{ color:#f2a24a; }
-  .stat.moves .v.crit{ color:var(--acc); }
-  .stat.stars .v{ color:var(--gold); }
+/* ---- top bar ---- */
+.gtop{ display:flex; align-items:center; gap:11px; }
+.ginfo{ flex:1; min-width:0; }
+.glevel{ font-family:var(--font-d); font-weight:700; font-size:20px; line-height:1; }
+.pips{ display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+.pip{ width:15px; height:15px; }
+.movesbox{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-width:62px; height:52px; border:2.5px solid var(--line); border-radius:14px;
+  background:var(--gold); box-shadow:0 3px 0 var(--shadow); flex:none; padding:0 8px;
+}
+.movesbox b{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
+.movesbox span{ font-size:9px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; margin-top:1px; }
+.movesbox.warn{ background:#ffb14a; }
+.movesbox.crit{ background:var(--red); color:#fff; }
 
-  /* ── board ─────────────────────────────────────────── */
-  .boardframe{
-    position:relative; align-self:center; width:100%;
-    padding:10px; border-radius:16px;
-    background:linear-gradient(180deg,#332d24,#241f18);
-    box-shadow:0 24px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
-  }
-  .board{
-    position:relative; width:100%;
-    aspect-ratio:var(--cols)/var(--rows);
-    border-radius:8px; overflow:hidden; touch-action:manipulation;
-  }
-  .cells{ position:absolute; inset:0; display:grid;
-    grid-template-columns:repeat(var(--cols),1fr); grid-template-rows:repeat(var(--rows),1fr); }
-  .cell{ position:relative; }
-  .cell.hl::after{ /* legal move for a stepping piece (empty) */
-    content:""; position:absolute; left:50%; top:50%; width:26%; height:26%;
-    transform:translate(-50%,-50%); border-radius:50%;
-    background:rgba(33,27,21,.34);
-  }
-  .cell.hl.hasstar::after{ /* legal move that grabs a star */
-    width:64%; height:64%; background:transparent;
-    border:3px solid rgba(33,27,21,.42); box-sizing:border-box;
-  }
-  .cell.src::before{ content:""; position:absolute; inset:0; background:var(--acc-soft); }
+/* ---- board ---- */
+.boardwrap{
+  border:3px solid var(--line); border-radius:20px; background:var(--card);
+  box-shadow:0 5px 0 var(--shadow); padding:9px;
+}
+.board{
+  position:relative; width:100%; aspect-ratio:var(--cols)/var(--rows);
+  border-radius:11px; overflow:hidden; touch-action:none;
+}
+.cells{ position:absolute; inset:0; display:grid;
+  grid-template-columns:repeat(var(--cols),1fr); grid-template-rows:repeat(var(--rows),1fr); }
+.cell{ position:relative; }
+.cell.hl::after{ content:""; position:absolute; left:50%; top:50%; width:26%; height:26%;
+  transform:translate(-50%,-50%); border-radius:50%; background:rgba(44,39,51,.24); }
+.cell.hover::before{ content:""; position:absolute; inset:0; background:rgba(87,194,104,.34); }
 
-  .overlay{ position:absolute; inset:0; pointer-events:none; }
-  .tok{
-    position:absolute; width:calc(100%/var(--cols)); height:calc(100%/var(--rows));
-    display:flex; align-items:center; justify-content:center;
-    transition:transform .26s cubic-bezier(.34,1.32,.5,1);
-    will-change:transform;
-  }
-  .piece{ pointer-events:auto; cursor:pointer; }
-  .piece .g{
-    font-size:min(8vw,44px); line-height:1; color:var(--piece);
-    text-shadow:0 1px 0 var(--piece-hi), 0 3px 5px rgba(0,0,0,.35);
-    transition:transform .12s ease;
-  }
-  .piece.sel .g{ transform:translateY(-6%) scale(1.06); }
-  .piece.sel::after{
-    content:""; position:absolute; left:8%; top:8%; right:8%; bottom:8%;
-    border-radius:26%; border:2.5px solid var(--acc);
-    box-shadow:0 0 0 4px rgba(224,113,74,.18);
-  }
-  .piece.pulse::before{
-    content:""; position:absolute; inset:12%; border-radius:24%;
-    border:2.5px solid var(--acc); animation:pulse 1s ease-out infinite;
-  }
-  @keyframes pulse{ 0%{ transform:scale(.8); opacity:.9 } 100%{ transform:scale(1.5); opacity:0 } }
+.overlay{ position:absolute; inset:0; pointer-events:none; }
+.tok{
+  position:absolute; left:0; top:0;
+  width:calc(100%/var(--cols)); height:calc(100%/var(--rows));
+  display:flex; align-items:center; justify-content:center;
+  transition:transform .26s var(--pop); will-change:transform;
+}
+.tok.dragging{ transition:none; }
 
-  .star .s{
-    font-size:min(6.2vw,34px); line-height:1; color:var(--gold);
-    filter:drop-shadow(0 0 6px rgba(246,196,69,.6));
-    animation:twinkle 3s ease-in-out infinite;
-  }
-  .star.got .s{ animation:grab .42s cubic-bezier(.3,1.4,.5,1) forwards; }
-  @keyframes twinkle{ 0%,100%{ opacity:.92; transform:scale(1) } 50%{ opacity:1; transform:scale(1.08) } }
-  @keyframes grab{ 0%{ transform:scale(1) } 40%{ transform:scale(1.6); opacity:1 } 100%{ transform:scale(0); opacity:0 } }
+/* star */
+.star svg{ width:56%; height:56%; overflow:visible; transition:transform .2s var(--pop); }
+.star svg path{ transition:filter .2s; }
+.star.canland svg{ transform:scale(1.16); }
+.star.canland svg path{ filter:drop-shadow(0 2px 4px rgba(240,169,44,.6)); }
+.star.got svg{ animation:grab .4s var(--pop) forwards; }
+@keyframes grab{ 0%{transform:scale(1)} 45%{transform:scale(1.55); opacity:1} 100%{transform:scale(0); opacity:0} }
 
-  /* ── controls ──────────────────────────────────────── */
-  .controls{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-  button.btn{
-    font-family:inherit; font-size:12.5px; letter-spacing:.04em; color:var(--ink);
-    background:linear-gradient(180deg,var(--panel2),var(--panel));
-    border:1px solid var(--rule); border-radius:12px; padding:12px 8px;
-    display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;
-    transition:transform .08s ease, border-color .2s ease, background .2s ease;
-  }
-  button.btn .ic{ font-size:17px; line-height:1; }
-  button.btn:active{ transform:translateY(1px) scale(.98); }
-  button.btn:disabled{ opacity:.38; cursor:default; }
-  button.btn.hint{ border-color:rgba(224,113,74,.4); }
-  button.btn.hint .ic{ color:var(--acc); }
+/* piece chip */
+.piece{ pointer-events:auto; cursor:grab; }
+.piece:active{ cursor:grabbing; }
+.chip{
+  width:76%; height:76%; border:2.5px solid var(--line); border-radius:32%;
+  box-shadow:0 3px 0 var(--shadow); display:flex; align-items:center; justify-content:center;
+  transition:box-shadow .1s var(--calm);
+}
+.chip .g{
+  font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols2",serif;
+  font-size:min(8.2vw,40px); line-height:1; color:#fff8e6;
+  text-shadow:-1.4px -1.4px 0 var(--line),1.4px -1.4px 0 var(--line),-1.4px 1.4px 0 var(--line),1.4px 1.4px 0 var(--line),0 3px 3px rgba(0,0,0,.2);
+}
+.piece.sel .chip{ box-shadow:0 6px 0 var(--shadow); }
+.piece.pulse .chip{ animation:bob .7s ease-in-out infinite; }
+@keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9%) } }
+.chip.N{ background:var(--red); } .chip.R{ background:var(--blue); }
+.chip.B{ background:var(--green); } .chip.Q{ background:var(--purple); } .chip.K{ background:var(--amber); }
 
-  .hintbar{ min-height:18px; text-align:center; font-size:12.5px; color:var(--dim); letter-spacing:.01em; }
-  .hintbar b{ color:var(--ink); }
+/* ---- teach line ---- */
+.teach{ display:none; text-align:center; font-family:var(--font-d); font-weight:600;
+  font-size:14px; color:var(--ink-soft); min-height:0; }
+.teach.show{ display:block; }
+.teach b{ color:var(--ink); }
 
-  .foot{ text-align:center; font-size:11px; color:var(--faint); letter-spacing:.06em; line-height:1.7; }
-  .foot a{ color:var(--dim); text-decoration:none; border-bottom:1px solid var(--rule); }
+/* ---- controls ---- */
+.controls{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
+.ctl{ height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  font-size:13px; font-weight:600; }
+.ctl .ic{ font-size:20px; line-height:1; }
+.ctl.hint{ background:var(--gold); }
 
-  /* ── overlays (win / lose / menu) ───────────────────── */
-  .scrim{
-    position:fixed; inset:0; background:rgba(10,9,14,.72); backdrop-filter:blur(4px);
-    display:flex; align-items:center; justify-content:center; padding:22px; z-index:20;
-    opacity:0; pointer-events:none; transition:opacity .25s ease;
-  }
-  .scrim.show{ opacity:1; pointer-events:auto; }
-  .card{
-    width:100%; max-width:400px; background:linear-gradient(180deg,var(--panel2),var(--panel));
-    border:1px solid var(--rule); border-radius:20px; padding:26px 24px 22px;
-    box-shadow:0 30px 80px rgba(0,0,0,.55); transform:translateY(10px) scale(.98);
-    transition:transform .3s cubic-bezier(.2,.8,.3,1);
-  }
-  .scrim.show .card{ transform:none; }
-  .card h2{ font-family:"Instrument Serif","Newsreader",serif; font-style:italic; font-weight:400;
-    font-size:34px; margin:0 0 6px; }
-  .card p{ font-size:14px; color:var(--dim); line-height:1.6; margin:0 0 18px; }
-  .rating{ font-size:34px; letter-spacing:.14em; margin:6px 0 14px; }
-  .rating .on{ color:var(--gold); filter:drop-shadow(0 0 8px rgba(246,196,69,.5)); }
-  .rating .off{ color:rgba(236,231,220,.18); }
-  .rline{ font-size:12.5px; color:var(--dim); margin:-6px 0 18px; letter-spacing:.02em; }
-  .rowbtns{ display:flex; gap:10px; }
-  .rowbtns button{
-    flex:1; font-family:inherit; font-size:14px; padding:13px; border-radius:12px; cursor:pointer;
-    border:1px solid var(--rule); background:var(--panel2); color:var(--ink);
-    transition:transform .08s ease;
-  }
-  .rowbtns button:active{ transform:translateY(1px); }
-  .rowbtns button.primary{ background:var(--acc); border-color:var(--acc); color:#1a1109; font-weight:600; }
+/* ---- overlays ---- */
+.scrim{ position:fixed; inset:0; background:rgba(44,39,51,.42); backdrop-filter:blur(2px);
+  display:flex; align-items:center; justify-content:center; padding:20px; z-index:20;
+  opacity:0; pointer-events:none; transition:opacity .2s; }
+.scrim.show{ opacity:1; pointer-events:auto; }
+.card{ width:100%; max-width:400px; background:var(--card); border:3px solid var(--line);
+  border-radius:22px; box-shadow:0 6px 0 var(--shadow); padding:24px 22px 20px;
+  transform:translateY(12px) scale(.96); transition:transform .28s var(--pop); }
+.scrim.show .card{ transform:none; }
+.card h2{ font-size:30px; line-height:1; text-align:center; }
+.bigstars{ display:flex; justify-content:center; gap:10px; margin:16px 0 6px; }
+.bigstars svg{ width:46px; height:46px; }
+.rline{ text-align:center; font-size:14px; color:var(--ink-soft); margin:4px 0 18px; }
+.rowbtns{ display:flex; gap:11px; }
+.rowbtns .mk{ flex:1; height:52px; display:flex; align-items:center; justify-content:center; font-size:17px; }
+.mk.accent{ background:var(--gold); }
 
-  /* level menu */
-  .menu-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-  .menu-head h2{ margin:0; }
-  .x{ background:none; border:none; color:var(--dim); font-size:24px; cursor:pointer; line-height:1; padding:4px; }
-  .seg{ display:flex; gap:6px; background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:4px; margin-bottom:16px; }
-  .seg button{ flex:1; font-family:inherit; font-size:12.5px; padding:9px; border-radius:9px; border:none; cursor:pointer;
-    background:transparent; color:var(--dim); letter-spacing:.03em; }
-  .seg button.on{ background:var(--acc); color:#1a1109; font-weight:600; }
-  .lvlgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-  .lvlcell{
-    aspect-ratio:1; border-radius:12px; border:1px solid var(--rule);
-    background:var(--panel2); display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:4px; cursor:pointer; position:relative; transition:transform .08s ease, border-color .2s ease;
-  }
-  .lvlcell:active{ transform:translateY(1px); }
-  .lvlcell .n{ font-size:19px; font-weight:600; }
-  .lvlcell .rs{ font-size:9px; letter-spacing:.1em; color:var(--gold); height:11px; }
-  .lvlcell.locked{ opacity:.4; cursor:default; }
-  .lvlcell.locked .n{ color:var(--faint); }
-  .lvlcell.cur{ border-color:var(--acc); }
-  .endless-panel{ font-size:13.5px; color:var(--dim); line-height:1.7; }
-  .diffrow{ display:flex; gap:8px; margin:14px 0 4px; }
-  .diffrow button{ flex:1; font-family:inherit; font-size:12.5px; padding:11px; border-radius:11px; cursor:pointer;
-    border:1px solid var(--rule); background:var(--panel2); color:var(--ink); letter-spacing:.02em; }
-  .diffrow button.on{ border-color:var(--acc); background:var(--acc-soft); }
-
-  .rules{ font-size:12.5px; color:var(--dim); line-height:1.7; }
-  .rules b{ color:var(--ink); }
-  .rules .pc{ color:var(--gold); font-weight:600; }
+/* menu */
+.menu-head{ display:flex; align-items:center; gap:11px; margin-bottom:16px; }
+.logo{ position:relative; width:40px; height:38px; flex:none; }
+.logo i{ position:absolute; width:17px; height:17px; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
+.logo i:nth-child(1){ left:0; top:3px; background:var(--red); border-radius:40% 55% 50% 48%; transform:rotate(-6deg); }
+.logo i:nth-child(2){ right:0; top:0; background:var(--blue); border-radius:52% 45% 50% 55%; transform:rotate(5deg); }
+.logo i:nth-child(3){ left:12px; bottom:0; background:var(--green); border-radius:50%; }
+.menu-head h2{ font-size:28px; flex:1; }
+.x{ background:none; border:none; color:var(--ink); font-size:26px; cursor:pointer; line-height:1; padding:4px; font-family:var(--font-d); }
+.seg{ display:flex; gap:7px; margin-bottom:15px; }
+.seg .mk{ flex:1; height:44px; display:flex; align-items:center; justify-content:center; font-size:15px; }
+.seg .mk.on{ background:var(--gold); }
+.lvlgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.lvlcard{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+  border-width:3px; position:relative; }
+.lvlcard .n{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
+.lvlcard .rs{ display:flex; gap:2px; height:11px; }
+.lvlcard .rs svg{ width:11px; height:11px; }
+.lvlcard.easy{ border-color:var(--green); } .lvlcard.med{ border-color:var(--amber); }
+.lvlcard.hard{ border-color:var(--red); } .lvlcard.xhard{ border-color:var(--purple); }
+.lvlcard.lock{ background:#e9e0cb; }
+.lvlcard.lock .n{ color:var(--ink-soft); }
+.lvlcard.lock:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
+.lvlcard.cur::after{ content:""; position:absolute; inset:-3px; border-radius:16px; border:3px solid var(--ink); pointer-events:none; }
+.diffrow{ display:flex; gap:8px; margin:6px 0 14px; }
+.diffrow .mk{ flex:1; height:44px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.diffrow .mk.on{ background:var(--gold); }
+.rules{ font-family:var(--font-d); font-weight:500; font-size:13px; color:var(--ink-soft); line-height:1.75;
+  border-top:2.5px dashed rgba(44,39,51,.2); padding-top:13px; margin-top:16px; }
+.rules b{ color:var(--ink); }
+.credit{ text-align:center; margin-top:14px; font-family:var(--font-d); font-weight:500; font-size:12px; }
+.credit a{ color:var(--ink-soft); text-decoration:none; border-bottom:2px solid rgba(44,39,51,.25); }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <span class="glyph">♞</span>
-      <div>
-        <h1>Gambit</h1>
-        <div class="tag">collect every star</div>
-      </div>
+<div class="app">
+  <div class="gtop">
+    <button class="mk icobtn" id="b-menu" aria-label="Levels">☰</button>
+    <div class="ginfo">
+      <div class="glevel" id="glevel">Level 1</div>
+      <div class="pips" id="pips"></div>
     </div>
-    <div class="lvltag" id="lvltag"><span>Level</span><b id="lvlname">—</b></div>
-  </header>
-
-  <div class="stats">
-    <div class="stat moves"><div class="k">Moves</div><div class="v" id="s-moves">0<small id="s-limit">/0</small></div></div>
-    <div class="stat stars"><div class="k">Stars</div><div class="v" id="s-stars">0<small>/0</small></div></div>
-    <div class="stat"><div class="k">Best</div><div class="v" id="s-best">★</div></div>
+    <div class="movesbox" id="movesbox"><b id="movesleft">0</b><span>left</span></div>
   </div>
 
-  <div class="boardframe">
+  <div class="boardwrap">
     <div class="board" id="board">
       <div class="cells" id="cells"></div>
       <div class="overlay" id="overlay"></div>
     </div>
   </div>
 
-  <div class="hintbar" id="hintbar">Tap a piece, then tap a highlighted square.</div>
+  <div class="teach" id="teach"></div>
 
   <div class="controls">
-    <button class="btn" id="b-undo"><span class="ic">↶</span>Undo</button>
-    <button class="btn" id="b-reset"><span class="ic">⟲</span>Reset</button>
-    <button class="btn hint" id="b-hint"><span class="ic">✦</span>Hint</button>
-    <button class="btn" id="b-menu"><span class="ic">☰</span>Levels</button>
-  </div>
-
-  <div class="foot">
-    Guide your pieces by real chess moves · land on a star to collect it · finish before the moves run out.<br>
-    A puzzle by <a href="../index.html">İzge Bayyurt</a>
+    <button class="mk ctl" id="b-undo"><span class="ic">↶</span>Undo</button>
+    <button class="mk ctl" id="b-reset"><span class="ic">⟲</span>Reset</button>
+    <button class="mk ctl hint" id="b-hint"><span class="ic">✦</span>Hint</button>
   </div>
 </div>
 
-<!-- win / lose card -->
+<!-- win / lose -->
 <div class="scrim" id="endscrim">
   <div class="card">
     <h2 id="end-title">Solved</h2>
-    <div class="rating" id="end-rating"></div>
+    <div class="bigstars" id="end-stars"></div>
     <div class="rline" id="end-rline"></div>
-    <p id="end-msg"></p>
     <div class="rowbtns" id="end-btns"></div>
   </div>
 </div>
 
-<!-- level menu -->
+<!-- menu -->
 <div class="scrim" id="menuscrim">
   <div class="card">
-    <div class="menu-head"><h2>Puzzles</h2><button class="x" id="menu-x">×</button></div>
+    <div class="menu-head">
+      <div class="logo"><i></i><i></i><i></i></div>
+      <h2>Gambit</h2>
+      <button class="x" id="menu-x">×</button>
+    </div>
     <div class="seg">
-      <button id="seg-campaign" class="on">Campaign</button>
-      <button id="seg-endless">Endless</button>
+      <button class="mk on" id="seg-campaign">Levels</button>
+      <button class="mk" id="seg-endless">Endless</button>
     </div>
-    <div id="campaign-view">
-      <div class="lvlgrid" id="lvlgrid"></div>
-    </div>
+    <div id="campaign-view"><div class="lvlgrid" id="lvlgrid"></div></div>
     <div id="endless-view" style="display:none">
-      <div class="endless-panel">
-        Freshly generated puzzles, each verified solvable and tuned so a flawless run has no move to spare. Pick a size:
-      </div>
       <div class="diffrow" id="diffrow">
-        <button data-d="easy" class="on">Casual</button>
-        <button data-d="medium">Clever</button>
-        <button data-d="hard">Fiendish</button>
+        <button class="mk on" data-d="easy">Small</button>
+        <button class="mk" data-d="medium">Medium</button>
+        <button class="mk" data-d="hard">Big</button>
       </div>
-      <div class="rowbtns" style="margin-top:14px">
-        <button class="primary" id="gen-go">Generate puzzle →</button>
-      </div>
+      <div class="rowbtns"><button class="mk accent" id="gen-go" style="flex:1;height:52px;font-size:17px;">New puzzle →</button></div>
     </div>
-    <div class="rules" style="margin-top:18px; border-top:1px solid var(--rule); padding-top:14px">
-      <b>How pieces move</b> — <span class="pc">♞</span> knight leaps in an L ·
-      <span class="pc">♜</span> rook slides straight · <span class="pc">♝</span> bishop slides diagonally ·
-      <span class="pc">♛</span> queen does both · <span class="pc">♚</span> king steps one square.
-      Sliding pieces can't jump over another piece.
+    <div class="rules">
+      <b>Land a piece on every star.</b> Drag it there — pieces move by chess rules:
+      <b style="color:var(--red)">♞</b> L-leap · <b style="color:var(--blue)">♜</b> straight ·
+      <b style="color:var(--green)">♝</b> diagonal · <b style="color:var(--purple)">♛</b> both ·
+      <b style="color:var(--amber)">♚</b> one step. No jumping over pieces.
     </div>
+    <div class="credit"><a href="../index.html">by İzge Bayyurt</a></div>
   </div>
 </div>
 
@@ -283,8 +251,8 @@
 'use strict';
 /* ══════════════════════════════════════════════════════════════════
    Gambit — a chess star-collecting puzzler.
-   Land a piece on a star to collect it; grab them all within the move
-   limit. Pieces move by real chess rules and block one another.
+   Drag a piece onto a star to collect it; grab them all before the
+   moves run out. Pieces move by real chess rules and block one another.
    ══════════════════════════════════════════════════════════════════ */
 
 /* ---------- pure logic (movement + optimal solver) ---------- */
@@ -292,8 +260,8 @@ const KNIGHT = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 const KING   = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 const ROOK_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
 const BISHOP_DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
-const GLYPH = { N:'♞', R:'♜', B:'♝', Q:'♛', K:'♚', P:'♟' };
-const PNAME = { N:'knight', R:'rook', B:'bishop', Q:'queen', K:'king', P:'pawn' };
+const GLYPH = { N:'♞', R:'♜', B:'♝', Q:'♛', K:'♚' };
+const PNAME = { N:'knight', R:'rook', B:'bishop', Q:'queen', K:'king' };
 
 function legalMoves(pieces, idx, cols, rows) {
   const p = pieces[idx];
@@ -371,28 +339,25 @@ function solve(pieces0, stars, cols, rows, limit, nodeCap) {
 
 /* ---------- campaign data (limits verified against the solver) ---------- */
 const CAMPAIGN = [
-  { name:'First Steps', cols:4, rows:4, limit:4,
-    pieces:[{type:'N',r:3,c:0}],
-    stars:[{r:1,c:1},{r:2,c:3}] },
-  { name:'Rook Sweep', cols:5, rows:5, limit:7,
-    pieces:[{type:'R',r:0,c:0}],
-    stars:[{r:0,c:3},{r:2,c:3},{r:2,c:0},{r:4,c:4}] },
-  { name:'Two Knights', cols:5, rows:5, limit:8,
-    pieces:[{type:'N',r:4,c:0},{type:'N',r:4,c:4}],
-    stars:[{r:0,c:1},{r:0,c:3},{r:2,c:2},{r:1,c:4}] },
-  { name:'Bishop Pair', cols:6, rows:6, limit:8,
+  { cols:4, rows:4, limit:4, tier:'easy',
+    pieces:[{type:'N',r:3,c:0}], stars:[{r:1,c:1},{r:2,c:3}] },
+  { cols:5, rows:5, limit:7, tier:'easy',
+    pieces:[{type:'R',r:0,c:0}], stars:[{r:0,c:3},{r:2,c:3},{r:2,c:0},{r:4,c:4}] },
+  { cols:5, rows:5, limit:8, tier:'med',
+    pieces:[{type:'N',r:4,c:0},{type:'N',r:4,c:4}], stars:[{r:0,c:1},{r:0,c:3},{r:2,c:2},{r:1,c:4}] },
+  { cols:6, rows:6, limit:8, tier:'med',
     pieces:[{type:'B',r:5,c:0},{type:'B',r:5,c:1}],
     stars:[{r:0,c:5},{r:3,c:2},{r:1,c:4},{r:2,c:4},{r:4,c:2},{r:0,c:4}] },
-  { name:'Blocked Path', cols:6, rows:6, limit:7,
+  { cols:6, rows:6, limit:7, tier:'med',
     pieces:[{type:'R',r:0,c:0},{type:'R',r:5,c:5},{type:'N',r:2,c:2}],
     stars:[{r:0,c:5},{r:5,c:0},{r:3,c:3},{r:1,c:4},{r:4,c:1},{r:2,c:5}] },
-  { name:"Queen's Field", cols:6, rows:6, limit:9,
+  { cols:6, rows:6, limit:9, tier:'hard',
     pieces:[{type:'Q',r:5,c:0},{type:'K',r:0,c:5}],
     stars:[{r:0,c:0},{r:2,c:2},{r:3,c:4},{r:5,c:5},{r:1,c:3},{r:4,c:1}] },
-  { name:'Cavalry Charge', cols:6, rows:6, limit:10,
+  { cols:6, rows:6, limit:10, tier:'hard',
     pieces:[{type:'N',r:5,c:0},{type:'N',r:5,c:5},{type:'N',r:5,c:2}],
     stars:[{r:0,c:0},{r:0,c:5},{r:1,c:2},{r:2,c:4},{r:3,c:1},{r:1,c:3},{r:0,c:2}] },
-  { name:'Royal Court', cols:7, rows:7, limit:9,
+  { cols:7, rows:7, limit:9, tier:'xhard',
     pieces:[{type:'Q',r:6,c:3},{type:'N',r:6,c:0},{type:'B',r:6,c:6}],
     stars:[{r:0,c:0},{r:0,c:6},{r:3,c:3},{r:1,c:4},{r:4,c:1},{r:2,c:5},{r:5,c:2},{r:1,c:1}] },
 ];
@@ -400,148 +365,138 @@ const CAMPAIGN = [
 /* ---------- persistent progress ---------- */
 const SAVE_KEY = 'gambit.v1';
 let save = load();
-function load(){
-  try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch(e){ return {}; }
-}
+function load(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch(e){ return {}; } }
 function persist(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
 function bestOf(i){ return (save.best && save.best[i]) || 0; }
 function unlocked(i){ return i === 0 || bestOf(i-1) > 0; }
-function recordStars(i, s){
-  save.best = save.best || {};
-  if (s > (save.best[i]||0)) { save.best[i] = s; persist(); }
+function recordStars(i, s){ save.best = save.best || {}; if (s > (save.best[i]||0)) { save.best[i] = s; persist(); } }
+
+/* ---------- star svg ---------- */
+const STAR_PATH = 'M50 5 L62 38 L97 38 L68 59 L79 94 L50 72 L21 94 L32 59 L3 38 L38 38 Z';
+function starSVG(fill, stroke){
+  return '<svg viewBox="0 0 100 100"><path d="'+STAR_PATH+'" fill="'+fill+'" stroke="'+(stroke||'#2c2733')+
+    '" stroke-width="7" stroke-linejoin="round"/></svg>';
 }
 
 /* ---------- game state ---------- */
-let G = null;   // active game
-let uid = 1;
+let G = null, uid = 1;
 
 function makeGame(def, meta){
   const pieces = def.pieces.map(p => ({ id: uid++, type:p.type, r:p.r, c:p.c }));
   const stars  = def.stars.map(s => ({ id: uid++, r:s.r, c:s.c, collected:false }));
-  // optimal: solver bound generous; for campaign limit>=optimal, for endless we pass it in
   let optimal = meta && meta.optimal;
   if (optimal == null) {
     const sol = solve(def.pieces.map(p=>({type:p.type,r:p.r,c:p.c})), def.stars, def.cols, def.rows, def.limit, 2500000);
     optimal = sol ? sol.len : def.limit;
   }
-  const limit = Math.max(def.limit, optimal); // never ship an impossible limit
   return {
     cols:def.cols, rows:def.rows, pieces, stars,
-    total: stars.length, collected:0, limit, optimal,
-    moves:0, selected:null, legal:new Set(), history:[],
-    over:false, won:false,
-    mode: meta ? meta.mode : 'campaign',
-    level: meta ? meta.level : -1,
-    name: def.name,
+    total: stars.length, collected:0, limit: Math.max(def.limit, optimal), optimal,
+    moves:0, selected:null, legal:new Set(), history:[], over:false, won:false,
+    mode: meta ? meta.mode : 'campaign', level: meta ? meta.level : -1,
+    tier: def.tier || 'med',
   };
 }
 
 /* ---------- rendering ---------- */
 const $ = id => document.getElementById(id);
 const board = $('board'), cellsEl = $('cells'), overlayEl = $('overlay');
+const pieceEl = id => overlayEl.querySelector('[data-pid="'+id+'"]');
+const starEl  = id => overlayEl.querySelector('[data-sid="'+id+'"]');
+const pieceAt = (r,c) => G.pieces.find(p=>p.r===r&&p.c===c);
 
-function pctPos(r, c){ return { left:(c/G.cols*100)+'%', top:(r/G.rows*100)+'%' }; }
+function setTok(el, r, c, dx, dy, extra){
+  el.style.transform = 'translate(calc('+c+' * 100% + '+(dx||0)+'px), calc('+r+' * 100% + '+(dy||0)+'px)) '+(extra||'');
+}
 
 function buildBoard(){
   board.style.setProperty('--cols', G.cols);
   board.style.setProperty('--rows', G.rows);
-  // cells
   cellsEl.innerHTML = '';
-  for (let r = 0; r < G.rows; r++){
-    for (let c = 0; c < G.cols; c++){
-      const d = document.createElement('div');
-      d.className = 'cell ' + (((r + c) & 1) ? 'dark' : 'light');
-      d.style.background = ((r + c) & 1) ? 'var(--sq-d)' : 'var(--sq-l)';
-      d.dataset.r = r; d.dataset.c = c;
-      cellsEl.appendChild(d);
-    }
+  for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++){
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.style.background = ((r + c) & 1) ? 'var(--sq-d)' : 'var(--sq-l)';
+    d.dataset.r = r; d.dataset.c = c;
+    cellsEl.appendChild(d);
   }
-  // overlay tokens (stars beneath pieces)
   overlayEl.innerHTML = '';
   for (const s of G.stars){
     const el = document.createElement('div');
     el.className = 'tok star'; el.dataset.sid = s.id;
-    Object.assign(el.style, pctPos(s.r, s.c));
-    el.innerHTML = '<span class="s">★</span>';
+    el.innerHTML = starSVG('var(--gold)');
     overlayEl.appendChild(el);
+    setTok(el, s.r, s.c);
   }
   for (const p of G.pieces){
     const el = document.createElement('div');
     el.className = 'tok piece'; el.dataset.pid = p.id;
-    Object.assign(el.style, pctPos(p.r, p.c));
-    el.innerHTML = '<span class="g">' + GLYPH[p.type] + '</span>';
+    el.innerHTML = '<div class="chip '+p.type+'"><span class="g">'+GLYPH[p.type]+'</span></div>';
     overlayEl.appendChild(el);
+    setTok(el, p.r, p.c);
   }
   refresh();
 }
 
 function refresh(){
-  // piece positions + selection
   for (const p of G.pieces){
-    const el = overlayEl.querySelector('[data-pid="'+p.id+'"]');
-    Object.assign(el.style, pctPos(p.r, p.c));
+    const el = pieceEl(p.id);
     el.classList.toggle('sel', G.selected === p.id);
     el.classList.remove('pulse');
+    if (!el.classList.contains('dragging')) setTok(el, p.r, p.c);
   }
-  // star states
-  for (const s of G.stars){
-    const el = overlayEl.querySelector('[data-sid="'+s.id+'"]');
-    if (s.collected) el.classList.add('got');
-  }
-  // cell highlights
-  const cells = cellsEl.children;
   const starAt = new Set(G.stars.filter(s=>!s.collected).map(s=>s.r*G.cols+s.c));
-  let selPiece = G.selected != null ? G.pieces.find(p=>p.id===G.selected) : null;
-  for (const cell of cells){
-    const r = +cell.dataset.r, c = +cell.dataset.c, key = r*G.cols+c;
-    cell.classList.toggle('hl', G.legal.has(key));
-    cell.classList.toggle('hasstar', G.legal.has(key) && starAt.has(key));
-    cell.classList.toggle('src', selPiece != null && selPiece.r===r && selPiece.c===c);
+  for (const s of G.stars){
+    const el = starEl(s.id);
+    el.classList.toggle('got', s.collected);
+    el.classList.toggle('canland', !s.collected && G.legal.has(s.r*G.cols+s.c));
   }
-  // stats
-  $('s-moves').firstChild.nodeValue = G.moves;
-  $('s-limit').textContent = '/' + G.limit;
-  const left = G.limit - G.moves;
-  const mv = $('s-moves');
-  mv.classList.toggle('warn', left <= 3 && left > 1);
-  mv.classList.toggle('crit', left <= 1);
-  $('s-stars').firstChild.nodeValue = G.collected;
-  $('s-stars').querySelector('small').textContent = '/' + G.total;
-  $('lvlname').textContent = G.name;
-  $('lvltag').querySelector('span').textContent = G.mode === 'endless' ? 'Endless' : 'Level ' + (G.level+1);
-  const bestTxt = G.mode === 'campaign' ? starStr(bestOf(G.level)) : '—';
-  $('s-best').textContent = bestTxt || '—';
+  for (const cell of cellsEl.children){
+    const key = (+cell.dataset.r)*G.cols + (+cell.dataset.c);
+    cell.classList.toggle('hl', G.legal.has(key) && !starAt.has(key));
+    cell.classList.remove('hover');
+  }
+  // top bar
+  $('glevel').textContent = G.mode === 'endless' ? 'Endless' : 'Level ' + (G.level+1);
+  const pips = $('pips'); pips.innerHTML='';
+  for (const s of G.stars){
+    const d = document.createElement('span'); d.className='pip';
+    d.innerHTML = s.collected ? starSVG('var(--gold)') : starSVG('transparent','rgba(44,39,51,.35)');
+    pips.appendChild(d);
+  }
+  const left = G.limit - G.moves, mb = $('movesbox');
+  $('movesleft').textContent = left;
+  mb.classList.toggle('warn', left <= 3 && left > 1);
+  mb.classList.toggle('crit', left <= 1);
   $('b-undo').disabled = G.history.length === 0 || G.over;
+  updateTeach();
 }
 
-function starStr(n){ return n>0 ? '★'.repeat(n) + '·'.repeat(0) : ''; }
+function updateTeach(){
+  const t = $('teach');
+  let msg = '';
+  if (G.mode==='campaign' && G.level===0 && G.moves===0 && G.selected==null && !G.over)
+    msg = 'Drag the knight onto a ★';
+  t.innerHTML = msg; t.classList.toggle('show', !!msg);
+}
 
-/* ---------- interaction ---------- */
+/* ---------- selection & moves ---------- */
 function selectPiece(id){
   G.selected = id;
   const idx = G.pieces.findIndex(p=>p.id===id);
-  const dests = legalMoves(G.pieces, idx, G.cols, G.rows);
-  G.legal = new Set(dests.map(d=>d.r*G.cols+d.c));
+  G.legal = new Set(legalMoves(G.pieces, idx, G.cols, G.rows).map(d=>d.r*G.cols+d.c));
   refresh();
 }
 function deselect(){ G.selected = null; G.legal = new Set(); refresh(); }
 
 function snapshot(){
-  return {
-    pieces: G.pieces.map(p=>({id:p.id,type:p.type,r:p.r,c:p.c})),
-    stars: G.stars.map(s=>({collected:s.collected})),
-    collected:G.collected, moves:G.moves,
-  };
+  return { pieces:G.pieces.map(p=>({r:p.r,c:p.c})), stars:G.stars.map(s=>s.collected),
+           collected:G.collected, moves:G.moves };
 }
 function restore(sn){
   sn.pieces.forEach((sp,i)=>{ G.pieces[i].r=sp.r; G.pieces[i].c=sp.c; });
-  sn.stars.forEach((ss,i)=>{
-    G.stars[i].collected = ss.collected;
-    const el = overlayEl.querySelector('[data-sid="'+G.stars[i].id+'"]');
-    if (el){ el.classList.toggle('got', ss.collected); }
-  });
-  G.collected = sn.collected; G.moves = sn.moves;
-  G.over = false; G.won = false;
+  sn.stars.forEach((sc,i)=>{ G.stars[i].collected = sc; });
+  G.collected = sn.collected; G.moves = sn.moves; G.over=false; G.won=false;
 }
 
 function doMove(id, r, c){
@@ -549,52 +504,79 @@ function doMove(id, r, c){
   G.history.push(snapshot());
   p.r = r; p.c = c;
   G.moves++;
-  // collect?
   const s = G.stars.find(s=>!s.collected && s.r===r && s.c===c);
-  if (s){
-    s.collected = true; G.collected++;
-    const el = overlayEl.querySelector('[data-sid="'+s.id+'"]');
-    if (el) el.classList.add('got');
-  }
-  deselect(); // also refreshes & animates piece
-  setHint('');
-  // resolve
-  if (G.collected === G.total){ G.won = true; G.over = true; setTimeout(endGame, 300); return; }
-  if (G.moves >= G.limit || !anyMove()){ G.over = true; setTimeout(endGame, 260); return; }
+  if (s){ s.collected = true; G.collected++; const el = starEl(s.id); if (el) el.classList.add('got'); }
+  deselect();
+  if (G.collected === G.total){ G.won = true; G.over = true; refresh(); setTimeout(endGame, 320); return; }
+  if (G.moves >= G.limit || !anyMove()){ G.over = true; refresh(); setTimeout(endGame, 280); return; }
 }
-
 function anyMove(){
   for (let i=0;i<G.pieces.length;i++) if (legalMoves(G.pieces,i,G.cols,G.rows).length) return true;
   return false;
 }
 
-board.addEventListener('click', (e)=>{
-  if (G.over) return;
-  // piece?
-  const pieceEl = e.target.closest('.piece');
-  if (pieceEl){
-    const id = +pieceEl.dataset.pid;
-    if (G.selected === id) deselect(); else selectPiece(id);
-    return;
-  }
-  // cell
+/* ---------- pointer: tap OR drag ---------- */
+function cellFromEvent(e){
   const rect = board.getBoundingClientRect();
-  const c = Math.floor((e.clientX - rect.left) / rect.width * G.cols);
-  const r = Math.floor((e.clientY - rect.top) / rect.height * G.rows);
-  if (r<0||c<0||r>=G.rows||c>=G.cols){ deselect(); return; }
-  const key = r*G.cols+c;
-  if (G.selected != null && G.legal.has(key)){ doMove(G.selected, r, c); return; }
-  const onPiece = G.pieces.find(p=>p.r===r&&p.c===c);
-  if (onPiece){ if (G.selected===onPiece.id) deselect(); else selectPiece(onPiece.id); }
-  else deselect();
+  const c = Math.floor((e.clientX - rect.left) / rect.width  * G.cols);
+  const r = Math.floor((e.clientY - rect.top ) / rect.height * G.rows);
+  return { r, c, inside: r>=0 && c>=0 && r<G.rows && c<G.cols };
+}
+let drag = null;
+
+board.addEventListener('pointerdown', e=>{
+  if (G.over) return;
+  const cell = cellFromEvent(e);
+  if (!cell.inside) return;
+  const p = pieceAt(cell.r, cell.c);
+  if (p){
+    const wasSel = G.selected === p.id;
+    selectPiece(p.id);
+    const el = pieceEl(p.id);
+    el.classList.add('dragging'); el.style.zIndex = 6;
+    drag = { id:p.id, sx:e.clientX, sy:e.clientY, moved:false, wasSel, el, r:p.r, c:p.c };
+    board.setPointerCapture(e.pointerId);
+  } else {
+    drag = { id:null, sx:e.clientX, sy:e.clientY, moved:false };
+  }
 });
+board.addEventListener('pointermove', e=>{
+  if (!drag) return;
+  const dx = e.clientX-drag.sx, dy = e.clientY-drag.sy;
+  if (!drag.moved && Math.hypot(dx,dy) > 6) drag.moved = true;
+  if (drag.id!=null && drag.moved){
+    setTok(drag.el, drag.r, drag.c, dx, dy, 'scale(1.12)');
+    const cell = cellFromEvent(e);
+    for (const c of cellsEl.children) c.classList.remove('hover');
+    if (cell.inside && G.legal.has(cell.r*G.cols+cell.c)){
+      const idx = cell.r*G.cols + cell.c;
+      cellsEl.children[idx].classList.add('hover');
+    }
+  }
+});
+function endDrag(e){
+  if (!drag) return;
+  const cell = cellFromEvent(e);
+  if (drag.id != null){
+    drag.el.classList.remove('dragging'); drag.el.style.zIndex = '';
+    const legal = cell.inside && G.legal.has(cell.r*G.cols+cell.c);
+    if (drag.moved){
+      if (legal) doMove(drag.id, cell.r, cell.c);
+      else { setTok(drag.el, drag.r, drag.c); refresh(); }   // spring back, stay selected
+    } else {
+      if (drag.wasSel) deselect(); else refresh();           // tap toggles
+    }
+  } else {
+    const legal = cell.inside && G.selected!=null && G.legal.has(cell.r*G.cols+cell.c);
+    if (legal) doMove(G.selected, cell.r, cell.c); else deselect();
+  }
+  drag = null;
+}
+board.addEventListener('pointerup', endDrag);
+board.addEventListener('pointercancel', endDrag);
 
 /* ---------- controls ---------- */
-$('b-undo').onclick = ()=>{
-  if (!G.history.length || G.over) return;
-  restore(G.history.pop());
-  deselect(); setHint('');
-};
+$('b-undo').onclick = ()=>{ if (!G.history.length || G.over) return; restore(G.history.pop()); deselect(); };
 $('b-reset').onclick = ()=> startLevel(G.mode, G.level, G.__def, G.__meta);
 $('b-hint').onclick = giveHint;
 $('b-menu').onclick = openMenu;
@@ -602,101 +584,66 @@ $('b-menu').onclick = openMenu;
 function giveHint(){
   if (G.over) return;
   const cur = G.pieces.map(p=>({type:p.type,r:p.r,c:p.c}));
-  const remStars = G.stars.filter(s=>!s.collected).map(s=>({r:s.r,c:s.c}));
-  const budget = G.limit - G.moves;
-  setHint('<span style="opacity:.7">thinking…</span>');
-  // let the label paint before the (fast) synchronous solve
-  setTimeout(()=>{
-    const sol = solve(cur, remStars, G.cols, G.rows, budget, 2500000);
-    if (!sol || !sol.moves.length){
-      setHint(budget<=0 ? 'Out of moves — <b>reset</b> and try a new line.'
-                        : 'No solution from here. Try <b>undo</b>.');
-      return;
-    }
-    const mv = sol.moves[0];
-    const p = G.pieces[mv.piece];
-    if (p){
-      selectPiece(p.id);   // highlights this piece's legal moves (incl. the target)
-      const el = overlayEl.querySelector('[data-pid="'+p.id+'"]');
-      if (el) el.classList.add('pulse');   // added after refresh so it persists
-    }
-    setHint('Move the <b>'+PNAME[p.type]+'</b> to the ringed square. '+
-            '<span style="opacity:.6">('+sol.len+' moves to finish)</span>');
-  }, 20);
-}
-
-let hintTimer=null;
-function setHint(html){
-  const bar = $('hintbar');
-  bar.innerHTML = html || defaultHint();
-}
-function defaultHint(){
-  if (!G) return '';
-  const left = G.limit - G.moves;
-  if (G.selected!=null) return 'Tap a highlighted square to move · tap the piece again to cancel.';
-  return 'Tap a piece to see its moves · ' + left + ' move' + (left===1?'':'s') + ' left.';
+  const rem = G.stars.filter(s=>!s.collected).map(s=>({r:s.r,c:s.c}));
+  const sol = solve(cur, rem, G.cols, G.rows, G.limit - G.moves, 2500000);
+  const t = $('teach');
+  if (!sol || !sol.moves.length){
+    t.innerHTML = 'No line from here — try <b>undo</b>.'; t.classList.add('show'); return;
+  }
+  const p = G.pieces[sol.moves[0].piece];
+  selectPiece(p.id);
+  const el = pieceEl(p.id); if (el) el.classList.add('pulse');
+  t.innerHTML = 'Move the <b>'+PNAME[p.type]+'</b> to a ringed square.';
+  t.classList.add('show');
 }
 
 /* ---------- start / end ---------- */
 function startLevel(mode, level, def, meta){
   G = makeGame(def, meta || {mode, level});
   G.__def = def; G.__meta = meta || {mode, level, optimal:G.optimal};
-  buildBoard();
-  setHint('');
-  closeMenu(); closeEnd();
+  buildBoard(); closeMenu(); closeEnd();
 }
-
-function startCampaign(i){
-  const def = CAMPAIGN[i];
-  startLevel('campaign', i, def, {mode:'campaign', level:i});
-}
+function startCampaign(i){ startLevel('campaign', i, CAMPAIGN[i], {mode:'campaign', level:i}); }
 
 function endGame(){
-  const scrim = $('endscrim');
   if (G.won){
     const rating = G.moves <= G.optimal ? 3 : G.moves <= G.optimal+1 ? 2 : 1;
     if (G.mode === 'campaign') recordStars(G.level, rating);
-    $('end-title').textContent = rating===3 ? 'Brilliant!' : rating===2 ? 'Solved' : 'Cleared';
-    $('end-rating').innerHTML =
-      Array.from({length:3},(_,k)=> '<span class="'+(k<rating?'on':'off')+'">★</span>').join('');
-    $('end-rline').textContent =
-      'You used ' + G.moves + ' move'+(G.moves===1?'':'s') +
-      ' · a flawless line is ' + G.optimal + '.';
-    $('end-msg').textContent = rating===3
-      ? 'Not a move wasted. That is the optimal solution.'
-      : 'Every star collected. Can you do it in ' + G.optimal + '?';
+    $('end-title').textContent = rating===3 ? 'Perfect!' : 'Solved!';
+    $('end-stars').innerHTML = [0,1,2].map(k=> starSVG(k<rating?'var(--gold)':'transparent', k<rating?'#2c2733':'rgba(44,39,51,.3)')).join('');
+    $('end-rline').innerHTML = rating===3
+      ? 'Not a move wasted.'
+      : G.moves+' moves · a perfect line is <b>'+G.optimal+'</b>';
     buildEndButtons(true);
   } else {
     $('end-title').textContent = 'Out of moves';
-    $('end-rating').innerHTML = '';
-    $('end-rline').textContent = G.collected + ' of ' + G.total + ' stars collected.';
-    $('end-msg').textContent = 'A tighter route grabs them all. Undo a step or reset the board.';
+    $('end-stars').innerHTML = '';
+    $('end-rline').innerHTML = G.collected+' / '+G.total+' stars collected';
     buildEndButtons(false);
   }
-  scrim.classList.add('show');
+  $('endscrim').classList.add('show');
 }
-
 function buildEndButtons(won){
   const box = $('end-btns'); box.innerHTML='';
-  const mk = (label, cls, fn)=>{ const b=document.createElement('button'); b.textContent=label; if(cls)b.className=cls; b.onclick=fn; box.appendChild(b); };
+  const mk = (label, cls, fn)=>{ const b=document.createElement('button'); b.className='mk'+(cls?' '+cls:''); b.textContent=label; b.onclick=fn; box.appendChild(b); };
   if (won){
     if (G.mode === 'campaign'){
       const next = G.level + 1;
-      mk('Replay', '', ()=>{ closeEnd(); startCampaign(G.level); });
-      if (next < CAMPAIGN.length) mk('Next level →', 'primary', ()=>{ closeEnd(); startCampaign(next); });
-      else mk('Menu', 'primary', ()=>{ closeEnd(); openMenu(); });
+      mk('Replay','', ()=>{ closeEnd(); startCampaign(G.level); });
+      if (next < CAMPAIGN.length) mk('Next →','accent', ()=>{ closeEnd(); startCampaign(next); });
+      else mk('Menu','accent', ()=>{ closeEnd(); openMenu(); });
     } else {
-      mk('Replay', '', ()=>{ closeEnd(); startLevel('endless', -1, G.__def, G.__meta); });
-      mk('New puzzle →', 'primary', ()=>{ closeEnd(); generateEndless(G.__meta.diff||'medium'); });
+      mk('Replay','', ()=>{ closeEnd(); startLevel('endless', -1, G.__def, G.__meta); });
+      mk('New →','accent', ()=>{ closeEnd(); generateEndless(G.__meta.diff||'medium'); });
     }
   } else {
-    mk('Undo', '', ()=>{ closeEnd(); if(G.history.length){ restore(G.history.pop()); deselect(); } G.over=false; refresh(); });
-    mk('Reset board', 'primary', ()=>{ closeEnd(); startLevel(G.mode, G.level, G.__def, G.__meta); });
+    mk('Undo','', ()=>{ closeEnd(); if(G.history.length){ restore(G.history.pop()); } G.over=false; deselect(); });
+    mk('Retry','accent', ()=>{ closeEnd(); startLevel(G.mode, G.level, G.__def, G.__meta); });
   }
 }
 function closeEnd(){ $('endscrim').classList.remove('show'); }
 
-/* ---------- level menu ---------- */
+/* ---------- menu ---------- */
 function openMenu(){ buildLvlGrid(); $('menuscrim').classList.add('show'); }
 function closeMenu(){ $('menuscrim').classList.remove('show'); }
 $('menu-x').onclick = closeMenu;
@@ -706,18 +653,15 @@ $('endscrim').addEventListener('click', e=>{ if(e.target===$('endscrim')) closeE
 function buildLvlGrid(){
   const grid = $('lvlgrid'); grid.innerHTML='';
   CAMPAIGN.forEach((def,i)=>{
-    const cell = document.createElement('div');
-    const open = unlocked(i);
-    cell.className = 'lvlcell' + (open?'':' locked') + (G && G.mode==='campaign' && G.level===i ? ' cur':'');
-    const b = bestOf(i);
-    cell.innerHTML = '<div class="n">'+(open ? (i+1) : '🔒')+'</div>'+
-                     '<div class="rs">'+(b>0 ? '★'.repeat(b) : '')+'</div>';
+    const open = unlocked(i), b = bestOf(i);
+    const cell = document.createElement('button');
+    cell.className = 'mk lvlcard '+def.tier + (open?'':' lock') + (G && G.mode==='campaign' && G.level===i ? ' cur':'');
+    const rs = [0,1,2].map(k=> starSVG(k<b?'var(--gold)':'transparent', k<b?'#2c2733':'rgba(44,39,51,.28)')).join('');
+    cell.innerHTML = '<div class="n">'+(open ? (i+1) : '🔒')+'</div><div class="rs">'+(open?rs:'')+'</div>';
     if (open) cell.onclick = ()=> startCampaign(i);
     grid.appendChild(cell);
   });
 }
-
-// segmented campaign / endless
 $('seg-campaign').onclick = ()=> setSeg('campaign');
 $('seg-endless').onclick = ()=> setSeg('endless');
 function setSeg(which){
@@ -727,29 +671,23 @@ function setSeg(which){
   $('endless-view').style.display = which==='endless' ? '' : 'none';
 }
 let endlessDiff = 'easy';
-document.querySelectorAll('#diffrow button').forEach(b=>{
-  b.onclick = ()=>{
-    endlessDiff = b.dataset.d;
-    document.querySelectorAll('#diffrow button').forEach(x=>x.classList.toggle('on', x===b));
-  };
+document.querySelectorAll('#diffrow .mk').forEach(b=>{
+  b.onclick = ()=>{ endlessDiff = b.dataset.d;
+    document.querySelectorAll('#diffrow .mk').forEach(x=>x.classList.toggle('on', x===b)); };
 });
 $('gen-go').onclick = ()=> generateEndless(endlessDiff);
 
 /* ---------- endless generator (guaranteed solvable, tight limit) ---------- */
 const DIFF = {
-  easy:   { cols:5, rows:5, pieces:['N','R'],       stars:4, minOpt:4, maxOpt:7,  slack:2 },
-  medium: { cols:6, rows:6, pieces:['N','B','R'],   stars:6, minOpt:6, maxOpt:10, slack:1 },
-  hard:   { cols:7, rows:7, pieces:['Q','N','B'],   stars:8, minOpt:8, maxOpt:13, slack:1 },
+  easy:   { cols:5, rows:5, pieces:['N','R'],     stars:4, minOpt:4, maxOpt:7,  slack:2 },
+  medium: { cols:6, rows:6, pieces:['N','B','R'], stars:6, minOpt:6, maxOpt:10, slack:1 },
+  hard:   { cols:7, rows:7, pieces:['Q','N','B'], stars:8, minOpt:8, maxOpt:13, slack:1 },
 };
 function randInt(n){ return Math.floor(Math.random()*n); }
-
 function generateEndless(diff){
   const cfg = DIFF[diff] || DIFF.medium;
-  setHint('<span style="opacity:.7">generating…</span>');
   closeMenu();
-  // try repeatedly; each attempt is cheap
-  let best = null, attempts = 0;
-  const t0 = performance.now();
+  let best = null, attempts = 0; const t0 = performance.now();
   while (attempts < 400 && performance.now()-t0 < 900){
     attempts++;
     const used = new Set();
@@ -757,19 +695,16 @@ function generateEndless(diff){
     const pieces = cfg.pieces.map(t=>{ const p=cell(); return {type:t, r:p.r, c:p.c}; });
     const stars  = Array.from({length:cfg.stars}, ()=> cell());
     const sol = solve(pieces, stars, cfg.cols, cfg.rows, cfg.maxOpt, 1200000);
-    if (!sol) continue;
-    if (sol.len < cfg.minOpt || sol.len > cfg.maxOpt) continue;
-    best = { cols:cfg.cols, rows:cfg.rows, pieces, stars, limit: sol.len + cfg.slack, name: diffName(diff), optimal: sol.len };
+    if (!sol || sol.len < cfg.minOpt || sol.len > cfg.maxOpt) continue;
+    best = { cols:cfg.cols, rows:cfg.rows, pieces, stars, limit: sol.len + cfg.slack, optimal: sol.len, tier:'med' };
     break;
   }
-  if (!best){ setHint('Could not craft one — <b>try again</b>.'); return; }
+  if (!best){ const t=$('teach'); t.innerHTML='Could not craft one — try again.'; t.classList.add('show'); openMenu(); return; }
   startLevel('endless', -1, best, { mode:'endless', level:-1, optimal:best.optimal, diff });
 }
-function diffName(d){ return d==='easy'?'Casual':d==='medium'?'Clever':'Fiendish'; }
 
 /* ---------- boot ---------- */
 (function boot(){
-  // resume last campaign level, else the furthest unlocked, else level 1
   let start = 0;
   for (let i=0;i<CAMPAIGN.length;i++) if (unlocked(i)) start = i;
   if (bestOf(start) > 0 && start+1 < CAMPAIGN.length && unlocked(start+1)) start = start+1;
