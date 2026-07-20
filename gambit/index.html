@@ -114,6 +114,13 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 @keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9%) } }
 .chip.N{ background:var(--red); } .chip.R{ background:var(--blue); }
 .chip.B{ background:var(--green); } .chip.Q{ background:var(--purple); } .chip.K{ background:var(--amber); }
+/* enemy blocker: a muted "other side" chip you capture by landing on it */
+.chip.enemy{ background:#6f6a76; border-radius:26%; }
+.chip.enemy .g{ color:#f2ede2; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+.enemy.target .chip{ box-shadow:0 0 0 3px var(--red), 0 3px 0 var(--shadow); animation:enemybob .8s ease-in-out infinite; }
+@keyframes enemybob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-7%) } }
+.enemy.gone .chip{ animation:capture .34s var(--calm) forwards; }
+@keyframes capture{ 0%{ transform:scale(1) } 35%{ transform:scale(1.18) } 100%{ transform:scale(0) rotate(22deg); opacity:0 } }
 
 /* ---- teach line ---- */
 .teach{ display:none; text-align:center; font-family:var(--font-d); font-weight:600;
@@ -241,7 +248,8 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <b>Land a piece on every star.</b> Drag it there — pieces move by chess rules:
       <b style="color:var(--red)">♞</b> L-leap · <b style="color:var(--blue)">♜</b> straight ·
       <b style="color:var(--green)">♝</b> diagonal · <b style="color:var(--purple)">♛</b> both ·
-      <b style="color:var(--amber)">♚</b> one step. No jumping over pieces.
+      <b style="color:var(--amber)">♚</b> one step. No jumping over pieces.<br>
+      <b style="color:#6f6a76">♟</b> Grey blockers stop sliders — <b>capture</b> one by landing on it.
     </div>
     <div class="credit"><a href="../index.html">by İzge Bayyurt</a></div>
   </div>
@@ -260,47 +268,61 @@ const KNIGHT = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 const KING   = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 const ROOK_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
 const BISHOP_DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
-const GLYPH = { N:'♞', R:'♜', B:'♝', Q:'♛', K:'♚' };
+const GLYPH = { N:'♞', R:'♜', B:'♝', Q:'♛', K:'♚', P:'♟' };
 const PNAME = { N:'knight', R:'rook', B:'bishop', Q:'queen', K:'king' };
 
-function legalMoves(pieces, idx, cols, rows) {
+// enemySet: encoded positions of alive enemy blockers. Own pieces block fully
+// (can't land). An enemy is a legal landing (capture) but a slider can't pass one.
+function legalMoves(pieces, idx, cols, rows, enemySet) {
+  enemySet = enemySet || EMPTY_SET;
   const p = pieces[idx];
-  const occ = new Set();
-  for (let i = 0; i < pieces.length; i++) if (i !== idx) occ.add(pieces[i].r * cols + pieces[i].c);
+  const own = new Set();
+  for (let i = 0; i < pieces.length; i++) if (i !== idx) own.add(pieces[i].r * cols + pieces[i].c);
   const inside = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
   const out = [];
   if (p.type === 'N' || p.type === 'K') {
     for (const [dr, dc] of (p.type === 'N' ? KNIGHT : KING)) {
       const r = p.r + dr, c = p.c + dc;
-      if (inside(r, c) && !occ.has(r * cols + c)) out.push({ r, c });
+      if (inside(r, c) && !own.has(r * cols + c)) out.push({ r, c });
     }
   } else {
     const dirs = p.type === 'R' ? ROOK_DIRS : p.type === 'B' ? BISHOP_DIRS : ROOK_DIRS.concat(BISHOP_DIRS);
     for (const [dr, dc] of dirs) {
       let r = p.r + dr, c = p.c + dc;
-      while (inside(r, c) && !occ.has(r * cols + c)) { out.push({ r, c }); r += dr; c += dc; }
+      while (inside(r, c)) {
+        const k = r * cols + c;
+        if (own.has(k)) break;
+        out.push({ r, c });
+        if (enemySet.has(k)) break;   // capture, but can't slide beyond
+        r += dr; c += dc;
+      }
     }
   }
   return out;
 }
+const EMPTY_SET = new Set();
 
 function popcount(x){ let n = 0; while (x){ x &= x - 1; n++; } return n; }
 
 // Optimal solver via IDA* — heuristic is remaining stars (admissible & consistent:
-// a move collects at most one star). Returns {moves:[{piece,r,c}], len} or null.
-function solve(pieces0, stars, cols, rows, limit, nodeCap) {
+// a move collects at most one star; captures collect none). Tracks star mask and
+// alive-enemy mask. Returns {moves:[{piece,r,c}], len} or null.
+function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap) {
   nodeCap = nodeCap || 2500000;
-  const starBit = new Map();
-  stars.forEach((s, i) => starBit.set(s.r * cols + s.c, i));
+  enemies0 = enemies0 || [];
+  const starBit = new Map();  stars.forEach((s, i) => starBit.set(s.r * cols + s.c, i));
+  const enemyBit = new Map(); enemies0.forEach((e, i) => enemyBit.set(e.r * cols + e.c, i));
   let mask0 = 0;
   for (const p of pieces0) { const b = starBit.get(p.r * cols + p.c); if (b !== undefined) mask0 |= (1 << b); }
-  const key = (pcs, mask) => { let s = mask + '|'; for (const p of pcs) s += (p.r * cols + p.c) + ','; return s; };
+  const eAll = (1 << enemies0.length) - 1;
+  const enemySetOf = (em) => { const s = new Set(); for (let i=0;i<enemies0.length;i++) if (em & (1<<i)) s.add(enemies0[i].r*cols+enemies0[i].c); return s; };
+  const key = (pcs, sm, em) => { let s = sm + '|' + em + '|'; for (const p of pcs) s += (p.r * cols + p.c) + ','; return s; };
   let nodes = 0;
   let bound = stars.length - popcount(mask0);
 
   while (bound <= limit) {
     const seen = new Map(), path = [];
-    const res = dfs(pieces0, mask0, 0, bound, path, seen);
+    const res = dfs(pieces0, mask0, eAll, 0, bound, path, seen);
     if (res === true) return { moves: path.slice(), len: path.length };
     if (res === Infinity) return null;
     bound = res;
@@ -308,26 +330,27 @@ function solve(pieces0, stars, cols, rows, limit, nodeCap) {
   }
   return null;
 
-  function dfs(pcs, mask, g, bound, path, seen) {
+  function dfs(pcs, sm, em, g, bound, path, seen) {
     if (++nodes > nodeCap) return Infinity;
-    const rem = stars.length - popcount(mask);
+    const rem = stars.length - popcount(sm);
     if (rem === 0) return true;
     const f = g + rem;
     if (f > bound) return f;
-    const k = key(pcs, mask);
+    const k = key(pcs, sm, em);
     const prev = seen.get(k);
     if (prev !== undefined && prev <= g) return Infinity;
     seen.set(k, g);
+    const eset = enemySetOf(em);
     let min = Infinity;
     for (let i = 0; i < pcs.length; i++) {
-      for (const d of legalMoves(pcs, i, cols, rows)) {
+      for (const d of legalMoves(pcs, i, cols, rows, eset)) {
         const np = pcs.slice();
         np[i] = { type: pcs[i].type, r: d.r, c: d.c };
-        let nmask = mask;
-        const b = starBit.get(d.r * cols + d.c);
-        if (b !== undefined) nmask |= (1 << b);
+        const pos = d.r * cols + d.c;
+        let nsm = sm; const sb = starBit.get(pos); if (sb !== undefined) nsm |= (1 << sb);
+        let nem = em; const eb = enemyBit.get(pos); if (eb !== undefined) nem &= ~(1 << eb);
         path.push({ piece: i, r: d.r, c: d.c });
-        const t = dfs(np, nmask, g + 1, bound, path, seen);
+        const t = dfs(np, nsm, nem, g + 1, bound, path, seen);
         if (t === true) return true;   // leave the winning move on the path
         path.pop();
         if (t < min) min = t;
@@ -360,7 +383,29 @@ const CAMPAIGN = [
   { cols:7, rows:7, limit:9, tier:'xhard',
     pieces:[{type:'Q',r:6,c:3},{type:'N',r:6,c:0},{type:'B',r:6,c:6}],
     stars:[{r:0,c:0},{r:0,c:6},{r:3,c:3},{r:1,c:4},{r:4,c:1},{r:2,c:5},{r:5,c:2},{r:1,c:1}] },
+
+  // ── enemy blockers introduced from here ──
+  { cols:5, rows:5, limit:7, tier:'med',
+    pieces:[{type:'R',r:2,c:0}], enemies:[{type:'P',r:2,c:2}],
+    stars:[{r:2,c:1},{r:2,c:4},{r:0,c:2},{r:4,c:2}] },
+  { cols:6, rows:6, limit:6, tier:'med',
+    pieces:[{type:'B',r:0,c:0}], enemies:[{type:'P',r:4,c:4}],
+    stars:[{r:1,c:1},{r:2,c:2},{r:3,c:3},{r:5,c:5}] },
+  { cols:5, rows:5, limit:8, tier:'hard',
+    pieces:[{type:'R',r:4,c:4}], enemies:[{type:'P',r:0,c:1},{type:'P',r:1,c:0}],
+    stars:[{r:0,c:0},{r:4,c:0},{r:0,c:4},{r:2,c:2}] },
+  { cols:6, rows:6, limit:9, tier:'hard',
+    pieces:[{type:'Q',r:3,c:2}],
+    enemies:[{type:'P',r:0,c:1},{type:'P',r:1,c:0},{type:'P',r:1,c:1},
+             {type:'P',r:5,c:4},{type:'P',r:4,c:5},{type:'P',r:4,c:4}],
+    stars:[{r:0,c:0},{r:5,c:5},{r:0,c:5},{r:5,c:0},{r:3,c:3}] },
+  { cols:7, rows:7, limit:12, tier:'xhard',
+    pieces:[{type:'Q',r:3,c:3},{type:'R',r:6,c:0}],
+    enemies:[{type:'P',r:0,c:1},{type:'P',r:1,c:0},{type:'P',r:1,c:1},
+             {type:'P',r:0,c:5},{type:'P',r:1,c:6},{type:'P',r:1,c:5}],
+    stars:[{r:0,c:0},{r:0,c:6},{r:6,c:6},{r:6,c:3},{r:3,c:0},{r:2,c:2},{r:4,c:4},{r:3,c:6}] },
 ];
+const FIRST_ENEMY_LEVEL = 8;   // index of "Breach" — first level with blockers
 
 /* ---------- persistent progress ---------- */
 const SAVE_KEY = 'gambit.v1';
@@ -382,27 +427,30 @@ function starSVG(fill, stroke){
 let G = null, uid = 1;
 
 function makeGame(def, meta){
-  const pieces = def.pieces.map(p => ({ id: uid++, type:p.type, r:p.r, c:p.c }));
-  const stars  = def.stars.map(s => ({ id: uid++, r:s.r, c:s.c, collected:false }));
+  const pieces  = def.pieces.map(p => ({ id: uid++, type:p.type, r:p.r, c:p.c }));
+  const stars   = def.stars.map(s => ({ id: uid++, r:s.r, c:s.c, collected:false }));
+  const enemies = (def.enemies||[]).map(e => ({ id: uid++, type:e.type||'P', r:e.r, c:e.c, captured:false }));
   let optimal = meta && meta.optimal;
   if (optimal == null) {
-    const sol = solve(def.pieces.map(p=>({type:p.type,r:p.r,c:p.c})), def.stars, def.cols, def.rows, def.limit, 2500000);
+    const sol = solve(def.pieces.map(p=>({type:p.type,r:p.r,c:p.c})), def.stars, def.enemies||[], def.cols, def.rows, def.limit, 2500000);
     optimal = sol ? sol.len : def.limit;
   }
   return {
-    cols:def.cols, rows:def.rows, pieces, stars,
+    cols:def.cols, rows:def.rows, pieces, stars, enemies,
     total: stars.length, collected:0, limit: Math.max(def.limit, optimal), optimal,
     moves:0, selected:null, legal:new Set(), history:[], over:false, won:false,
     mode: meta ? meta.mode : 'campaign', level: meta ? meta.level : -1,
     tier: def.tier || 'med',
   };
 }
+function aliveEnemySet(){ const s = new Set(); for (const e of G.enemies) if (!e.captured) s.add(e.r*G.cols+e.c); return s; }
 
 /* ---------- rendering ---------- */
 const $ = id => document.getElementById(id);
 const board = $('board'), cellsEl = $('cells'), overlayEl = $('overlay');
 const pieceEl = id => overlayEl.querySelector('[data-pid="'+id+'"]');
 const starEl  = id => overlayEl.querySelector('[data-sid="'+id+'"]');
+const enemyEl = id => overlayEl.querySelector('[data-eid="'+id+'"]');
 const pieceAt = (r,c) => G.pieces.find(p=>p.r===r&&p.c===c);
 
 function setTok(el, r, c, dx, dy, extra){
@@ -428,6 +476,14 @@ function buildBoard(){
     overlayEl.appendChild(el);
     setTok(el, s.r, s.c);
   }
+  for (const e of G.enemies){
+    const el = document.createElement('div');
+    el.className = 'tok enemy'; el.dataset.eid = e.id;
+    el.innerHTML = '<div class="chip enemy"><span class="g">'+(GLYPH[e.type]||'♟')+'</span></div>';
+    overlayEl.appendChild(el);
+    setTok(el, e.r, e.c);
+    if (e.captured) el.classList.add('gone');
+  }
   for (const p of G.pieces){
     const el = document.createElement('div');
     el.className = 'tok piece'; el.dataset.pid = p.id;
@@ -450,6 +506,12 @@ function refresh(){
     const el = starEl(s.id);
     el.classList.toggle('got', s.collected);
     el.classList.toggle('canland', !s.collected && G.legal.has(s.r*G.cols+s.c));
+  }
+  for (const e of G.enemies){
+    const el = enemyEl(e.id);
+    el.classList.toggle('gone', e.captured);
+    el.classList.toggle('target', !e.captured && G.legal.has(e.r*G.cols+e.c));
+    if (!e.captured && !el.classList.contains('dragging')) setTok(el, e.r, e.c);
   }
   for (const cell of cellsEl.children){
     const key = (+cell.dataset.r)*G.cols + (+cell.dataset.c);
@@ -475,8 +537,10 @@ function refresh(){
 function updateTeach(){
   const t = $('teach');
   let msg = '';
-  if (G.mode==='campaign' && G.level===0 && G.moves===0 && G.selected==null && !G.over)
-    msg = 'Drag the knight onto a ★';
+  if (G.mode==='campaign' && G.moves===0 && G.selected==null && !G.over){
+    if (G.level===0) msg = 'Drag the knight onto a ★';
+    else if (G.level===FIRST_ENEMY_LEVEL) msg = 'Grey pieces block the way — capture them by landing on them.';
+  }
   t.innerHTML = msg; t.classList.toggle('show', !!msg);
 }
 
@@ -484,18 +548,19 @@ function updateTeach(){
 function selectPiece(id){
   G.selected = id;
   const idx = G.pieces.findIndex(p=>p.id===id);
-  G.legal = new Set(legalMoves(G.pieces, idx, G.cols, G.rows).map(d=>d.r*G.cols+d.c));
+  G.legal = new Set(legalMoves(G.pieces, idx, G.cols, G.rows, aliveEnemySet()).map(d=>d.r*G.cols+d.c));
   refresh();
 }
 function deselect(){ G.selected = null; G.legal = new Set(); refresh(); }
 
 function snapshot(){
   return { pieces:G.pieces.map(p=>({r:p.r,c:p.c})), stars:G.stars.map(s=>s.collected),
-           collected:G.collected, moves:G.moves };
+           enemies:G.enemies.map(e=>e.captured), collected:G.collected, moves:G.moves };
 }
 function restore(sn){
   sn.pieces.forEach((sp,i)=>{ G.pieces[i].r=sp.r; G.pieces[i].c=sp.c; });
   sn.stars.forEach((sc,i)=>{ G.stars[i].collected = sc; });
+  sn.enemies.forEach((ec,i)=>{ G.enemies[i].captured = ec; });
   G.collected = sn.collected; G.moves = sn.moves; G.over=false; G.won=false;
 }
 
@@ -506,12 +571,15 @@ function doMove(id, r, c){
   G.moves++;
   const s = G.stars.find(s=>!s.collected && s.r===r && s.c===c);
   if (s){ s.collected = true; G.collected++; const el = starEl(s.id); if (el) el.classList.add('got'); }
+  const en = G.enemies.find(e=>!e.captured && e.r===r && e.c===c);
+  if (en){ en.captured = true; const el = enemyEl(en.id); if (el) el.classList.add('gone'); }
   deselect();
   if (G.collected === G.total){ G.won = true; G.over = true; refresh(); setTimeout(endGame, 320); return; }
   if (G.moves >= G.limit || !anyMove()){ G.over = true; refresh(); setTimeout(endGame, 280); return; }
 }
 function anyMove(){
-  for (let i=0;i<G.pieces.length;i++) if (legalMoves(G.pieces,i,G.cols,G.rows).length) return true;
+  const es = aliveEnemySet();
+  for (let i=0;i<G.pieces.length;i++) if (legalMoves(G.pieces,i,G.cols,G.rows,es).length) return true;
   return false;
 }
 
@@ -585,7 +653,8 @@ function giveHint(){
   if (G.over) return;
   const cur = G.pieces.map(p=>({type:p.type,r:p.r,c:p.c}));
   const rem = G.stars.filter(s=>!s.collected).map(s=>({r:s.r,c:s.c}));
-  const sol = solve(cur, rem, G.cols, G.rows, G.limit - G.moves, 2500000);
+  const en  = G.enemies.filter(e=>!e.captured).map(e=>({r:e.r,c:e.c}));
+  const sol = solve(cur, rem, en, G.cols, G.rows, G.limit - G.moves, 2500000);
   const t = $('teach');
   if (!sol || !sol.moves.length){
     t.innerHTML = 'No line from here — try <b>undo</b>.'; t.classList.add('show'); return;
@@ -679,9 +748,9 @@ $('gen-go').onclick = ()=> generateEndless(endlessDiff);
 
 /* ---------- endless generator (guaranteed solvable, tight limit) ---------- */
 const DIFF = {
-  easy:   { cols:5, rows:5, pieces:['N','R'],     stars:4, minOpt:4, maxOpt:7,  slack:2 },
-  medium: { cols:6, rows:6, pieces:['N','B','R'], stars:6, minOpt:6, maxOpt:10, slack:1 },
-  hard:   { cols:7, rows:7, pieces:['Q','N','B'], stars:8, minOpt:8, maxOpt:13, slack:1 },
+  easy:   { cols:5, rows:5, pieces:['N','R'],     stars:4, enemies:0, minOpt:4, maxOpt:7,  slack:2 },
+  medium: { cols:6, rows:6, pieces:['N','B','R'], stars:6, enemies:2, minOpt:6, maxOpt:11, slack:1 },
+  hard:   { cols:7, rows:7, pieces:['Q','N','B'], stars:8, enemies:3, minOpt:8, maxOpt:14, slack:1 },
 };
 function randInt(n){ return Math.floor(Math.random()*n); }
 function generateEndless(diff){
@@ -692,11 +761,12 @@ function generateEndless(diff){
     attempts++;
     const used = new Set();
     const cell = ()=>{ let k; do { k = randInt(cfg.rows)*cfg.cols + randInt(cfg.cols); } while(used.has(k)); used.add(k); return {r:Math.floor(k/cfg.cols), c:k%cfg.cols}; };
-    const pieces = cfg.pieces.map(t=>{ const p=cell(); return {type:t, r:p.r, c:p.c}; });
-    const stars  = Array.from({length:cfg.stars}, ()=> cell());
-    const sol = solve(pieces, stars, cfg.cols, cfg.rows, cfg.maxOpt, 1200000);
+    const pieces  = cfg.pieces.map(t=>{ const p=cell(); return {type:t, r:p.r, c:p.c}; });
+    const enemies = Array.from({length:cfg.enemies||0}, ()=>{ const p=cell(); return {type:'P', r:p.r, c:p.c}; });
+    const stars   = Array.from({length:cfg.stars}, ()=> cell());
+    const sol = solve(pieces, stars, enemies, cfg.cols, cfg.rows, cfg.maxOpt, 1200000);
     if (!sol || sol.len < cfg.minOpt || sol.len > cfg.maxOpt) continue;
-    best = { cols:cfg.cols, rows:cfg.rows, pieces, stars, limit: sol.len + cfg.slack, optimal: sol.len, tier:'med' };
+    best = { cols:cfg.cols, rows:cfg.rows, pieces, enemies, stars, limit: sol.len + cfg.slack, optimal: sol.len, tier:'med' };
     break;
   }
   if (!best){ const t=$('teach'); t.innerHTML='Could not craft one — try again.'; t.classList.add('show'); openMenu(); return; }
