@@ -189,12 +189,13 @@ let shotOwner = null, extraFriction = 1;
 // stats -> shot. aim = { aimX (start board -0.42..0.42), speed (m/s), spin }
 function startShot(owner, stats, aim) {
   shotOwner = owner;
-  const missAmt = 1 - stats.acc / 100;
-  ball.x = clamp(aim.aimX + (rand() - 0.5) * missAmt * 0.34, -0.44, 0.44);
+  // low accuracy = thinner margins, NOT a random ball. The shot still goes where you aim.
+  const miss = Math.pow(1 - stats.acc / 100, 1.4);
+  ball.x = clamp(aim.aimX + (rand() - 0.5) * miss * 0.10, -0.44, 0.44);
   ball.z = FOUL; ball.y = BALL_R; ball.vx = 0;
   ball.vz = clamp(aim.speed * (0.72 + stats.spd / 100 * 0.55), 6.5, 13.5);
   const curCap = 0.4 + stats.cur / 100 * 2.1;
-  ball.spin = clamp(aim.spin, -curCap, curCap) + (rand() - 0.5) * missAmt * 0.5;
+  ball.spin = clamp(aim.spin, -curCap, curCap) + (rand() - 0.5) * miss * 0.13;
   ball.power = 0.6 + stats.pow / 100 * 1.1;
   ball.dist = 0; ball.live = true; ball.gutter = false;
   trail.length = 0; rollSfx();
@@ -467,7 +468,9 @@ function strokeToAim(st) {
   let dy = E.y - S.y; if (dy > -20) dy = -20;
   let sl = 0; for (let i = 1; i < st.length; i++) sl += len(st[i].x - st[i-1].x, st[i].y - st[i-1].y);
   const dx = E.x - S.x;
-  return { aimX: clamp(dx / (W * 0.5) * 0.42, -0.42, 0.42), speed: clamp(sl / H * 20, 7, 13), spin: clamp(strokeCurve(st) * 3, -2.2, 2.2) };
+  let curv = strokeCurve(st);
+  if (Math.abs(curv) < 0.035) curv = 0; // deadzone: a near-straight swipe rolls straight
+  return { aimX: clamp(dx / (W * 0.5) * 0.42, -0.42, 0.42), speed: clamp(sl / H * 20, 7, 13), spin: clamp(curv * 2.4, -2.2, 2.2) };
 }
 function launchAlienShot() {
   const a = match.alien;

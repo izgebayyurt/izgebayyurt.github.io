@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>lane3d</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #05060a; overflow: hidden; -webkit-user-select: none; user-select: none;
+    font-family: -apple-system, system-ui, sans-serif; }
+  #gl { display: block; touch-action: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #f5f0e6; }
+  #msg { position: absolute; left: 0; right: 0; bottom: 5%; text-align: center; font-weight: 700; font-size: 15px; color: rgba(245,240,230,0.75); }
+  #cnt { position: absolute; left: 0; right: 0; top: 7%; text-align: center; font-weight: 800; font-size: 22px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="hud"><div id="cnt"></div><div id="msg">swipe up to bowl — curve your swipe to hook</div></div>
+<script type="module">
+import * as THREE from './vendor/three.module.js';
+import * as CANNON from './vendor/cannon-es.js';
+
+const clamp = (v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t;
+let W = innerWidth, H = innerHeight;
+
+// ---------------- renderer / scene ----------------
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(W, H);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#05060a');
+scene.fog = new THREE.Fog('#05060a', 12, 26);
+
+const camera = new THREE.PerspectiveCamera(46, W/H, 0.1, 100);
+
+// ---------------- environment (gradient) for glossy reflections ----------------
+function gradientEnv() {
+  const c = document.createElement('canvas'); c.width = 16; c.height = 128;
+  const g = c.getContext('2d'); const grd = g.createLinearGradient(0,0,0,128);
+  grd.addColorStop(0, '#2a3a5c'); grd.addColorStop(0.5, '#11151f'); grd.addColorStop(1, '#05060a');
+  g.fillStyle = grd; g.fillRect(0,0,16,128);
+  const tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+scene.environment = gradientEnv();
+
+// ---------------- lights ----------------
+scene.add(new THREE.AmbientLight(0x556688, 0.5));
+const key = new THREE.DirectionalLight(0xfff2e0, 2.0);
+key.position.set(2.5, 7, 4); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 0.5; key.shadow.camera.far = 40;
+key.shadow.camera.left = -2; key.shadow.camera.right = 2; key.shadow.camera.top = 22; key.shadow.camera.bottom = -3;
+key.shadow.bias = -0.0004; key.shadow.radius = 4;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x4fd1c5, 0.35); fill.position.set(-4, 3, 2); scene.add(fill);
+const rim = new THREE.PointLight(0x88aaff, 10, 14); rim.position.set(0, 2.4, 18.6); scene.add(rim);
+
+// ---------------- constants ----------------
+const LANE_HALF = 0.525, LANE_LEN = 19.2, FOUL = 0, PIN_Z0 = 17.4, GUT = 0.14;
+const BALL_R = 0.108, PIN_H = 0.38, PIN_R = 0.06;
+const LAYOUT = [[0,0],[-1,1],[1,1],[-2,2],[0,2],[2,2],[-3,3],[-1,3],[1,3],[3,3]];
+
+// warm pin-deck light so the pins read cream/white like a real alley
+const deckLight = new THREE.SpotLight(0xfff0d8, 22, 6, 0.9, 0.6, 1.2);
+deckLight.position.set(0, 2.4, PIN_Z0 - 2.2); deckLight.target.position.set(0, 0.2, PIN_Z0 + 0.3);
+scene.add(deckLight); scene.add(deckLight.target);
+
+// ---------------- physics world ----------------
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0,-9.82,0) });
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
+world.solver.iterations = 12;
+const matLane = new CANNON.Material('lane'), matPin = new CANNON.Material('pin'), matBall = new CANNON.Material('ball'), matWall = new CANNON.Material('wall');
+world.addContactMaterial(new CANNON.ContactMaterial(matLane, matBall, { friction: 0.03, restitution: 0.05 }));
+world.addContactMaterial(new CANNON.ContactMaterial(matLane, matPin, { friction: 0.28, restitution: 0.12 }));
+world.addContactMaterial(new CANNON.ContactMaterial(matBall, matPin, { friction: 0.04, restitution: 0.5 }));
+world.addContactMaterial(new CANNON.ContactMaterial(matPin, matPin, { friction: 0.1, restitution: 0.45 }));
+world.addContactMaterial(new CANNON.ContactMaterial(matWall, matBall, { friction: 0.0, restitution: 0.2 }));
+world.addContactMaterial(new CANNON.ContactMaterial(matWall, matPin, { friction: 0.1, restitution: 0.3 }));
+
+// floor (thin box — far more stable contacts than an infinite plane)
+const floor = new CANNON.Body({ mass: 0, material: matLane, shape: new CANNON.Box(new CANNON.Vec3(2, 0.5, LANE_LEN)) });
+floor.position.set(0, -0.5, LANE_LEN/2);
+world.addBody(floor);
+// gutter drop-off: two walls just outside the lane, and a floor for the gutters lower down
+function addWall(x) {
+  const b = new CANNON.Body({ mass: 0, material: matWall, shape: new CANNON.Box(new CANNON.Vec3(0.02, 0.25, LANE_LEN/2)) });
+  b.position.set(x, 0.1, LANE_LEN/2); world.addBody(b);
+}
+addWall(-(LANE_HALF+0.001)); addWall(LANE_HALF+0.001);
+// back wall (pit) so pins/ball don't fly forever
+const back = new CANNON.Body({ mass:0, material:matWall, shape:new CANNON.Box(new CANNON.Vec3(1.2,1,0.1)) });
+back.position.set(0,0.5,LANE_LEN+0.4); world.addBody(back);
+
+// ---------------- meshes ----------------
+// lane wood texture
+function laneTexture() {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 1024;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0,0,0,1024);
+  grd.addColorStop(0,'#caa66e'); grd.addColorStop(0.5,'#b8945c'); grd.addColorStop(1,'#a07f4a');
+  g.fillStyle = grd; g.fillRect(0,0,128,1024);
+  // boards
+  g.globalAlpha = 0.12; g.strokeStyle = '#5a4326'; g.lineWidth = 1;
+  for (let i=1;i<20;i++){ g.beginPath(); g.moveTo(i*128/20,0); g.lineTo(i*128/20,1024); g.stroke(); }
+  // grain
+  g.globalAlpha = 0.06; g.strokeStyle = '#3a2c18';
+  for (let i=0;i<120;i++){ const x=Math.random()*128; g.beginPath(); g.moveTo(x,0); g.lineTo(x+(Math.random()-0.5)*6,1024); g.stroke(); }
+  g.globalAlpha = 1;
+  // aiming arrows (dark chevrons) ~ 1/4 up
+  g.fillStyle = '#5a4326';
+  for (let i=-2;i<=2;i++){ const cxp=64+i*16; const yy=760; g.beginPath(); g.moveTo(cxp,yy); g.lineTo(cxp-4,yy+12); g.lineTo(cxp+4,yy+12); g.closePath(); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+const laneMat = new THREE.MeshStandardMaterial({ map: laneTexture(), roughness: 0.28, metalness: 0.0, envMapIntensity: 0.6 });
+const laneMesh = new THREE.Mesh(new THREE.PlaneGeometry(LANE_HALF*2, LANE_LEN), laneMat);
+laneMesh.rotation.x = -Math.PI/2; laneMesh.position.set(0,0,LANE_LEN/2); laneMesh.receiveShadow = true; scene.add(laneMesh);
+// gutters
+const gutMat = new THREE.MeshStandardMaterial({ color: 0x181c26, roughness: 0.5, metalness: 0.1 });
+for (const s of [-1,1]) {
+  const gm = new THREE.Mesh(new THREE.PlaneGeometry(GUT, LANE_LEN), gutMat);
+  gm.rotation.x = -Math.PI/2; gm.position.set(s*(LANE_HALF+GUT/2), -0.03, LANE_LEN/2); gm.receiveShadow = true; scene.add(gm);
+}
+// foul line
+const foulMesh = new THREE.Mesh(new THREE.PlaneGeometry(LANE_HALF*2, 0.03), new THREE.MeshBasicMaterial({ color: 0xff5d73 }));
+foulMesh.rotation.x = -Math.PI/2; foulMesh.position.set(0, 0.002, 0.1); scene.add(foulMesh);
+// backdrop (pin deck masking + gradient wall)
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x0d1424, roughness: 0.8 });
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(6, 4), wallMat);
+wall.position.set(0, 1.4, LANE_LEN + 0.6); scene.add(wall);
+const deckMat = new THREE.MeshStandardMaterial({ color: 0x222a3a, roughness: 0.5 });
+const deck = new THREE.Mesh(new THREE.PlaneGeometry(LANE_HALF*2+GUT*2, 1.6), deckMat);
+deck.rotation.x = -Math.PI/2; deck.position.set(0, 0.001, PIN_Z0 + 0.4); deck.receiveShadow = true; scene.add(deck);
+
+// pin texture: white body, two red stripes on the neck (v runs base=0 → top=1; canvas y is top-down)
+function pinTexture() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256;
+  const g = c.getContext('2d'); g.fillStyle = '#f6f2e9'; g.fillRect(0,0,64,256);
+  const band = (v0, v1, col) => { g.fillStyle = col; const y1 = (1-v1)*256, y0 = (1-v0)*256; g.fillRect(0, y1, 64, y0-y1); };
+  band(0.70, 0.735, '#d8354c'); band(0.755, 0.79, '#d8354c'); // two neck stripes just below the head
+  g.fillStyle = 'rgba(0,0,0,0.06)'; g.fillRect(0, 248, 64, 8);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+// real bowling-pin silhouette (radius fraction, height fraction), smoothed with a spline
+const R = PIN_R, HH = PIN_H;
+const pinCtrl = [
+  [0.46,0.00],[0.50,0.025],[0.455,0.06],[0.58,0.13],[0.80,0.23],[1.00,0.31],
+  [0.94,0.38],[0.72,0.47],[0.50,0.56],[0.42,0.63],[0.415,0.68],[0.47,0.74],
+  [0.515,0.80],[0.50,0.85],[0.40,0.91],[0.25,0.96],[0.10,0.99],[0.02,1.00]
+].map(([r,h]) => new THREE.Vector2(Math.max(0.003, r*R), h*HH));
+const pinPts = new THREE.SplineCurve(pinCtrl).getPoints(64);
+const pinGeo = new THREE.LatheGeometry(pinPts, 32);
+pinGeo.translate(0, -HH/2, 0);
+pinGeo.computeVertexNormals();
+const pinMat = new THREE.MeshStandardMaterial({ map: pinTexture(), roughness: 0.3, metalness: 0.0, envMapIntensity: 0.5 });
+
+// ball
+let ballColor = 0x2ec4b6;
+const ballGeo = new THREE.SphereGeometry(BALL_R, 48, 48);
+const ballMat = new THREE.MeshPhysicalMaterial({ color: ballColor, roughness: 0.08, metalness: 0.2, clearcoat: 1.0, clearcoatRoughness: 0.06, envMapIntensity: 1.2 });
+const ballMesh = new THREE.Mesh(ballGeo, ballMat); ballMesh.castShadow = true; scene.add(ballMesh);
+// finger holes (dark dots) — a small group that rotates with the ball
+const holeMat = new THREE.MeshStandardMaterial({ color: 0x0a0a12, roughness: 0.6 });
+const holes = new THREE.Group();
+for (const off of [[-0.03,0.02],[0.03,0.02],[0,-0.03]]) { const hh = new THREE.Mesh(new THREE.CircleGeometry(0.012, 12), holeMat); hh.position.set(off[0], off[1], BALL_R-0.001); holes.add(hh); }
+ballMesh.add(holes);
+
+// ---------------- entities ----------------
+const pins = [];
+function makePinBody(x, z) {
+  // box collider (stable); the pretty lathe mesh is what you see
+  const body = new CANNON.Body({ mass: 1.1, material: matPin, allowSleep: true, sleepSpeedLimit: 0.14, sleepTimeLimit: 0.35 });
+  body.addShape(new CANNON.Box(new CANNON.Vec3(PIN_R*0.85, PIN_H/2, PIN_R*0.85)));
+  body.position.set(x, PIN_H/2, z); body.angularDamping = 0.14; body.linearDamping = 0.04;
+  return body;
+}
+for (const [gx,gy] of LAYOUT) {
+  const x = gx*0.1525, z = PIN_Z0 + gy*0.264;
+  const body = makePinBody(x, z); world.addBody(body);
+  const mesh = new THREE.Mesh(pinGeo, pinMat); mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+  pins.push({ body, mesh, hx: x, hz: z });
+}
+const ballBody = new CANNON.Body({ mass: 6, material: matBall, shape: new CANNON.Sphere(BALL_R), allowSleep: false });
+ballBody.position.set(0, BALL_R, FOUL); world.addBody(ballBody);
+
+function rackPins() {
+  for (const p of pins) { const b = p.body; b.wakeUp(); b.position.set(p.hx, PIN_H/2, p.hz); b.velocity.setZero(); b.angularVelocity.setZero(); b.quaternion.set(0,0,0,1); }
+}
+function standingCount() {
+  let n = 0; const up = new CANNON.Vec3();
+  for (const p of pins) { p.body.quaternion.vmult(new CANNON.Vec3(0,1,0), up); if (up.y > 0.6 && p.body.position.y < PIN_H) n++; }
+  return n;
+}
+
+// ---------------- shot ----------------
+let rolling = false, hookF = 0, camMode = 'aim', settleT = 0;
+function shoot(aimX, speed, spin) {
+  rackPins();
+  ballBody.wakeUp();
+  ballBody.position.set(clamp(aimX,-0.4,0.4), BALL_R, FOUL + 0.05);
+  ballBody.velocity.set(0, 0, speed);
+  ballBody.angularVelocity.set(speed/BALL_R, spin*4, 0); // rolling (matched to linear so it doesn't skid) + side spin
+  hookF = spin * 0.75;
+  rolling = true; camMode = 'roll'; settleT = 0;
+  document.getElementById('msg').textContent = '';
+}
+
+// ---------------- input ----------------
+let drawing=false, stroke=[];
+canvas.addEventListener('pointerdown', e=>{ if(rolling) return; drawing=true; stroke=[{x:e.clientX,y:e.clientY,t:performance.now()}]; });
+canvas.addEventListener('pointermove', e=>{ if(drawing) stroke.push({x:e.clientX,y:e.clientY,t:performance.now()}); });
+canvas.addEventListener('pointerup', ()=>{ if(!drawing) return; drawing=false; if(stroke.length>1) launch(); });
+function launch() {
+  const S=stroke[0], E=stroke[stroke.length-1];
+  let dx=E.x-S.x, dy=E.y-S.y; if(dy>-20) dy=-20;
+  let sl=0; for(let i=1;i<stroke.length;i++) sl+=Math.hypot(stroke[i].x-stroke[i-1].x, stroke[i].y-stroke[i-1].y);
+  let turn=0,n=0; for(let i=2;i<stroke.length;i++){const ax=stroke[i-1].x-stroke[i-2].x,ay=stroke[i-1].y-stroke[i-2].y,bx=stroke[i].x-stroke[i-1].x,by=stroke[i].y-stroke[i-1].y;const la=Math.hypot(ax,ay),lb=Math.hypot(bx,by);if(la<1||lb<1)continue;turn+=(ax*by-ay*bx)/(la*lb);n++;}
+  let curv = n?turn:0; if(Math.abs(curv)<0.035) curv=0;
+  const aimX = clamp(dx/(W*0.5)*0.4, -0.4, 0.4);
+  const speed = clamp(sl/H*22, 7.5, 13);
+  const spin = clamp(curv*2.2, -1.6, 1.6);
+  shoot(aimX, speed, spin);
+}
+
+// ---------------- loop ----------------
+const tmpV = new CANNON.Vec3();
+function syncMeshes() {
+  ballMesh.position.copy(ballBody.position); ballMesh.quaternion.copy(ballBody.quaternion);
+  for (const p of pins) { p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); }
+}
+function updateCamera(dt) {
+  let cx, cy, cz, lx, ly, lz;
+  if (camMode === 'debug') { cx=0.15; cy=0.34; cz=PIN_Z0-1.15; lx=0; ly=0.2; lz=PIN_Z0+0.2; }
+  else if (camMode === 'aim') { cx=0; cy=0.55; cz=-1.7; lx=0; ly=0.28; lz=6; }
+  else {
+    const bz = ballBody.position.z, t = clamp(bz / PIN_Z0, 0, 1);
+    cx = clamp(ballBody.position.x, -0.35, 0.35) * 0.22;
+    cy = lerp(0.55, 1.4, t);
+    cz = clamp(bz - 2.4, -1.7, PIN_Z0 - 3.2);
+    lx = clamp(ballBody.position.x, -0.4, 0.4) * 0.35; ly = 0.3; lz = lerp(bz + 3, PIN_Z0 + 0.3, t);
+  }
+  const k = 1 - Math.pow(0.001, dt);
+  camera.position.x = lerp(camera.position.x, cx, k);
+  camera.position.y = lerp(camera.position.y, cy, k);
+  camera.position.z = lerp(camera.position.z, cz, k);
+  camera._lx = lerp(camera._lx ?? lx, lx, k); camera._ly = lerp(camera._ly ?? ly, ly, k); camera._lz = lerp(camera._lz ?? lz, lz, k);
+  camera.lookAt(camera._lx, camera._ly, camera._lz);
+}
+let acc = 0, lastT = performance.now();
+function frame(now) {
+  const dt = Math.min((now - lastT)/1000, 0.05); lastT = now;
+  // physics
+  acc += dt; const FIXED = 1/120; let steps = 0;
+  while (acc >= FIXED && steps < 8) {
+    if (rolling && ballBody.position.z < PIN_Z0 && Math.abs(hookF) > 0.001) ballBody.velocity.x += hookF * FIXED * clamp(1 - ballBody.position.z/LANE_LEN, 0, 1);
+    world.step(FIXED); acc -= FIXED; steps++;
+  }
+  if (rolling) {
+    const moving = ballBody.velocity.length() > 0.25 || pins.some(p => p.body.velocity.length() > 0.15 || p.body.angularVelocity.length() > 0.4);
+    const past = ballBody.position.z > PIN_Z0 + 0.9 || ballBody.position.y < -0.3;
+    settleT += dt;
+    if ((!moving && (past || ballBody.position.z > 6) && settleT > 0.4) || settleT > 6) {
+      rolling = false; camMode = 'aim';
+      const knocked = 10 - standingCount();
+      document.getElementById('cnt').textContent = knocked === 10 ? 'STRIKE!' : (knocked + ' down');
+      document.getElementById('msg').textContent = 'swipe up to bowl again';
+    }
+  }
+  updateCamera(dt);
+  syncMeshes();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+addEventListener('resize', ()=>{ W=innerWidth; H=innerHeight; camera.aspect=W/H; camera.updateProjectionMatrix(); renderer.setSize(W,H); });
+camera.position.set(0,0.55,-1.7);
+syncMeshes(); renderer.render(scene, camera);
+requestAnimationFrame(frame);
+
+// debug api
+window.__b = { shoot, standingCount, ballBody, pins, pinCam: ()=>{ camMode='debug'; } };
+window.__ready = true;
+</script>
+</body>
+</html>
