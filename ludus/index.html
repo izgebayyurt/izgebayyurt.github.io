@@ -78,6 +78,8 @@ body{
   border-radius:9px; padding:6px 8px; text-align:center; overflow:hidden;
 }
 .stat b{ display:block; font-family:var(--font-d); font-size:17px; font-weight:600; line-height:1.1; }
+.stat b.bump{ animation:statbump .35s var(--pop); }
+@keyframes statbump{ 0%{ transform:scale(1); } 40%{ transform:scale(1.22); } 100%{ transform:scale(1); } }
 .stat small{ display:block; font-family:var(--font-sc); font-size:9px; letter-spacing:.14em; opacity:.62; text-transform:uppercase; margin-top:2px; }
 .stat.gold b{ color:var(--gold2); }
 .stat.fame b{ color:#cf9fb6; }
@@ -432,9 +434,11 @@ body{
 .duel-ehead .en{ font-family:var(--font-d); font-weight:700; font-size:16px; color:#f0c98a; letter-spacing:.06em; }
 .duel-ehead .es{ font-family:var(--font-sc); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#c98a5a; }
 .hpbar{ height:15px; border-radius:9px; background:rgba(0,0,0,.4); border:1.5px solid rgba(230,216,189,.2); overflow:hidden; position:relative; margin-top:5px; }
-.hpbar > i{ display:block; height:100%; transition:width .18s var(--calm); }
-.hpbar.enemy > i{ background:linear-gradient(90deg,#7a241a,#c0392b); }
-.hpbar.player > i{ background:linear-gradient(90deg,#3f7a3c,#79b356); }
+.hpbar i{ position:absolute; left:0; top:0; bottom:0; display:block; }
+.hpbar .fill{ z-index:2; transition:width .15s var(--calm); }
+.hpbar .ghost{ z-index:1; background:rgba(255,236,200,.55); transition:width .5s ease .3s; }  /* trails behind — recent damage reads as a pale wake */
+.hpbar.enemy .fill{ background:linear-gradient(90deg,#7a241a,#c0392b); }
+.hpbar.player .fill{ background:linear-gradient(90deg,#3f7a3c,#79b356); }
 .hpbar .lab{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   font-family:var(--font-d); font-size:10px; font-weight:600; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.7); letter-spacing:.04em; }
 
@@ -451,8 +455,32 @@ body{
 }
 .fighter.player{ left:8%; background:radial-gradient(circle at 40% 30%, #3a2c22, #1c1410);
   border:2px solid var(--bronze); box-shadow:inset 0 0 0 3px rgba(200,145,47,.25), 0 6px 14px rgba(0,0,0,.5); transform:scaleX(1); }
-.fighter.enemy{ right:8%; background:radial-gradient(circle at 40% 30%, #4a2620, #241210);
+.fighter.enemy{ left:72%; background:radial-gradient(circle at 40% 30%, #4a2620, #241210);
   border:2px solid var(--blood); box-shadow:inset 0 0 0 3px rgba(147,47,34,.3), 0 6px 14px rgba(0,0,0,.5); transform:scaleX(-1); }
+.fighter.enemy.can-hit{ box-shadow:inset 0 0 0 3px rgba(147,47,34,.3), 0 0 16px rgba(224,176,74,.55), 0 6px 14px rgba(0,0,0,.5); }
+
+/* the reach line — how far your blade carries from where you stand */
+.reach-zone{ position:absolute; bottom:22px; height:3px; border-radius:2px; pointer-events:none;
+  background:linear-gradient(90deg, rgba(200,145,47,.55), rgba(200,145,47,.06)); transition:opacity .2s; }
+.reach-zone.hot{ background:linear-gradient(90deg, rgba(224,176,74,.9), rgba(224,176,74,.12)); }
+
+/* movement affordances — hold either side of the arena to walk */
+.mv-hint{ position:absolute; bottom:40px; font-family:var(--font-d); font-size:34px;
+  color:rgba(230,216,189,.22); pointer-events:none; transition:color .15s, text-shadow .15s; }
+.mv-hint.left{ left:6px; } .mv-hint.right{ right:6px; }
+.mv-hint.held{ color:rgba(224,176,74,.85); text-shadow:0 0 12px rgba(224,176,74,.5); }
+
+/* impact sparks */
+.spark{ position:absolute; width:5px; height:5px; border-radius:50%; background:#ffd15c; pointer-events:none; z-index:6;
+  animation:sparkfly .45s ease-out forwards; }
+@keyframes sparkfly{ from{ opacity:1; transform:translate(0,0) scale(1); } to{ opacity:0; transform:translate(var(--dx,20px), var(--dy,-40px)) scale(.4); } }
+
+/* full-stage moments */
+.stagefx{ position:absolute; inset:0; pointer-events:none; z-index:7; }
+.stagefx.roar{ background:radial-gradient(80% 90% at 50% 70%, rgba(224,176,74,.45), transparent 70%); animation:roarfx .9s ease-out forwards; }
+.stagefx.mourn{ background:radial-gradient(120% 120% at 50% 50%, transparent 30%, rgba(10,6,4,.85)); animation:mournfx 1.3s ease-in forwards; }
+@keyframes roarfx{ 0%{opacity:0;} 18%{opacity:1;} 100%{opacity:0;} }
+@keyframes mournfx{ 0%{opacity:0;} 60%{opacity:1;} 100%{opacity:1;} }
 .fighter.p-lunge{ transform:translateX(46px); }
 .fighter.e-lunge{ transform:scaleX(-1) translateX(46px); }
 .fighter.p-hurt{ filter:brightness(2.2) sepia(1) hue-rotate(-35deg) saturate(4); }
@@ -463,15 +491,16 @@ body{
 .fighter.player.downed{ transform:scaleX(1) rotate(16deg) translateY(10px); filter:grayscale(1) brightness(.45); opacity:.7; }
 .fighter.enemy.downed{ transform:scaleX(-1) rotate(16deg) translateY(10px); filter:grayscale(1) brightness(.45); opacity:.7; }
 
-/* enemy telegraph */
+/* enemy telegraph — red ring = heavy (blockable, hurts), yellow = quick jab */
 .tele{
-  position:absolute; right:8%; bottom:26px; width:78px; height:78px; pointer-events:none;
+  position:absolute; left:72%; bottom:26px; width:78px; height:78px; pointer-events:none;
   display:flex; align-items:flex-start; justify-content:center;
 }
 .tele .ring{
   position:absolute; inset:-8px; border-radius:22px; border:3px solid #ff5a3c;
   opacity:0; transform:scale(1.35);
 }
+.tele.jab .ring{ border-color:#f2c94c; }
 .tele.on .ring{ animation:tele var(--tdur,0.7s) linear forwards; }
 @keyframes tele{ from{opacity:.15; transform:scale(1.45);} to{opacity:.95; transform:scale(1);} }
 .tele .bang{ position:absolute; top:-26px; font-size:26px; opacity:0; }
@@ -645,15 +674,15 @@ const PORTRAITS = ['🗡️','⚔️','🛡️','🪓','🔱','🏹','🤺','�
 // lean: bonus starting stats · hpMul: max-HP scale · duel knobs (block/dodge/riposte/strike).
 const CLASSES = {
   murmillo:   { name:'Murmillo',    ic:'🛡️', blurb:'Heavy shield, iron nerve',
-                lean:{str:2,agi:0,vit:4}, hpMul:1.18, block:1.6, dodge:0.9,  riposte:1.0, strikeMul:1.0,  strikeCd:1.12 },
+                lean:{str:2,agi:0,vit:4}, hpMul:1.18, block:1.6, dodge:0.9,  riposte:1.0, strikeMul:1.0,  strikeCd:1.12, reach:0.95 },
   thraex:     { name:'Thraex',      ic:'🗡️', blurb:'Curved sica, relentless',
-                lean:{str:4,agi:1,vit:1}, hpMul:1.02, block:1.05, dodge:1.0, riposte:1.0, strikeMul:1.15, strikeCd:0.98 },
+                lean:{str:4,agi:1,vit:1}, hpMul:1.02, block:1.05, dodge:1.0, riposte:1.0, strikeMul:1.15, strikeCd:0.98, reach:1.0 },
   retiarius:  { name:'Retiarius',   ic:'🔱', blurb:'Net and trident, elusive',
-                lean:{str:1,agi:4,vit:0}, hpMul:0.94, block:0.8, dodge:1.4,  riposte:1.25, strikeMul:1.0, strikeCd:0.9 },
+                lean:{str:1,agi:4,vit:0}, hpMul:0.94, block:0.8, dodge:1.4,  riposte:1.25, strikeMul:1.0, strikeCd:0.9, reach:1.5 },
   secutor:    { name:'Secutor',     ic:'⚔️', blurb:'Patient hunter, deadly counter',
-                lean:{str:2,agi:2,vit:2}, hpMul:1.06, block:1.2, dodge:1.1,  riposte:1.5, strikeMul:1.0,  strikeCd:1.0 },
+                lean:{str:2,agi:2,vit:2}, hpMul:1.06, block:1.2, dodge:1.1,  riposte:1.5, strikeMul:1.0,  strikeCd:1.0, reach:1.1 },
   dimachaerus:{ name:'Dimachaerus', ic:'🤺', blurb:'Twin blades, no guard',
-                lean:{str:3,agi:3,vit:0}, hpMul:0.9,  block:0.55, dodge:1.0, riposte:1.0, strikeMul:1.12, strikeCd:0.7 },
+                lean:{str:3,agi:3,vit:0}, hpMul:0.9,  block:0.55, dodge:1.0, riposte:1.0, strikeMul:1.12, strikeCd:0.7, reach:0.85 },
 };
 const CLASS_IDS = Object.keys(CLASSES);
 const clsOf = g => CLASSES[g.cls] || CLASSES.thraex;
@@ -1191,9 +1220,15 @@ function fmt(n){
   return n.toExponential(2).replace('+','');
 }
 
+let _lastGold=null, _lastFame=null;
 function renderTop(){
-  $('#s-gold').textContent = fmt(S.gold);
-  $('#s-fame').textContent = fmt(S.fame);
+  const gEl = $('#s-gold'), fEl = $('#s-fame');
+  const gv = fmt(S.gold), fv = fmt(S.fame);
+  if(_lastGold!==null && gv!==_lastGold){ gEl.classList.remove('bump'); void gEl.offsetWidth; gEl.classList.add('bump'); }
+  if(_lastFame!==null && fv!==_lastFame){ fEl.classList.remove('bump'); void fEl.offsetWidth; fEl.classList.add('bump'); }
+  _lastGold=gv; _lastFame=fv;
+  gEl.textContent = gv;
+  fEl.textContent = fv;
   $('#s-pop').textContent  = alive()+'/'+slots();
   $('#daychip').textContent = 'Day '+S.day;
   $('#goal-txt').innerHTML = nextGoal();
@@ -1828,10 +1863,13 @@ function buildDuelDOM(){
   d.innerHTML = `
     <div class="duel-ehead">
       <div class="en" id="d-en"></div><div class="es" id="d-es"></div>
-      <div class="hpbar enemy"><i id="d-ehp"></i><span class="lab" id="d-ehpl"></span></div>
+      <div class="hpbar enemy"><i class="ghost" id="d-ehpg"></i><i class="fill" id="d-ehp"></i><span class="lab" id="d-ehpl"></span></div>
     </div>
     <div class="duel-stage" id="d-stage">
       <div class="floor"></div>
+      <div class="reach-zone" id="d-reach"></div>
+      <div class="mv-hint left" id="d-mvl">‹</div>
+      <div class="mv-hint right" id="d-mvr">›</div>
       <div class="fighter player" id="d-pf"></div>
       <div class="fighter enemy" id="d-ef"></div>
       <div class="tele" id="d-tele"><div class="ring"></div><div class="bang">⚠️</div></div>
@@ -1839,22 +1877,23 @@ function buildDuelDOM(){
     </div>
     <div class="duel-phud">
       <div class="pn"><span id="d-pn"></span><small id="d-pinfo"></small></div>
-      <div class="hpbar player"><i id="d-php"></i><span class="lab" id="d-phpl"></span></div>
+      <div class="hpbar player"><i class="ghost" id="d-phpg"></i><i class="fill" id="d-php"></i><span class="lab" id="d-phpl"></span></div>
       <div class="stambar" id="d-stamwrap"><i id="d-stam"></i></div>
     </div>
     <div class="duel-pad">
       <div class="dbtn strike" id="d-b-strike">Strike<small>fast · cheap</small><div class="cd"></div></div>
       <div class="dbtn heavy" id="d-b-heavy">Heavy<small>slow · staggers</small><div class="cd"></div></div>
-      <div class="dbtn block" id="d-b-block">Block<small>brace a blow</small><div class="cd"></div></div>
-      <div class="dbtn dodge" id="d-b-dodge">Dodge<small>evade → riposte</small><div class="cd"></div></div>
+      <div class="dbtn block" id="d-b-block">Block<small>brace · 20 stam</small><div class="cd"></div></div>
+      <div class="dbtn dodge" id="d-b-dodge">Dodge<small>hop back · riposte</small><div class="cd"></div></div>
     </div>
     <div class="dbtn special" id="d-b-special"><div class="charge" id="d-charge"></div><span class="sp-txt" id="d-sp-label">Signature</span></div>
     <div class="duel-cover" id="d-cover" style="display:none"></div>`;
   document.body.appendChild(d);
   dz = {
-    root:d, en:$('#d-en'), es:$('#d-es'), ehp:$('#d-ehp'), ehpl:$('#d-ehpl'),
+    root:d, en:$('#d-en'), es:$('#d-es'), ehp:$('#d-ehp'), ehpg:$('#d-ehpg'), ehpl:$('#d-ehpl'),
     stage:$('#d-stage'), pf:$('#d-pf'), ef:$('#d-ef'), tele:$('#d-tele'), banner:$('#d-banner'),
-    pn:$('#d-pn'), pinfo:$('#d-pinfo'), php:$('#d-php'), phpl:$('#d-phpl'),
+    reach:$('#d-reach'), mvl:$('#d-mvl'), mvr:$('#d-mvr'),
+    pn:$('#d-pn'), pinfo:$('#d-pinfo'), php:$('#d-php'), phpg:$('#d-phpg'), phpl:$('#d-phpl'),
     stam:$('#d-stam'), stamwrap:$('#d-stamwrap'), cover:$('#d-cover'),
     bStrike:$('#d-b-strike'), bHeavy:$('#d-b-heavy'), bBlock:$('#d-b-block'), bDodge:$('#d-b-dodge'),
     bSpecial:$('#d-b-special'), charge:$('#d-charge'), spLabel:$('#d-sp-label'),
@@ -1862,6 +1901,25 @@ function buildDuelDOM(){
   const bind=(elm,k)=> elm.addEventListener('pointerdown', e=>{ e.preventDefault(); dInput(k); });
   bind(dz.bStrike,'strike'); bind(dz.bHeavy,'heavy'); bind(dz.bBlock,'block'); bind(dz.bDodge,'dodge');
   bind(dz.bSpecial,'special');
+  // movement: hold either side of the arena to walk — the whole stage is a control
+  const setMove = e=>{
+    const r = dz.stage.getBoundingClientRect();
+    D.moveDir = (e.clientX - r.left) < r.width/2 ? -1 : 1;
+  };
+  dz.stage.addEventListener('pointerdown', e=>{ e.preventDefault(); D.movePtr = e.pointerId; setMove(e); });
+  dz.stage.addEventListener('pointermove', e=>{ if(D.movePtr === e.pointerId) setMove(e); });
+  const endMove = e=>{ if(D.movePtr === e.pointerId){ D.movePtr = null; D.moveDir = 0; } };
+  dz.stage.addEventListener('pointerup', endMove);
+  dz.stage.addEventListener('pointercancel', endMove);
+  // keyboard for desktop play
+  window.addEventListener('keydown', e=>{
+    if(!D.active || D.ended) return;
+    if(e.key==='ArrowRight'||e.key==='d') D.moveDir = 1;
+    else if(e.key==='ArrowLeft'||e.key==='a') D.moveDir = -1;
+  });
+  window.addEventListener('keyup', e=>{
+    if(['ArrowRight','ArrowLeft','a','d'].includes(e.key)) D.moveDir = 0;
+  });
 }
 
 function dAnim(elm, cls, dur){ elm.classList.add(cls); setTimeout(()=>elm.classList.remove(cls), dur); }
@@ -1869,9 +1927,32 @@ function teleOn(dur){ const t=dz.tele; t.classList.remove('on'); t.style.setProp
 function teleOff(){ dz.tele.classList.remove('on'); }
 function spawnFloat(where, cls, text){
   const f = el('div','float '+cls); f.textContent = text;
-  const left = where==='enemy' ? (60+Math.random()*10) : where==='player' ? (13+Math.random()*10) : (40+Math.random()*8);
-  f.style.left = left+'%'; f.style.top = (22+Math.random()*20)+'%';
+  let left;
+  if(D.W){  // position over the actual fighters
+    const px = D.px/D.W*100, ex = D.ex/D.W*100;
+    left = where==='enemy' ? ex-6+Math.random()*8 : where==='player' ? px-6+Math.random()*8 : (px+ex)/2-6+Math.random()*8;
+  } else {
+    left = where==='enemy' ? (60+Math.random()*10) : where==='player' ? (13+Math.random()*10) : (40+Math.random()*8);
+  }
+  f.style.left = Math.max(2,Math.min(84,left))+'%'; f.style.bottom = (118+Math.random()*42)+'px';
   dz.stage.appendChild(f); setTimeout(()=>f.remove(), 850);
+}
+// impact sparks — a small burst of flecks at a stage x position (px)
+function spawnSparks(x, n, col){
+  for(let i=0;i<(n||6);i++){
+    const s = el('div','spark'); if(col) s.style.background = col;
+    s.style.left = x+'px'; s.style.bottom = (55+Math.random()*30)+'px';
+    s.style.setProperty('--dx', (Math.random()*90-45)+'px');
+    s.style.setProperty('--dy', (-30-Math.random()*60)+'px');
+    dz.stage.appendChild(s); setTimeout(()=>s.remove(), 480);
+  }
+}
+// hitstop — freeze the sim for a beat so a landed blow has weight
+function hitstop(ms){ D.freezeUntil = Math.max(D.freezeUntil||0, (D.now||0) + ms); }
+// a full-stage flash — gold roar for victory, dark pall for a death
+function stageFx(cls, ms){
+  const o = el('div','stagefx '+cls);
+  dz.stage.appendChild(o); setTimeout(()=>o.remove(), ms||900);
 }
 
 function startDuel(g){
@@ -1905,7 +1986,9 @@ function showIntro(){
       <div class="dcbtn go" id="di-go">Enter the Sand</div>
       <div class="dcbtn leave" id="di-leave">Not yet</div>
     </div>
-    <div class="hint"><b style="color:var(--blood2)">A duel is to the death — lose and ${g.name} dies.</b> Land hits and take them to charge your <b>${specOf(g).ic} ${specOf(g).name}</b>. When the enemy flashes <b>⚠️</b>, <b>Block</b> or <b>Dodge</b> — a well-timed Dodge sets up a <b>Riposte</b>.</div>`;
+    <div class="hint"><b style="color:var(--blood2)">A duel is to the death — lose and ${g.name} dies.</b>
+      <b>Hold either side of the arena</b> to advance or retreat — strikes only land <b>in reach</b> (the gold line), and stepping back makes his blows part empty air.
+      A <b>yellow ring</b> is a quick jab, a <b>red ring</b> a lunging heavy — Block and Dodge cost stamina now, so spacing is the cheapest shield. Land and take hits to charge <b>${specOf(g).ic} ${specOf(g).name}</b>.</div>`;
   const prev=$('#di-prev'), next=$('#di-next');
   if(i<=0) prev.setAttribute('disabled','');
   if(i>=S.maxTier || i>=MAX_RANK-1) next.setAttribute('disabled','');
@@ -1945,6 +2028,16 @@ function beginDuel(){
   D.ensnareUntil = 0; D.exposedUntil = 0;
   dz.spLabel.textContent = specOf(g).ic + ' ' + specOf(g).name;
   dz.ef.classList.remove('netted');
+  // ---- the sand: a 1-D arena. Hold either side of the stage to walk; reach decides everything ----
+  D.W = dz.stage.clientWidth || 360;
+  D.px = D.W*0.16; D.ex = D.W*0.84;                 // fighter positions (centers)
+  D.moveDir = 0; D.movePtr = null;
+  D.pSpeed = 130 + g.agi*1.2;                        // your walk speed (AGI helps)
+  D.reach  = (76 + (g.gear.weapon||0)*3) * (c.reach||1);   // strike reach in px — class + weapon
+  D.eReach = 78 + (i*7)%24;                          // the foe's reach varies by opponent
+  D.eSpeed = Math.min(165, 92 + i*3);                // foes close faster up the ladder
+  D.atkType = 'jab'; D.retreating = false;
+  D.freezeUntil = 0;
   D.phase = 'idle'; D.phaseEnd = 1e15;    // enemy holds until countdown ends
   D.ended = false; D.locked = true;
   renderDuel(D.now || performance.now());
@@ -1969,7 +2062,9 @@ function dInput(k){
   if(!D.active || D.ended || D.locked) return;
   const ts = D.now, g = D.g;
   if(D.cd[k] > ts) return;
+  const dist = D.ex - D.px;
   if(k==='strike'){
+    if(dist > D.reach){ spawnFloat('player','miss','out of reach'); D.cd.strike = ts+170; D.cdTotal.strike = 170; return; }
     if(D.stam < D.strikeCost){ spawnFloat('player','miss','winded'); return; }
     D.stam -= D.strikeCost;
     let dmg = (g.str*1.25 + g.level*1.4 + D.wpn*0.6) * D.strikeMul * (0.9+Math.random()*0.25), cls='dmg';
@@ -1977,10 +2072,12 @@ function dInput(k){
     D.ehp -= dmg;
     dAnim(dz.pf,'p-lunge',150); dAnim(dz.ef,'e-hurt',150);
     spawnFloat('enemy', cls, '-'+Math.round(dmg)); vib(10);
+    spawnSparks(D.ex, 5); hitstop(cls==='crit'?110:55);
     addCharge(12);
     D.cd.strike = ts + D.strikeCd; D.cdTotal.strike = D.strikeCd;
     if(D.ehp<=0){ D.ehp=0; endDuel(true); }
   } else if(k==='heavy'){
+    if(dist > D.reach*1.18){ spawnFloat('player','miss','out of reach'); D.cd.heavy = ts+170; D.cdTotal.heavy = 170; return; }
     if(D.stam < D.heavyCost){ spawnFloat('player','miss','winded'); return; }
     D.stam -= D.heavyCost;
     let dmg = (g.str*2.5 + g.level*1.8 + D.wpn*1.1) * D.strikeMul * (0.9+Math.random()*0.2), cls='big';
@@ -1989,13 +2086,21 @@ function dInput(k){
     D.ehp -= dmg;
     dAnim(dz.pf,'p-lunge',190); dAnim(dz.ef,'e-hurt',190);
     spawnFloat('enemy', cls, '-'+Math.round(dmg)); vib(18);
+    spawnSparks(D.ex, 9); hitstop(95); dAnim(dz.root,'shake',180);
     addCharge(17);
     D.cd.heavy = ts + D.heavyCd; D.cdTotal.heavy = D.heavyCd;
     if(D.ehp<=0){ D.ehp=0; endDuel(true); }
   } else if(k==='block'){
-    D.blockUntil = ts + 380; D.cd.block = ts + D.blockCd; D.cdTotal.block = D.blockCd;
+    // bracing costs wind — defense and offense drink from the same skin
+    if(D.stam < 20){ spawnFloat('player','miss','winded'); return; }
+    D.stam -= 20;
+    D.blockUntil = ts + 340; D.cd.block = ts + D.blockCd; D.cdTotal.block = D.blockCd;
   } else if(k==='dodge'){
-    D.dodgeUntil = ts + D.dodgeWin; D.cd.dodge = ts + D.dodgeCd; D.cdTotal.dodge = D.dodgeCd;
+    if(D.stam < 16){ spawnFloat('player','miss','winded'); return; }
+    D.stam -= 16;
+    D.px = Math.max(D.W*0.05, D.px - 58);            // a real hop backward — spacing IS the dodge
+    D.dodgeUntil = ts + D.dodgeWin*0.62;             // tighter i-frames than before: timing matters now
+    D.cd.dodge = ts + D.dodgeCd; D.cdTotal.dodge = D.dodgeCd;
   } else if(k==='special'){
     doSpecial(ts, g);
   }
@@ -2006,6 +2111,8 @@ function addCharge(n){ D.charge = Math.min(D.chargeMax, D.charge + n); }
 // Fire the class signature move (only when the charge meter is full).
 function doSpecial(ts, g){
   if(D.charge < D.chargeMax){ spawnFloat('player','miss','not ready'); return; }
+  // melee signatures need the foe in reach — the net alone can be thrown from distance
+  if(g.cls !== 'retiarius' && (D.ex - D.px) > D.reach*1.3){ spawnFloat('player','miss','out of reach'); return; }
   D.charge = 0;
   const wpn = D.wpn, S_ = g.str;
   const hit = (dmg, cls, label)=>{
@@ -2056,57 +2163,93 @@ function doSpecial(ts, g){
   }
 }
 
-function updateEnemy(ts){
-  // ensnared by a net — the foe can't wind up an attack
+function updateEnemy(ts, dt){
+  // ensnared by a net — the foe can neither move nor wind up
   if(ts < D.ensnareUntil){
     if(D.phase==='windup'){ teleOff(); }
     D.phase='idle'; D.phaseEnd = D.ensnareUntil + 150;
     return;
   }
+  const dist = D.ex - D.px;
   if(D.phase==='idle'){
-    if(ts >= D.phaseEnd){
-      D.phase='windup';
-      D.windupDur = Math.max(460, 820 - D.tier*22);
-      D.phaseEnd = ts + D.windupDur;
+    // walk toward striking range; shuffle back if crowded
+    if(dist > D.eReach*0.85)      D.ex -= D.eSpeed*dt/1000;
+    else if(dist < D.eReach*0.45) D.ex += D.eSpeed*0.6*dt/1000;
+    if(D.retreating) D.ex += D.eSpeed*0.7*dt/1000;
+    // attack when cooled down and in range
+    if(ts >= D.phaseEnd && dist <= D.eReach*1.05){
+      const heavy = Math.random() < 0.4;
+      D.atkType = heavy ? 'heavy' : 'jab';
+      D.windupDur = heavy ? Math.max(560, 820 - D.tier*20) + Math.random()*180
+                          : 300 + Math.random()*140;         // jabs are quick — react-blocking them is hard
+      D.phase='windup'; D.phaseEnd = ts + D.windupDur;
       teleOn(D.windupDur);
+      dz.tele.classList.toggle('jab', !heavy);
     }
   } else if(D.phase==='windup'){
+    if(D.atkType==='heavy') D.ex -= 95*dt/1000;              // a heavy commits — he lunges in
     if(ts >= D.phaseEnd) resolveEnemyHit(ts);
   } else if(D.phase==='recover'){
+    if(D.retreating) D.ex += 70*dt/1000;
     if(ts >= D.phaseEnd){
-      D.phase='idle';
-      D.phaseEnd = ts + Math.max(450, 700 + Math.random()*650 - D.tier*20);
+      D.phase='idle'; D.retreating = false;
+      D.phaseEnd = ts + Math.max(260, (D.atkType==='jab' ? 320+Math.random()*380 : 480+Math.random()*520) - D.tier*10);
     }
   }
+  // never overlap, never leave the sand
+  D.ex = Math.max(D.px + 64, Math.min(D.W*0.95, D.ex));
 }
 
 function resolveEnemyHit(ts){
-  D.phase='recover'; D.phaseEnd = ts + 430; teleOff();
+  teleOff();
   dAnim(dz.ef,'e-lunge',180);
-  let dmg = oppPower(D.tier) * (0.55 + Math.random()*0.5) * 0.9;
+  const dist = D.ex - D.px;
+  // spaced it — the blow parts empty air, and he's wide open
+  if(dist > D.eReach*1.12){
+    D.phase='recover'; D.phaseEnd = ts + 680; D.retreating = false;
+    spawnFloat('enemy','miss','WHIFF');
+    return;
+  }
+  D.phase='recover'; D.phaseEnd = ts + (D.atkType==='jab' ? 340 : 560);
+  D.retreating = Math.random() < 0.35;
+  let dmg = oppPower(D.tier) * (0.55 + Math.random()*0.5) * 0.9 * (D.atkType==='jab' ? 0.5 : 1.15);
   dmg /= (1 + D.g.vit*0.02);
-  if(ts < D.blockUntil){ dmg*=D.blockKeep; spawnFloat('player','block','BLOCK'); vib(8); }
+  if(ts < D.blockUntil){ dmg*=D.blockKeep; spawnFloat('player','block','BLOCK'); spawnSparks(D.px, 4, '#8fd0ff'); vib(8); }
   else if(ts < D.dodgeUntil){ dmg=0; D.riposte=true; spawnFloat('player','miss','DODGE!'); spawnFloat('center','block','RIPOSTE READY'); vib(6); }
   else {
     if(ts < D.exposedUntil){ dmg *= 1.6; spawnFloat('player','crit','EXPOSED!'); }   // caught mid-whirlwind
     dAnim(dz.root,'shake',280); vib(30);
   }
-  if(dmg>0){ D.php -= dmg; dAnim(dz.pf,'p-hurt',160); spawnFloat('player','pd','-'+Math.round(dmg)); }
+  if(dmg>0){ D.php -= dmg; dAnim(dz.pf,'p-hurt',160); spawnFloat('player','pd','-'+Math.round(dmg)); spawnSparks(D.px, 5, '#ff6a4a'); hitstop(45); }
   addCharge(9);                                    // taking a blow builds fury too
   if(D.php<=0){ D.php=0; endDuel(false); }
 }
 
 function renderDuel(ts){
-  dz.ehp.style.width = Math.max(0, D.ehp/D.emax*100)+'%';
-  dz.ehpl.textContent = Math.ceil(Math.max(0,D.ehp))+' / '+D.emax;
-  dz.php.style.width = Math.max(0, D.php/D.pmax*100)+'%';
+  const eW = Math.max(0, D.ehp/D.emax*100)+'%', pW = Math.max(0, D.php/D.pmax*100)+'%';
+  dz.ehp.style.width = eW; dz.ehpg.style.width = eW;     // ghost fill trails via CSS delay
+  dz.ehpl.textContent = fmt(Math.ceil(Math.max(0,D.ehp)))+' / '+fmt(D.emax);
+  dz.php.style.width = pW; dz.phpg.style.width = pW;
   dz.phpl.textContent = Math.ceil(Math.max(0,D.php))+' / '+D.pmax;
   dz.stam.style.width = (D.stam/STAM_MAX*100)+'%';
   dz.stamwrap.classList.toggle('low', D.stam < 30);
   dz.pf.classList.toggle('p-block', ts < D.blockUntil);
   dz.pf.classList.toggle('p-dodge', ts < D.dodgeUntil);
   dz.ef.classList.toggle('netted', ts < D.ensnareUntil);
-  const cds = [['strike',dz.bStrike,D.strikeCost],['heavy',dz.bHeavy,D.heavyCost],['block',dz.bBlock,0],['dodge',dz.bDodge,0]];
+  // positions on the sand
+  if(D.W){
+    dz.pf.style.left = (D.px-39)+'px';
+    dz.ef.style.left = (D.ex-39)+'px';
+    dz.tele.style.left = (D.ex-39)+'px';
+    dz.reach.style.left = D.px+'px';
+    dz.reach.style.width = D.reach+'px';
+    const inReach = (D.ex - D.px) <= D.reach;
+    dz.ef.classList.toggle('can-hit', inReach && !D.ended);
+    dz.reach.classList.toggle('hot', inReach);
+    dz.mvl.classList.toggle('held', D.moveDir===-1);
+    dz.mvr.classList.toggle('held', D.moveDir===1);
+  }
+  const cds = [['strike',dz.bStrike,D.strikeCost],['heavy',dz.bHeavy,D.heavyCost],['block',dz.bBlock,20],['dodge',dz.bDodge,16]];
   for(const [k,btn,cost] of cds){
     const rem = D.cd[k]-ts, tot = D.cdTotal[k]||1;
     btn.querySelector('.cd').style.width = rem>0 ? Math.min(100, rem/tot*100)+'%' : '0%';
@@ -2122,9 +2265,14 @@ function duelFrame(ts){
   if(!D.active){ D.raf=null; return; }
   const dt = D.last ? Math.min(100, ts-D.last) : 16;
   D.last = ts; D.now = ts;
-  if(!D.ended && !D.locked){
+  if(!D.ended && !D.locked && ts >= (D.freezeUntil||0)){
+    // your legs: hold a side of the arena (or arrow keys) to walk
+    if(D.moveDir){
+      D.px += D.moveDir * D.pSpeed * dt/1000;
+      D.px = Math.max(D.W*0.05, Math.min(D.ex-64, D.px));
+    }
     D.stam = Math.min(STAM_MAX, D.stam + (16 + D.g.agi*0.8)*dt/1000);
-    updateEnemy(ts);
+    updateEnemy(ts, dt);
   }
   renderDuel(ts);
   D.raf = requestAnimationFrame(duelFrame);
@@ -2149,6 +2297,7 @@ function endDuel(won){
     S.log.push({cls:'win', txt:`⚔️ <b>${g.name}</b> bested ${theFoe(i)} in single combat! <span class="cash">+${fmt(data.gain)}◈</span> · +${fmt(data.fame)} fame`});
     if(data.drop) S.log.push({cls:'level', txt:`🎁 <b>${g.name}</b> claimed a <b>${data.drop.name}</b> as spoils.`});
     dAnim(dz.ef,'downed',1400); vib([20,40,30]);
+    stageFx('roar', 900); spawnSparks(D.ex, 14); dAnim(dz.root,'shake',260);
   } else if(Math.random() < deathCut(S.fac.infirmary)){
     // the Medicus drags a dying man from the sand — Infirmary level sets the odds
     g.state = 'injured'; g.progress = 0; g.hp = 0;
@@ -2160,6 +2309,7 @@ function endDuel(won){
     recordDeath(g, i);
     S.log.push({cls:'death', txt:`💀 <b>${g.name}</b> fell to ${theFoe(i)} in single combat. The ludus mourns.`});
     dAnim(dz.pf,'downed',1400); vib(90);
+    stageFx('mourn', 1400);
   }
   if(S.log.length>60) S.log = S.log.slice(-60);
   save();
