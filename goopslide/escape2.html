@@ -649,23 +649,28 @@
     undoStack.push(snapshot()); moves++; SND.swipe();
     const pre=undoStack[undoStack.length-1].drops;
     const colOf=id=>{ const d=pre.find(x=>x.id===id); return d?d.color:0; };
-    const pathOf=t=>t&&t.length>1?t.slice(1).map(cc=>({x:cellX(cc[1]),y:cellY(cc[0])})):null;
+    const pathOf=t=>t&&t.length>1?t.slice(1).map(cc=>({x:cellX(cc[1]),y:cellY(cc[0])})):null; const drainWalk=[];
     res.merges.forEach(m=>{ const g=renderById[m.from]; const wp=pathOf(m.trail);
       ghosts.push({px:g?g.px:cellX(m.c),py:g?g.py:cellY(m.r),wp:wp||[{x:cellX(m.c),y:cellY(m.r)}],life:1,rr:g?g.rr:sizeR(1),ci:colOf(m.from),
-        onEnd:()=>{ const e=renderById[m.to]; if(e) e.pop=1; SND.merge();
+        onEnd:()=>{ const e=renderById[m.to]; const dd2=state.drops.find(x=>x.id===m.to);
+          if(e){ e.pop=1; if(dd2){ e.tr=sizeR(dd2.size); e.ds=dd2.size; } } SND.merge();
           burst(cellX(m.c),cellY(m.r),COLORS[colOf(m.to)].main,12,S*.11);
           if(JUICE.ripple) rings.push({x:cellX(m.c),y:cellY(m.r),ci:colOf(m.to),life:1}); }});
       delete renderById[m.from]; });
     res.drains.forEach((dd,i)=>{ const g=renderById[dd.id]; const wp=pathOf(dd.trail);
       let ox2=0,oy2=0; if(dd.r===0)oy2=-S*.9; else if(dd.r===gh-1)oy2=S*.9; else if(dd.c===0)ox2=-S*.9; else if(dd.c===gw-1)ox2=S*.9;
-      ghosts.push({px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),wp:wp||[{x:cellX(dd.c),y:cellY(dd.r)}],life:1,rr:g?g.rr:sizeR(1),ci:dd.color,
+      const gw2={px:g?g.px:cellX(dd.c),py:g?g.py:cellY(dd.r),wp:wp||[{x:cellX(dd.c),y:cellY(dd.r)}],life:1,rr:g?g.rr:sizeR(1),ci:dd.color,
         onEnd:function(){ this.drain=true; this.tx=cellX(dd.c)+ox2; this.ty=cellY(dd.r)+oy2; SND.drain(i);
           burst(cellX(dd.c),cellY(dd.r),COLORS[dd.color].main,16,S*.13);
-          if(JUICE.ripple) rings.push({x:cellX(dd.c),y:cellY(dd.r),ci:dd.color,life:1}); }});
+          if(JUICE.ripple) rings.push({x:cellX(dd.c),y:cellY(dd.r),ci:dd.color,life:1}); }};
+      ghosts.push(gw2); drainWalk.push({g:gw2,len:(dd.trail||[]).length});
       delete renderById[dd.id]; });
     if(res.corks.length){ document.getElementById('hint').style.display=''; } if(res.corks.length) document.getElementById('hint').innerHTML='🫙 Corked! A goop is stuck in the wrong hole — <b>↶ undo</b> (Z) is free.';
     state.drops=res.drops; state.molds=res.molds;
-    state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0,sc:1}; e.tr=sizeR(d.size);
+    const growLater=new Map(); res.merges.forEach(m=>{ if(!growLater.has(m.to)){ const pd=pre.find(x=>x.id===m.to); if(pd) growLater.set(m.to,pd.size); } });
+    state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0,sc:1};
+      if(growLater.has(d.id)){ e.tr=sizeR(growLater.get(d.id)); e.ds=growLater.get(d.id); }   // grow on arrival, not on swipe
+      else { e.tr=sizeR(d.size); e.ds=undefined; }
       if(d.corners&&d.corners.length){ e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r)})); d.corners=[]; } });
     if(res.redirs) SND.boing&&SND.boing(Math.min(res.redirs,2));
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
@@ -674,14 +679,18 @@
     if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k));
       if(o!==doorWasOpen){ SND.door&&SND.door(o); doorWasOpen=o; } }
     if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; renderById[id].wp=null; } } ghosts=[]; moving=false; }
-    if(isWinS(state.drops,state.molds)){ won=true; onWin(); }
+    if(isWinS(state.drops,state.molds)){ won=true;
+      const spots=[]; res.drains.forEach(dd=>{ if(!spots.some(h=>h.r===dd.r&&h.c===dd.c)) spots.push({r:dd.r,c:dd.c,color:dd.color}); });
+      if(!instant&&drainWalk.length){ const last=drainWalk.reduce((a,b)=>b.len>a.len?b:a);
+        const prevEnd=last.g.onEnd; last.g.onEnd=function(){ prevEnd.call(this); onWin(spots); }; }
+      else onWin(spots); }
   }
   function updateMoves(){ const el=document.getElementById('moves'); el.textContent=moves;
     el.classList.remove('tickA'); void el.offsetWidth; el.classList.add('tickA'); }
-  function onWin(){ SND.win(); const par=LEVELS[levelIdx].par||0; const star=moves<=par;
+  function onWin(spots){ SND.win(); const par=LEVELS[levelIdx].par||0; const star=moves<=par;
     const prev=prog.best[levelIdx]; if(prev===undefined||moves<prev){ prog.best[levelIdx]=moves; saveProg(); }
     document.getElementById('wintxt').innerHTML=moves+' moves · par '+par+(star?' · ⭐':'');
-    const spots=holes.slice();                                        // staggered win cascade at the holes
+    spots=(spots&&spots.length)?spots:holes.slice();                  // celebrate the gate(s) that actually accepted
     spots.forEach((h,i)=>{ setTimeout(()=>{ burst(cellX(h.c),cellY(h.r),COLORS[h.color].main,22,S*.16);
       rings.push({x:cellX(h.c),y:cellY(h.r),ci:h.color,life:1}); }, i*JUICE.winStagger); });
     setTimeout(()=>document.getElementById('win').style.display='flex',480+spots.length*JUICE.winStagger); }
@@ -764,7 +773,7 @@
       ctx.beginPath(); ctx.arc(cx+rx*.75,cy+ry*.55,S*.045,0,7); ctx.fill();
       ctx.beginPath(); ctx.arc(cx-rx*.7,cy+ry*.35,S*.035,0,7); ctx.fill(); }
     if(d&&d.size>1&&hasSizes){ ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='800 '+Math.round(rad*.78)+'px ui-rounded,system-ui';
-      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(d.size,cx,cy+rad*.04); }
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText((e.ds!==undefined?e.ds:d.size),cx,cy+rad*.04); }
   }
   function frame(){
     tNow=performance.now()/1000;
