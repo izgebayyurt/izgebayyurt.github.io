@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>lane2d</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0b0e14; overflow: hidden; -webkit-user-select: none; user-select: none;
+    font-family: -apple-system, system-ui, sans-serif; }
+  canvas { display: block; touch-action: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as CANNON from './vendor/cannon-es.js';
+
+const cv = document.getElementById('c'), cx = cv.getContext('2d');
+let W=0, H=0, DPR=1;
+function resize(){ DPR=Math.min(devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; cx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+addEventListener('resize', resize);
+const TAU=Math.PI*2, clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t, len=(x,y)=>Math.hypot(x,y);
+
+const COL = { bg:'#0b0e14', lane:'#1b2436', laneTop:'#26324c', gutter:'#0a0d16', ball:'#4fd1c5', ballDk:'#1f7a74',
+  pin:'#f4efe4', pinShade:'#cfc7b6', band:'#ff5062', line:'rgba(255,255,255,0.06)', text:'#f4efe4' };
+
+// ---------------- world constants (meters) ----------------
+const LANE_HALF=0.525, LANE_LEN=19.2, FOUL=0, PIN_Z0=17.4, PIN_H=0.38, PIN_R=0.06, BALL_R=0.108;
+const LAYOUT=[[0,0],[-1,1],[1,1],[-2,2],[0,2],[2,2],[-3,3],[-1,3],[1,3],[3,3]];
+
+// ---------------- camera (pseudo-3D projection, flat 2D drawing) ----------------
+const cam={ y:1.15, z:-4.6, pitch:0.235, f:0, vp:0 };
+function layout(){ cam.f = H*1.55; cam.vp = H*0.60; }
+function project(x,y,z){ const rx=x, ry=y-cam.y, rz=z-cam.z, c=Math.cos(cam.pitch), s=Math.sin(cam.pitch);
+  const dz=rz*c - ry*s, dy=ry*c + rz*s, zz=dz<0.05?0.05:dz, sc=cam.f/zz;
+  return { x:W/2+rx*sc, y:cam.vp - dy*sc, sc, z:zz }; }
+
+// ---------------- physics (cannon-es, headless) ----------------
+const world = new CANNON.World({ gravity:new CANNON.Vec3(0,-9.82,0) });
+world.broadphase = new CANNON.SAPBroadphase(world); world.allowSleep = true; world.solver.iterations = 12;
+const mLane=new CANNON.Material('l'), mPin=new CANNON.Material('p'), mBall=new CANNON.Material('b'), mWall=new CANNON.Material('w');
+world.addContactMaterial(new CANNON.ContactMaterial(mLane,mBall,{friction:0.03,restitution:0.05}));
+world.addContactMaterial(new CANNON.ContactMaterial(mLane,mPin,{friction:0.28,restitution:0.12}));
+world.addContactMaterial(new CANNON.ContactMaterial(mBall,mPin,{friction:0.04,restitution:0.5}));
+world.addContactMaterial(new CANNON.ContactMaterial(mPin,mPin,{friction:0.1,restitution:0.45}));
+world.addContactMaterial(new CANNON.ContactMaterial(mWall,mBall,{friction:0,restitution:0.2}));
+world.addContactMaterial(new CANNON.ContactMaterial(mWall,mPin,{friction:0.1,restitution:0.3}));
+
+const floor = new CANNON.Body({ mass:0, material:mLane, shape:new CANNON.Box(new CANNON.Vec3(2,0.5,LANE_LEN)) });
+floor.position.set(0,-0.5,LANE_LEN/2); world.addBody(floor);
+for (const sx of [-1,1]) { const w=new CANNON.Body({mass:0,material:mWall,shape:new CANNON.Box(new CANNON.Vec3(0.02,0.25,LANE_LEN/2))}); w.position.set(sx*(LANE_HALF+0.001),0.1,LANE_LEN/2); world.addBody(w); }
+const back=new CANNON.Body({mass:0,material:mWall,shape:new CANNON.Box(new CANNON.Vec3(1.2,1,0.1))}); back.position.set(0,0.5,LANE_LEN+0.4); world.addBody(back);
+
+const pins=[];
+for (const [gx,gy] of LAYOUT){
+  const x=gx*0.1525, z=PIN_Z0+gy*0.264;
+  const b=new CANNON.Body({ mass:1.1, material:mPin, allowSleep:true, sleepSpeedLimit:0.14, sleepTimeLimit:0.35 });
+  b.addShape(new CANNON.Box(new CANNON.Vec3(PIN_R*0.85, PIN_H/2, PIN_R*0.85)));
+  b.position.set(x, PIN_H/2, z); b.angularDamping=0.14; b.linearDamping=0.04;
+  world.addBody(b); pins.push({ body:b, hx:x, hz:z });
+}
+const ballBody=new CANNON.Body({ mass:6, material:mBall, shape:new CANNON.Sphere(BALL_R), allowSleep:false });
+ballBody.position.set(0,BALL_R,FOUL); world.addBody(ballBody);
+
+function rack(){ for(const p of pins){ const b=p.body; b.wakeUp(); b.position.set(p.hx,PIN_H/2,p.hz); b.velocity.setZero(); b.angularVelocity.setZero(); b.quaternion.set(0,0,0,1); } }
+function standing(){ let n=0; const up=new CANNON.Vec3(); for(const p of pins){ p.body.quaternion.vmult(new CANNON.Vec3(0,1,0),up); if(up.y>0.6 && p.body.position.y<PIN_H) n++; } return n; }
+
+// ---------------- shot ----------------
+let rolling=false, hookF=0, settleT=0, msg='swipe up to bowl — curve to hook', cnt='';
+const trail=[];
+function shoot(aimX, speed, spin){
+  rack(); ballBody.wakeUp();
+  ballBody.position.set(clamp(aimX,-0.4,0.4), BALL_R, FOUL+0.05);
+  ballBody.velocity.set(0,0,speed);
+  ballBody.angularVelocity.set(speed/BALL_R, spin*4, 0);
+  hookF = spin*0.75; rolling=true; settleT=0; trail.length=0; msg=''; cnt='';
+}
+
+// ---------------- input ----------------
+let drawing=false, stroke=[];
+cv.addEventListener('pointerdown', e=>{ if(rolling) return; drawing=true; stroke=[{x:e.clientX,y:e.clientY}]; });
+cv.addEventListener('pointermove', e=>{ if(drawing) stroke.push({x:e.clientX,y:e.clientY}); });
+cv.addEventListener('pointerup', ()=>{ if(!drawing) return; drawing=false; if(stroke.length>1) launch(); });
+function launch(){
+  const S=stroke[0], E=stroke[stroke.length-1]; let dx=E.x-S.x, dy=E.y-S.y; if(dy>-20)dy=-20;
+  let sl=0; for(let i=1;i<stroke.length;i++) sl+=len(stroke[i].x-stroke[i-1].x, stroke[i].y-stroke[i-1].y);
+  let turn=0,n=0; for(let i=2;i<stroke.length;i++){const ax=stroke[i-1].x-stroke[i-2].x,ay=stroke[i-1].y-stroke[i-2].y,bx=stroke[i].x-stroke[i-1].x,by=stroke[i].y-stroke[i-1].y;const la=len(ax,ay),lb=len(bx,by);if(la<1||lb<1)continue;turn+=(ax*by-ay*bx)/(la*lb);n++;}
+  let curv=n?turn:0; if(Math.abs(curv)<0.035)curv=0;
+  shoot(clamp(dx/(W*0.5)*0.4,-0.4,0.4), clamp(sl/H*22,7.5,13), clamp(curv*2.2,-1.6,1.6));
+}
+
+// ---------------- loop ----------------
+let acc=0, lastT=performance.now();
+const tmp=new CANNON.Vec3();
+function frame(now){
+  const dt=Math.min((now-lastT)/1000,0.05); lastT=now;
+  acc+=dt; const FIXED=1/120; let steps=0;
+  while(acc>=FIXED && steps<8){ if(rolling && ballBody.position.z<PIN_Z0 && Math.abs(hookF)>0.001) ballBody.velocity.x += hookF*FIXED*clamp(1-ballBody.position.z/LANE_LEN,0,1); world.step(FIXED); acc-=FIXED; steps++; }
+  if(rolling){ trail.push({x:ballBody.position.x,z:ballBody.position.z}); if(trail.length>26)trail.shift();
+    const moving = ballBody.velocity.length()>0.25 || pins.some(p=>p.body.velocity.length()>0.15 || p.body.angularVelocity.length()>0.4);
+    const past = ballBody.position.z>PIN_Z0+0.9 || ballBody.position.y<-0.3; settleT+=dt;
+    if((!moving && (past||ballBody.position.z>6) && settleT>0.4) || settleT>6){ rolling=false; const k=10-standing(); cnt = k===10?'STRIKE!':k+' down'; msg='swipe up to bowl again'; }
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+
+// ---------------- 2D render ----------------
+function render(){
+  cx.fillStyle=COL.bg; cx.fillRect(0,0,W,H);
+  drawLane();
+  // depth-sorted pins + ball
+  const items = pins.map(p=>({z:p.body.position.z, pin:p})); items.push({z:ballBody.position.z, ball:true});
+  items.sort((a,b)=>b.z-a.z);
+  drawTrail();
+  for(const it of items){ if(it.ball) drawBall(); else drawPin(it.pin); }
+  // hud
+  cx.textAlign='center'; cx.fillStyle=COL.text; cx.font='800 26px -apple-system,system-ui,sans-serif';
+  if(cnt) cx.fillText(cnt, W/2, H*0.12);
+  cx.fillStyle='rgba(244,239,228,0.6)'; cx.font='600 15px -apple-system,system-ui,sans-serif'; cx.fillText(msg, W/2, H-40);
+  if(drawing && stroke.length>1){ cx.strokeStyle='rgba(79,209,197,0.6)'; cx.lineWidth=3; cx.lineCap='round'; cx.lineJoin='round'; cx.beginPath(); cx.moveTo(stroke[0].x,stroke[0].y); for(let i=1;i<stroke.length;i++)cx.lineTo(stroke[i].x,stroke[i].y); cx.stroke(); }
+}
+function poly(pts, fill){ cx.fillStyle=fill; cx.beginPath(); cx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++)cx.lineTo(pts[i].x,pts[i].y); cx.closePath(); cx.fill(); }
+function drawLane(){
+  const zE=PIN_Z0+1.0;
+  const c1=project(-LANE_HALF,0,FOUL),c2=project(LANE_HALF,0,FOUL),c3=project(LANE_HALF,0,zE),c4=project(-LANE_HALF,0,zE);
+  poly([project(-LANE_HALF-0.14,0,FOUL),c1,c4,project(-LANE_HALF-0.14,0,zE)], COL.gutter);
+  poly([c2,project(LANE_HALF+0.14,0,FOUL),project(LANE_HALF+0.14,0,zE),c3], COL.gutter);
+  const g=cx.createLinearGradient(0,c3.y,0,c1.y); g.addColorStop(0,COL.laneTop); g.addColorStop(1,COL.lane); poly([c1,c2,c3,c4],g);
+  cx.strokeStyle=COL.line; cx.lineWidth=1;
+  for(let i=1;i<7;i++){ const xx=-LANE_HALF+LANE_HALF*2*i/7; const a=project(xx,0,FOUL),b=project(xx,0,zE); cx.beginPath(); cx.moveTo(a.x,a.y); cx.lineTo(b.x,b.y); cx.stroke(); }
+  cx.fillStyle='rgba(255,255,255,0.14)';
+  for(let i=-2;i<=2;i++){ const a=project(i*0.14,0,4.2); cx.beginPath(); cx.moveTo(a.x,a.y-4); cx.lineTo(a.x-3,a.y+3); cx.lineTo(a.x+3,a.y+3); cx.closePath(); cx.fill(); }
+  cx.strokeStyle='rgba(255,80,98,0.5)'; cx.lineWidth=3; cx.beginPath(); cx.moveTo(c1.x,c1.y); cx.lineTo(c2.x,c2.y); cx.stroke();
+}
+function drawTrail(){ for(let i=0;i<trail.length;i++){ const t=i/trail.length, pr=project(trail[i].x,BALL_R*0.5,trail[i].z); cx.globalAlpha=t*0.3; cx.fillStyle=COL.ball; cx.beginPath(); cx.arc(pr.x,pr.y,BALL_R*pr.sc*(0.4+t*0.5),0,TAU); cx.fill(); } cx.globalAlpha=1; }
+function drawPin(p){
+  const b=p.body;
+  b.quaternion.vmult(new CANNON.Vec3(0,-PIN_H/2,0), tmp); const fx=b.position.x+tmp.x, fy=b.position.y+tmp.y, fz=b.position.z+tmp.z;
+  b.quaternion.vmult(new CANNON.Vec3(0, PIN_H/2,0), tmp); const hx=b.position.x+tmp.x, hy=b.position.y+tmp.y, hz=b.position.z+tmp.z;
+  const foot=project(fx,fy,fz), head=project(hx,hy,hz);
+  const dx=head.x-foot.x, dy=head.y-foot.y, L=Math.hypot(dx,dy)||1, px=-dy/L, py=dx/L, sc=foot.sc;
+  const up = new CANNON.Vec3(); b.quaternion.vmult(new CANNON.Vec3(0,1,0), up); const down = up.y < 0.6;
+  // shadow ellipse on lane
+  const sh=project(b.position.x,0.001,b.position.z); cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(sh.x, sh.y, PIN_R*1.5*sh.sc, PIN_R*0.7*sh.sc, 0, 0, TAU); cx.fill();
+  // pin silhouette: base .. belly .. neck .. head
+  const segs=[[0,0.052],[0.16,0.062],[0.3,0.052],[0.5,0.03],[0.64,0.027],[0.78,0.036],[0.9,0.03],[1,0.012]];
+  cx.beginPath();
+  for(let i=0;i<segs.length;i++){ const [t,w]=segs[i], cxp=foot.x+dx*t, cyp=foot.y+dy*t, ww=w*sc; const X=cxp+px*ww,Y=cyp+py*ww; if(i===0)cx.moveTo(X,Y); else cx.lineTo(X,Y); }
+  for(let i=segs.length-1;i>=0;i--){ const [t,w]=segs[i], cxp=foot.x+dx*t, cyp=foot.y+dy*t, ww=w*sc; cx.lineTo(cxp-px*ww,cyp-py*ww); }
+  cx.closePath();
+  cx.fillStyle = down ? COL.pinShade : COL.pin; cx.fill();
+  cx.strokeStyle='rgba(0,0,0,0.12)'; cx.lineWidth=1; cx.stroke();
+  // red neck stripe
+  const s0=0.66,s1=0.74, a0x=foot.x+dx*s0,a0y=foot.y+dy*s0,a1x=foot.x+dx*s1,a1y=foot.y+dy*s1, w0=0.032*sc,w1=0.04*sc;
+  cx.beginPath(); cx.moveTo(a0x+px*w0,a0y+py*w0); cx.lineTo(a1x+px*w1,a1y+py*w1); cx.lineTo(a1x-px*w1,a1y-py*w1); cx.lineTo(a0x-px*w0,a0y-py*w0); cx.closePath();
+  cx.fillStyle = down ? '#c0424f' : COL.band; cx.fill();
+}
+function drawBall(){
+  const pr=project(ballBody.position.x, ballBody.position.y, ballBody.position.z), r=BALL_R*pr.sc;
+  cx.fillStyle='rgba(0,0,0,0.25)'; const sh=project(ballBody.position.x,0.001,ballBody.position.z); cx.beginPath(); cx.ellipse(sh.x,sh.y,r*0.9,r*0.5,0,0,TAU); cx.fill();
+  const g=cx.createRadialGradient(pr.x-r*0.3,pr.y-r*0.35,r*0.1,pr.x,pr.y,r); g.addColorStop(0,'#7ff0e6'); g.addColorStop(1,COL.ballDk);
+  cx.fillStyle=g; cx.beginPath(); cx.arc(pr.x,pr.y,r,0,TAU); cx.fill();
+}
+
+resize(); rack();
+requestAnimationFrame(frame);
+window.__b = { shoot, standing, ballBody, pins };
+window.__ready = true;
+</script>
+</body>
+</html>
