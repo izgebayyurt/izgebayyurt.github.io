@@ -640,7 +640,7 @@ let save = load();
 function load(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch(e){ return {}; } }
 function persist(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
 function bestOf(i){ return (save.best && save.best[i]) || 0; }
-function unlocked(i){ return i === 0 || bestOf(i-1) > 0; }
+function unlocked(i){ return true; }   // all levels open
 function recordStars(i, s){ save.best = save.best || {}; if (s > (save.best[i]||0)) { save.best[i] = s; persist(); } }
 
 /* ---------- star svg ---------- */
