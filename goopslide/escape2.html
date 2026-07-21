@@ -385,26 +385,26 @@
      map:["#E#####","#..#..#","#..o.##","##...p#","H.#..p#","#o....#","#######"]},
     {hint:"", par:16, limit:22, risk:1,
      map:["#E#####","#...###","#..o.##","##.#.p#","H.#.#p#","#o....#","#######"]},
-    {hint:"A goop on a <b>plate</b> holds the door open.", par:4, limit:8, risk:0,
-     map:["######","##...#","##o#.#","#....#","###.o#","A_=._#","######"]},
-    {hint:"", par:6, limit:10, risk:0,
-     map:["########","##.o_o.#","###..#.A","####=_##","#####o.#","########"]},
+    {hint:"A goop on a <b>plate</b> holds the door open — leave the plate and it <b>slams shut</b>.", par:5, limit:9, risk:1,
+     map:["#######","#..._=#","#.....A","#.#.._#","#.p...#","#o.#..#","#.....#","#.....#","#####B#"]},
     {hint:"", par:6, limit:10, risk:1,
-     map:["####A#","#o...#","#o..##","#.#_##","#..=o#","###._#","######"]},
+     map:["##A####","#....o#","#.....#","#.#...#","#.#..p#","#.p.#o#","#_...=#","#...._#","#B#####"]},
+    {hint:"", par:6, limit:10, risk:1,
+     map:["#######","#..#.o#","#.....#","#.#.p.#","#.....#","#..pq.C","#..#__A","#....=#","#B#####"]},
     {hint:"", par:7, limit:11, risk:1,
-     map:["######","#....#","#o..##","#o#_##","A..=o#","###._#","######"]},
-    {hint:"", par:7, limit:11, risk:0,
-     map:["####A###","###o_..#","#....#.#","####=_##","#####oo#","########"]},
+     map:["##AB###","#.....#","#...#_#","#...###","##....#","#.....#","#o....#","#..=_p#","#######"]},
     {hint:"", par:8, limit:12, risk:1,
-     map:["######","#....#","#o..##","#.#_##","A..=o#","###o_#","######"]},
+     map:["##AB#####","##.....##","#.......#","##.p...##","##=....o#","#_..p..qC","#......_#","#########"]},
+    {hint:"", par:8, limit:12, risk:1,
+     map:["###B###","#.....#","#...opA","#=_...#","##q.._#","#...p.#","#.....#","##....#","###C###"]},
     {hint:"", par:10, limit:14, risk:1,
-     map:["######","##...#","#o..##","#.#_##","A..=o#","###o_#","######"]},
-    {hint:"", par:11, limit:15, risk:1,
-     map:["######","###..#","#oo..#","#.#_##","A..=.#","###o_#","######"]},
+     map:["#########","#_p.....#","A._o#...#","#.......#","##......#","#.o=...p#","#######B#"]},
+    {hint:"", par:10, limit:14, risk:1,
+     map:["#####B###","#q##...##","#oq.=...A","#...#p._#","#..po...#","#..._...#","######C##"]},
     {hint:"", par:14, limit:20, risk:1,
-     map:["######","#.p###","A_.=##","#o#_.#","##..oB","#p.o.#","######"]},
+     map:["#######","A..._=#","#.....#","#...._#","#.p#.##","#o##..#","####..#","#.....#","#####B#"]},
     {hint:"", par:15, limit:21, risk:1,
-     map:["#######","App#.##","#_..=p#","#o##._#","#.#..o#","#####B#"]},
+     map:["########","#..o...#","#.##.=.#","##.o.###","#_.#.###","#....._#","####A###"]},
     {hint:"<b>Wedges</b> deflect you along their diagonal; their flat sides bounce you back. <b>Bumpers</b> always send you back.", par:3, limit:7, risk:0,
      map:["######","#...##","#....#","#.o#.#","#....#","#...sA","#....#","#.y..#","#....#","######"]},
     {hint:"", par:3, limit:7, risk:0,
@@ -547,7 +547,6 @@
   function simulate(drops,molds,dir){
     // true simultaneous ticks: every ball advances one cell per tick; head-on = collision
     const [SDR,SDC]=DIRS[dir]; const ds=drops.map(d=>({...d})), ms=molds.map(m=>({...m}));
-    const dOpen=doorCellG&&platesG.some(k=>drops.some(d=>d.r+','+d.c===k));
     const key=(r,c)=>r+','+c;
     const isTransit=k=>triMapG[k]!==undefined||twallG[k]!==undefined||bumpSetG.has(k);
     const occ=new Map(); ds.forEach((d,i)=>occ.set(key(d.r,d.c),i));
@@ -559,6 +558,8 @@
     const prio=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*SDR+ds[b].c*SDC)-(ds[a].r*SDR+ds[a].c*SDC)||ds[a].r-ds[b].r||ds[a].c-ds[b].c);
     let guard=0;
     while(M.some(m=>m.active&&!removed.has(m.i)) && guard++<500){
+      const dOpen=doorCellG?platesG.some(pk=>{const[pr,pc]=pk.split(',').map(Number); return ds.some((d2,i2)=>!removed.has(i2)&&d2.r===pr&&d2.c===pc);}):false;
+      if(doorCellG&&!dOpen){ const pj=occ.get(doorCellG); if(pj!==undefined&&M[pj]&&M[pj].active) M[pj].active=false; }  // door closes on its occupant
       for(const a of prio){ const ma=M[a]; if(!ma.active||removed.has(a))continue;
         const ta=key(ds[a].r+ma.dr, ds[a].c+ma.dc);
         const j=occ.get(ta); if(j===undefined||j===a)continue; const mb=M[j];
