@@ -153,22 +153,21 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .gate.open .gatetile{ opacity:0; transform:scale(.4) rotate(-12deg); }
 /* transformer: a ghost of the target piece — land to become it */
 .tok.xform{ z-index:2; }
-.xtile{ width:80%; height:80%; border-radius:32%; border:2.5px dashed var(--line); position:relative;
-  box-shadow:0 3px 0 var(--shadow); display:flex; align-items:center; justify-content:center;
-  filter:saturate(.7) brightness(1.12); animation:xbob 2.4s ease-in-out infinite; }
-.xtile.N{ background:var(--red); } .xtile.R{ background:var(--blue); } .xtile.B{ background:var(--green); }
-.xtile.Q{ background:var(--purple); } .xtile.K{ background:var(--king); }
-.xtile .xg{ font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols2",serif; font-size:min(7vw,34px);
-  line-height:1; color:#fff8e6; opacity:.92;
-  text-shadow:-1.4px -1.4px 0 var(--line),1.4px -1.4px 0 var(--line),-1.4px 1.4px 0 var(--line),1.4px 1.4px 0 var(--line); }
-.xtile .xarr{ position:absolute; right:4%; bottom:4%; width:40%; height:40%; background:var(--card);
+.xtile{ width:80%; height:80%; border-radius:32%; border:3px dashed var(--xc); position:relative;
+  background:rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center;
+  animation:xbob 2.4s ease-in-out infinite; }
+.xtile .xg{ font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols2",serif; font-size:min(7.5vw,36px);
+  line-height:1; color:var(--xc); text-shadow:0 1px 0 rgba(255,255,255,.7), 0 0 3px rgba(255,255,255,.8); }
+.xtile .xarr{ position:absolute; right:2%; bottom:2%; width:40%; height:40%; background:var(--card);
   border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 var(--shadow);
   display:flex; align-items:center; justify-content:center; }
 .xtile .xarr svg{ width:72%; height:72%; }
 @keyframes xbob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-6%) } }
-/* switch star key badge */
-.keybadge{ position:absolute; right:-3px; bottom:-3px; width:48%; height:48%; }
-.keybadge svg{ width:100%; height:100%; overflow:visible; }
+/* switch star — a coloured ring links it to its matching-colour gate */
+.swring{ position:absolute; left:50%; top:50%; width:82%; height:82%; transform:translate(-50%,-50%);
+  border-radius:50%; border:3.5px solid var(--sc); box-shadow:0 0 0 1.5px rgba(44,39,51,.25);
+  animation:swpulse 1.8s ease-in-out infinite; }
+@keyframes swpulse{ 0%,100%{ transform:translate(-50%,-50%) scale(1); opacity:.9 } 50%{ transform:translate(-50%,-50%) scale(1.06); opacity:1 } }
 
 /* ---- teach line ---- */
 .teach{ display:none; text-align:center; font-family:var(--font-d); font-weight:600;
@@ -335,7 +334,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <b style="color:var(--king)">♚</b> one step. No jumping over pieces.<br>
       <b style="color:#1c1a22">♟</b> Black pawns stop sliders — <b>capture</b> one by landing on it.<br>
       <b>Walls</b> block sliders (knights leap over) · step on a <b style="color:#22b8cf">portal</b> to pop out its twin · a <b style="color:var(--red)">coloured star</b> needs its matching piece.<br>
-      <b style="color:#4aa8c0">Ice</b> — sliders can’t stop on it · a <b>🔑 switch</b> star opens its gate · a <b>swirl</b> tile transforms your piece.
+      <b style="color:#4aa8c0">Ice</b> — sliders can’t stop on it · a <b>ringed switch</b> star opens its matching gate · a <b>dashed</b> tile transforms your piece.
     </div>
     <div class="credit"><a href="../index.html">by İzge Bayyurt</a></div>
   </div>
@@ -957,7 +956,7 @@ function swirlSVG(col){
   return '<svg viewBox="0 0 100 100" fill="none" stroke="'+col+'" stroke-width="9" stroke-linecap="round">'
     + '<path d="M78 40 A30 30 0 1 0 82 60"/><path d="M78 22 L80 42 L60 40"/></svg>';
 }
-const GATE_COLORS = ['#c98a3a','#5b8def','#4bb39a','#d16a9a'];
+const GATE_COLORS = ['#5f7088','#9a5bb0','#2f9e8e','#b3823a']; // steel / plum / teal — distinct from star gold
 function gateColorOf(pos){ const i=G.gates.findIndex(g=>g.pos===pos); return GATE_COLORS[(i<0?0:i)%GATE_COLORS.length]; }
 function switchColorOf(pos){ const i=G.gates.findIndex(g=>g.sw===pos); return i<0?null:GATE_COLORS[i%GATE_COLORS.length]; }
 
@@ -1058,16 +1057,18 @@ function buildBoard(){
     overlayEl.appendChild(el); setTok(el, Math.floor(g.pos/G.cols), g.pos%G.cols);
   });
   G.transformers.forEach((toType,pos)=>{
+    const col = PIECE_COLOR[toType];
     const el = document.createElement('div'); el.className='tok xform';
-    el.innerHTML='<div class="xtile '+toType+'"><span class="xg">'+GLYPH[toType]+'</span>'
-      + '<div class="xarr">'+swirlSVG(INK)+'</div></div>';
+    el.innerHTML='<div class="xtile" style="--xc:'+col+'"><span class="xg">'+GLYPH[toType]+'</span>'
+      + '<div class="xarr">'+swirlSVG(col)+'</div></div>';
     overlayEl.appendChild(el); setTok(el, Math.floor(pos/G.cols), pos%G.cols);
   });
   for (const s of G.stars){
     const el = document.createElement('div');
     el.className = 'tok star'; el.dataset.sid = s.id;
     const swc = switchColorOf(s.r*G.cols+s.c);
-    el.innerHTML = starSVG(starColor(s.key)) + (swc ? '<span class="keybadge">'+keySVG(swc)+'</span>' : '');
+    if (swc) el.classList.add('switch');
+    el.innerHTML = (swc ? '<span class="swring" style="--sc:'+swc+'"></span>' : '') + starSVG(starColor(s.key));
     overlayEl.appendChild(el);
     setTok(el, s.r, s.c);
   }
@@ -1145,7 +1146,7 @@ function updateTeach(){
     else if (G.level===FIRST_PORTAL_LEVEL) msg = 'Step onto a portal to pop out its twin.';
     else if (G.level===FIRST_KEYED_LEVEL) msg = 'A coloured star needs the matching-colour piece.';
     else if (G.level===FIRST_ICE_LEVEL) msg = 'Ice is slippery — sliders skate across and can’t stop on it.';
-    else if (G.level===FIRST_GATE_LEVEL) msg = 'Grab the 🔑 star to open its gate.';
+    else if (G.level===FIRST_GATE_LEVEL) msg = 'Collect the ringed star to open its matching gate.';
     else if (G.level===FIRST_XFORM_LEVEL) msg = 'Land on a swirl tile to transform into that piece.';
   }
   t.innerHTML = msg; t.classList.toggle('show', !!msg);
