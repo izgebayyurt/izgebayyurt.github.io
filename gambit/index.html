@@ -47,6 +47,9 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .mk:disabled{ opacity:.4; cursor:default; }
 .mk:disabled:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
 .icobtn{ width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:20px; padding:0; flex:none; }
+#b-music{ font-size:22px; position:relative; }
+#b-music.off{ color:rgba(44,39,51,.38); }
+#b-music.off::after{ content:''; position:absolute; left:9px; right:9px; top:50%; height:2.5px; margin-top:-1px; background:var(--red); border-radius:2px; transform:rotate(-22deg); }
 
 /* ---- top bar ---- */
 .gtop{ display:flex; align-items:center; gap:11px; }
@@ -169,9 +172,10 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .menu-head{ display:flex; align-items:center; gap:11px; margin-bottom:16px; }
 .logo{ position:relative; width:40px; height:38px; flex:none; }
 .logo i{ position:absolute; width:17px; height:17px; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
-.logo i:nth-child(1){ left:0; top:3px; background:var(--red); border-radius:40% 55% 50% 48%; transform:rotate(-6deg); }
-.logo i:nth-child(2){ right:0; top:0; background:var(--blue); border-radius:52% 45% 50% 55%; transform:rotate(5deg); }
-.logo i:nth-child(3){ left:12px; bottom:0; background:var(--green); border-radius:50%; }
+.logo i:nth-child(1){ left:0; top:3px; background:var(--red); border-radius:40% 55% 50% 48%; --rot:-6deg; animation:logofloat 3s ease-in-out infinite; }
+.logo i:nth-child(2){ right:0; top:0; background:var(--blue); border-radius:52% 45% 50% 55%; --rot:5deg; animation:logofloat 3.4s ease-in-out infinite .25s; }
+.logo i:nth-child(3){ left:12px; bottom:0; background:var(--green); border-radius:50%; --rot:0deg; animation:logofloat 2.7s ease-in-out infinite .45s; }
+@keyframes logofloat{ 0%,100%{ transform:translateY(0) rotate(var(--rot)); } 50%{ transform:translateY(-3px) rotate(calc(var(--rot) + 7deg)); } }
 .menu-head h2{ font-size:28px; flex:1; }
 .x{ background:none; border:none; color:var(--ink); font-size:26px; cursor:pointer; line-height:1; padding:4px; font-family:var(--font-d); }
 .seg{ display:flex; gap:7px; margin-bottom:15px; }
@@ -185,6 +189,12 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .pfill{ height:100%; width:0; background:var(--gold); border-right:2px solid var(--line); transition:width .5s var(--pop); }
 .ptext{ font-family:var(--font-d); font-weight:600; font-size:12.5px; color:var(--ink); white-space:nowrap; }
 .ptext .g{ color:#f0a92c; }
+/* chapter dividers */
+.chapter{ grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:6px 2px 0;
+  font-family:var(--font-d); font-weight:700; font-size:13px; letter-spacing:.06em; color:var(--ink-soft); text-transform:uppercase; }
+.chapter::before,.chapter::after{ content:''; height:2.5px; background:rgba(44,39,51,.14); border-radius:2px; }
+.chapter::before{ width:12px; } .chapter::after{ flex:1; }
+.chapter:first-child{ margin-top:0; }
 /* mechanic badges on level cards */
 .lvlcard{ overflow:hidden; }
 .badges{ position:absolute; top:5px; right:6px; display:flex; gap:3px; }
@@ -220,6 +230,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   <div class="gtop">
     <button class="mk icobtn" id="b-menu" aria-label="Levels">☰</button>
     <button class="mk icobtn" id="b-mute" aria-label="Sound">🔊</button>
+    <button class="mk icobtn" id="b-music" aria-label="Music">♫</button>
     <div class="ginfo">
       <div class="glevel" id="glevel">Level 1</div>
       <div class="pips" id="pips"></div>
@@ -339,6 +350,36 @@ const Sfx = (function(){
     win(){ init(); [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.5,'triangle',0.2,i*0.085)); tone(1568,0.4,'sine',0.07,0.38); },
     lose(){ init(); tone(300,0.5,'sawtooth',0.14,0,110); },
     tap(){ init(); tone(640,0.045,'sine',0.05); },
+  };
+})();
+
+/* ---------- ambient music (soft generated pad loop) ---------- */
+const Music = (function(){
+  let ctx=null, master=null, playing=false, timer=null, step=0;
+  let muted = localStorage.getItem('gambit.music')==='0';   // default on
+  const BASE=196; // G3
+  const CHORDS=[[0,3,7,10],[-2,0,5,8],[-4,0,3,7],[-5,-1,2,7]]; // gentle i-VI-IV-v-ish
+  const f=s=>BASE*Math.pow(2,s/12);
+  function init(){ if(ctx) return; try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=muted?0:0.14; master.connect(ctx.destination);}catch(e){} }
+  function pad(freqs,dur){
+    if(!ctx) return; const t=ctx.currentTime;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(1,t+2); g.gain.setValueAtTime(1,t+dur-2.5); g.gain.linearRampToValueAtTime(0,t+dur);
+    const filt=ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=650;
+    const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=0.06; lg.gain.value=280; lfo.connect(lg); lg.connect(filt.frequency); lfo.start(t); lfo.stop(t+dur);
+    g.connect(filt); filt.connect(master);
+    for(const fr of freqs){ const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=fr;
+      const o2=ctx.createOscillator(); o2.type='triangle'; o2.frequency.value=fr*1.004;
+      const og=ctx.createGain(); og.gain.value=0.3; o.connect(og); o2.connect(og); og.connect(g);
+      o.start(t); o.stop(t+dur); o2.start(t); o2.stop(t+dur); }
+  }
+  function loop(){ if(!playing) return; const ch=CHORDS[step%CHORDS.length];
+    const freqs=ch.map(f); freqs.push(f(ch[0]-12)); pad(freqs,9); step++; timer=setTimeout(loop,8000); }
+  return {
+    isMuted(){ return muted; },
+    start(){ init(); if(ctx&&ctx.state==='suspended') ctx.resume(); if(playing||muted) return; playing=true; loop(); },
+    stop(){ playing=false; if(timer){ clearTimeout(timer); timer=null; } },
+    setMuted(m){ muted=m; try{localStorage.setItem('gambit.music',m?'0':'1');}catch(e){} if(master) master.gain.value=m?0:0.14; if(m) this.stop(); else this.start(); },
+    resume(){ if(ctx&&ctx.state==='suspended') ctx.resume(); if(!muted&&!playing) this.start(); },
   };
 })();
 
@@ -1098,11 +1139,12 @@ $('b-undo').onclick = ()=>{ if (!G.history.length || G.over) return; restore(G.h
 $('b-reset').onclick = ()=> startLevel(G.mode, G.level, G.__def, G.__meta);
 $('b-hint').onclick = giveHint;
 $('b-menu').onclick = openMenu;
-function syncMute(){ $('b-mute').textContent = Sfx.isMuted() ? '🔇' : '🔊'; }
+function syncMute(){ $('b-mute').textContent = Sfx.isMuted() ? '🔇' : '🔊'; $('b-music').classList.toggle('off', Music.isMuted()); }
 $('b-mute').onclick = ()=>{ Sfx.init(); Sfx.resume(); Sfx.setMuted(!Sfx.isMuted()); syncMute(); };
+$('b-music').onclick = ()=>{ Music.setMuted(!Music.isMuted()); syncMute(); };
 // unlock audio on first gesture; give every marker button a soft tap
 document.addEventListener('pointerdown', (e)=>{
-  Sfx.init(); Sfx.resume();
+  Sfx.init(); Sfx.resume(); Music.resume();
   const btn = e.target.closest('.mk'); if (btn && !btn.disabled) Sfx.tap();
 }, { passive:true });
 
@@ -1194,10 +1236,12 @@ function mechBadges(def){
   if (def.enemies&&def.enemies.length) h+='<span class="badge e"></span>';
   return h ? '<div class="badges">'+h+'</div>' : '';
 }
+const CHAPTERS = { 0:'Basics', [FIRST_WALL_LEVEL]:'Walls', [FIRST_PORTAL_LEVEL]:'Portals', [FIRST_KEYED_LEVEL]:'Keyed Stars', 42:'Mixed', 100:'Advanced' };
 function buildLvlGrid(){
   const grid = $('lvlgrid'); grid.innerHTML='';
   let total=0, solved=0;
   CAMPAIGN.forEach((def,i)=>{
+    if (CHAPTERS[i]){ const h=document.createElement('div'); h.className='chapter'; h.innerHTML='<span>'+CHAPTERS[i]+'</span>'; grid.appendChild(h); }
     const open = unlocked(i), b = bestOf(i);
     total += b; if (b>0) solved++;
     const cell = document.createElement('button');
