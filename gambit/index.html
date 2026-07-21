@@ -176,10 +176,25 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .seg{ display:flex; gap:7px; margin-bottom:15px; }
 .seg .mk{ flex:1; height:44px; display:flex; align-items:center; justify-content:center; font-size:15px; }
 .seg .mk.on{ background:var(--gold); }
-#campaign-view{ max-height:46vh; overflow-y:auto; margin:0 -4px; padding:2px 4px; }
+.lvlscroll{ max-height:42vh; overflow-y:auto; margin:0 -4px; padding:2px 4px; }
 .lvlgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+/* menu progress */
+.progress-row{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; }
+.pbar{ flex:1; height:12px; background:var(--paper); border:2.5px solid var(--line); border-radius:999px; overflow:hidden; box-shadow:0 2px 0 var(--shadow); }
+.pfill{ height:100%; width:0; background:var(--gold); border-right:2px solid var(--line); transition:width .5s var(--pop); }
+.ptext{ font-family:var(--font-d); font-weight:600; font-size:12.5px; color:var(--ink); white-space:nowrap; }
+.ptext .g{ color:#f0a92c; }
+/* mechanic badges on level cards */
+.lvlcard{ overflow:hidden; }
+.badges{ position:absolute; top:5px; right:6px; display:flex; gap:3px; }
+.badge{ width:8px; height:8px; border-radius:50%; border:1.5px solid var(--line); box-sizing:border-box; }
+.badge.w{ border-radius:2px; background:var(--ink); }
+.badge.p{ background:#22b8cf; }
+.badge.k{ background:#e05a9c; }
+.badge.e{ background:#1c1a22; }
 .lvlcard{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
   border-width:3px; position:relative; }
+#confetti{ position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:30; }
 .lvlcard .n{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
 .lvlcard .rs{ display:flex; gap:2px; height:11px; }
 .lvlcard .rs svg{ width:11px; height:11px; }
@@ -227,6 +242,8 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   </div>
 </div>
 
+<canvas id="confetti"></canvas>
+
 <!-- win / lose -->
 <div class="scrim" id="endscrim">
   <div class="card">
@@ -249,7 +266,13 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <button class="mk on" id="seg-campaign">Levels</button>
       <button class="mk" id="seg-endless">Endless</button>
     </div>
-    <div id="campaign-view"><div class="lvlgrid" id="lvlgrid"></div></div>
+    <div id="campaign-view">
+      <div class="progress-row">
+        <div class="pbar"><div class="pfill" id="pfill"></div></div>
+        <div class="ptext" id="ptext"></div>
+      </div>
+      <div class="lvlscroll" id="lvlscroll"><div class="lvlgrid" id="lvlgrid"></div></div>
+    </div>
     <div id="endless-view" style="display:none">
       <div class="diffrow" id="diffrow">
         <button class="mk on" data-d="easy">Small</button>
@@ -316,6 +339,40 @@ const Sfx = (function(){
     lose(){ init(); tone(300,0.5,'sawtooth',0.14,0,110); },
     tap(){ init(); tone(640,0.045,'sine',0.05); },
   };
+})();
+
+/* ---------- confetti burst (win juice) ---------- */
+const Confetti = (function(){
+  const cv = document.getElementById('confetti'); const cx = cv.getContext('2d');
+  let parts = [], raf = 0, DPR = 1;
+  const COLORS = ['#ef4a5a','#3d8bdf','#57c268','#9b62d6','#f0a92c','#ffd15c','#22b8cf'];
+  function resize(){ DPR = Math.min(window.devicePixelRatio||1, 2); cv.width = innerWidth*DPR; cv.height = innerHeight*DPR; }
+  function burst(n){
+    resize();
+    const cxp = innerWidth/2, cyp = innerHeight*0.42;
+    for (let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2, sp = 4 + Math.random()*9;
+      parts.push({ x:cxp*DPR, y:cyp*DPR, vx:Math.cos(a)*sp*DPR, vy:(Math.sin(a)*sp - 6)*DPR,
+        w:(6+Math.random()*6)*DPR, h:(9+Math.random()*7)*DPR, rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*0.4,
+        col:COLORS[(Math.random()*COLORS.length)|0], life:1 });
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+  function tick(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    let alive = 0;
+    for (const p of parts){
+      if (p.life<=0) continue; alive++;
+      p.vy += 0.35*DPR; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= 0.011;
+      cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot); cx.globalAlpha = Math.max(0,Math.min(1,p.life*1.4));
+      cx.fillStyle = p.col; cx.strokeStyle = '#2c2733'; cx.lineWidth = 1.5*DPR;
+      cx.fillRect(-p.w/2,-p.h/2,p.w,p.h); cx.strokeRect(-p.w/2,-p.h/2,p.w,p.h);
+      cx.restore();
+    }
+    if (alive>0) raf = requestAnimationFrame(tick);
+    else { cx.clearRect(0,0,cv.width,cv.height); parts=[]; raf=0; }
+  }
+  return { burst };
 })();
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1078,6 +1135,7 @@ function endGame(){
   if (G.won){
     const rating = G.moves <= G.optimal ? 3 : G.moves <= G.optimal+1 ? 2 : 1;
     if (G.mode === 'campaign') recordStars(G.level, rating);
+    Confetti.burst(rating===3 ? 90 : rating===2 ? 55 : 32);
     $('end-title').textContent = rating===3 ? 'Perfect!' : 'Solved!';
     $('end-stars').innerHTML = [0,1,2].map(k=> starSVG(k<rating?'var(--gold)':'transparent', k<rating?'#2c2733':'rgba(44,39,51,.3)')).join('');
     $('end-rline').innerHTML = rating===3
@@ -1113,23 +1171,45 @@ function buildEndButtons(won){
 function closeEnd(){ $('endscrim').classList.remove('show'); }
 
 /* ---------- menu ---------- */
-function openMenu(){ buildLvlGrid(); $('menuscrim').classList.add('show'); }
+function openMenu(){
+  buildLvlGrid(); $('menuscrim').classList.add('show');
+  // scroll the grid to the current level
+  requestAnimationFrame(()=>{
+    const cur = $('lvlgrid').querySelector('.cur') || $('lvlgrid').querySelector('[data-i="'+(G?G.level:0)+'"]');
+    const sc = $('lvlscroll');
+    if (cur && sc) sc.scrollTop = Math.max(0, cur.offsetTop - sc.clientHeight/2 + cur.offsetHeight/2);
+  });
+}
 function closeMenu(){ $('menuscrim').classList.remove('show'); }
 $('menu-x').onclick = closeMenu;
 $('menuscrim').addEventListener('click', e=>{ if(e.target===$('menuscrim')) closeMenu(); });
 $('endscrim').addEventListener('click', e=>{ if(e.target===$('endscrim')) closeEnd(); });
 
+function mechBadges(def){
+  let h='';
+  if (def.walls&&def.walls.length) h+='<span class="badge w"></span>';
+  if (def.portals&&def.portals.length) h+='<span class="badge p"></span>';
+  if (def.stars.some(s=>s.key)) h+='<span class="badge k"></span>';
+  if (def.enemies&&def.enemies.length) h+='<span class="badge e"></span>';
+  return h ? '<div class="badges">'+h+'</div>' : '';
+}
 function buildLvlGrid(){
   const grid = $('lvlgrid'); grid.innerHTML='';
+  let total=0, solved=0;
   CAMPAIGN.forEach((def,i)=>{
     const open = unlocked(i), b = bestOf(i);
+    total += b; if (b>0) solved++;
     const cell = document.createElement('button');
     cell.className = 'mk lvlcard '+def.tier + (open?'':' lock') + (G && G.mode==='campaign' && G.level===i ? ' cur':'');
+    cell.dataset.i = i;
     const rs = [0,1,2].map(k=> starSVG(k<b?'var(--gold)':'transparent', k<b?'#2c2733':'rgba(44,39,51,.28)')).join('');
-    cell.innerHTML = '<div class="n">'+(open ? (i+1) : '🔒')+'</div><div class="rs">'+(open?rs:'')+'</div>';
+    cell.innerHTML = mechBadges(def) + '<div class="n">'+(open ? (i+1) : '🔒')+'</div><div class="rs">'+(open?rs:'')+'</div>';
     if (open) cell.onclick = ()=> startCampaign(i);
     grid.appendChild(cell);
   });
+  const max = CAMPAIGN.length*3;
+  $('pfill').style.width = (total/max*100)+'%';
+  $('ptext').innerHTML = '<span class="g">★</span> '+total+'/'+max+' · '+solved+'/'+CAMPAIGN.length;
 }
 $('seg-campaign').onclick = ()=> setSeg('campaign');
 $('seg-endless').onclick = ()=> setSeg('endless');
