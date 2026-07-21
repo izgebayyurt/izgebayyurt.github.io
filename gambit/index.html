@@ -17,6 +17,7 @@
   --shadow:rgba(44,39,51,.9);
   --sq-l:#fbf5e6; --sq-d:#ecd9b3;
   --red:#ef4a5a; --blue:#3d8bdf; --green:#57c268; --purple:#9b62d6; --amber:#f0a92c; --gold:#ffd15c;
+  --king:#e8590c;  /* deep orange — kept well apart from the star gold */
   --font-d:"Fredoka", system-ui, sans-serif;
   --font-u:"Nunito", system-ui, sans-serif;
   --pop:cubic-bezier(.34,1.7,.6,1); --calm:cubic-bezier(.4,0,.2,1);
@@ -113,7 +114,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .piece.pulse .chip{ animation:bob .7s ease-in-out infinite; }
 @keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9%) } }
 .chip.N{ background:var(--red); } .chip.R{ background:var(--blue); }
-.chip.B{ background:var(--green); } .chip.Q{ background:var(--purple); } .chip.K{ background:var(--amber); }
+.chip.B{ background:var(--green); } .chip.Q{ background:var(--purple); } .chip.K{ background:var(--king); }
 /* enemy blocker: a solid black pawn on a pale stone token — the opposing side */
 .chip.enemy{ background:#cfc8ba; border-color:var(--line); }
 .chip.enemy .g{ color:#14121a; text-shadow:0 1.5px 0 rgba(255,255,255,.45); }
@@ -285,7 +286,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <b>Land a piece on every star.</b> Drag it there — pieces move by chess rules:
       <b style="color:var(--red)">♞</b> L-leap · <b style="color:var(--blue)">♜</b> straight ·
       <b style="color:var(--green)">♝</b> diagonal · <b style="color:var(--purple)">♛</b> both ·
-      <b style="color:var(--amber)">♚</b> one step. No jumping over pieces.<br>
+      <b style="color:var(--king)">♚</b> one step. No jumping over pieces.<br>
       <b style="color:#1c1a22">♟</b> Black pawns stop sliders — <b>capture</b> one by landing on it.<br>
       <b>Walls</b> block sliders (knights leap over) · step on a <b style="color:#22b8cf">portal</b> to pop out its twin · a <b style="color:var(--red)">coloured star</b> needs its matching piece.
     </div>
@@ -829,7 +830,7 @@ function starSVG(fill, stroke){
 /* ---------- game state ---------- */
 let G = null, uid = 1;
 
-const PIECE_COLOR = { N:'var(--red)', R:'var(--blue)', B:'var(--green)', Q:'var(--purple)', K:'var(--amber)' };
+const PIECE_COLOR = { N:'var(--red)', R:'var(--blue)', B:'var(--green)', Q:'var(--purple)', K:'var(--king)' };
 const PORTAL_COLORS = ['#22b8cf','#e64980','#f59f00','#7048e8']; // per-pair
 function makeGame(def, meta){
   const pieces  = def.pieces.map(p => ({ id: uid++, type:p.type, r:p.r, c:p.c }));
