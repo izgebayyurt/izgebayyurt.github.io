@@ -137,27 +137,38 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   box-shadow:0 1px 2px rgba(0,0,0,.35); }
 .wall.v{ width:7px; margin-left:-3.5px; }
 .wall.h{ height:7px; margin-top:-3.5px; }
-/* ice: frictionless tile — can't stop on it */
-.cell.ice{ background:#cfeaf2 !important; box-shadow:inset 0 0 0 2px rgba(120,190,210,.5); position:relative; }
-.cell.ice::after{ content:''; position:absolute; inset:14% 62% 62% 14%; border-radius:50%;
-  background:linear-gradient(135deg,rgba(255,255,255,.85),transparent); pointer-events:none; }
-/* gate: portcullis that opens when its switch star is collected */
+/* ice: frictionless tile — a frosty square with a snowflake */
+.cell.ice{ background:#d3ecf4 !important; }
+.tok.ice{ z-index:0; }
+.ice .frost{ width:92%; height:92%; border-radius:16%; background:linear-gradient(150deg,#e7f6fb,#bfe4ef);
+  border:2.5px solid var(--line); box-shadow:0 3px 0 var(--shadow), inset 0 2px 4px rgba(255,255,255,.7);
+  display:flex; align-items:center; justify-content:center; }
+.ice .frost svg{ width:62%; height:62%; }
+/* gate: a locked barrier that opens when its switch star is collected */
 .tok.gate{ z-index:2; }
-.gate .bars{ width:80%; height:80%; display:flex; justify-content:space-between; align-items:stretch;
-  border:2.5px solid var(--line); border-radius:5px; background:rgba(44,39,51,.10); padding:3px 6px;
-  transition:opacity .3s var(--calm), transform .3s var(--calm); }
-.gate .bars i{ width:4px; background:var(--line); border-radius:3px; }
-.gate.open .bars{ opacity:.16; transform:scaleY(.12); }
-/* transformer: landing here changes the piece's type */
+.gatetile{ width:90%; height:90%; border-radius:20%; background:var(--gc); border:2.5px solid var(--line);
+  box-shadow:0 3px 0 var(--shadow); display:flex; align-items:center; justify-content:center;
+  transition:opacity .35s var(--calm), transform .35s var(--calm); }
+.gatetile svg{ width:62%; height:62%; }
+.gate.open .gatetile{ opacity:0; transform:scale(.4) rotate(-12deg); }
+/* transformer: a ghost of the target piece — land to become it */
 .tok.xform{ z-index:2; }
-.xform .xr{ width:66%; height:66%; border-radius:30%; border:3px dashed var(--xc);
-  display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.35);
-  animation:xspin 6s linear infinite; }
-.xform .xr .g{ font-family:"Segoe UI Symbol","Apple Symbols",serif; font-size:min(6vw,30px); color:var(--xc);
-  opacity:.85; animation:xspin 6s linear infinite reverse; }
-@keyframes xspin{ from{ transform:rotate(0) } to{ transform:rotate(360deg) } }
-/* switch star badge */
-.keybadge{ position:absolute; right:2px; bottom:0; font-size:min(3.6vw,15px); filter:drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+.xtile{ width:80%; height:80%; border-radius:32%; border:2.5px dashed var(--line); position:relative;
+  box-shadow:0 3px 0 var(--shadow); display:flex; align-items:center; justify-content:center;
+  filter:saturate(.7) brightness(1.12); animation:xbob 2.4s ease-in-out infinite; }
+.xtile.N{ background:var(--red); } .xtile.R{ background:var(--blue); } .xtile.B{ background:var(--green); }
+.xtile.Q{ background:var(--purple); } .xtile.K{ background:var(--king); }
+.xtile .xg{ font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols2",serif; font-size:min(7vw,34px);
+  line-height:1; color:#fff8e6; opacity:.92;
+  text-shadow:-1.4px -1.4px 0 var(--line),1.4px -1.4px 0 var(--line),-1.4px 1.4px 0 var(--line),1.4px 1.4px 0 var(--line); }
+.xtile .xarr{ position:absolute; right:4%; bottom:4%; width:40%; height:40%; background:var(--card);
+  border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 var(--shadow);
+  display:flex; align-items:center; justify-content:center; }
+.xtile .xarr svg{ width:72%; height:72%; }
+@keyframes xbob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-6%) } }
+/* switch star key badge */
+.keybadge{ position:absolute; right:-3px; bottom:-3px; width:48%; height:48%; }
+.keybadge svg{ width:100%; height:100%; overflow:visible; }
 
 /* ---- teach line ---- */
 .teach{ display:none; text-align:center; font-family:var(--font-d); font-weight:600;
@@ -917,6 +928,38 @@ function starSVG(fill, stroke){
   return '<svg viewBox="0 0 100 100"><path d="'+STAR_PATH+'" fill="'+fill+'" stroke="'+(stroke||'#2c2733')+
     '" stroke-width="7" stroke-linejoin="round"/></svg>';
 }
+const INK = '#2c2733';
+// ink-outlined white snowflake (six arms + branch ticks)
+const SNOW_ARMS = 'M50 14 L50 86 M20 32 L80 68 M80 32 L20 68';
+const SNOW_TICKS = 'M50 26 l-9 -9 M50 26 l9 -9 M50 74 l-9 9 M50 74 l9 9'
+  + ' M31 25 l1 13 M31 25 l-12 3 M69 75 l-1 -13 M69 75 l12 -3'
+  + ' M69 25 l-1 13 M69 25 l12 3 M31 75 l1 -13 M31 75 l-12 -3';
+function snowSVG(){
+  return '<svg viewBox="0 0 100 100"><g fill="none" stroke-linecap="round">'
+    + '<path d="'+SNOW_ARMS+'" stroke="'+INK+'" stroke-width="12"/>'
+    + '<path d="'+SNOW_TICKS+'" stroke="'+INK+'" stroke-width="10"/>'
+    + '<path d="'+SNOW_ARMS+'" stroke="#eaf7fb" stroke-width="6"/>'
+    + '<path d="'+SNOW_TICKS+'" stroke="#eaf7fb" stroke-width="5"/></g></svg>';
+}
+function lockSVG(col){
+  return '<svg viewBox="0 0 100 100">'
+    + '<path d="M33 50 v-11 a17 17 0 0 1 34 0 v11" fill="none" stroke="'+INK+'" stroke-width="10" stroke-linecap="round"/>'
+    + '<rect x="24" y="46" width="52" height="40" rx="10" fill="'+col+'" stroke="'+INK+'" stroke-width="6"/>'
+    + '<circle cx="50" cy="63" r="6.5" fill="'+INK+'"/><rect x="46.5" y="63" width="7" height="14" rx="3" fill="'+INK+'"/></svg>';
+}
+function keySVG(col){
+  return '<svg viewBox="0 0 100 100"><g stroke="'+INK+'" stroke-width="9" stroke-linecap="round">'
+    + '<circle cx="33" cy="33" r="15" fill="'+col+'"/><line x1="44" y1="44" x2="84" y2="84"/>'
+    + '<line x1="70" y1="72" x2="80" y2="62"/><line x1="80" y1="82" x2="90" y2="72"/></g></svg>';
+}
+// two curved arrows (transform)
+function swirlSVG(col){
+  return '<svg viewBox="0 0 100 100" fill="none" stroke="'+col+'" stroke-width="9" stroke-linecap="round">'
+    + '<path d="M78 40 A30 30 0 1 0 82 60"/><path d="M78 22 L80 42 L60 40"/></svg>';
+}
+const GATE_COLORS = ['#c98a3a','#5b8def','#4bb39a','#d16a9a'];
+function gateColorOf(pos){ const i=G.gates.findIndex(g=>g.pos===pos); return GATE_COLORS[(i<0?0:i)%GATE_COLORS.length]; }
+function switchColorOf(pos){ const i=G.gates.findIndex(g=>g.sw===pos); return i<0?null:GATE_COLORS[i%GATE_COLORS.length]; }
 
 /* ---------- game state ---------- */
 let G = null, uid = 1;
@@ -1002,21 +1045,29 @@ function buildBoard(){
     }
     overlayEl.appendChild(el);
   }
+  // ice (frosty tiles) — behind pieces
+  G.iceSet.forEach(pos=>{
+    const el = document.createElement('div'); el.className='tok ice';
+    el.innerHTML='<div class="frost">'+snowSVG()+'</div>';
+    overlayEl.appendChild(el); setTok(el, Math.floor(pos/G.cols), pos%G.cols);
+  });
   // gates (open when their switch star is collected) + transformers
   G.gates.forEach(g=>{
     const el = document.createElement('div'); el.className='tok gate'; el.dataset.gpos=g.pos;
-    el.innerHTML='<div class="bars"><i></i><i></i><i></i></div>';
+    el.innerHTML='<div class="gatetile" style="--gc:'+gateColorOf(g.pos)+'">'+lockSVG(gateColorOf(g.pos))+'</div>';
     overlayEl.appendChild(el); setTok(el, Math.floor(g.pos/G.cols), g.pos%G.cols);
   });
   G.transformers.forEach((toType,pos)=>{
     const el = document.createElement('div'); el.className='tok xform';
-    el.innerHTML='<div class="xr" style="--xc:'+PIECE_COLOR[toType]+'"><span class="g">'+GLYPH[toType]+'</span></div>';
+    el.innerHTML='<div class="xtile '+toType+'"><span class="xg">'+GLYPH[toType]+'</span>'
+      + '<div class="xarr">'+swirlSVG(INK)+'</div></div>';
     overlayEl.appendChild(el); setTok(el, Math.floor(pos/G.cols), pos%G.cols);
   });
   for (const s of G.stars){
     const el = document.createElement('div');
     el.className = 'tok star'; el.dataset.sid = s.id;
-    el.innerHTML = starSVG(starColor(s.key)) + (isSwitch(s.r*G.cols+s.c) ? '<span class="keybadge">🔑</span>' : '');
+    const swc = switchColorOf(s.r*G.cols+s.c);
+    el.innerHTML = starSVG(starColor(s.key)) + (swc ? '<span class="keybadge">'+keySVG(swc)+'</span>' : '');
     overlayEl.appendChild(el);
     setTok(el, s.r, s.c);
   }
