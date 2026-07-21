@@ -137,6 +137,27 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   box-shadow:0 1px 2px rgba(0,0,0,.35); }
 .wall.v{ width:7px; margin-left:-3.5px; }
 .wall.h{ height:7px; margin-top:-3.5px; }
+/* ice: frictionless tile — can't stop on it */
+.cell.ice{ background:#cfeaf2 !important; box-shadow:inset 0 0 0 2px rgba(120,190,210,.5); position:relative; }
+.cell.ice::after{ content:''; position:absolute; inset:14% 62% 62% 14%; border-radius:50%;
+  background:linear-gradient(135deg,rgba(255,255,255,.85),transparent); pointer-events:none; }
+/* gate: portcullis that opens when its switch star is collected */
+.tok.gate{ z-index:2; }
+.gate .bars{ width:80%; height:80%; display:flex; justify-content:space-between; align-items:stretch;
+  border:2.5px solid var(--line); border-radius:5px; background:rgba(44,39,51,.10); padding:3px 6px;
+  transition:opacity .3s var(--calm), transform .3s var(--calm); }
+.gate .bars i{ width:4px; background:var(--line); border-radius:3px; }
+.gate.open .bars{ opacity:.16; transform:scaleY(.12); }
+/* transformer: landing here changes the piece's type */
+.tok.xform{ z-index:2; }
+.xform .xr{ width:66%; height:66%; border-radius:30%; border:3px dashed var(--xc);
+  display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.35);
+  animation:xspin 6s linear infinite; }
+.xform .xr .g{ font-family:"Segoe UI Symbol","Apple Symbols",serif; font-size:min(6vw,30px); color:var(--xc);
+  opacity:.85; animation:xspin 6s linear infinite reverse; }
+@keyframes xspin{ from{ transform:rotate(0) } to{ transform:rotate(360deg) } }
+/* switch star badge */
+.keybadge{ position:absolute; right:2px; bottom:0; font-size:min(3.6vw,15px); filter:drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
 
 /* ---- teach line ---- */
 .teach{ display:none; text-align:center; font-family:var(--font-d); font-weight:600;
@@ -203,6 +224,9 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .badge.p{ background:#22b8cf; }
 .badge.k{ background:#e05a9c; }
 .badge.e{ background:#1c1a22; }
+.badge.ice{ background:#7fd3e6; }
+.badge.gate{ background:#b08442; border-radius:2px; }
+.badge.xf{ background:#12b886; }
 .lvlcard{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
   border-width:3px; position:relative; }
 #confetti{ position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:30; }
@@ -299,7 +323,8 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <b style="color:var(--green)">♝</b> diagonal · <b style="color:var(--purple)">♛</b> both ·
       <b style="color:var(--king)">♚</b> one step. No jumping over pieces.<br>
       <b style="color:#1c1a22">♟</b> Black pawns stop sliders — <b>capture</b> one by landing on it.<br>
-      <b>Walls</b> block sliders (knights leap over) · step on a <b style="color:#22b8cf">portal</b> to pop out its twin · a <b style="color:var(--red)">coloured star</b> needs its matching piece.
+      <b>Walls</b> block sliders (knights leap over) · step on a <b style="color:#22b8cf">portal</b> to pop out its twin · a <b style="color:var(--red)">coloured star</b> needs its matching piece.<br>
+      <b style="color:#4aa8c0">Ice</b> — sliders can’t stop on it · a <b>🔑 switch</b> star opens its gate · a <b>swirl</b> tile transforms your piece.
     </div>
     <div class="credit"><a href="../index.html">by İzge Bayyurt</a></div>
   </div>
@@ -347,6 +372,8 @@ const Sfx = (function(){
     collect(n){ init(); const f=PENT[Math.min(n-1,PENT.length-1)]||PENT[0]; tone(f,0.34,'sine',0.22); tone(f*2,0.16,'sine',0.07,0.01); },
     capture(){ init(); noise(0.13,0.22,1700); tone(120,0.17,'square',0.13,0,66); },
     warp(){ init(); tone(420,0.18,'sine',0.14,0,880); tone(660,0.16,'sine',0.10,0.05,1320); },
+    transform(){ init(); tone(330,0.16,'triangle',0.13,0,660); tone(495,0.18,'sine',0.10,0.08,990); },
+    gate(){ init(); tone(180,0.28,'sawtooth',0.12,0,300); tone(90,0.3,'square',0.08); },
     win(){ init(); [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.5,'triangle',0.2,i*0.085)); tone(1568,0.4,'sine',0.07,0.38); },
     lose(){ init(); tone(300,0.5,'sawtooth',0.14,0,110); },
     tap(){ init(); tone(640,0.045,'sine',0.05); },
@@ -433,28 +460,32 @@ const PNAME = { N:'knight', R:'rook', B:'bishop', Q:'queen', K:'king' };
 
 const EMPTY_SET = new Set(), EMPTY_MAP = new Map();
 function edgeKey(a,b){ return a<b ? a*10000+b : b*10000+a; }
-// Build fast lookups from a level's walls/portals.
+// Build fast lookups from a level's walls / portals / ice / gates / transformers.
 function features(def, cols){
   const wallEdges = new Set();
   for (const w of (def.walls||[])) wallEdges.add(edgeKey(w[0]*cols+w[1], w[2]*cols+w[3]));
   const portals = new Map();
   for (const p of (def.portals||[])){ const a=p[0]*cols+p[1], b=p[2]*cols+p[3]; portals.set(a,b); portals.set(b,a); }
-  return { wallEdges, portals };
+  const ice = new Set((def.ice||[]).map(c=>c[0]*cols+c[1]));
+  const gates = (def.gates||[]).map(g=>({pos:g[0]*cols+g[1], sw:g[2]*cols+g[3]}));
+  const transformers = new Map((def.transformers||[]).map(t=>[t[0]*cols+t[1], t[2]]));
+  return { wallEdges, portals, ice, gates, transformers };
 }
 
-// feat: { enemies:Set(pos), wallEdges:Set, portals:Map(pos->twin), blockers:Set(pos) }.
+// feat: { enemies, wallEdges, portals, blockers, ice, closedGates }.
 // Returns [{r,c,land:{r,c}}] — land is the final square (a portal's twin when you
-// step onto a portal). Knights leap walls; king/sliders are blocked by them.
+// step onto one). Knights leap walls; sliders can't stop on ice; closed gates block.
 function legalMoves(pieces, idx, cols, rows, feat) {
   feat = feat || {};
   const enemies = feat.enemies || EMPTY_SET, wallEdges = feat.wallEdges || EMPTY_SET,
-        portals = feat.portals || EMPTY_MAP, blockers = feat.blockers || EMPTY_SET;
+        portals = feat.portals || EMPTY_MAP, blockers = feat.blockers || EMPTY_SET,
+        ice = feat.ice || EMPTY_SET, closedGates = feat.closedGates || EMPTY_SET;
   const p = pieces[idx];
   const own = new Set();
   for (let i = 0; i < pieces.length; i++) if (i !== idx) own.add(pieces[i].r * cols + pieces[i].c);
   const inside = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
-  const blocked = pos => own.has(pos) || blockers.has(pos);
-  const twinFree = tw => !own.has(tw) && !enemies.has(tw) && !blockers.has(tw);
+  const blocked = pos => own.has(pos) || blockers.has(pos) || closedGates.has(pos);
+  const twinFree = tw => !blocked(tw) && !enemies.has(tw) && !ice.has(tw);
   const out = [];
   const enter = (r,c)=>{ const pos=r*cols+c;
     if (portals.has(pos)){ const tw=portals.get(pos); if (twinFree(tw)) out.push({r,c,land:{r:Math.floor(tw/cols),c:tw%cols}}); }
@@ -465,7 +496,7 @@ function legalMoves(pieces, idx, cols, rows, feat) {
       const r = p.r + dr, c = p.c + dc; if (!inside(r,c)) continue;
       const pos = r*cols+c;
       if (p.type==='K' && wallEdges.has(edgeKey(ppos,pos))) continue;
-      if (blocked(pos)) continue;
+      if (blocked(pos) || ice.has(pos)) continue;
       if (enemies.has(pos)){ out.push({r,c,land:{r,c}}); continue; }
       enter(r,c);
     }
@@ -478,7 +509,8 @@ function legalMoves(pieces, idx, cols, rows, feat) {
         if (wallEdges.has(edgeKey(prev,pos))) break;
         if (blocked(pos)) break;
         if (enemies.has(pos)){ out.push({r,c,land:{r,c}}); break; }
-        if (portals.has(pos)){ const tw=portals.get(pos); if (twinFree(tw)) out.push({r,c,land:{r:Math.floor(tw/cols),c:tw%cols}}); }
+        if (ice.has(pos)){ /* frictionless — pass through, can't stop */ }
+        else if (portals.has(pos)){ const tw=portals.get(pos); if (twinFree(tw)) out.push({r,c,land:{r:Math.floor(tw/cols),c:tw%cols}}); }
         else out.push({r,c,land:{r,c}});
         pr=r; pc=c; r += dr; c += dc;
       }
@@ -494,8 +526,7 @@ function popcount(x){ let n = 0; while (x){ x &= x - 1; n++; } return n; }
 function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap, def) {
   nodeCap = nodeCap || 2500000;
   enemies0 = enemies0 || [];
-  const feat0 = features(def||{}, cols);
-  const wallEdges = feat0.wallEdges, portals = feat0.portals;
+  const F = features(def||{}, cols);
   const blockers = new Set(((def&&def.blockers)||[]).map(b=>b[0]*cols+b[1]));
   const starAt = new Map(); stars.forEach((s,i)=> starAt.set(s.r*cols+s.c, {i, key:s.key||null}));
   const enemyBit = new Map(); enemies0.forEach((e,i)=> enemyBit.set(e.r*cols+e.c, i));
@@ -503,7 +534,8 @@ function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap, def) {
   for (const p of pieces0){ const st=starAt.get(p.r*cols+p.c); if (st && (st.key==null||st.key===p.type)) mask0|=(1<<st.i); }
   const eAll = (1 << enemies0.length) - 1;
   const enemySetOf = (em) => { const s = new Set(); for (let i=0;i<enemies0.length;i++) if (em & (1<<i)) s.add(enemies0[i].r*cols+enemies0[i].c); return s; };
-  const key = (pcs, sm, em) => { let s = sm + '|' + em + '|'; for (const p of pcs) s += (p.r * cols + p.c) + ','; return s; };
+  const closedGatesOf = (sm) => { const s=new Set(); for(const gt of F.gates){ const st=starAt.get(gt.sw); if(!(st && (sm&(1<<st.i)))) s.add(gt.pos); } return s; };
+  const key = (pcs, sm, em) => { let s = sm + '|' + em + '|'; for (const p of pcs) s += (p.r * cols + p.c) + p.type + ','; return s; };
   let nodes = 0;
   let bound = stars.length - popcount(mask0);
 
@@ -527,13 +559,14 @@ function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap, def) {
     const prev = seen.get(k);
     if (prev !== undefined && prev <= g) return Infinity;
     seen.set(k, g);
-    const feat = { enemies: enemySetOf(em), wallEdges, portals, blockers };
+    const feat = { enemies: enemySetOf(em), wallEdges:F.wallEdges, portals:F.portals, blockers, ice:F.ice, closedGates:closedGatesOf(sm) };
     let min = Infinity;
     for (let i = 0; i < pcs.length; i++) {
       for (const mv of legalMoves(pcs, i, cols, rows, feat)) {
         const land = mv.land, lpos = land.r*cols+land.c;
         const np = pcs.slice();
-        np[i] = { type: pcs[i].type, r: land.r, c: land.c };
+        let nt = pcs[i].type; if (F.transformers.has(lpos)) nt = F.transformers.get(lpos);
+        np[i] = { type: nt, r: land.r, c: land.c };
         let nsm = sm; const st = starAt.get(lpos); if (st && (st.key==null||st.key===pcs[i].type)) nsm |= (1 << st.i);
         let nem = em; const eb = enemyBit.get(mv.r*cols+mv.c); if (eb !== undefined) nem &= ~(1 << eb);
         path.push({ piece: i, r: mv.r, c: mv.c });
@@ -849,8 +882,25 @@ const CAMPAIGN = [
   { cols:6, rows:6, limit:13, optimal:11, tier:'xhard',
     pieces:[{type:'B',r:2,c:5},{type:'N',r:1,c:5},{type:'N',r:2,c:4}], enemies:[{type:'P',r:3,c:4},{type:'P',r:1,c:4}],
     stars:[{r:2,c:3},{r:0,c:2},{r:2,c:0},{r:5,c:1},{r:3,c:0,key:'B'},{r:5,c:4}] },
+
+  { cols:5, rows:5, limit:7, optimal:5, tier:'hard',
+    pieces:[{type:'R',r:2,c:2}], enemies:[],
+    stars:[{r:0,c:2},{r:4,c:2},{r:2,c:0},{r:2,c:4}], ice:[[1,2],[3,2],[2,1],[2,3]] },
+  { cols:5, rows:5, limit:7, optimal:5, tier:'hard',
+    pieces:[{type:'R',r:0,c:0},{type:'N',r:4,c:4}], enemies:[],
+    stars:[{r:0,c:4},{r:4,c:0},{r:2,c:2},{r:0,c:2}], ice:[[0,1],[0,3],[2,0]] },
+  { cols:5, rows:5, limit:6, optimal:4, tier:'hard',
+    pieces:[{type:'R',r:0,c:0}], enemies:[],
+    stars:[{r:0,c:4},{r:4,c:2},{r:0,c:2},{r:4,c:4}], walls:[[2,0,3,0],[2,1,3,1],[2,3,3,3],[2,4,3,4]], gates:[[3,2,0,4]] },
+  { cols:5, rows:5, limit:8, optimal:6, tier:'hard',
+    pieces:[{type:'R',r:0,c:0}], enemies:[],
+    stars:[{r:2,c:2},{r:0,c:4},{r:4,c:0},{r:4,c:4}], walls:[[2,2,1,2],[2,2,3,2],[2,2,2,1],[2,2,2,3]], transformers:[[0,2,'N']] },
+  { cols:6, rows:6, limit:9, optimal:7, tier:'xhard',
+    pieces:[{type:'R',r:0,c:0},{type:'N',r:5,c:5}], enemies:[],
+    stars:[{r:0,c:5},{r:5,c:0},{r:3,c:3},{r:2,c:2}], portals:[[5,1,1,4]], ice:[[0,2],[0,3]] },
 ];
 const FIRST_ENEMY_LEVEL = 30, FIRST_WALL_LEVEL = 15, FIRST_PORTAL_LEVEL = 24, FIRST_KEYED_LEVEL = 33;
+const FIRST_ICE_LEVEL = 100, FIRST_GATE_LEVEL = 102, FIRST_XFORM_LEVEL = 103;
 
 /* ---------- persistent progress ---------- */
 const SAVE_KEY = 'gambit.v1';
@@ -886,6 +936,8 @@ function makeGame(def, meta){
   return {
     cols:def.cols, rows:def.rows, pieces, stars, enemies,
     walls: def.walls||[], portals: def.portals||[], wallEdges: feat.wallEdges, portalMap: feat.portals,
+    ice: def.ice||[], iceSet: feat.ice, gates: feat.gates, gatesRaw: def.gates||[],
+    transformers: feat.transformers, transformersRaw: def.transformers||[],
     total: stars.length, collected:0, limit: Math.max(def.limit, optimal), optimal,
     moves:0, selected:null, legal:new Set(), landMap:new Map(), history:[], over:false, won:false,
     mode: meta ? meta.mode : 'campaign', level: meta ? meta.level : -1,
@@ -893,9 +945,11 @@ function makeGame(def, meta){
   };
 }
 function aliveEnemySet(){ const s = new Set(); for (const e of G.enemies) if (!e.captured) s.add(e.r*G.cols+e.c); return s; }
-function featGame(){ return { enemies: aliveEnemySet(), wallEdges: G.wallEdges, portals: G.portalMap }; }
+function closedGatesNow(){ const s=new Set(); for (const g of G.gates){ const sw=G.stars.find(st=>st.r*G.cols+st.c===g.sw); if (!(sw && sw.collected)) s.add(g.pos); } return s; }
+function featGame(){ return { enemies: aliveEnemySet(), wallEdges: G.wallEdges, portals: G.portalMap, ice: G.iceSet, closedGates: closedGatesNow() }; }
 function starColor(key){ return key ? PIECE_COLOR[key] : 'var(--gold)'; }
-function defFromG(){ return { cols:G.cols, rows:G.rows, walls:G.walls, portals:G.portals }; }
+function defFromG(){ return { cols:G.cols, rows:G.rows, walls:G.walls, portals:G.portals, ice:G.ice, gates:G.gatesRaw, transformers:G.transformersRaw }; }
+function isSwitch(pos){ return G.gates.some(g=>g.sw===pos); }
 
 /* ---------- rendering ---------- */
 const $ = id => document.getElementById(id);
@@ -917,6 +971,7 @@ function buildBoard(){
     const d = document.createElement('div');
     d.className = 'cell';
     d.style.background = ((r + c) & 1) ? 'var(--sq-d)' : 'var(--sq-l)';
+    if (G.iceSet.has(r*G.cols+c)) d.classList.add('ice');
     d.dataset.r = r; d.dataset.c = c;
     cellsEl.appendChild(d);
   }
@@ -947,10 +1002,21 @@ function buildBoard(){
     }
     overlayEl.appendChild(el);
   }
+  // gates (open when their switch star is collected) + transformers
+  G.gates.forEach(g=>{
+    const el = document.createElement('div'); el.className='tok gate'; el.dataset.gpos=g.pos;
+    el.innerHTML='<div class="bars"><i></i><i></i><i></i></div>';
+    overlayEl.appendChild(el); setTok(el, Math.floor(g.pos/G.cols), g.pos%G.cols);
+  });
+  G.transformers.forEach((toType,pos)=>{
+    const el = document.createElement('div'); el.className='tok xform';
+    el.innerHTML='<div class="xr" style="--xc:'+PIECE_COLOR[toType]+'"><span class="g">'+GLYPH[toType]+'</span></div>';
+    overlayEl.appendChild(el); setTok(el, Math.floor(pos/G.cols), pos%G.cols);
+  });
   for (const s of G.stars){
     const el = document.createElement('div');
     el.className = 'tok star'; el.dataset.sid = s.id;
-    el.innerHTML = starSVG(starColor(s.key));
+    el.innerHTML = starSVG(starColor(s.key)) + (isSwitch(s.r*G.cols+s.c) ? '<span class="keybadge">🔑</span>' : '');
     overlayEl.appendChild(el);
     setTok(el, s.r, s.c);
   }
@@ -977,8 +1043,12 @@ function refresh(){
     const el = pieceEl(p.id);
     el.classList.toggle('sel', G.selected === p.id);
     el.classList.remove('pulse');
+    const chip = el.querySelector('.chip');           // keep chip in sync with type (transformers / undo)
+    if (chip && !chip.classList.contains(p.type)){ chip.className='chip '+p.type; chip.querySelector('.g').textContent=GLYPH[p.type]; }
     if (!el.classList.contains('dragging')) setTok(el, p.r, p.c);
   }
+  const closed = G.gates.length ? closedGatesNow() : null;
+  if (closed) for (const el of overlayEl.querySelectorAll('.gate')) el.classList.toggle('open', !closed.has(+el.dataset.gpos));
   const selType = G.selected!=null ? (G.pieces.find(p=>p.id===G.selected)||{}).type : null;
   const starAt = new Set(G.stars.filter(s=>!s.collected).map(s=>s.r*G.cols+s.c));
   for (const s of G.stars){
@@ -1023,6 +1093,9 @@ function updateTeach(){
     else if (G.level===FIRST_WALL_LEVEL) msg = 'Walls stop sliders — but a knight leaps right over them.';
     else if (G.level===FIRST_PORTAL_LEVEL) msg = 'Step onto a portal to pop out its twin.';
     else if (G.level===FIRST_KEYED_LEVEL) msg = 'A coloured star needs the matching-colour piece.';
+    else if (G.level===FIRST_ICE_LEVEL) msg = 'Ice is slippery — sliders skate across and can’t stop on it.';
+    else if (G.level===FIRST_GATE_LEVEL) msg = 'Grab the 🔑 star to open its gate.';
+    else if (G.level===FIRST_XFORM_LEVEL) msg = 'Land on a swirl tile to transform into that piece.';
   }
   t.innerHTML = msg; t.classList.toggle('show', !!msg);
 }
@@ -1039,11 +1112,11 @@ function selectPiece(id){
 function deselect(){ G.selected = null; G.legal = new Set(); refresh(); }
 
 function snapshot(){
-  return { pieces:G.pieces.map(p=>({r:p.r,c:p.c})), stars:G.stars.map(s=>s.collected),
+  return { pieces:G.pieces.map(p=>({r:p.r,c:p.c,type:p.type})), stars:G.stars.map(s=>s.collected),
            enemies:G.enemies.map(e=>e.captured), collected:G.collected, moves:G.moves };
 }
 function restore(sn){
-  sn.pieces.forEach((sp,i)=>{ G.pieces[i].r=sp.r; G.pieces[i].c=sp.c; });
+  sn.pieces.forEach((sp,i)=>{ G.pieces[i].r=sp.r; G.pieces[i].c=sp.c; G.pieces[i].type=sp.type; });
   sn.stars.forEach((sc,i)=>{ G.stars[i].collected = sc; });
   sn.enemies.forEach((ec,i)=>{ G.enemies[i].captured = ec; });
   G.collected = sn.collected; G.moves = sn.moves; G.over=false; G.won=false;
@@ -1063,7 +1136,13 @@ function doMove(id, r, c){
   if (s){ s.collected = true; G.collected++; const el = starEl(s.id); if (el) el.classList.add('got'); }
   const en = G.enemies.find(e=>!e.captured && e.r===r && e.c===c);
   if (en){ en.captured = true; const el = enemyEl(en.id); if (el) el.classList.add('gone'); }
+  const lpos = lr*G.cols+lc;
+  let transformed = false;
+  if (G.transformers.has(lpos)){ p.type = G.transformers.get(lpos); transformed = true; }
+  const openedGate = s && isSwitch(lpos);
   if (s) Sfx.collect(G.collected); else if (en) Sfx.capture(); else if (warped) Sfx.warp(); else Sfx.move();
+  if (transformed) Sfx.transform();
+  if (openedGate) Sfx.gate();
   deselect();
   if (G.collected === G.total){ G.won = true; G.over = true; refresh(); setTimeout(endGame, 320); return; }
   if (G.moves >= G.limit || !anyMove()){ G.over = true; refresh(); setTimeout(endGame, 280); return; }
@@ -1234,6 +1313,9 @@ function mechBadges(def){
   if (def.portals&&def.portals.length) h+='<span class="badge p"></span>';
   if (def.stars.some(s=>s.key)) h+='<span class="badge k"></span>';
   if (def.enemies&&def.enemies.length) h+='<span class="badge e"></span>';
+  if (def.ice&&def.ice.length) h+='<span class="badge ice"></span>';
+  if (def.gates&&def.gates.length) h+='<span class="badge gate"></span>';
+  if (def.transformers&&def.transformers.length) h+='<span class="badge xf"></span>';
   return h ? '<div class="badges">'+h+'</div>' : '';
 }
 const CHAPTERS = { 0:'Basics', [FIRST_WALL_LEVEL]:'Walls', [FIRST_PORTAL_LEVEL]:'Portals', [FIRST_KEYED_LEVEL]:'Keyed Stars', 42:'Mixed', 100:'Advanced' };
