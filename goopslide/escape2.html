@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Goop — escape II (wall gaps)</title>
+<title>Goop Out</title>
 <style>
   :root{color-scheme:dark;
     --ink:#0d0b14; --face:#5f5880; --band:#454060; --floor:#221e2e;
@@ -27,6 +27,7 @@
     transition:transform .06s,box-shadow .06s;}
   button.chip:active{transform:translateY(3px);box-shadow:0 1px 0 var(--band),0 3px 0 var(--ink);}
   #mute.off{opacity:.45;text-decoration:line-through;}
+  .chip.dim{opacity:.35;}
   #moves{color:var(--mint);text-shadow:0 0 9px var(--mintglow);font:900 21px ui-rounded,system-ui;text-align:center;}
   #moves.over{color:#ffd27a;text-shadow:0 0 9px rgba(255,210,122,.4);}
   #hardtag{color:#ffd27a;text-shadow:0 0 8px rgba(255,210,122,.45);font-size:10.5px;font-weight:800;letter-spacing:.4px;}
@@ -37,6 +38,15 @@
     font-size:12.5px;color:var(--dim);background:var(--floor);border:2px solid var(--ink);border-radius:12px;
     padding:7px 14px;box-shadow:inset 0 3px 7px rgba(0,0,0,.5);max-width:88vw;text-align:center;}
   #hint b{color:var(--text);} #hint i{color:#7d75a0;}
+  #title{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(120% 120% at 50% 12%, #2b2737 0%, #201c2b 55%, #151220 100%);}
+  #title .tcard{display:flex;flex-direction:column;align-items:center;gap:22px;}
+  #title h1{margin:0;font:900 44px ui-rounded,system-ui;color:var(--text);letter-spacing:.5px;
+    text-shadow:0 0 30px var(--mintglow);}
+  #tblob{width:86px;height:86px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #8ceccf, var(--mint));
+    border:3px solid var(--ink);box-shadow:0 0 40px var(--mintglow);animation:blobb 2.6s ease-in-out infinite;}
+  @keyframes blobb{0%,100%{transform:scale(1,1);}50%{transform:scale(1.06,.94);}}
+  #tplay{padding:12px 44px;font-size:16px;}
   .modal{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;background:rgba(15,12,22,.6);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}
   .bigst{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #8ceccf, var(--mint));
     border:2px solid var(--ink);box-shadow:0 0 16px var(--mintglow);}
@@ -49,6 +59,9 @@
   .modal h2{margin:0;font:900 26px ui-rounded,system-ui;color:var(--text);text-shadow:0 0 14px rgba(63,214,172,.25);}
   .modal .sub{color:var(--dim);font-size:13.5px;text-align:center;}
   #pgrid{display:grid;grid-template-columns:repeat(5,52px);gap:9px;max-height:56vh;overflow-y:auto;padding:6px;}
+  .psec{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;
+    font:800 11px ui-rounded,system-ui;color:var(--dim);letter-spacing:.6px;text-transform:uppercase;
+    padding:10px 2px 0;} .psec:first-child{padding-top:0;} .psec .cnt{font-weight:700;letter-spacing:.2px;text-transform:none;}
   .lvbtn{width:52px;height:52px;border-radius:12px;border:2px solid var(--ink);background:var(--face);
     box-shadow:0 3px 0 var(--band),0 5px 0 var(--ink);font:800 15px ui-rounded,system-ui;color:var(--text);
     cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;}
@@ -84,6 +97,7 @@
     </div>
   </div>
   <div id="hint">Swipe moves <b>every</b> goop. Escape through the <b>gap in the wall</b> that matches your colour.</div>
+  <div id="title"><div class="tcard"><div id="tblob"></div><h1>Goop Out</h1><button class="chip" id="tplay">Play</button></div></div>
   <div id="win" class="modal"><div class="card"><h2>Solved!</h2><div id="starrow" style="display:none" class="bigst"></div><div class="sub" id="wintxt"></div><div id="winbtns"><button class="chip" id="wnext">Next</button></div></div></div>
   <div id="pick" class="modal"><div class="card"><h2>Levels</h2><div class="sub" id="buildid"></div><div id="pgrid"></div><button class="chip" id="pclose">✕ Close</button></div></div>
 
@@ -129,6 +143,9 @@
     merge:()=>{ tone(260,170,.1,'sine',.5); tone(420,300,.12,'sine',.3,.04); },
     drain:i=>{ tone(320,660,.14,'triangle',.45,(i||0)*.07); tone(880,1320,.1,'sine',.2,.05+(i||0)*.07); },
     bump:()=>tone(110,80,.05,'sine',.22),
+    warp:()=>{ tone(340,520,.09,'sine',.2); tone(520,340,.09,'sine',.14); },
+    slam:()=>{ tone(75,150,.11,'sine',.5); tone(52,95,.16,'sine',.42); },
+    squish:()=>{ tone(240,90,.08,'sine',.22); tone(150,60,.1,'sine',.18); },
     win:()=>[523,659,784,1046].forEach((f,i)=>tone(f,f,.16,'triangle',.3,i*.09)),
     undo:()=>tone(520,330,.07,'sine',.2),
     tick:()=>tone(760,760,.03,'sine',.12),
@@ -365,26 +382,26 @@
      map:["########","#o.##..C","#.q##.##","#....o.#","#.q###.A","#...#..#","#.p...pB","########"]},
     {hint:"", par:27, limit:38, risk:1,
      map:["########","A.p..q.#","##.#...#","##.##..#","##....##","#..##o.#","B..po#q#","###C####"]},
-    {hint:"The number on a door is the <b>exact blob size</b> it takes — merge to fit.", par:4, limit:8, risk:1,
-     map:["#######","##....D","#..#ooE","#..#..#","#.##o.#","#######"]},
+    {hint:"The number on a door is the <b>exact blob size</b> it takes — merge to fit.", par:4, limit:8, risk:0,
+     map:["#####E#","#..o#.#","#....o#","#.....#","#.###.#","#.....#","#######"]},
     {hint:"", par:5, limit:9, risk:0,
-     map:["####E##","#..#..#","#...p.#","##....#","#.#..p#","#..oo.#","####H##"]},
-    {hint:"", par:6, limit:10, risk:1,
-     map:["####E###","#.....p#","#.#....#","#....#.#","#.p..oo#","#.....p#","#I######"]},
+     map:["####E#","#..#o#","##...#","#.o.##","#..###","#...##","######"]},
+    {hint:"", par:6, limit:10, risk:0,
+     map:["######","##..o#","#....#","#....#","#...##","#.#.oE","######"]},
     {hint:"", par:7, limit:11, risk:0,
-     map:["####E###","#.....p#","###....#","#....#.#","#.p..oo#","#.....p#","#I######"]},
+     map:["##A###","Hp.###","#o..##","#p#.##","#.#..#","######"]},
     {hint:"", par:8, limit:12, risk:0,
-     map:["#######","#.o##.#","#...#o#","#.#...#","#..#..#","#E#####"]},
+     map:["#B#####","#p.#..#","#.#...#","#..#o.#","E.o.p.#","#######"]},
     {hint:"", par:9, limit:13, risk:0,
-     map:["####E##","#..#..#","#...p##","##....#","#.#..p#","#..oo.#","####H##"]},
-    {hint:"", par:10, limit:14, risk:1,
-     map:["#####F##","H.#.o.p#","#o.....#","#op..p.#","#...#..#","#####G##"]},
-    {hint:"", par:12, limit:17, risk:0,
-     map:["#E#####","#..#..#","#...p##","##....#","H.#..p#","#o.o..#","#######"]},
-    {hint:"", par:14, limit:20, risk:0,
-     map:["#E#####","#..#..#","#..o.##","##...p#","H.#..p#","#o....#","#######"]},
-    {hint:"", par:16, limit:22, risk:1,
-     map:["#E#####","#...###","#..o.##","##.#.p#","H.#.#p#","#o....#","#######"]},
+     map:["######","#p...H","#....#","#....#","##..o#","#...p#","###.o#","###A##"]},
+    {hint:"", par:10, limit:14, risk:0,
+     map:["##E####","#.o#o.#","##..#.#","###...#","####..#","#######"]},
+    {hint:"", par:10, limit:14, risk:0,
+     map:["#######","#.#...#","E....##","#o.#..#","###o#.#","#.....#","#######"]},
+    {hint:"", par:9, limit:13, risk:0,
+     map:["######","#o#..#","#....#","##o.##","#....#","##...#","##E###"]},
+    {hint:"", par:7, limit:11, risk:0,
+     map:["####K#","#q.pq#","#....A","##...#","#..o.B","#...##","######"]},
     {hint:"A goop on a <b>plate</b> holds the door open — leave the plate and it <b>slams shut</b>.", par:5, limit:9, risk:1,
      map:["#######","#..._=#","#.....A","#.#.._#","#.p...#","#o.#..#","#.....#","#.....#","#####B#"]},
     {hint:"", par:6, limit:10, risk:1,
@@ -406,6 +423,8 @@
     {hint:"", par:15, limit:21, risk:1,
      map:["########","#..o...#","#.##.=.#","##.o.###","#_.#.###","#....._#","####A###"]},
     {hint:"<b>Wedges</b> deflect you along their diagonal; their flat sides bounce you back. <b>Bumpers</b> always send you back.", par:3, limit:7, risk:0,
+     map:["######","#.zo##","#...##","#..###","A.s..#","#....#","######"]},
+    {hint:"", par:3, limit:7, risk:0,
      map:["######","#...##","#....#","#.o#.#","#....#","#...sA","#....#","#.y..#","#....#","######"]},
     {hint:"", par:3, limit:7, risk:0,
      map:["#######","#.#...#","As...w#","##..#.#","##..#.#","##..#.#","#..o..#","#.#.#.#","#.....#","#######"]},
@@ -413,112 +432,158 @@
      map:["#######","##....#","#Z....#","#o....#","#.y..##","#..o..#","####A##"]},
     {hint:"", par:4, limit:8, risk:0,
      map:["######","##...#","##.#.#","#....#","#.o..#","A...s#","#..o.#","#..y.#","######"]},
-    {hint:"", par:4, limit:8, risk:0,
-     map:["#########","#....s..#","#.....o.A","#.....#.#","#..o....#","#..z....#","#...#.#.#","##......#","#########"]},
     {hint:"", par:5, limit:9, risk:0,
      map:["##A#####","#o....##","##o...##","#.x##.##","#......#","#....#.#","########"]},
     {hint:"", par:5, limit:9, risk:0,
      map:["######","#..###","#...s#","##o..#","#..x.#","#.#.o#","#A####"]},
     {hint:"", par:4, limit:8, risk:0,
+     map:["#########","#....s..#","#.....o.A","#.....#.#","#..o....#","#..z....#","#...#.#.#","##......#","#########"]},
+    {hint:"", par:4, limit:8, risk:0,
      map:["##A######","#.......#","##..o.x.#","#...###.#","#o.s....#","#..s....#","#########"]},
-    {hint:"", par:3, limit:7, risk:0,
-     map:["######","#.zo##","#...##","#..###","A.s..#","#....#","######"]},
-    {hint:"", par:5, limit:9, risk:1,
-     map:["#######","#...###","#.o...#","##.####","As.####","#.y.ob#","#######"]},
-    {hint:"", par:5, limit:9, risk:1,
+    {hint:"", par:5, limit:9, risk:0,
      map:["######","#.wo##","#..x.#","#....#","A.s#.#","#..###","######"]},
     {hint:"", par:6, limit:10, risk:0,
      map:["#####A#","##.##.#","##.##.#","#o.#..#","#.y..##","#..o..#","#######"]},
-    {hint:"", par:7, limit:11, risk:1,
-     map:["########","#..#...#","##..##.#","#......#","#...#..#","A....o.#","#.oy...#","##...#.#","########"]},
-    {hint:"", par:8, limit:12, risk:1,
-     map:["##A#####","#o.w.o##","##....##","#s..##.#","#.z....#","#s.###.#","########"]},
     {hint:"", par:6, limit:10, risk:0,
      map:["######","#...##","#.#..#","#zo#.#","#.#..#","#..#sA","#s.#.#","#.##.#","#....#","######"]},
-    {hint:"", par:6, limit:10, risk:0,
-     map:["######","##z..#","##.#s#","#....#","#.o..#","A.x#.#","#..#.#","#.o#.#","######"]},
-    {hint:"", par:7, limit:11, risk:1,
+    {hint:"", par:7, limit:11, risk:0,
      map:["#######","#.#...#","#s....#","#.....#","#.w.###","##..#.#","#.....#","#.o...#","###A###"]},
-    {hint:"", par:8, limit:12, risk:1,
-     map:["#######","#..#o.#","#.....#","#...#.#","#...#.#","#.#...#","##.x###","#.o...#","##..#.#","###A###"]},
     {hint:"", par:9, limit:13, risk:0,
      map:["########","#......#","##.....#","#.....s#","#...#..#","A....o.#","#.oy...#","##...#.#","########"]},
-    {hint:"", par:9, limit:13, risk:1,
-     map:["######","#.o#.#","##.#.#","##...#","#o.w.#","#.bs.#","#A####"]},
-    {hint:"", par:10, limit:14, risk:1,
-     map:["#######","#.#...#","#s...##","#.....#","#.z...#","#....b#","##...o#","#.....#","###A###"]},
-    {hint:"", par:7, limit:11, risk:1,
-     map:["#######","#b..o.#","#.....#","#.#.#.#","#.#.#.#","#.#.#.#","##.x#.#","#.o...#","##..#.#","###A###"]},
-    {hint:"", par:8, limit:12, risk:1,
-     map:["######","##o###","##..s#","##...#","#.ow.#","#.b..#","#A####"]},
-    {hint:"", par:9, limit:13, risk:1,
-     map:["######","###.o#","As...#","#....#","#bo..#","#....#","#....#","#s..w#","##.b.#","######"]},
+    {hint:"", par:6, limit:10, risk:0,
+     map:["######","##z..#","##.#s#","#....#","#.o..#","A.x#.#","#..#.#","#.o#.#","######"]},
+    {hint:"", par:6, limit:10, risk:0,
+     map:["#########","#....s#.#","#..#....A","#.....#.#","#..o.s..#","#..z.o..#","#...#...#","##......#","#########"]},
+    {hint:"", par:7, limit:11, risk:0,
+     map:["######","##..##","##..s#","#....#","#.o.##","A.x..#","#....#","#.o..#","######"]},
+    {hint:"", par:9, limit:13, risk:0,
+     map:["#######","#.#...#","#s...##","#.....#","#.z...#","#.....#","##....#","#.o...#","###A###"]},
     {hint:"", par:10, limit:14, risk:0,
      map:["#########","#z......#","#..#.s..A","#...#...#","#.so##.##","#..#.o..#","#.......#","##......#","#########"]},
     {hint:"", par:11, limit:15, risk:0,
      map:["########","#o.w.o##","##.....#","#sx....#","A.ws..##","#..#.###","########"]},
-    {hint:"", par:12, limit:17, risk:1,
-     map:["######","#.o..#","#y..##","#...##","#...##","#..#.#","#o..X#","#.#..#","####A#"]},
-    {hint:"", par:13, limit:18, risk:0,
-     map:["#######","#..#o.#","#z...##","#..##.#","##..#.#","#.X...#","##.x.W#","##o...#","###..##","###A###"]},
     {hint:"", par:11, limit:15, risk:0,
-     map:["########","#......#","##.....#","#o..#.s#","#...#..#","A......#","#.oy...#","##...#.#","########"]},
-    {hint:"", par:11, limit:15, risk:1,
-     map:["#######","#..#o.#","#z...##","#...#.#","#...#.#","#.X...#","##.x.W#","##o...#","##...b#","###A###"]},
-    {hint:"", par:12, limit:17, risk:1,
-     map:["#######","#..b###","#....o#","##s...#","#...#.#","Aoy..##","#######"]},
-    {hint:"", par:13, limit:18, risk:0,
-     map:["######","#.s.##","#.#..#","#yo#.#","###..#","#..#s#","#s.w.#","#.y..#","###.##","###A##"]},
-    {hint:"", par:14, limit:20, risk:0,
-     map:["#######","#..#o##","#....##","#..##.#","##..#o#","#.X...#","##.x.W#","#.....#","#.#..##","###A###"]},
-    {hint:"", par:15, limit:21, risk:1,
-     map:["#########","A....s..C","#....o..#","#.....wp#","#o..#...#","#.......B","#.....q.#","#...##..#","#......##","#########"]},
-    {hint:"", par:16, limit:22, risk:0,
-     map:["#######","A.#..##","#.....#","##...##","#.#.###","#.o..##","###.y.#","#s..s.#","#.....#","#######"]},
-    {hint:"", par:12, limit:17, risk:1,
-     map:["######A#","#......C","#.p.#q.B","#z.....#","#...X..#","#..#..o#","##.....#","########"]},
-    {hint:"", par:13, limit:18, risk:1,
-     map:["#########","#.......#","#.##o.w.#","#..o....#","A..s.#.s#","#.....x.#","#########"]},
-    {hint:"", par:15, limit:21, risk:1,
-     map:["########","#......#","#.z....#","#....sp#","#o..##.#","#.....##","##..##p#","#.o....#","#..###.A","######B#"]},
-    {hint:"", par:16, limit:22, risk:1,
-     map:["#CA##B###","#..q....#","#.#.xp..#","#......##","#.#.o...#","#.......#","#s...#..#","#.......#","#########"]},
-    {hint:"", par:17, limit:24, risk:1,
-     map:["#########","#.......#","#.#.....A","#..##.w##","#.......B","#..##o..#","#..Z..X##","#...#..p#","#......##","#########"]},
-    {hint:"", par:18, limit:25, risk:1,
-     map:["#########","#.......#","A....s..#","#.o.#...#","#...##.##","#..w.o..#","#.....y.#","##.#....#","#########"]},
-    {hint:"", par:20, limit:28, risk:1,
-     map:["###B#####","So....o.#","##.Y...##","#.pz....#","#.......#","###SA####"]},
-    {hint:"", par:15, limit:21, risk:1,
-     map:["#########","#.#.....#","#..#..w.#","#..o.y..#","Ao.s.#.s#","#.....x.#","#########"]},
-    {hint:"", par:17, limit:24, risk:1,
-     map:["#########","#.#.....#","#.o#..w.#","#.......#","Ao.s.#.s#","#.....x.#","#########"]},
-    {hint:"", par:18, limit:25, risk:1,
-     map:["#######","#b..o##","#z..###","#..##.#","##...o#","#.X...#","##.x.W#","#.....#","#.#..##","###A###"]},
-    {hint:"", par:20, limit:28, risk:1,
-     map:["##CA#####","B...p.#.#","#...#...#","#.#.o...#","#....w..#","#.q.#..##","#.......#","#########"]},
+     map:["#######","#.....#","#o..x.#","##...s#","#....##","##s...#","A.#.#.#","#...#.#","#######"]},
+    {hint:"", par:7, limit:11, risk:1,
+     map:["#######","#b..o.#","#.....#","#.#.#.#","#.#.#.#","#.#.#.#","##.x#.#","#.o...#","##..#.#","###A###"]},
+    {hint:"", par:8, limit:12, risk:1,
+     map:["##A#####","#o.w.o##","##....##","#s..##.#","#.z....#","#s.###.#","########"]},
+    {hint:"", par:9, limit:13, risk:1,
+     map:["######","#.o#.#","##.#.#","##...#","#o.w.#","#.bs.#","#A####"]},
     {hint:"", par:12, limit:17, risk:0,
      map:["######","#.s.##","#.#..#","#yo#.#","#.##.#","#..#.#","#s.ws#","#.z..#","#....#","###A##"]},
     {hint:"", par:12, limit:17, risk:0,
      map:["#######","A.#..##","#.....#","##...##","#...###","#....##","###.yo#","#.....#","#.....#","#######"]},
-    {hint:"", par:24, limit:34, risk:1,
-     map:["#########","A....s#.C","#....o..#","#.....wp#","#o..#.q.#","#.......B","#.......#","#...##..#","#.....#.#","#########"]},
-    {hint:"", par:25, limit:35, risk:1,
-     map:["#########","#o......#","#.#.....A","#..##.w##","#.......B","#..##...#","#..Z..X##","#...##.p#","#......##","#########"]},
+    {hint:"", par:13, limit:18, risk:0,
+     map:["#######","#..#o.#","#z...##","#..##.#","##..#.#","#.X...#","##.x.W#","##o...#","###..##","###A###"]},
+    {hint:"", par:13, limit:18, risk:0,
+     map:["######","#.s.##","#.#..#","#yo#.#","###..#","#..#s#","#s.w.#","#.y..#","###.##","###A##"]},
+    {hint:"", par:10, limit:14, risk:1,
+     map:["######","#.#.o#","As#..#","#....#","#bo..#","#....#","#....#","#s..w#","##.b.#","######"]},
+    {hint:"", par:11, limit:15, risk:1,
+     map:["######A#","#......C","#.p..q.B","#......#","#..#...#","#..#.z.#","##.o...#","########"]},
+    {hint:"", par:14, limit:20, risk:0,
+     map:["#######","#..#o##","#....##","#..##.#","##..#o#","#.X...#","##.x.W#","#.....#","#.#..##","###A###"]},
+    {hint:"", par:13, limit:18, risk:1,
+     map:["#########","#.......#","#.##o.w.#","#..o....#","A..s.#.s#","#.....x.#","#########"]},
+    {hint:"", par:15, limit:21, risk:1,
+     map:["#########","A....s..C","#....o..#","#.....wp#","#o..#...#","#.......B","#.....q.#","#...##..#","#......##","#########"]},
+    {hint:"", par:15, limit:21, risk:1,
+     map:["########","#......#","#.z....#","#....sp#","#o..##.#","#.....##","##..##p#","#.o....#","#..###.A","######B#"]},
+    {hint:"", par:16, limit:22, risk:1,
+     map:["#CA##B###","#..q....#","#.#.xp..#","#......##","#.#.o...#","#.......#","#s...#..#","#.......#","#########"]},
+    {hint:"", par:12, limit:17, risk:1,
+     map:["######","#.o..#","#y..##","#...##","#...##","#..#.#","#o..X#","#.#..#","####A#"]},
+    {hint:"", par:12, limit:17, risk:1,
+     map:["#######","#..b###","#....o#","##s...#","#...#.#","Aoy..##","#######"]},
+    {hint:"", par:12, limit:17, risk:1,
+     map:["######A#","#......C","#.p.#q.B","#z.....#","#...X..#","#..#..o#","##.....#","########"]},
+    {hint:"", par:17, limit:24, risk:1,
+     map:["#########","#.......#","#.#.....A","#..##.w##","#.......B","#..##o..#","#..Z..X##","#...#..p#","#......##","#########"]},
+    {hint:"", par:18, limit:25, risk:1,
+     map:["#########","#.......#","A....s..#","#.o.#...#","#...##.##","#..w.o..#","#.....y.#","##.#....#","#########"]},
+    {hint:"", par:19, limit:27, risk:1,
+     map:["#######","#b..o##","#z..###","#..##.#","##....#","#.Xo..#","##.x.W#","#.....#","#.#..##","###A###"]},
+    {hint:"", par:20, limit:28, risk:1,
+     map:["###B#####","So....o.#","##.Y...##","#.pz....#","#.......#","###SA####"]},
+    {hint:"", par:11, limit:15, risk:1,
+     map:["#########","#.......#","#..#z...#","#..#...##","#.......B","#..#.o..#","#..Z..X##","#......pA","#.......#","#########"]},
+    {hint:"", par:11, limit:15, risk:1,
+     map:["#########","#.....s.#","#..#o.wb#","#...#y..#","#o.s.#.s#","#.....x.#","###A#####"]},
+    {hint:"", par:8, limit:12, risk:1,
+     map:["#######","#..#o.#","#.....#","#...#.#","#...#.#","#.#...#","##.x###","#.o...#","##..#.#","###A###"]},
+    {hint:"", par:20, limit:28, risk:1,
+     map:["##CA#####","B...p.#.#","#...#...#","#.#.o...#","#....w..#","#.q.#..##","#.......#","#########"]},
+    {hint:"", par:8, limit:12, risk:1,
+     map:["######","##o###","##..s#","##...#","#.ow.#","#.b..#","#A####"]},
+    {hint:"", par:8, limit:12, risk:1,
+     map:["#######","#..b###","#yo..o#","##.####","As.####","#.#####","#######"]},
+    {hint:"", par:26, limit:36, risk:1,
+     map:["#########","A....s#.C","#....o..#","#.....wp#","#o..w.q.#","#.......B","#.......#","#....#..#","#...###.#","#########"]},
+    {hint:"", par:8, limit:12, risk:1,
+     map:["########","#......#","#......#","#....sp#","#......#","##.z..##","#..o.#p#","#.o....#","#..#...A","######B#"]},
+    {hint:"<b>Portals</b>: slide into one, come out the other — still sliding.", par:3, limit:7, risk:0,
+     map:["########","#.@o...#","#......#","#......#","#p...#.#","#...#.@B","#...#..#","###A####"]},
+    {hint:"", par:4, limit:8, risk:0,
+     map:["#########","#.@.....#","#..##..o#","#..##.#.#","#..##.#.#","#..##.#.#","#......@A","#.......#","#########"]},
+    {hint:"", par:4, limit:8, risk:0,
+     map:["#A######","#.#....#","#.#.#..#","#.#.#..#","#@o....#","#..##..#","##...@.#","########"]},
+    {hint:"", par:5, limit:9, risk:0,
+     map:["#######","A.....#","#o..@.#","#p..#.#","#@.o..B","#..#..#","#.....#","###p..#","#######"]},
+    {hint:"", par:5, limit:9, risk:0,
+     map:["#########","#..o...##","#@......#","#.#.##..#","#@......A","#.#.##..#","#.#.##..#","#.......#","#########"]},
+    {hint:"", par:6, limit:10, risk:0,
+     map:["#########","#.@...#.#","##..#..o#","#.#.#.#.#","#.#.#.#.#","#.#.#.#.#","#......@A","#.......#","#########"]},
+    {hint:"", par:6, limit:10, risk:0,
+     map:["#####B###","A.......#","#..#....#","#o..#...#","#...p..##","#@o@...##","#########"]},
+    {hint:"", par:7, limit:11, risk:0,
+     map:["#########","#.@...#.#","##..#..o#","#.#.#...#","#.#.#...#","#.......#","#.#.##.@A","#.......#","#########"]},
+    {hint:"", par:7, limit:11, risk:0,
+     map:["##B#####","#..#o..#","#...#..#","A......#","#..o@p##","#@.....#","#....#.#","#......#","########"]},
+    {hint:"", par:8, limit:12, risk:0,
+     map:["######A#","#..#...#","#...#po#","#.@....#","#.....##","###..@.#","######B#"]},
+    {hint:"", par:8, limit:12, risk:0,
+     map:["#######","#....##","#..@..#","#.....#","#o.#@.A","##.#..#","#o.#..#","#######"]},
+    {hint:"", par:9, limit:13, risk:0,
+     map:["##A######","#..#...##","#..p....#","##......#","#o#.q.p@C","#.......#","#....@..#","######B##"]},
+    {hint:"", par:9, limit:13, risk:0,
+     map:["#B#######","#.......C","#.......#","A.......#","##@..o..#","#.p....q#","#.......#","#.#....@#","#########"]},
+    {hint:"", par:10, limit:14, risk:0,
+     map:["#########","#.@..##.#","##.##..o#","#.#.....#","#.......#","#.......#","#....#.@A","##......#","#########"]},
+    {hint:"", par:10, limit:14, risk:0,
+     map:["######A##","#.p.....#","#.....po#","#...#..@#","##....o##","#...@#..#","#....#..#","######B##"]},
+    {hint:"", par:11, limit:15, risk:0,
+     map:["########","##.....#","#.#....#","#.o.#.@#","#.p.o..B","#....@.#","#....#p#","#A######"]},
+    {hint:"", par:12, limit:17, risk:0,
+     map:["#######","##..@o#","#...#.#","###..##","#.....#","#.@...#","#.#..##","####..#","#####A#"]},
+    {hint:"", par:13, limit:18, risk:0,
+     map:["###A#####","#...##o.#","##...##.#","#...@...#","#@......#","#.##..###","#########"]},
+    {hint:"", par:14, limit:20, risk:0,
+     map:["########","#...o#o#","##.....#","#.#..@.A","#.@....#","#......#","#......#","#..#..##","########"]},
+    {hint:"", par:14, limit:20, risk:0,
+     map:["####A###","#....o##","#..o.#.#","#..#@..#","#..#...#","##.....#","#@.....#","##..#..#","########"]},
   ];
+  const PACKS_META=[{name:"Campaign",start:0,len:112},{name:"Size doors",start:112,len:10},{name:"Plates",start:122,len:10},{name:"Wedges",start:132,len:50},{name:"Portals",start:182,len:20}];
 
-  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,twallG,bumpSetG,stickyG,wstickyG,wadjG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
+  let gw,gh,grid,spikes,holes,holeMapG,holeSizeG,doorCellG,platesG,doorAnim,doorWasOpen,triMapG,twallG,bumpSetG,stickyG,wstickyG,wadjG,portalG,state,undoStack,moves,levelIdx,won,mass0,colorMass0;
   const DIRV=[[-1,0],[1,0],[0,-1],[0,1]];
   const DEFL=[{3:1,0:2,2:'b',1:'b'},{3:0,1:2,2:'b',0:'b'},{2:0,1:3,3:'b',0:'b'},{2:1,0:3,3:'b',1:'b'}];
   const DIRI=(dr,dc)=>dr===-1?0:dr===1?1:dc===-1?2:3;
-  let hitStop=0,gateFlash={},limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0,spawnT0=0,hasSizes=false;
-  const PKEY='gm_escape2_v1';
-  let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'{"best":{}}'); }catch(e){ prog={best:{}}; }
+  let hitStop=0,gateFlash={},pendSquish=false,boardFade=1,limitNow=0,movesLeft=0,parts=[],sqA=0,sqAxisH=false,sqDir=[0,0],trails=[],rings=[],tNow=0,spawnT0=0,hasSizes=false;
+  const DEBUG=true;   // playtest: all levels unlocked + build stamp; flip for release
+  const lvKey=i=>{ const l=LEVELS[i]; if(!l._k){ let h=2166136261; const str2=l.map.join('/');
+    for(let j=0;j<str2.length;j++){ h^=str2.charCodeAt(j); h=Math.imul(h,16777619); } l._k=(h>>>0).toString(36); } return l._k; };
+  const PKEY='gm_escape2_v2';
+  let prog; try{ prog=JSON.parse(localStorage.getItem(PKEY)||'null'); }catch(e){ prog=null; }
+  if(!prog){ prog={v:2,best:{}};
+    try{ const old=JSON.parse(localStorage.getItem('gm_escape2_v1')||'null');   // one-time index->id migration
+      if(old&&old.best) for(const k in old.best){ const i=+k; if(LEVELS[i]!==undefined) prog.best[lvKey(i)]=old.best[k]; }
+    }catch(e){} }
   const saveProg=()=>{ try{ localStorage.setItem(PKEY,JSON.stringify(prog)); }catch(e){} };
-  const isUnlocked=i=>true;   // all levels open (playtest mode)
+  const isUnlocked=i=>DEBUG||i===0||prog.best[lvKey(i-1)]!==undefined;
   const inb=(r,c)=>r>=0&&c>=0&&r<gh&&c<gw;
   function parse(lv){ const m=lv.map; gh=m.length; gw=Math.max(...m.map(s=>s.length));
-    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; triMapG={}; twallG={}; bumpSetG=new Set(); stickyG=new Set(); wstickyG=new Set(); wadjG=new Set(); const drops=[], molds=[]; let id=0;
+    grid=[]; spikes=new Set(); holes=[]; holeMapG={}; holeSizeG={}; doorCellG=null; platesG=[]; triMapG={}; twallG={}; bumpSetG=new Set(); portalG=[]; stickyG=new Set(); wstickyG=new Set(); wadjG=new Set(); const drops=[], molds=[]; let id=0;
     for(let r=0;r<gh;r++){ const row=[]; for(let c=0;c<gw;c++){ const ch=(m[r]||'')[c]||'#';
       if(ch==='#'){ row.push('#'); }
       else if('ABC'.includes(ch)){ row.push('#'); const ci='ABC'.indexOf(ch); holes.push({r,c,color:ci}); holeMapG[r+','+c]=ci; }
@@ -531,6 +596,7 @@
       else if(ch==='s'){ row.push('.'); stickyG.add(r+','+c); }
       else if(ch==='S'){ row.push('#'); wstickyG.add(r+','+c); }
       else if(ch==='_'){ row.push('.'); platesG.push(r+','+c); }
+      else if(ch==='@'){ row.push('.'); portalG.push(r+','+c); }
       else { row.push('.');
         if(ch==='o') drops.push({id:id++,r,c,size:1,color:0,locked:false,stuck:false});
         else if(ch==='p') drops.push({id:id++,r,c,size:1,color:1,locked:false,stuck:false});
@@ -552,7 +618,7 @@
     const occ=new Map(); ds.forEach((d,i)=>occ.set(key(d.r,d.c),i));
     const M=ds.map((d,i)=>({ i, dr:SDR, dc:SDC, active:!d.locked,
       budget:(stickyG.has(key(d.r,d.c))||d.stuck)?1:Infinity,
-      hitW:new Set(), hitB:new Set(), red:0, hitGoo:false,
+      hitW:new Set(), hitB:new Set(), hitP:new Set(), red:0, hitGoo:false,
       trail:[[d.r,d.c]], sr:d.r, sc:d.c }));
     const removed=new Set(), merges=[], drains=[], corks=[]; let redirs=0;
     const prio=ds.map((d,i)=>i).filter(i=>!ds[i].locked).sort((a,b)=>(ds[b].r*SDR+ds[b].c*SDC)-(ds[a].r*SDR+ds[a].c*SDC)||ds[a].r-ds[b].r||ds[a].c-ds[b].c);
@@ -605,7 +671,13 @@
             removed.add(idx); occ.delete(key(d.r,d.c)); merges.push({from:d.id,to:ds[j].id,r:nr,c:nc,trail:m.trail}); }
           m.active=false; continue; }
         occ.delete(key(d.r,d.c)); d.r=nr; d.c=nc; occ.set(k,idx); m.trail.push([nr,nc]);
-        if(stickyG.has(k)){ m.active=false; continue; }
+        let kk=k;
+        if(portalG.length===2&&portalG.includes(kk)&&!m.hitP.has(kk)){
+          const twin=(portalG[0]===kk)?portalG[1]:portalG[0];
+          if(!occ.has(twin)){ m.hitP.add(kk); m.hitP.add(twin);
+            const tp=twin.split(','); occ.delete(kk); d.r=+tp[0]; d.c=+tp[1]; occ.set(twin,idx);
+            m.trail.push([d.r,d.c,1]); kk=twin; } }
+        if(stickyG.has(kk)){ m.active=false; continue; }
         if(--m.budget<=0){ m.active=false; continue; }
         advanced=true; }
       if(!advanced){
@@ -620,7 +692,7 @@
     for(const m of M){ if(removed.has(m.i))continue; const d=ds[m.i]; if(d.locked)continue;
       const moved=(d.r!==m.sr||d.c!==m.sc);
       d.stuck=m.hitGoo?true:(moved?false:!!d.stuck);
-      d.corners=m.trail.length>1?m.trail.slice(1).map(cc=>({r:cc[0],c:cc[1]})):[]; }
+      d.corners=m.trail.length>1?m.trail.slice(1).map(cc=>({r:cc[0],c:cc[1],j:cc[2]})):[]; }
     const nd=ds.filter((d,i)=>!removed.has(i)); const locks=[];
     for(const mo of ms){ if(mo.filled)continue; const d=nd.find(d=>!d.locked&&d.r===mo.r&&d.c===mo.c&&d.size===mo.size);
       if(d){ d.locked=true; mo.filled=true; locks.push(d.id); } }
@@ -649,7 +721,7 @@
     colorMass0={}; _l0.drops.forEach(d=>{ colorMass0[d.color]=(colorMass0[d.color]||0)+1; });
     state={drops:_l0.drops.map(d=>({...d})), molds:_l0.molds.map(m=>({...m}))};
     layout(); { let si=0; state.drops.forEach(d=>{ renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),tr:sizeR(d.size),pop:0,sc:0,sdelay:(si++)*70}; }); spawnT0=performance.now(); }
-    parts=[]; trails=[]; rings=[]; sqA=0; gateFlash={}; hitStop=0; doorAnim=0; doorWasOpen=false;
+    parts=[]; trails=[]; rings=[]; sqA=0; gateFlash={}; hitStop=0; boardFade=0; pendSquish=false; doorAnim=0; doorWasOpen=false;
     document.getElementById('lvlname').textContent='Level '+(levelIdx+1);
     document.getElementById('parlbl').textContent='par '+(LEVELS[levelIdx].par||'—');
     document.getElementById('hardtag').style.display=LEVELS[levelIdx].risk?'':'none';
@@ -662,13 +734,13 @@
     const before=sig(state.drops,state.molds); const res=simulate(state.drops,state.molds,dir);
     if(before===sig(res.drops,res.molds)){ SND.bump();
       res.drops.forEach(d=>{ if(d.locked) return; const e=renderById[d.id]; if(!e) return;
-        if(d.corners&&d.corners.length) e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r)}));
+        if(d.corners&&d.corners.length) e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r),j:cc.j}));
         else e.wp=[{x:e.px+DIRS[dir][1]*S*.20,y:e.py+DIRS[dir][0]*S*.20}]; });
       sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir]; moving=true; return; }
     undoStack.push(snapshot()); moves++; SND.swipe();
     const pre=undoStack[undoStack.length-1].drops;
     const colOf=id=>{ const d=pre.find(x=>x.id===id); return d?d.color:0; };
-    const pathOf=t=>t&&t.length>1?t.slice(1).map(cc=>({x:cellX(cc[1]),y:cellY(cc[0])})):null; const drainWalk=[];
+    const pathOf=t=>t&&t.length>1?t.slice(1).map(cc=>({x:cellX(cc[1]),y:cellY(cc[0]),j:cc[2]})):null; const drainWalk=[];
     res.merges.forEach(m=>{ const g=renderById[m.from]; const wp=pathOf(m.trail);
       ghosts.push({px:g?g.px:cellX(m.c),py:g?g.py:cellY(m.r),wp:wp||[{x:cellX(m.c),y:cellY(m.r)}],life:1,rr:g?g.rr:sizeR(1),ci:colOf(m.from),
         onEnd:()=>{ const e=renderById[m.to]; const dd2=state.drops.find(x=>x.id===m.to);
@@ -687,17 +759,18 @@
       delete renderById[dd.id]; });
     if(res.corks.length){ document.getElementById('hint').style.display=''; } if(res.corks.length) document.getElementById('hint').innerHTML='🫙 Corked! A goop is stuck in the wrong hole — <b>↶ undo</b> (Z) is free.';
     state.drops=res.drops; state.molds=res.molds;
+    if(state.drops.some(d=>{ const pd=pre.find(x=>x.id===d.id); return d.stuck&&!(pd&&pd.stuck); })) pendSquish=true;
     const growLater=new Map(); res.merges.forEach(m=>{ if(!growLater.has(m.to)){ const pd=pre.find(x=>x.id===m.to); if(pd) growLater.set(m.to,pd.size); } });
     state.drops.forEach(d=>{ let e=renderById[d.id]; if(!e) e=renderById[d.id]={px:cellX(d.c),py:cellY(d.r),rr:sizeR(d.size),pop:0,sc:1};
       if(growLater.has(d.id)){ e.tr=sizeR(growLater.get(d.id)); e.ds=growLater.get(d.id); }   // grow on arrival, not on swipe
       else { e.tr=sizeR(d.size); e.ds=undefined; }
-      if(d.corners&&d.corners.length){ e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r)})); d.corners=[]; } });
+      if(d.corners&&d.corners.length){ e.wp=d.corners.map(cc=>({x:cellX(cc.c),y:cellY(cc.r),j:cc.j})); d.corners=[]; } });
     if(res.redirs) SND.boing&&SND.boing(Math.min(res.redirs,2));
     res.locks.forEach(id=>{ const e=renderById[id]; if(e) e.pop=1; });
     sqAxisH=(dir==='left'||dir==='right'); sqDir=DIRS[dir];
     updateMoves(); moving=true;
     if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k));
-      if(o!==doorWasOpen){ SND.door&&SND.door(o); doorWasOpen=o; } }
+      if(o!==doorWasOpen){ if(o){ SND.door&&SND.door(o); } else { SND.slam&&SND.slam(); sqA=1; } doorWasOpen=o; } }
     if(instant){ for(const id in renderById){ const d=state.drops.find(x=>x.id==id); if(d){ renderById[id].px=cellX(d.c); renderById[id].py=cellY(d.r); renderById[id].rr=renderById[id].tr; renderById[id].wp=null; } } ghosts=[]; moving=false; }
     if(isWinS(state.drops,state.molds)){ won=true;
       const spots=[]; res.drains.forEach(dd=>{ if(!spots.some(h=>h.r===dd.r&&h.c===dd.c)) spots.push({r:dd.r,c:dd.c,color:dd.color}); });
@@ -705,11 +778,13 @@
         const prevEnd=last.g.onEnd; last.g.onEnd=function(){ prevEnd.call(this); onWin(spots); }; }
       else onWin(spots); }
   }
-  function updateMoves(){ const el=document.getElementById('moves'); el.textContent=moves;
+  function updateBtns(){ document.getElementById('undo').classList.toggle('dim',!undoStack.length);
+    document.getElementById('reset').classList.toggle('dim',moves===0&&!undoStack.length); }
+  function updateMoves(){ const el=document.getElementById('moves'); el.textContent=moves; updateBtns();
     el.classList.toggle('over', moves>(LEVELS[levelIdx].par||Infinity));
     el.classList.remove('tickA'); void el.offsetWidth; el.classList.add('tickA'); }
   function onWin(spots){ SND.win(); const par=LEVELS[levelIdx].par||0; const star=moves<=par;
-    const prev=prog.best[levelIdx]; if(prev===undefined||moves<prev){ prog.best[levelIdx]=moves; saveProg(); }
+    const prev=prog.best[lvKey(levelIdx)]; if(prev===undefined||moves<prev){ prog.best[lvKey(levelIdx)]=moves; saveProg(); }
     document.getElementById('wintxt').textContent=moves+' moves · par '+par;
     document.getElementById('starrow').style.display=star?'':'none';
     spots=(spots&&spots.length)?spots:holes.slice();                  // celebrate the gate(s) that actually accepted
@@ -740,17 +815,27 @@
   document.getElementById('reset').onclick=()=>loadLevel(levelIdx);
   document.getElementById('wnext').onclick=()=>loadLevel(levelIdx+1);
   function buildPicker(){ const g=document.getElementById('pgrid'); g.innerHTML='';
-    LEVELS.forEach((L,i)=>{ const b=document.createElement('button'); b.className='lvbtn';
-      const done=prog.best[i]!==undefined, star=done&&prog.best[i]<=(L.par||0);
-      if(done)b.classList.add('done'); if(!isUnlocked(i))b.classList.add('locked'); if(i===levelIdx)b.classList.add('cur');
-      if(L.risk)b.classList.add('risk');
-      b.textContent=(i+1);
-      if(star){ const s=document.createElement('span'); s.className='st'; b.appendChild(s); }
-      b.onclick=()=>{ if(isUnlocked(i)) loadLevel(i); };
-      g.appendChild(b); }); }
+    const packs=(typeof PACKS_META!=='undefined')?PACKS_META:[{name:'Levels',start:0,len:LEVELS.length}];
+    for(const pk of packs){
+      let solved=0, stars=0;
+      for(let i=pk.start;i<pk.start+pk.len;i++){ const bv=prog.best[lvKey(i)];
+        if(bv!==undefined){ solved++; if(bv<=(LEVELS[i].par||0)) stars++; } }
+      const h=document.createElement('div'); h.className='psec';
+      h.innerHTML='<span>'+pk.name+'</span><span class="cnt">'+solved+'/'+pk.len+(stars?' · '+stars+' stars':'')+'</span>';
+      g.appendChild(h);
+      for(let i=pk.start;i<pk.start+pk.len;i++){ const L=LEVELS[i];
+        const b=document.createElement('button'); b.className='lvbtn';
+        const bv=prog.best[lvKey(i)]; const done=bv!==undefined, star=done&&bv<=(L.par||0);
+        if(done)b.classList.add('done'); if(!isUnlocked(i))b.classList.add('locked'); if(i===levelIdx)b.classList.add('cur');
+        if(L.risk)b.classList.add('risk');
+        b.textContent=(i+1);
+        if(star){ const st2=document.createElement('span'); st2.className='st'; b.appendChild(st2); }
+        b.onclick=()=>{ if(isUnlocked(i)) loadLevel(i); };
+        g.appendChild(b); } } }
   document.getElementById('grid').onclick=()=>{ buildPicker(); document.getElementById('pick').style.display='flex'; };
   document.getElementById('pclose').onclick=()=>document.getElementById('pick').style.display='none';
 
+  document.getElementById('tplay').onclick=()=>{ document.getElementById('title').style.display='none'; SND.tick&&SND.tick(); };
   document.getElementById('mute').onclick=()=>{ muted=!muted; try{localStorage.setItem('gm_mute',muted?'1':'0');}catch(e){} muteBtn(); SND.tick(); }; muteBtn();
 
   // ---- layout & draw -------------------------------------------------------
@@ -781,7 +866,8 @@
     const sp=Math.min(6,e.sp||0)*JUICE.stretch;                                    // in-flight stretch
     const br=(!moving&&JUICE.breathe)?JUICE.breathe*Math.sin(tNow*6.283/JUICE.breathePeriod+((d&&d.id)||0)*1.7):0;
     const ax=sqAxisH?1:-1, def=sp*.5-JUICE.squash*sqA;                             // stretch while fast, squash on stop
-    const rx=rad*(1+br)*(1+ax*def), ry=rad*(1+br)*(1-ax*def*.7);
+    let rx=rad*(1+br)*(1+ax*def), ry=rad*(1+br)*(1-ax*def*.7);
+    if(d&&!d.locked&&doorCellG&&(d.r+','+d.c)===doorCellG&&doorAnim<.5){ rx*=.76; ry*=1.07; }   // squeezed in the shut door
     if(d&&d.locked){ ctx.fillStyle=C.dark; ctx.beginPath(); ctx.arc(cx,cy,rad*.6,0,7); ctx.fill();
       ctx.strokeStyle=INK; ctx.lineWidth=2; ctx.stroke(); return; }
     const halo=ctx.createRadialGradient(cx,cy,rad*.4,cx,cy,rad*1.9);
@@ -805,21 +891,26 @@
       if(e.sc===undefined)e.sc=1; if(e.sc<1&&performance.now()-spawnT0>(e.sdelay||0)) e.sc+=(1-e.sc)*.22;
       const ox0=e.px,oy0=e.py; let tx=cellX(d.c),ty=cellY(d.r);
       if(e.wp&&e.wp.length){ tx=e.wp[0].x; ty=e.wp[0].y;
-        if(Math.abs(tx-e.px)<3&&Math.abs(ty-e.py)<3){ e.wp.shift(); if(!e.wp.length){ tx=cellX(d.c); ty=cellY(d.r); } } }
+        if(e.wp[0].j){ rings.push({x:e.px,y:e.py,ci:d.color,life:1}); rings.push({x:tx,y:ty,ci:d.color,life:1});
+          SND.warp&&SND.warp(); e.px=tx; e.py=ty; e.wp.shift();
+          if(!e.wp.length){ tx=cellX(d.c); ty=cellY(d.r); } }
+        else if(Math.abs(tx-e.px)<3&&Math.abs(ty-e.py)<3){ e.wp.shift(); if(!e.wp.length){ tx=cellX(d.c); ty=cellY(d.r); } } }
       if(!frz){ e.px+=(tx-e.px)*.34; e.py+=(ty-e.py)*.34; } e.rr+=(e.tr-e.rr)*.3; e.pop*=.86;
       e.sp=Math.hypot(e.px-ox0,e.py-oy0);
       if(e.sp>1.4&&JUICE.trail>0){ trails.push({x:e.px,y:e.py,r:e.rr*.72,ci:d.color,life:1});
         if(trails.length>300)trails=trails.slice(-300); }
       mx=Math.max(mx,Math.abs(tx-e.px),Math.abs(ty-e.py)); }
     for(const g of ghosts){ if(frz) break;
-      if(g.wp&&g.wp.length){ const t=g.wp[0]; g.px+=(t.x-g.px)*.34; g.py+=(t.y-g.py)*.34;
-        if(Math.abs(t.x-g.px)<3&&Math.abs(t.y-g.py)<3){ g.wp.shift();
-          if(!g.wp.length&&g.onEnd){ g.onEnd(); g.onEnd=null; } } }
+      if(g.wp&&g.wp.length){ const t=g.wp[0];
+        if(t.j){ g.px=t.x; g.py=t.y; g.wp.shift(); if(!g.wp.length&&g.onEnd){ g.onEnd(); g.onEnd=null; } }
+        else { g.px+=(t.x-g.px)*.34; g.py+=(t.y-g.py)*.34;
+          if(Math.abs(t.x-g.px)<3&&Math.abs(t.y-g.py)<3){ g.wp.shift();
+            if(!g.wp.length&&g.onEnd){ g.onEnd(); g.onEnd=null; } } } }
       else { if(g.tx!==undefined){ g.px+=(g.tx-g.px)*.4; g.py+=(g.ty-g.py)*.4; } g.life-=.06; } }
     ghosts=ghosts.filter(g=>g.life>0);
-    if(moving && mx<0.6 && !ghosts.length){ moving=false; sqA=1; SND.land(); }
+    if(moving && mx<0.6 && !ghosts.length){ moving=false; sqA=1; SND.land(); if(pendSquish){ SND.squish&&SND.squish(); pendSquish=false; } }
     sqA*=.85;
-    if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k))?1:0; doorAnim+=(o-doorAnim)*.18; }
+    if(doorCellG){ const o=platesG.some(k=>state.drops.some(d=>d.r+','+d.c===k))?1:0; doorAnim+=(o-doorAnim)*(o?.18:.55); }
     for(const t of trails) t.life-=JUICE.trailFade; trails=trails.filter(t=>t.life>0);
     for(const rg of rings) rg.life-=.045; rings=rings.filter(r=>r.life>0);
     for(const p of parts){ p.vy+=.10; p.x+=p.vx; p.y+=p.vy; p.life-=.03; } parts=parts.filter(p=>p.life>0);
@@ -886,6 +977,13 @@
           ctx.strokeStyle='#a8c96a'; ctx.lineWidth=Math.max(2,S*.045); rr(x+S*.16,y+S*.16,S*.68,S*.68,S*.24); ctx.stroke();
           ctx.fillStyle='rgba(168,201,106,.6)';
           [[-.13,-.09],[.12,.01],[-.03,.14]].forEach(o2=>{ ctx.beginPath(); ctx.arc(cx+o2[0]*S,cy+o2[1]*S,S*.05,0,7); ctx.fill(); }); }
+        if(portalG.includes(r+','+c)){ const cx=x+S/2,cy=y+S/2;
+          ctx.fillStyle='#101622'; ctx.beginPath(); ctx.arc(cx,cy,S*.30,0,7); ctx.fill();
+          ctx.strokeStyle='#5ec6d8'; ctx.lineWidth=Math.max(2.4,S*.055);
+          ctx.beginPath(); ctx.arc(cx,cy,S*.30,0,7); ctx.stroke();
+          ctx.save(); ctx.translate(cx,cy); ctx.rotate(tNow*1.8);
+          ctx.strokeStyle='rgba(94,198,216,.75)'; ctx.lineWidth=Math.max(1.8,S*.04); ctx.setLineDash([S*.12,S*.10]);
+          ctx.beginPath(); ctx.arc(0,0,S*.19,0,7); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); }
         if(platesG.includes(r+','+c)){ const lit=state.drops.some(d=>d.r===r&&d.c===c);
           ctx.fillStyle=lit?'rgba(255,210,122,.22)':'rgba(120,112,150,.14)'; ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.fill();
           ctx.strokeStyle=lit?'#ffd27a':'#6f6890'; ctx.lineWidth=Math.max(2,S*.05); ctx.beginPath(); ctx.arc(x+S/2,y+S/2,S*.27,0,7); ctx.stroke();
@@ -913,6 +1011,8 @@
     state.drops.filter(d=>!d.locked).forEach(d=>{ const e=renderById[d.id]; if(e) drawBlob(e,d); });
     for(const p of parts){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color;
       ctx.beginPath(); ctx.arc(p.x,p.y,p.size*p.life+1,0,7); ctx.fill(); } ctx.globalAlpha=1;
+    if(boardFade<.995){ boardFade+=(1-boardFade)*.12; ctx.globalAlpha=1-boardFade;
+      ctx.fillStyle='#151220'; rr(ox-TRAY-3,oy-TRAY-3,gw*S+2*TRAY+6,gh*S+2*TRAY+6,24); ctx.fill(); ctx.globalAlpha=1; }
     ctx.restore();
     requestAnimationFrame(frame);
   }
@@ -924,8 +1024,8 @@
       if(d){ m=Math.max(m,Math.abs(renderById[id].px-cellX(d.c)),Math.abs(renderById[id].py-cellY(d.r))); } } return m; } };
   { let hsh=2166136261; const str=JSON.stringify(LEVELS.map(l=>[l.map,l.risk||0,l.hint||''])); 
     for(let i=0;i<str.length;i++){ hsh^=str.charCodeAt(i); hsh=Math.imul(hsh,16777619); }
-    document.getElementById('buildid').textContent='build '+(hsh>>>0).toString(36); }
-  let start0=0; while(start0<LEVELS.length-1&&prog.best[start0]!==undefined) start0++;
+    const be=document.getElementById('buildid'); if(DEBUG) be.textContent='build '+(hsh>>>0).toString(36); else be.style.display='none'; }
+  let start0=0; while(start0<LEVELS.length-1&&prog.best[lvKey(start0)]!==undefined) start0++;
   loadLevel(start0); requestAnimationFrame(frame);
 })();
 </script>
