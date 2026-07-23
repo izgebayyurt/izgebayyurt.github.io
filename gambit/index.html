@@ -17,6 +17,7 @@
   --shadow:rgba(44,39,51,.9);
   --sq-l:#fbf5e6; --sq-d:#ecd9b3;
   --red:#ef4a5a; --blue:#3d8bdf; --green:#57c268; --purple:#9b62d6; --amber:#f0a92c; --gold:#ffd15c;
+  --king:#e8590c;  /* deep orange — kept well apart from the star gold */
   --font-d:"Fredoka", system-ui, sans-serif;
   --font-u:"Nunito", system-ui, sans-serif;
   --pop:cubic-bezier(.34,1.7,.6,1); --calm:cubic-bezier(.4,0,.2,1);
@@ -46,6 +47,9 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .mk:disabled{ opacity:.4; cursor:default; }
 .mk:disabled:active{ transform:none; box-shadow:0 3px 0 var(--shadow); }
 .icobtn{ width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:20px; padding:0; flex:none; }
+#b-music{ font-size:22px; position:relative; }
+#b-music.off{ color:rgba(44,39,51,.38); }
+#b-music.off::after{ content:''; position:absolute; left:9px; right:9px; top:50%; height:2.5px; margin-top:-1px; background:var(--red); border-radius:2px; transform:rotate(-22deg); }
 
 /* ---- top bar ---- */
 .gtop{ display:flex; align-items:center; gap:11px; }
@@ -113,7 +117,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .piece.pulse .chip{ animation:bob .7s ease-in-out infinite; }
 @keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9%) } }
 .chip.N{ background:var(--red); } .chip.R{ background:var(--blue); }
-.chip.B{ background:var(--green); } .chip.Q{ background:var(--purple); } .chip.K{ background:var(--amber); }
+.chip.B{ background:var(--green); } .chip.Q{ background:var(--purple); } .chip.K{ background:var(--king); }
 /* enemy blocker: a solid black pawn on a pale stone token — the opposing side */
 .chip.enemy{ background:#cfc8ba; border-color:var(--line); }
 .chip.enemy .g{ color:#14121a; text-shadow:0 1.5px 0 rgba(255,255,255,.45); }
@@ -133,6 +137,37 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   box-shadow:0 1px 2px rgba(0,0,0,.35); }
 .wall.v{ width:7px; margin-left:-3.5px; }
 .wall.h{ height:7px; margin-top:-3.5px; }
+/* ice: frictionless tile — a frosty square with a snowflake */
+.cell.ice{ background:#d3ecf4 !important; }
+.tok.ice{ z-index:0; }
+.ice .frost{ width:92%; height:92%; border-radius:16%; background:linear-gradient(150deg,#e7f6fb,#bfe4ef);
+  border:2.5px solid var(--line); box-shadow:0 3px 0 var(--shadow), inset 0 2px 4px rgba(255,255,255,.7);
+  display:flex; align-items:center; justify-content:center; }
+.ice .frost svg{ width:62%; height:62%; }
+/* gate: a locked barrier that opens when its switch star is collected */
+.tok.gate{ z-index:2; }
+.gatetile{ width:90%; height:90%; border-radius:20%; background:var(--gc); border:2.5px solid var(--line);
+  box-shadow:0 3px 0 var(--shadow); display:flex; align-items:center; justify-content:center;
+  transition:opacity .35s var(--calm), transform .35s var(--calm); }
+.gatetile svg{ width:62%; height:62%; }
+.gate.open .gatetile{ opacity:0; transform:scale(.4) rotate(-12deg); }
+/* transformer: a ghost of the target piece — land to become it */
+.tok.xform{ z-index:2; }
+.xtile{ width:80%; height:80%; border-radius:32%; border:3px dashed var(--xc); position:relative;
+  background:rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center;
+  animation:xbob 2.4s ease-in-out infinite; }
+.xtile .xg{ font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols2",serif; font-size:min(7.5vw,36px);
+  line-height:1; color:var(--xc); text-shadow:0 1px 0 rgba(255,255,255,.7), 0 0 3px rgba(255,255,255,.8); }
+.xtile .xarr{ position:absolute; right:2%; bottom:2%; width:40%; height:40%; background:var(--card);
+  border:2.5px solid var(--line); border-radius:50%; box-shadow:0 2px 0 var(--shadow);
+  display:flex; align-items:center; justify-content:center; }
+.xtile .xarr svg{ width:72%; height:72%; }
+@keyframes xbob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-6%) } }
+/* switch star — a coloured ring links it to its matching-colour gate */
+.swring{ position:absolute; left:50%; top:50%; width:82%; height:82%; transform:translate(-50%,-50%);
+  border-radius:50%; border:3.5px solid var(--sc); box-shadow:0 0 0 1.5px rgba(44,39,51,.25);
+  animation:swpulse 1.8s ease-in-out infinite; }
+@keyframes swpulse{ 0%,100%{ transform:translate(-50%,-50%) scale(1); opacity:.9 } 50%{ transform:translate(-50%,-50%) scale(1.06); opacity:1 } }
 
 /* ---- teach line ---- */
 .teach{ display:none; text-align:center; font-family:var(--font-d); font-weight:600;
@@ -168,18 +203,43 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
 .menu-head{ display:flex; align-items:center; gap:11px; margin-bottom:16px; }
 .logo{ position:relative; width:40px; height:38px; flex:none; }
 .logo i{ position:absolute; width:17px; height:17px; border:2.5px solid var(--line); box-shadow:0 2px 0 var(--shadow); }
-.logo i:nth-child(1){ left:0; top:3px; background:var(--red); border-radius:40% 55% 50% 48%; transform:rotate(-6deg); }
-.logo i:nth-child(2){ right:0; top:0; background:var(--blue); border-radius:52% 45% 50% 55%; transform:rotate(5deg); }
-.logo i:nth-child(3){ left:12px; bottom:0; background:var(--green); border-radius:50%; }
+.logo i:nth-child(1){ left:0; top:3px; background:var(--red); border-radius:40% 55% 50% 48%; --rot:-6deg; animation:logofloat 3s ease-in-out infinite; }
+.logo i:nth-child(2){ right:0; top:0; background:var(--blue); border-radius:52% 45% 50% 55%; --rot:5deg; animation:logofloat 3.4s ease-in-out infinite .25s; }
+.logo i:nth-child(3){ left:12px; bottom:0; background:var(--green); border-radius:50%; --rot:0deg; animation:logofloat 2.7s ease-in-out infinite .45s; }
+@keyframes logofloat{ 0%,100%{ transform:translateY(0) rotate(var(--rot)); } 50%{ transform:translateY(-3px) rotate(calc(var(--rot) + 7deg)); } }
 .menu-head h2{ font-size:28px; flex:1; }
 .x{ background:none; border:none; color:var(--ink); font-size:26px; cursor:pointer; line-height:1; padding:4px; font-family:var(--font-d); }
 .seg{ display:flex; gap:7px; margin-bottom:15px; }
 .seg .mk{ flex:1; height:44px; display:flex; align-items:center; justify-content:center; font-size:15px; }
 .seg .mk.on{ background:var(--gold); }
-#campaign-view{ max-height:46vh; overflow-y:auto; margin:0 -4px; padding:2px 4px; }
+.lvlscroll{ max-height:42vh; overflow-y:auto; margin:0 -4px; padding:2px 4px; }
 .lvlgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+/* menu progress */
+.progress-row{ display:flex; align-items:center; gap:10px; margin:2px 0 12px; }
+.pbar{ flex:1; height:12px; background:var(--paper); border:2.5px solid var(--line); border-radius:999px; overflow:hidden; box-shadow:0 2px 0 var(--shadow); }
+.pfill{ height:100%; width:0; background:var(--gold); border-right:2px solid var(--line); transition:width .5s var(--pop); }
+.ptext{ font-family:var(--font-d); font-weight:600; font-size:12.5px; color:var(--ink); white-space:nowrap; }
+.ptext .g{ color:#f0a92c; }
+/* chapter dividers */
+.chapter{ grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:6px 2px 0;
+  font-family:var(--font-d); font-weight:700; font-size:13px; letter-spacing:.06em; color:var(--ink-soft); text-transform:uppercase; }
+.chapter::before,.chapter::after{ content:''; height:2.5px; background:rgba(44,39,51,.14); border-radius:2px; }
+.chapter::before{ width:12px; } .chapter::after{ flex:1; }
+.chapter:first-child{ margin-top:0; }
+/* mechanic badges on level cards */
+.lvlcard{ overflow:hidden; }
+.badges{ position:absolute; top:5px; right:6px; display:flex; gap:3px; }
+.badge{ width:8px; height:8px; border-radius:50%; border:1.5px solid var(--line); box-sizing:border-box; }
+.badge.w{ border-radius:2px; background:var(--ink); }
+.badge.p{ background:#22b8cf; }
+.badge.k{ background:#e05a9c; }
+.badge.e{ background:#1c1a22; }
+.badge.ice{ background:#7fd3e6; }
+.badge.gate{ background:#b08442; border-radius:2px; }
+.badge.xf{ background:#12b886; }
 .lvlcard{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
   border-width:3px; position:relative; }
+#confetti{ position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:30; }
 .lvlcard .n{ font-family:var(--font-d); font-weight:700; font-size:22px; line-height:1; }
 .lvlcard .rs{ display:flex; gap:2px; height:11px; }
 .lvlcard .rs svg{ width:11px; height:11px; }
@@ -204,6 +264,7 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   <div class="gtop">
     <button class="mk icobtn" id="b-menu" aria-label="Levels">☰</button>
     <button class="mk icobtn" id="b-mute" aria-label="Sound">🔊</button>
+    <button class="mk icobtn" id="b-music" aria-label="Music">♫</button>
     <div class="ginfo">
       <div class="glevel" id="glevel">Level 1</div>
       <div class="pips" id="pips"></div>
@@ -227,6 +288,8 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
   </div>
 </div>
 
+<canvas id="confetti"></canvas>
+
 <!-- win / lose -->
 <div class="scrim" id="endscrim">
   <div class="card">
@@ -249,7 +312,13 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <button class="mk on" id="seg-campaign">Levels</button>
       <button class="mk" id="seg-endless">Endless</button>
     </div>
-    <div id="campaign-view"><div class="lvlgrid" id="lvlgrid"></div></div>
+    <div id="campaign-view">
+      <div class="progress-row">
+        <div class="pbar"><div class="pfill" id="pfill"></div></div>
+        <div class="ptext" id="ptext"></div>
+      </div>
+      <div class="lvlscroll" id="lvlscroll"><div class="lvlgrid" id="lvlgrid"></div></div>
+    </div>
     <div id="endless-view" style="display:none">
       <div class="diffrow" id="diffrow">
         <button class="mk on" data-d="easy">Small</button>
@@ -262,9 +331,10 @@ h1,h2,h3{ font-family:var(--font-d); font-weight:700; margin:0; }
       <b>Land a piece on every star.</b> Drag it there — pieces move by chess rules:
       <b style="color:var(--red)">♞</b> L-leap · <b style="color:var(--blue)">♜</b> straight ·
       <b style="color:var(--green)">♝</b> diagonal · <b style="color:var(--purple)">♛</b> both ·
-      <b style="color:var(--amber)">♚</b> one step. No jumping over pieces.<br>
+      <b style="color:var(--king)">♚</b> one step. No jumping over pieces.<br>
       <b style="color:#1c1a22">♟</b> Black pawns stop sliders — <b>capture</b> one by landing on it.<br>
-      <b>Walls</b> block sliders (knights leap over) · step on a <b style="color:#22b8cf">portal</b> to pop out its twin · a <b style="color:var(--red)">coloured star</b> needs its matching piece.
+      <b>Walls</b> block sliders (knights leap over) · step on a <b style="color:#22b8cf">portal</b> to pop out its twin · a <b style="color:var(--red)">coloured star</b> needs its matching piece.<br>
+      <b style="color:#4aa8c0">Ice</b> — sliders can’t stop on it · a <b>ringed switch</b> star opens its matching gate · a <b>dashed</b> tile transforms your piece.
     </div>
     <div class="credit"><a href="../index.html">by İzge Bayyurt</a></div>
   </div>
@@ -312,10 +382,76 @@ const Sfx = (function(){
     collect(n){ init(); const f=PENT[Math.min(n-1,PENT.length-1)]||PENT[0]; tone(f,0.34,'sine',0.22); tone(f*2,0.16,'sine',0.07,0.01); },
     capture(){ init(); noise(0.13,0.22,1700); tone(120,0.17,'square',0.13,0,66); },
     warp(){ init(); tone(420,0.18,'sine',0.14,0,880); tone(660,0.16,'sine',0.10,0.05,1320); },
+    transform(){ init(); tone(330,0.16,'triangle',0.13,0,660); tone(495,0.18,'sine',0.10,0.08,990); },
+    gate(){ init(); tone(180,0.28,'sawtooth',0.12,0,300); tone(90,0.3,'square',0.08); },
     win(){ init(); [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.5,'triangle',0.2,i*0.085)); tone(1568,0.4,'sine',0.07,0.38); },
     lose(){ init(); tone(300,0.5,'sawtooth',0.14,0,110); },
     tap(){ init(); tone(640,0.045,'sine',0.05); },
   };
+})();
+
+/* ---------- ambient music (soft generated pad loop) ---------- */
+const Music = (function(){
+  let ctx=null, master=null, playing=false, timer=null, step=0;
+  let muted = localStorage.getItem('gambit.music')==='0';   // default on
+  const BASE=196; // G3
+  const CHORDS=[[0,3,7,10],[-2,0,5,8],[-4,0,3,7],[-5,-1,2,7]]; // gentle i-VI-IV-v-ish
+  const f=s=>BASE*Math.pow(2,s/12);
+  function init(){ if(ctx) return; try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=muted?0:0.14; master.connect(ctx.destination);}catch(e){} }
+  function pad(freqs,dur){
+    if(!ctx) return; const t=ctx.currentTime;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(1,t+2); g.gain.setValueAtTime(1,t+dur-2.5); g.gain.linearRampToValueAtTime(0,t+dur);
+    const filt=ctx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=650;
+    const lfo=ctx.createOscillator(), lg=ctx.createGain(); lfo.frequency.value=0.06; lg.gain.value=280; lfo.connect(lg); lg.connect(filt.frequency); lfo.start(t); lfo.stop(t+dur);
+    g.connect(filt); filt.connect(master);
+    for(const fr of freqs){ const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=fr;
+      const o2=ctx.createOscillator(); o2.type='triangle'; o2.frequency.value=fr*1.004;
+      const og=ctx.createGain(); og.gain.value=0.3; o.connect(og); o2.connect(og); og.connect(g);
+      o.start(t); o.stop(t+dur); o2.start(t); o2.stop(t+dur); }
+  }
+  function loop(){ if(!playing) return; const ch=CHORDS[step%CHORDS.length];
+    const freqs=ch.map(f); freqs.push(f(ch[0]-12)); pad(freqs,9); step++; timer=setTimeout(loop,8000); }
+  return {
+    isMuted(){ return muted; },
+    start(){ init(); if(ctx&&ctx.state==='suspended') ctx.resume(); if(playing||muted) return; playing=true; loop(); },
+    stop(){ playing=false; if(timer){ clearTimeout(timer); timer=null; } },
+    setMuted(m){ muted=m; try{localStorage.setItem('gambit.music',m?'0':'1');}catch(e){} if(master) master.gain.value=m?0:0.14; if(m) this.stop(); else this.start(); },
+    resume(){ if(ctx&&ctx.state==='suspended') ctx.resume(); if(!muted&&!playing) this.start(); },
+  };
+})();
+
+/* ---------- confetti burst (win juice) ---------- */
+const Confetti = (function(){
+  const cv = document.getElementById('confetti'); const cx = cv.getContext('2d');
+  let parts = [], raf = 0, DPR = 1;
+  const COLORS = ['#ef4a5a','#3d8bdf','#57c268','#9b62d6','#f0a92c','#ffd15c','#22b8cf'];
+  function resize(){ DPR = Math.min(window.devicePixelRatio||1, 2); cv.width = innerWidth*DPR; cv.height = innerHeight*DPR; }
+  function burst(n){
+    resize();
+    const cxp = innerWidth/2, cyp = innerHeight*0.42;
+    for (let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2, sp = 4 + Math.random()*9;
+      parts.push({ x:cxp*DPR, y:cyp*DPR, vx:Math.cos(a)*sp*DPR, vy:(Math.sin(a)*sp - 6)*DPR,
+        w:(6+Math.random()*6)*DPR, h:(9+Math.random()*7)*DPR, rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*0.4,
+        col:COLORS[(Math.random()*COLORS.length)|0], life:1 });
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+  function tick(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    let alive = 0;
+    for (const p of parts){
+      if (p.life<=0) continue; alive++;
+      p.vy += 0.35*DPR; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= 0.011;
+      cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot); cx.globalAlpha = Math.max(0,Math.min(1,p.life*1.4));
+      cx.fillStyle = p.col; cx.strokeStyle = '#2c2733'; cx.lineWidth = 1.5*DPR;
+      cx.fillRect(-p.w/2,-p.h/2,p.w,p.h); cx.strokeRect(-p.w/2,-p.h/2,p.w,p.h);
+      cx.restore();
+    }
+    if (alive>0) raf = requestAnimationFrame(tick);
+    else { cx.clearRect(0,0,cv.width,cv.height); parts=[]; raf=0; }
+  }
+  return { burst };
 })();
 
 /* ══════════════════════════════════════════════════════════════════
@@ -334,28 +470,32 @@ const PNAME = { N:'knight', R:'rook', B:'bishop', Q:'queen', K:'king' };
 
 const EMPTY_SET = new Set(), EMPTY_MAP = new Map();
 function edgeKey(a,b){ return a<b ? a*10000+b : b*10000+a; }
-// Build fast lookups from a level's walls/portals.
+// Build fast lookups from a level's walls / portals / ice / gates / transformers.
 function features(def, cols){
   const wallEdges = new Set();
   for (const w of (def.walls||[])) wallEdges.add(edgeKey(w[0]*cols+w[1], w[2]*cols+w[3]));
   const portals = new Map();
   for (const p of (def.portals||[])){ const a=p[0]*cols+p[1], b=p[2]*cols+p[3]; portals.set(a,b); portals.set(b,a); }
-  return { wallEdges, portals };
+  const ice = new Set((def.ice||[]).map(c=>c[0]*cols+c[1]));
+  const gates = (def.gates||[]).map(g=>({pos:g[0]*cols+g[1], sw:g[2]*cols+g[3]}));
+  const transformers = new Map((def.transformers||[]).map(t=>[t[0]*cols+t[1], t[2]]));
+  return { wallEdges, portals, ice, gates, transformers };
 }
 
-// feat: { enemies:Set(pos), wallEdges:Set, portals:Map(pos->twin), blockers:Set(pos) }.
+// feat: { enemies, wallEdges, portals, blockers, ice, closedGates }.
 // Returns [{r,c,land:{r,c}}] — land is the final square (a portal's twin when you
-// step onto a portal). Knights leap walls; king/sliders are blocked by them.
+// step onto one). Knights leap walls; sliders can't stop on ice; closed gates block.
 function legalMoves(pieces, idx, cols, rows, feat) {
   feat = feat || {};
   const enemies = feat.enemies || EMPTY_SET, wallEdges = feat.wallEdges || EMPTY_SET,
-        portals = feat.portals || EMPTY_MAP, blockers = feat.blockers || EMPTY_SET;
+        portals = feat.portals || EMPTY_MAP, blockers = feat.blockers || EMPTY_SET,
+        ice = feat.ice || EMPTY_SET, closedGates = feat.closedGates || EMPTY_SET;
   const p = pieces[idx];
   const own = new Set();
   for (let i = 0; i < pieces.length; i++) if (i !== idx) own.add(pieces[i].r * cols + pieces[i].c);
   const inside = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
-  const blocked = pos => own.has(pos) || blockers.has(pos);
-  const twinFree = tw => !own.has(tw) && !enemies.has(tw) && !blockers.has(tw);
+  const blocked = pos => own.has(pos) || blockers.has(pos) || closedGates.has(pos);
+  const twinFree = tw => !blocked(tw) && !enemies.has(tw) && !ice.has(tw);
   const out = [];
   const enter = (r,c)=>{ const pos=r*cols+c;
     if (portals.has(pos)){ const tw=portals.get(pos); if (twinFree(tw)) out.push({r,c,land:{r:Math.floor(tw/cols),c:tw%cols}}); }
@@ -366,7 +506,7 @@ function legalMoves(pieces, idx, cols, rows, feat) {
       const r = p.r + dr, c = p.c + dc; if (!inside(r,c)) continue;
       const pos = r*cols+c;
       if (p.type==='K' && wallEdges.has(edgeKey(ppos,pos))) continue;
-      if (blocked(pos)) continue;
+      if (blocked(pos) || ice.has(pos)) continue;
       if (enemies.has(pos)){ out.push({r,c,land:{r,c}}); continue; }
       enter(r,c);
     }
@@ -379,7 +519,8 @@ function legalMoves(pieces, idx, cols, rows, feat) {
         if (wallEdges.has(edgeKey(prev,pos))) break;
         if (blocked(pos)) break;
         if (enemies.has(pos)){ out.push({r,c,land:{r,c}}); break; }
-        if (portals.has(pos)){ const tw=portals.get(pos); if (twinFree(tw)) out.push({r,c,land:{r:Math.floor(tw/cols),c:tw%cols}}); }
+        if (ice.has(pos)){ /* frictionless — pass through, can't stop */ }
+        else if (portals.has(pos)){ const tw=portals.get(pos); if (twinFree(tw)) out.push({r,c,land:{r:Math.floor(tw/cols),c:tw%cols}}); }
         else out.push({r,c,land:{r,c}});
         pr=r; pc=c; r += dr; c += dc;
       }
@@ -395,8 +536,7 @@ function popcount(x){ let n = 0; while (x){ x &= x - 1; n++; } return n; }
 function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap, def) {
   nodeCap = nodeCap || 2500000;
   enemies0 = enemies0 || [];
-  const feat0 = features(def||{}, cols);
-  const wallEdges = feat0.wallEdges, portals = feat0.portals;
+  const F = features(def||{}, cols);
   const blockers = new Set(((def&&def.blockers)||[]).map(b=>b[0]*cols+b[1]));
   const starAt = new Map(); stars.forEach((s,i)=> starAt.set(s.r*cols+s.c, {i, key:s.key||null}));
   const enemyBit = new Map(); enemies0.forEach((e,i)=> enemyBit.set(e.r*cols+e.c, i));
@@ -404,7 +544,8 @@ function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap, def) {
   for (const p of pieces0){ const st=starAt.get(p.r*cols+p.c); if (st && (st.key==null||st.key===p.type)) mask0|=(1<<st.i); }
   const eAll = (1 << enemies0.length) - 1;
   const enemySetOf = (em) => { const s = new Set(); for (let i=0;i<enemies0.length;i++) if (em & (1<<i)) s.add(enemies0[i].r*cols+enemies0[i].c); return s; };
-  const key = (pcs, sm, em) => { let s = sm + '|' + em + '|'; for (const p of pcs) s += (p.r * cols + p.c) + ','; return s; };
+  const closedGatesOf = (sm) => { const s=new Set(); for(const gt of F.gates){ const st=starAt.get(gt.sw); if(!(st && (sm&(1<<st.i)))) s.add(gt.pos); } return s; };
+  const key = (pcs, sm, em) => { let s = sm + '|' + em + '|'; for (const p of pcs) s += (p.r * cols + p.c) + p.type + ','; return s; };
   let nodes = 0;
   let bound = stars.length - popcount(mask0);
 
@@ -428,13 +569,14 @@ function solve(pieces0, stars, enemies0, cols, rows, limit, nodeCap, def) {
     const prev = seen.get(k);
     if (prev !== undefined && prev <= g) return Infinity;
     seen.set(k, g);
-    const feat = { enemies: enemySetOf(em), wallEdges, portals, blockers };
+    const feat = { enemies: enemySetOf(em), wallEdges:F.wallEdges, portals:F.portals, blockers, ice:F.ice, closedGates:closedGatesOf(sm) };
     let min = Infinity;
     for (let i = 0; i < pcs.length; i++) {
       for (const mv of legalMoves(pcs, i, cols, rows, feat)) {
         const land = mv.land, lpos = land.r*cols+land.c;
         const np = pcs.slice();
-        np[i] = { type: pcs[i].type, r: land.r, c: land.c };
+        let nt = pcs[i].type; if (F.transformers.has(lpos)) nt = F.transformers.get(lpos);
+        np[i] = { type: nt, r: land.r, c: land.c };
         let nsm = sm; const st = starAt.get(lpos); if (st && (st.key==null||st.key===pcs[i].type)) nsm |= (1 << st.i);
         let nem = em; const eb = enemyBit.get(mv.r*cols+mv.c); if (eb !== undefined) nem &= ~(1 << eb);
         path.push({ piece: i, r: mv.r, c: mv.c });
@@ -750,8 +892,25 @@ const CAMPAIGN = [
   { cols:6, rows:6, limit:13, optimal:11, tier:'xhard',
     pieces:[{type:'B',r:2,c:5},{type:'N',r:1,c:5},{type:'N',r:2,c:4}], enemies:[{type:'P',r:3,c:4},{type:'P',r:1,c:4}],
     stars:[{r:2,c:3},{r:0,c:2},{r:2,c:0},{r:5,c:1},{r:3,c:0,key:'B'},{r:5,c:4}] },
+
+  { cols:5, rows:5, limit:7, optimal:5, tier:'hard',
+    pieces:[{type:'R',r:2,c:2}], enemies:[],
+    stars:[{r:0,c:2},{r:4,c:2},{r:2,c:0},{r:2,c:4}], ice:[[1,2],[3,2],[2,1],[2,3]] },
+  { cols:5, rows:5, limit:7, optimal:5, tier:'hard',
+    pieces:[{type:'R',r:0,c:0},{type:'N',r:4,c:4}], enemies:[],
+    stars:[{r:0,c:4},{r:4,c:0},{r:2,c:2},{r:0,c:2}], ice:[[0,1],[0,3],[2,0]] },
+  { cols:5, rows:5, limit:6, optimal:4, tier:'hard',
+    pieces:[{type:'R',r:0,c:0}], enemies:[],
+    stars:[{r:0,c:4},{r:4,c:2},{r:0,c:2},{r:4,c:4}], walls:[[2,0,3,0],[2,1,3,1],[2,3,3,3],[2,4,3,4]], gates:[[3,2,0,4]] },
+  { cols:5, rows:5, limit:8, optimal:6, tier:'hard',
+    pieces:[{type:'R',r:0,c:0}], enemies:[],
+    stars:[{r:2,c:2},{r:0,c:4},{r:4,c:0},{r:4,c:4}], walls:[[2,2,1,2],[2,2,3,2],[2,2,2,1],[2,2,2,3]], transformers:[[0,2,'N']] },
+  { cols:6, rows:6, limit:9, optimal:7, tier:'xhard',
+    pieces:[{type:'R',r:0,c:0},{type:'N',r:5,c:5}], enemies:[],
+    stars:[{r:0,c:5},{r:5,c:0},{r:3,c:3},{r:2,c:2}], portals:[[5,1,1,4]], ice:[[0,2],[0,3]] },
 ];
 const FIRST_ENEMY_LEVEL = 30, FIRST_WALL_LEVEL = 15, FIRST_PORTAL_LEVEL = 24, FIRST_KEYED_LEVEL = 33;
+const FIRST_ICE_LEVEL = 100, FIRST_GATE_LEVEL = 102, FIRST_XFORM_LEVEL = 103;
 
 /* ---------- persistent progress ---------- */
 const SAVE_KEY = 'gambit.v1';
@@ -768,11 +927,43 @@ function starSVG(fill, stroke){
   return '<svg viewBox="0 0 100 100"><path d="'+STAR_PATH+'" fill="'+fill+'" stroke="'+(stroke||'#2c2733')+
     '" stroke-width="7" stroke-linejoin="round"/></svg>';
 }
+const INK = '#2c2733';
+// ink-outlined white snowflake (six arms + branch ticks)
+const SNOW_ARMS = 'M50 14 L50 86 M20 32 L80 68 M80 32 L20 68';
+const SNOW_TICKS = 'M50 26 l-9 -9 M50 26 l9 -9 M50 74 l-9 9 M50 74 l9 9'
+  + ' M31 25 l1 13 M31 25 l-12 3 M69 75 l-1 -13 M69 75 l12 -3'
+  + ' M69 25 l-1 13 M69 25 l12 3 M31 75 l1 -13 M31 75 l-12 -3';
+function snowSVG(){
+  return '<svg viewBox="0 0 100 100"><g fill="none" stroke-linecap="round">'
+    + '<path d="'+SNOW_ARMS+'" stroke="'+INK+'" stroke-width="12"/>'
+    + '<path d="'+SNOW_TICKS+'" stroke="'+INK+'" stroke-width="10"/>'
+    + '<path d="'+SNOW_ARMS+'" stroke="#eaf7fb" stroke-width="6"/>'
+    + '<path d="'+SNOW_TICKS+'" stroke="#eaf7fb" stroke-width="5"/></g></svg>';
+}
+function lockSVG(col){
+  return '<svg viewBox="0 0 100 100">'
+    + '<path d="M33 50 v-11 a17 17 0 0 1 34 0 v11" fill="none" stroke="'+INK+'" stroke-width="10" stroke-linecap="round"/>'
+    + '<rect x="24" y="46" width="52" height="40" rx="10" fill="'+col+'" stroke="'+INK+'" stroke-width="6"/>'
+    + '<circle cx="50" cy="63" r="6.5" fill="'+INK+'"/><rect x="46.5" y="63" width="7" height="14" rx="3" fill="'+INK+'"/></svg>';
+}
+function keySVG(col){
+  return '<svg viewBox="0 0 100 100"><g stroke="'+INK+'" stroke-width="9" stroke-linecap="round">'
+    + '<circle cx="33" cy="33" r="15" fill="'+col+'"/><line x1="44" y1="44" x2="84" y2="84"/>'
+    + '<line x1="70" y1="72" x2="80" y2="62"/><line x1="80" y1="82" x2="90" y2="72"/></g></svg>';
+}
+// two curved arrows (transform)
+function swirlSVG(col){
+  return '<svg viewBox="0 0 100 100" fill="none" stroke="'+col+'" stroke-width="9" stroke-linecap="round">'
+    + '<path d="M78 40 A30 30 0 1 0 82 60"/><path d="M78 22 L80 42 L60 40"/></svg>';
+}
+const GATE_COLORS = ['#5f7088','#9a5bb0','#2f9e8e','#b3823a']; // steel / plum / teal — distinct from star gold
+function gateColorOf(pos){ const i=G.gates.findIndex(g=>g.pos===pos); return GATE_COLORS[(i<0?0:i)%GATE_COLORS.length]; }
+function switchColorOf(pos){ const i=G.gates.findIndex(g=>g.sw===pos); return i<0?null:GATE_COLORS[i%GATE_COLORS.length]; }
 
 /* ---------- game state ---------- */
 let G = null, uid = 1;
 
-const PIECE_COLOR = { N:'var(--red)', R:'var(--blue)', B:'var(--green)', Q:'var(--purple)', K:'var(--amber)' };
+const PIECE_COLOR = { N:'var(--red)', R:'var(--blue)', B:'var(--green)', Q:'var(--purple)', K:'var(--king)' };
 const PORTAL_COLORS = ['#22b8cf','#e64980','#f59f00','#7048e8']; // per-pair
 function makeGame(def, meta){
   const pieces  = def.pieces.map(p => ({ id: uid++, type:p.type, r:p.r, c:p.c }));
@@ -787,6 +978,8 @@ function makeGame(def, meta){
   return {
     cols:def.cols, rows:def.rows, pieces, stars, enemies,
     walls: def.walls||[], portals: def.portals||[], wallEdges: feat.wallEdges, portalMap: feat.portals,
+    ice: def.ice||[], iceSet: feat.ice, gates: feat.gates, gatesRaw: def.gates||[],
+    transformers: feat.transformers, transformersRaw: def.transformers||[],
     total: stars.length, collected:0, limit: Math.max(def.limit, optimal), optimal,
     moves:0, selected:null, legal:new Set(), landMap:new Map(), history:[], over:false, won:false,
     mode: meta ? meta.mode : 'campaign', level: meta ? meta.level : -1,
@@ -794,9 +987,11 @@ function makeGame(def, meta){
   };
 }
 function aliveEnemySet(){ const s = new Set(); for (const e of G.enemies) if (!e.captured) s.add(e.r*G.cols+e.c); return s; }
-function featGame(){ return { enemies: aliveEnemySet(), wallEdges: G.wallEdges, portals: G.portalMap }; }
+function closedGatesNow(){ const s=new Set(); for (const g of G.gates){ const sw=G.stars.find(st=>st.r*G.cols+st.c===g.sw); if (!(sw && sw.collected)) s.add(g.pos); } return s; }
+function featGame(){ return { enemies: aliveEnemySet(), wallEdges: G.wallEdges, portals: G.portalMap, ice: G.iceSet, closedGates: closedGatesNow() }; }
 function starColor(key){ return key ? PIECE_COLOR[key] : 'var(--gold)'; }
-function defFromG(){ return { cols:G.cols, rows:G.rows, walls:G.walls, portals:G.portals }; }
+function defFromG(){ return { cols:G.cols, rows:G.rows, walls:G.walls, portals:G.portals, ice:G.ice, gates:G.gatesRaw, transformers:G.transformersRaw }; }
+function isSwitch(pos){ return G.gates.some(g=>g.sw===pos); }
 
 /* ---------- rendering ---------- */
 const $ = id => document.getElementById(id);
@@ -818,6 +1013,7 @@ function buildBoard(){
     const d = document.createElement('div');
     d.className = 'cell';
     d.style.background = ((r + c) & 1) ? 'var(--sq-d)' : 'var(--sq-l)';
+    if (G.iceSet.has(r*G.cols+c)) d.classList.add('ice');
     d.dataset.r = r; d.dataset.c = c;
     cellsEl.appendChild(d);
   }
@@ -848,10 +1044,31 @@ function buildBoard(){
     }
     overlayEl.appendChild(el);
   }
+  // ice (frosty tiles) — behind pieces
+  G.iceSet.forEach(pos=>{
+    const el = document.createElement('div'); el.className='tok ice';
+    el.innerHTML='<div class="frost">'+snowSVG()+'</div>';
+    overlayEl.appendChild(el); setTok(el, Math.floor(pos/G.cols), pos%G.cols);
+  });
+  // gates (open when their switch star is collected) + transformers
+  G.gates.forEach(g=>{
+    const el = document.createElement('div'); el.className='tok gate'; el.dataset.gpos=g.pos;
+    el.innerHTML='<div class="gatetile" style="--gc:'+gateColorOf(g.pos)+'">'+lockSVG(gateColorOf(g.pos))+'</div>';
+    overlayEl.appendChild(el); setTok(el, Math.floor(g.pos/G.cols), g.pos%G.cols);
+  });
+  G.transformers.forEach((toType,pos)=>{
+    const col = PIECE_COLOR[toType];
+    const el = document.createElement('div'); el.className='tok xform';
+    el.innerHTML='<div class="xtile" style="--xc:'+col+'"><span class="xg">'+GLYPH[toType]+'</span>'
+      + '<div class="xarr">'+swirlSVG(col)+'</div></div>';
+    overlayEl.appendChild(el); setTok(el, Math.floor(pos/G.cols), pos%G.cols);
+  });
   for (const s of G.stars){
     const el = document.createElement('div');
     el.className = 'tok star'; el.dataset.sid = s.id;
-    el.innerHTML = starSVG(starColor(s.key));
+    const swc = switchColorOf(s.r*G.cols+s.c);
+    if (swc) el.classList.add('switch');
+    el.innerHTML = (swc ? '<span class="swring" style="--sc:'+swc+'"></span>' : '') + starSVG(starColor(s.key));
     overlayEl.appendChild(el);
     setTok(el, s.r, s.c);
   }
@@ -878,8 +1095,12 @@ function refresh(){
     const el = pieceEl(p.id);
     el.classList.toggle('sel', G.selected === p.id);
     el.classList.remove('pulse');
+    const chip = el.querySelector('.chip');           // keep chip in sync with type (transformers / undo)
+    if (chip && !chip.classList.contains(p.type)){ chip.className='chip '+p.type; chip.querySelector('.g').textContent=GLYPH[p.type]; }
     if (!el.classList.contains('dragging')) setTok(el, p.r, p.c);
   }
+  const closed = G.gates.length ? closedGatesNow() : null;
+  if (closed) for (const el of overlayEl.querySelectorAll('.gate')) el.classList.toggle('open', !closed.has(+el.dataset.gpos));
   const selType = G.selected!=null ? (G.pieces.find(p=>p.id===G.selected)||{}).type : null;
   const starAt = new Set(G.stars.filter(s=>!s.collected).map(s=>s.r*G.cols+s.c));
   for (const s of G.stars){
@@ -924,6 +1145,9 @@ function updateTeach(){
     else if (G.level===FIRST_WALL_LEVEL) msg = 'Walls stop sliders — but a knight leaps right over them.';
     else if (G.level===FIRST_PORTAL_LEVEL) msg = 'Step onto a portal to pop out its twin.';
     else if (G.level===FIRST_KEYED_LEVEL) msg = 'A coloured star needs the matching-colour piece.';
+    else if (G.level===FIRST_ICE_LEVEL) msg = 'Ice is slippery — sliders skate across and can’t stop on it.';
+    else if (G.level===FIRST_GATE_LEVEL) msg = 'Collect the ringed star to open its matching gate.';
+    else if (G.level===FIRST_XFORM_LEVEL) msg = 'Land on a swirl tile to transform into that piece.';
   }
   t.innerHTML = msg; t.classList.toggle('show', !!msg);
 }
@@ -940,11 +1164,11 @@ function selectPiece(id){
 function deselect(){ G.selected = null; G.legal = new Set(); refresh(); }
 
 function snapshot(){
-  return { pieces:G.pieces.map(p=>({r:p.r,c:p.c})), stars:G.stars.map(s=>s.collected),
+  return { pieces:G.pieces.map(p=>({r:p.r,c:p.c,type:p.type})), stars:G.stars.map(s=>s.collected),
            enemies:G.enemies.map(e=>e.captured), collected:G.collected, moves:G.moves };
 }
 function restore(sn){
-  sn.pieces.forEach((sp,i)=>{ G.pieces[i].r=sp.r; G.pieces[i].c=sp.c; });
+  sn.pieces.forEach((sp,i)=>{ G.pieces[i].r=sp.r; G.pieces[i].c=sp.c; G.pieces[i].type=sp.type; });
   sn.stars.forEach((sc,i)=>{ G.stars[i].collected = sc; });
   sn.enemies.forEach((ec,i)=>{ G.enemies[i].captured = ec; });
   G.collected = sn.collected; G.moves = sn.moves; G.over=false; G.won=false;
@@ -964,7 +1188,13 @@ function doMove(id, r, c){
   if (s){ s.collected = true; G.collected++; const el = starEl(s.id); if (el) el.classList.add('got'); }
   const en = G.enemies.find(e=>!e.captured && e.r===r && e.c===c);
   if (en){ en.captured = true; const el = enemyEl(en.id); if (el) el.classList.add('gone'); }
+  const lpos = lr*G.cols+lc;
+  let transformed = false;
+  if (G.transformers.has(lpos)){ p.type = G.transformers.get(lpos); transformed = true; }
+  const openedGate = s && isSwitch(lpos);
   if (s) Sfx.collect(G.collected); else if (en) Sfx.capture(); else if (warped) Sfx.warp(); else Sfx.move();
+  if (transformed) Sfx.transform();
+  if (openedGate) Sfx.gate();
   deselect();
   if (G.collected === G.total){ G.won = true; G.over = true; refresh(); setTimeout(endGame, 320); return; }
   if (G.moves >= G.limit || !anyMove()){ G.over = true; refresh(); setTimeout(endGame, 280); return; }
@@ -1040,11 +1270,12 @@ $('b-undo').onclick = ()=>{ if (!G.history.length || G.over) return; restore(G.h
 $('b-reset').onclick = ()=> startLevel(G.mode, G.level, G.__def, G.__meta);
 $('b-hint').onclick = giveHint;
 $('b-menu').onclick = openMenu;
-function syncMute(){ $('b-mute').textContent = Sfx.isMuted() ? '🔇' : '🔊'; }
+function syncMute(){ $('b-mute').textContent = Sfx.isMuted() ? '🔇' : '🔊'; $('b-music').classList.toggle('off', Music.isMuted()); }
 $('b-mute').onclick = ()=>{ Sfx.init(); Sfx.resume(); Sfx.setMuted(!Sfx.isMuted()); syncMute(); };
+$('b-music').onclick = ()=>{ Music.setMuted(!Music.isMuted()); syncMute(); };
 // unlock audio on first gesture; give every marker button a soft tap
 document.addEventListener('pointerdown', (e)=>{
-  Sfx.init(); Sfx.resume();
+  Sfx.init(); Sfx.resume(); Music.resume();
   const btn = e.target.closest('.mk'); if (btn && !btn.disabled) Sfx.tap();
 }, { passive:true });
 
@@ -1078,6 +1309,7 @@ function endGame(){
   if (G.won){
     const rating = G.moves <= G.optimal ? 3 : G.moves <= G.optimal+1 ? 2 : 1;
     if (G.mode === 'campaign') recordStars(G.level, rating);
+    Confetti.burst(rating===3 ? 90 : rating===2 ? 55 : 32);
     $('end-title').textContent = rating===3 ? 'Perfect!' : 'Solved!';
     $('end-stars').innerHTML = [0,1,2].map(k=> starSVG(k<rating?'var(--gold)':'transparent', k<rating?'#2c2733':'rgba(44,39,51,.3)')).join('');
     $('end-rline').innerHTML = rating===3
@@ -1113,23 +1345,50 @@ function buildEndButtons(won){
 function closeEnd(){ $('endscrim').classList.remove('show'); }
 
 /* ---------- menu ---------- */
-function openMenu(){ buildLvlGrid(); $('menuscrim').classList.add('show'); }
+function openMenu(){
+  buildLvlGrid(); $('menuscrim').classList.add('show');
+  // scroll the grid to the current level
+  requestAnimationFrame(()=>{
+    const cur = $('lvlgrid').querySelector('.cur') || $('lvlgrid').querySelector('[data-i="'+(G?G.level:0)+'"]');
+    const sc = $('lvlscroll');
+    if (cur && sc) sc.scrollTop = Math.max(0, cur.offsetTop - sc.clientHeight/2 + cur.offsetHeight/2);
+  });
+}
 function closeMenu(){ $('menuscrim').classList.remove('show'); }
 $('menu-x').onclick = closeMenu;
 $('menuscrim').addEventListener('click', e=>{ if(e.target===$('menuscrim')) closeMenu(); });
 $('endscrim').addEventListener('click', e=>{ if(e.target===$('endscrim')) closeEnd(); });
 
+function mechBadges(def){
+  let h='';
+  if (def.walls&&def.walls.length) h+='<span class="badge w"></span>';
+  if (def.portals&&def.portals.length) h+='<span class="badge p"></span>';
+  if (def.stars.some(s=>s.key)) h+='<span class="badge k"></span>';
+  if (def.enemies&&def.enemies.length) h+='<span class="badge e"></span>';
+  if (def.ice&&def.ice.length) h+='<span class="badge ice"></span>';
+  if (def.gates&&def.gates.length) h+='<span class="badge gate"></span>';
+  if (def.transformers&&def.transformers.length) h+='<span class="badge xf"></span>';
+  return h ? '<div class="badges">'+h+'</div>' : '';
+}
+const CHAPTERS = { 0:'Basics', [FIRST_WALL_LEVEL]:'Walls', [FIRST_PORTAL_LEVEL]:'Portals', [FIRST_KEYED_LEVEL]:'Keyed Stars', 42:'Mixed', 100:'Advanced' };
 function buildLvlGrid(){
   const grid = $('lvlgrid'); grid.innerHTML='';
+  let total=0, solved=0;
   CAMPAIGN.forEach((def,i)=>{
+    if (CHAPTERS[i]){ const h=document.createElement('div'); h.className='chapter'; h.innerHTML='<span>'+CHAPTERS[i]+'</span>'; grid.appendChild(h); }
     const open = unlocked(i), b = bestOf(i);
+    total += b; if (b>0) solved++;
     const cell = document.createElement('button');
     cell.className = 'mk lvlcard '+def.tier + (open?'':' lock') + (G && G.mode==='campaign' && G.level===i ? ' cur':'');
+    cell.dataset.i = i;
     const rs = [0,1,2].map(k=> starSVG(k<b?'var(--gold)':'transparent', k<b?'#2c2733':'rgba(44,39,51,.28)')).join('');
-    cell.innerHTML = '<div class="n">'+(open ? (i+1) : '🔒')+'</div><div class="rs">'+(open?rs:'')+'</div>';
+    cell.innerHTML = mechBadges(def) + '<div class="n">'+(open ? (i+1) : '🔒')+'</div><div class="rs">'+(open?rs:'')+'</div>';
     if (open) cell.onclick = ()=> startCampaign(i);
     grid.appendChild(cell);
   });
+  const max = CAMPAIGN.length*3;
+  $('pfill').style.width = (total/max*100)+'%';
+  $('ptext').innerHTML = '<span class="g">★</span> '+total+'/'+max+' · '+solved+'/'+CAMPAIGN.length;
 }
 $('seg-campaign').onclick = ()=> setSeg('campaign');
 $('seg-endless').onclick = ()=> setSeg('endless');
