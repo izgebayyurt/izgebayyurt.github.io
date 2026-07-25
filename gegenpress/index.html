@@ -1,0 +1,1908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0d1411" />
+<title>gegenpress</title>
+<style>
+  :root {
+    --ink: #e8f0ea;
+    --dim: #7d8f85;
+    --chrome: #101a16;
+    --chrome2: #16231e;
+    --line: #24352d;
+    --us: #4ea3ff;
+    --them: #ff5b4d;
+    --good: #6fe08a;
+    --warn: #ffc857;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0d1411; color: var(--ink);
+    font-family: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none;
+  }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  /* ---------- top bar ---------- */
+  #hud {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px calc(10px); background: var(--chrome);
+    border-bottom: 1px solid var(--line);
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .side { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .crest { width: 20px; height: 20px; border-radius: 5px; flex: 0 0 auto; }
+  .cname {
+    font-size: 12px; font-weight: 600; letter-spacing: .02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #score {
+    font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 20px; font-weight: 500; letter-spacing: .06em;
+    padding: 2px 10px; border-radius: 7px; background: var(--chrome2);
+    flex: 0 0 auto;
+  }
+  #clock { margin-left: auto; text-align: right; flex: 0 0 auto; }
+  #clock .big {
+    font-family: "Geist Mono", ui-monospace, monospace;
+    font-size: 15px; font-weight: 500;
+  }
+  #clock .sub { font-size: 9.5px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+  .iconbtn {
+    flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
+    background: var(--chrome2); border: 1px solid var(--line); color: var(--dim);
+    font-size: 13px; cursor: pointer; display: grid; place-items: center; padding: 0;
+    font-family: inherit;
+  }
+  .iconbtn:hover { color: var(--ink); }
+
+  /* ---------- pitch ---------- */
+  #wrap { flex: 1 1 auto; position: relative; min-height: 0; }
+  canvas { display: block; touch-action: none; position: absolute; inset: 0; }
+
+  /* floating banner over the pitch */
+  #banner {
+    position: absolute; left: 50%; top: 38%; transform: translate(-50%,-50%);
+    text-align: center; pointer-events: none; opacity: 0; transition: opacity .18s;
+    text-shadow: 0 3px 18px rgba(0,0,0,.7);
+  }
+  #banner.on { opacity: 1; }
+  #banner .b1 { font-size: clamp(30px, 11vw, 62px); font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  #banner .b2 { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); margin-top: 8px; }
+
+  /* tutorial / tip toast — sits in the column so it never covers the pitch */
+  #tip {
+    flex: 0 0 auto; margin: 0 10px; background: var(--chrome2);
+    border: 1px solid var(--line); border-left: 3px solid var(--warn);
+    border-radius: 10px; padding: 9px 11px; font-size: 12.5px; line-height: 1.45;
+    color: #cddbd3; display: none; cursor: pointer;
+  }
+  #tip.on { display: block; }
+  #tip b { color: var(--warn); font-weight: 600; }
+
+  /* ---------- threat strip ---------- */
+  #threat {
+    flex: 0 0 auto; display: flex; gap: 6px; overflow-x: auto; padding: 7px 10px;
+    background: var(--chrome); border-top: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  #threat::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; font-size: 10.5px; letter-spacing: .04em; padding: 4px 8px;
+    border-radius: 999px; background: #23120f; border: 1px solid #4a201b; color: #ffb3aa;
+    white-space: nowrap; font-weight: 500;
+  }
+  .chip.danger { background: #3a1009; border-color: #ff5b4d; color: #ffd2cc; }
+  .chip.calm { background: var(--chrome2); border-color: var(--line); color: var(--dim); }
+
+  /* ---------- action bar ---------- */
+  #bar {
+    flex: 0 0 auto; background: var(--chrome); border-top: 1px solid var(--line);
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  #who { display: flex; align-items: baseline; gap: 8px; min-height: 15px; }
+  #who .nm { font-size: 13px; font-weight: 600; }
+  #who .rl { font-size: 10.5px; color: var(--dim); letter-spacing: .04em; }
+  #who .hint { font-size: 11px; color: var(--dim); margin-left: auto; text-align: right; }
+  #acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  button.act {
+    font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: .03em;
+    padding: 9px 12px; border-radius: 9px; cursor: pointer;
+    background: var(--chrome2); color: var(--ink); border: 1px solid var(--line);
+    transition: background .1s, border-color .1s;
+  }
+  button.act:hover:not(:disabled) { background: #1e2f27; border-color: #354c40; }
+  button.act:disabled { opacity: .32; cursor: default; }
+  button.act.armed { background: #1d3b58; border-color: var(--us); color: #cfe6ff; }
+  button.act.ghost { background: transparent; color: var(--dim); }
+  button.act.go { margin-left: auto; background: #1d3b58; border-color: #2f6294; color: #d5eaff; }
+  button.act.go:hover:not(:disabled) { background: #24507a; }
+
+  /* ---------- overlays ---------- */
+  .sheet {
+    position: fixed; inset: 0; background: rgba(6,11,9,.93);
+    display: none; overflow-y: auto; z-index: 40;
+    padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+  }
+  .sheet.on { display: block; }
+  /* the ladder is a full stop, not an overlay — the match chrome must not show through */
+  #sheetTitle, #sheetRules { background: #0b110e; }
+  .inner { max-width: 470px; margin: 0 auto; }
+  h1.logo {
+    font-size: clamp(34px, 12vw, 58px); font-weight: 700; letter-spacing: -.035em;
+    margin: 14px 0 2px; line-height: .95;
+  }
+  h1.logo em { font-style: normal; color: var(--them); }
+  .tagline { color: var(--dim); font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 20px; }
+  h2 { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin: 22px 0 9px; font-weight: 600; }
+  .club {
+    display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+    padding: 11px 12px; margin-bottom: 7px; border-radius: 11px; cursor: pointer;
+    background: var(--chrome2); border: 1px solid var(--line); color: var(--ink);
+    font-family: inherit;
+  }
+  .club:hover:not(:disabled) { border-color: #3d5a4c; background: #1b2a23; }
+  .club:disabled { opacity: .38; cursor: default; }
+  .club .cr { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; }
+  .club .t1 { font-size: 14px; font-weight: 600; }
+  .club .t2 { font-size: 11px; color: var(--dim); margin-top: 1px; }
+  .club .tag {
+    margin-left: auto; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--dim); flex: 0 0 auto;
+  }
+  .club .tag.won { color: var(--good); }
+  p.copy { font-size: 13px; line-height: 1.6; color: #b9c8c0; margin: 0 0 11px; }
+  p.copy b { color: var(--ink); font-weight: 600; }
+  ul.copy { font-size: 13px; line-height: 1.6; color: #b9c8c0; padding-left: 18px; margin: 0 0 13px; }
+  ul.copy li { margin-bottom: 6px; }
+  ul.copy b { color: var(--ink); font-weight: 600; }
+  .kbd {
+    font-family: "Geist Mono", ui-monospace, monospace; font-size: 11px;
+    background: var(--chrome2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+  }
+  .wide {
+    display: block; width: 100%; font-family: inherit; font-size: 14px; font-weight: 600;
+    padding: 13px; border-radius: 11px; cursor: pointer; margin-top: 16px;
+    background: #1d3b58; border: 1px solid #2f6294; color: #d5eaff;
+  }
+  .wide:hover { background: #24507a; }
+  .wide.sec { background: transparent; border-color: var(--line); color: var(--dim); }
+  .wide.sec:hover { color: var(--ink); border-color: #3d5a4c; }
+  #resultScore {
+    font-family: "Geist Mono", ui-monospace, monospace; font-size: 44px;
+    letter-spacing: .08em; margin: 6px 0 4px;
+  }
+  .rlabel { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+  .foot { margin-top: 26px; font-size: 11px; color: #4d5b53; line-height: 1.6; }
+  .foot a { color: #6e8378; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="side">
+      <div class="crest" id="crestUs"></div>
+      <div class="cname" id="nameUs">Southbank</div>
+    </div>
+    <div id="score">0–0</div>
+    <div class="side">
+      <div class="crest" id="crestThem"></div>
+      <div class="cname" id="nameThem">—</div>
+    </div>
+    <div id="clock">
+      <div class="big" id="clockBig">1/14</div>
+      <div class="sub">turn</div>
+    </div>
+    <button class="iconbtn" id="btnSound" title="Sound">♪</button>
+    <button class="iconbtn" id="btnHelp" title="How to play">?</button>
+    <button class="iconbtn" id="btnQuit" title="Leave match">✕</button>
+  </div>
+
+  <div id="wrap">
+    <canvas id="c"></canvas>
+    <div id="banner"><div class="b1"></div><div class="b2"></div></div>
+  </div>
+
+  <div id="tip"></div>
+  <div id="threat"></div>
+
+  <div id="bar">
+    <div id="who"><span class="nm">—</span><span class="rl"></span><span class="hint"></span></div>
+    <div id="acts"></div>
+  </div>
+</div>
+
+<!-- ======================= TITLE ======================= -->
+<div class="sheet on" id="sheetTitle"><div class="inner">
+  <h1 class="logo">gegen<em>press</em></h1>
+  <div class="tagline">turn-based soccer tactics</div>
+  <p class="copy">
+    Every opponent move is shown <b>before</b> you commit. No dice, no randomness — read the
+    telegraph, put bodies in the right squares, win the ball back and punish them.
+    Fourteen turns. Draws don't count.
+  </p>
+  <h2>The ladder</h2>
+  <div id="ladder"></div>
+  <button class="wide sec" id="btnRules">How to play</button>
+  <div class="foot">
+    A tactics puzzle in the spirit of <i>Into the Breach</i>. Everything is deterministic —
+    if you lose the ball, it's because of a square you chose.
+  </div>
+</div></div>
+
+<!-- ======================= RULES ======================= -->
+<div class="sheet" id="sheetRules"><div class="inner">
+  <h1 class="logo" style="font-size:30px">how to play</h1>
+
+  <h2>The turn</h2>
+  <ul class="copy">
+    <li>At the start of every turn the opposition <b>declares everything it will do</b> — runs,
+      passes, shots, tackles — drawn on the pitch in red. They are locked into it.</li>
+    <li>Then you move. Each of your players may <b>move once and act once</b>, in any order you like.
+      Tap a player, tap a square, then pick an action.</li>
+    <li>Press <span class="kbd">End Turn</span> and their declared plan resolves. Anything you
+      blocked, intercepted or dodged simply fails.</li>
+    <li><span class="kbd">Reset</span> rewinds the whole turn. It's a puzzle — experiment freely.</li>
+    <li>On a keyboard: <span class="kbd">Tab</span> cycles players, <span class="kbd">Space</span> ends the
+      turn, <span class="kbd">U</span> undoes a move, <span class="kbd">R</span> resets,
+      <span class="kbd">Esc</span> cancels an action.</li>
+  </ul>
+
+  <h2>Winning the ball</h2>
+  <ul class="copy">
+    <li><b>Tackle</b> needs <b>two</b> of your players adjacent to the carrier. One body is not enough —
+      a lone tackle fails and leaves that player <b>beaten</b> (no turn next round).</li>
+    <li>Your <b>Anchor</b> tackles alone, but only <b>goal-side</b> — it has to be in front of the carrier,
+      between them and your goal. Chasing from behind does not win the ball. Their Enforcers work the same way.</li>
+    <li>Your <b>Sweeper</b> can <b>Shove</b> an adjacent opponent one square. Shove a carrier over the
+      touchline and the throw-in is yours.</li>
+    <li>Passes and shots travel in straight rays. Any body standing in the lane
+      <b>intercepts or blocks</b> it — that's most of your defending.</li>
+  </ul>
+
+  <h2>Scoring</h2>
+  <ul class="copy">
+    <li>Shots are rays too — straight or diagonal, toward the goal. Every shot shows its verdict
+      up front: <b>GOAL</b>, <b>SAVED</b> or <b>BLOCKED</b>.</li>
+    <li>A keeper's reach <b>shrinks as you get closer</b>. From distance it covers the whole goal;
+      from point-blank it only saves the exact square it stands on. Get in the box.</li>
+    <li>A keeper that rushes off its line saves nothing but the squares it physically occupies.</li>
+    <li>Their keeper picks its spot by reading <b>whoever has the ball right now</b>. Pass to a
+      teammate who hasn't acted yet, then shoot with them — the keeper committed to the wrong player.
+      That combo is the whole game.</li>
+  </ul>
+
+  <h2>Your squad</h2>
+  <ul class="copy">
+    <li><b>Anchor</b> — tackles alone from goal-side. Your ball-winner.</li>
+    <li><b>Sweeper</b> — fastest legs, and the Shove.</li>
+    <li><b>Playmaker</b> — longest shot range, and a <b>Threaded</b> pass that slips past the first
+      body in the lane.</li>
+    <li><b>Keeper</b> — stays near its box, <b>Claims</b> any ball within one square.</li>
+  </ul>
+  <button class="wide" id="btnRulesClose">Got it</button>
+</div></div>
+
+<!-- ======================= RESULT ======================= -->
+<div class="sheet" id="sheetResult"><div class="inner" style="text-align:center">
+  <div class="rlabel" id="resultTop">full time</div>
+  <div id="resultScore">0–0</div>
+  <div class="rlabel" id="resultSub"></div>
+  <p class="copy" id="resultCopy" style="text-align:left;margin-top:22px"></p>
+  <button class="wide" id="btnAgain">Play again</button>
+  <button class="wide sec" id="btnLadder">Back to the ladder</button>
+</div></div>
+
+<script>
+'use strict';
+
+/* ============================================================ geometry & constants */
+
+const COLS = 7, ROWS = 9;
+const GOAL = [1, 2, 3, 4, 5];              // columns the goal mouth spans
+const D8 = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+const D4 = [[0,-1],[1,0],[0,1],[-1,0]];
+const DNAME = ['N','NE','E','SE','S','SW','W','NW'];
+const PASS_RANGE = 5;
+
+const key = (c, r) => r * 32 + c;
+const inB = (c, r) => c >= 0 && c < COLS && r >= 0 && r < ROWS;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+const cheb = (a, b, c, d) => Math.max(Math.abs(a - c), Math.abs(b - d));
+
+// 'us' attack upward (toward row -1), 'them' downward (toward row ROWS)
+const fwd      = t => t === 'us' ? -1 : 1;
+const goalRow  = t => t === 'us' ? -1 : ROWS;        // the row a team shoots at
+const lineRow  = t => t === 'us' ? ROWS - 1 : 0;     // where that team's own keeper stands
+const boxRows  = t => t === 'us' ? [ROWS - 3, ROWS - 1] : [0, 2];
+const foe      = t => t === 'us' ? 'them' : 'us';
+
+/* ============================================================ roles */
+
+const ROLES = {
+  gk:      { name: 'Keeper',    speed: 2, shot: 3, solo: false },
+  anchor:  { name: 'Anchor',    speed: 3, shot: 3, solo: true  },
+  sweeper: { name: 'Sweeper',   speed: 4, shot: 4, solo: false },
+  maker:   { name: 'Playmaker', speed: 3, shot: 5, solo: false },
+  striker: { name: 'Striker',   speed: 3, shot: 5, solo: false },
+  winger:  { name: 'Winger',    speed: 4, shot: 4, solo: false },
+  enforcer:{ name: 'Enforcer',  speed: 3, shot: 3, solo: true  },
+  runner:  { name: 'Runner',    speed: 4, shot: 4, solo: false },
+};
+// tougher clubs carry a +1 speed boost, folded in here so every caller sees it
+function role(p) {
+  const R = ROLES[p.role];
+  if (!p.boost) return R;
+  return { name: R.name, speed: R.speed + 1, shot: R.shot, solo: R.solo };
+}
+const roleOf = role;
+
+// keeper reach along its goal line, by how many squares the shot travelled
+function reachFor(dist) { return dist <= 1 ? 0 : dist <= 2 ? 1 : dist <= 3 ? 2 : 3; }
+
+/* ============================================================ the ladder */
+
+const CLUBS = [
+  { name: 'Marlow Athletic', col: '#e0663f', note: 'Direct, honest, one striker up top',
+    squad: ['gk','striker','winger','winger'], turns: 14, gkBonus: 0, boost: 0, deepRead: 0,
+    brief: 'They run straight at goal. Learn to read the telegraph and double up on the carrier.' },
+  { name: 'Riverfield United', col: '#d94f6e', note: 'An enforcer who tackles alone',
+    squad: ['gk','striker','winger','enforcer'], turns: 14, gkBonus: 0, boost: 0, deepRead: 0,
+    brief: 'Their Enforcer wins the ball without help — but only from in front. Do not carry the ball straight at it.' },
+  { name: 'Aldergate FC', col: '#b45ce0', note: 'Four forward, they crowd the lanes',
+    squad: ['gk','striker','striker','winger','enforcer'], turns: 14, gkBonus: 0, boost: 0, deepRead: 1,
+    brief: 'Four of them press at once and they sit in your shooting lanes. Use the Threaded pass.' },
+  { name: 'Kestrel City', col: '#3f8fe0', note: 'A keeper with a long reach',
+    squad: ['gk','striker','runner','winger','enforcer'], turns: 14, gkBonus: 1, boost: 0, deepRead: 1,
+    brief: 'Their keeper covers more of the goal and reads every attacker, not just the ball. Get point-blank.' },
+  { name: 'Blackpond', col: '#9aa7b2', note: 'Champions. Faster, deeper, meaner',
+    squad: ['gk','striker','runner','winger','enforcer','enforcer'], turns: 12, gkBonus: 1, boost: 1, deepRead: 1,
+    brief: 'Two solo tacklers, an extra body, and two fewer turns. You will need the pass-then-shoot combo.' },
+];
+const US = { name: 'Southbank', col: '#4ea3ff' };
+
+/* ============================================================ save/load */
+
+const SAVE = 'gegenpress.v1';
+function loadProg() {
+  try { const j = JSON.parse(localStorage.getItem(SAVE) || '{}'); return { beaten: j.beaten || [] }; }
+  catch (e) { return { beaten: [] }; }
+}
+function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) {} }
+let prog = loadProg();
+
+/* ============================================================ state */
+
+const S = {
+  screen: 'title',
+  clubIx: 0, club: CLUBS[0],
+  players: [], ball: 0, nextId: 1,
+  turn: 1, maxTurns: 14,
+  score: { us: 0, them: 0 },
+  phase: 'plan',            // plan | resolve | over
+  intents: [],
+  sel: null, armed: null,   // armed action awaiting a target
+  snap: null, gen: 0,       // gen invalidates in-flight resolution steps
+  ballTw: null, fx: [],
+  tips: [],
+  sound: true,
+};
+
+/* ============================================================ audio */
+
+let AC = null;
+function actx() {
+  if (!AC) { const K = window.AudioContext || window.webkitAudioContext; if (K) AC = new K(); }
+  return AC;
+}
+function tone(freq, dur, type, vol, slideTo) {
+  if (!S.sound) return;
+  const a = actx(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, a.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime + dur);
+  g.gain.setValueAtTime(0, a.currentTime);
+  g.gain.linearRampToValueAtTime(vol == null ? .12 : vol, a.currentTime + .012);
+  g.gain.exponentialRampToValueAtTime(.0001, a.currentTime + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur + .02);
+}
+const SFX = {
+  step:  () => tone(220, .06, 'triangle', .05),
+  kick:  () => tone(330, .1, 'square', .07, 160),
+  save:  () => tone(180, .16, 'sawtooth', .07, 90),
+  block: () => tone(140, .12, 'square', .08, 70),
+  steal: () => tone(520, .12, 'triangle', .1, 780),
+  lost:  () => tone(300, .2, 'sawtooth', .09, 110),
+  goal:  () => { tone(523, .16, 'triangle', .12); setTimeout(() => tone(659, .16, 'triangle', .12), 110);
+                 setTimeout(() => tone(784, .3, 'triangle', .12), 220); },
+  conceded: () => { tone(300, .2, 'sawtooth', .1, 200); setTimeout(() => tone(200, .35, 'sawtooth', .1, 120), 180); },
+  whistle: () => tone(1400, .22, 'sine', .06, 1700),
+};
+
+/* ============================================================ board queries */
+
+function at(c, r) { for (const p of S.players) if (p.col === c && p.row === r) return p; return null; }
+function byId(id) { for (const p of S.players) if (p.id === id) return p; return null; }
+function carrier() { return byId(S.ball); }
+function owner() { const p = carrier(); return p ? p.team : null; }
+function keeperOf(team) { for (const p of S.players) if (p.team === team && p.role === 'gk') return p; return null; }
+function squad(team) { return S.players.filter(p => p.team === team); }
+
+// number of opposing bodies adjacent to a square
+function pressureOn(team, c, r) {
+  let n = 0;
+  for (const p of S.players) if (p.team !== team && !p.beaten && cheb(p.col, p.row, c, r) === 1) n++;
+  return n;
+}
+// A solo tackler has to be goal-side of the carrier — in front of them, not chasing.
+// Adjacency means this is always exactly one row into the carrier's attacking direction.
+function goalSide(tackler, cr, row) {
+  const g = goalRow(cr.team), tr = row == null ? tackler.row : row;
+  return Math.abs(tr - g) < Math.abs(cr.row - g);
+}
+
+function canStand(p, c, r) {
+  if (!inB(c, r)) return false;
+  if (p.role === 'gk') {
+    const [lo, hi] = boxRows(p.team);
+    if (r < lo || r > hi) return false;
+    if (c < 1 || c > COLS - 2) return false;
+  }
+  return true;
+}
+// how far a square is from the goal the team attacks (smaller = better)
+function progress(team, c, r) { return Math.abs(r - goalRow(team)); }
+
+/* ============================================================ movement */
+
+// BFS over free orthogonal squares; returns Map(key -> {c,r,steps,path})
+function reach(p, ignoreBall) {
+  const budget = (!ignoreBall && S.ball === p.id)
+    ? Math.max(1, role(p).speed - 1)   // carrying the ball costs a step
+    : role(p).speed;
+  const out = new Map();
+  const start = { c: p.col, r: p.row, steps: 0, path: [] };
+  out.set(key(p.col, p.row), start);
+  let frontier = [start];
+  for (let s = 1; s <= budget; s++) {
+    const nxt = [];
+    for (const n of frontier) for (const [dc, dr] of D4) {
+      const c = n.c + dc, r = n.r + dr, k = key(c, r);
+      if (out.has(k)) continue;
+      if (!canStand(p, c, r)) continue;
+      if (at(c, r)) continue;
+      const node = { c, r, steps: s, path: n.path.concat([[c, r]]) };
+      out.set(k, node); nxt.push(node);
+    }
+    frontier = nxt;
+  }
+  return out;
+}
+
+/* ============================================================ passing & shooting */
+
+// A pass is a direction. The ball flies until it meets the first body, or runs out of range.
+function passOutcome(p, dirIx, thread) {
+  const [dc, dr] = D8[dirIx];
+  const lane = [];
+  let skipped = false, lastIn = [p.col, p.row];
+  for (let i = 1; i <= PASS_RANGE; i++) {
+    const c = p.col + dc * i, r = p.row + dr * i;
+    // markers always sit on the pitch, so nothing is ever drawn off the canvas
+    if (!inB(c, r)) return { dir: dirIx, lane, kind: 'out', at: lastIn };
+    lane.push([c, r]); lastIn = [c, r];
+    const o = at(c, r);
+    if (o) {
+      if (thread && !skipped && o.team !== p.team) { skipped = true; continue; }
+      return {
+        dir: dirIx, lane, at: [c, r], who: o,
+        kind: o.team === p.team ? 'receive' : 'intercept',
+      };
+    }
+  }
+  return { dir: dirIx, lane, kind: 'out', at: lastIn };
+}
+
+// Only directions that actually find a body. Hoofing it out of play just hands
+// over possession, so it is never offered as a choice.
+function passOptions(p, thread) {
+  const out = [];
+  for (let d = 0; d < 8; d++) {
+    const o = passOutcome(p, d, thread);
+    if (o.kind === 'out') continue;
+    if (o.kind === 'receive' && o.who.id === p.id) continue;
+    out.push(o);
+  }
+  return out;
+}
+
+// A shot is a forward ray that must land inside the goal mouth.
+// Verdict is computed against the board exactly as it stands.
+function shotOptions(p, opts) {
+  const o = opts || {};
+  const c0 = o.c == null ? p.col : o.c, r0 = o.r == null ? p.row : o.r;
+  const ignore = o.ignore || null;
+  const R = role(p), ad = fwd(p.team), gr = goalRow(p.team);
+  const dist = Math.abs(gr - r0);
+  const res = [];
+  if (dist > R.shot) return res;
+  for (const dc of [-1, 0, 1]) {
+    const tc = c0 + dc * dist;
+    if (!GOAL.includes(tc)) continue;
+    const lane = [];
+    let blocker = null, bad = false;
+    for (let i = 1; i < dist; i++) {
+      const c = c0 + dc * i, r = r0 + ad * i;
+      if (!inB(c, r)) { bad = true; break; }
+      lane.push([c, r]);
+      if (!blocker) {
+        const q = at(c, r);
+        if (q && q.id !== p.id && q !== ignore) blocker = q;
+      }
+    }
+    if (bad) continue;
+
+    let verdict = 'goal', by = null, margin = 0;
+    if (blocker) {
+      verdict = blocker.role === 'gk' ? 'saved' : 'blocked';
+      by = blocker;
+    } else {
+      const gk = keeperOf(foe(p.team));
+      if (gk && gk !== ignore && !gk.beaten) {
+        const bonus = gk.team === 'them' ? S.club.gkBonus : 0;
+        if (gk.row === lineRow(gk.team)) {
+          const d = Math.abs(gk.col - tc), rc = reachFor(dist) + bonus;
+          if (d <= rc) { verdict = 'saved'; by = gk; }
+          else margin = d - rc;
+        } else {
+          margin = 3; // keeper has abandoned its line
+        }
+      } else margin = 4;
+    }
+    res.push({ dir: dc, dist, lane, target: [tc, gr], verdict, by, margin, from: [c0, r0] });
+  }
+  return res;
+}
+const scoringShots = (p, o) => shotOptions(p, o).filter(s => s.verdict === 'goal');
+
+/* ============================================================ possession changes */
+
+function giveBall(p, why) {
+  const was = owner();
+  S.ball = p.id;
+  if (was && was !== p.team) {
+    if (p.team === 'us') SFX.steal(); else SFX.lost();
+    flash(p.team === 'us' ? 'WON IT BACK' : 'LOST IT', why || '', p.team === 'us' ? '#6fe08a' : '#ff5b4d', 700);
+  }
+}
+
+// ball leaves the pitch: nearest opponent takes the throw-in
+function outOfPlay(loser, c, r) {
+  const cc = clamp(c, 0, COLS - 1), rr = clamp(r, 0, ROWS - 1);
+  const cands = squad(foe(loser)).filter(p => p.role !== 'gk');
+  let best = cands[0], bd = 1e9;
+  for (const p of cands) { const d = cheb(p.col, p.row, cc, rr); if (d < bd) { bd = d; best = p; } }
+  if (!best) best = keeperOf(foe(loser));
+  if (best) giveBall(best, 'out of play');
+}
+
+/* ============================================================ kickoff / formations */
+
+function formation(team, squadRoles) {
+  const list = [];
+  const flip = r => team === 'us' ? ROWS - 1 - r : r;
+  // slots are written from the goal outward
+  const slots = [[3,0],[3,2],[1,3],[5,3],[3,4],[0,2]];
+  squadRoles.forEach((rl, i) => {
+    const s = slots[Math.min(i, slots.length - 1)];
+    list.push({ id: S.nextId++, team, role: rl, col: s[0], row: flip(s[1]), beaten: 0, moved: false, acted: false, tw: null });
+  });
+  return list;
+}
+
+function kickoff(possession) {
+  S.players = formation('us', ['gk','anchor','sweeper','maker'])
+    .concat(formation('them', S.club.squad));
+  if (S.club.boost) for (const p of S.players) if (p.team === 'them' && p.role !== 'gk') p.boost = 1;
+  const taker = squad(possession).find(p => p.role === 'striker' || p.role === 'maker')
+             || squad(possession).find(p => p.role !== 'gk');
+  S.ball = taker.id;
+  S.ballTw = null;
+  S.sel = null; S.armed = null;
+}
+
+/* ============================================================ match flow */
+
+function startMatch(ix) {
+  S.clubIx = ix; S.club = CLUBS[ix];
+  S.maxTurns = S.club.turns;
+  S.turn = 1; S.score = { us: 0, them: 0 };
+  S.screen = 'match'; S.phase = 'plan';
+  kickoff('them');
+  S.tips = ix === 0 ? TIPS.slice() : [];
+  beginTurn(true);
+  syncHUD();
+  hide('sheetTitle'); hide('sheetResult');
+  SFX.whistle();
+}
+
+function beginTurn(first) {
+  // beaten is set to 2 so that ticking down here still costs the whole next turn
+  for (const p of S.players) {
+    p.moved = false; p.acted = false; p.origin = null;
+    if (p.beaten > 0) p.beaten--;
+  }
+  S.gen++;
+  S.intents = planThem();
+  S.snap = snapshot();
+  S.phase = 'plan';
+  S.sel = null; S.armed = null;
+  if (S.tips.length) showTip(S.tips[0]);
+  syncHUD();
+}
+
+function snapshot() {
+  return JSON.stringify({ players: S.players, ball: S.ball, score: S.score, turn: S.turn });
+}
+function restore() {
+  if (!S.snap || S.phase !== 'plan') return;
+  const j = JSON.parse(S.snap);
+  S.players = j.players; S.ball = j.ball; S.score = j.score; S.turn = j.turn;
+  for (const p of S.players) p.tw = null;
+  S.ballTw = null; S.sel = null; S.armed = null; S.fx = [];
+  script.length = 0; S.gen++;
+  syncHUD();
+}
+
+function scored(team, note) {
+  S.score[team]++;
+  if (team === 'us') { SFX.goal(); flash('GOAL', note || S.club.name + ' 0 – you 1', '#6fe08a', 1500); confetti('#6fe08a'); }
+  else { SFX.conceded(); flash('CONCEDED', note || '', '#ff5b4d', 1500); }
+  syncHUD();
+  // whole turn ends; their declared plan is scrapped and positions reset
+  S.phase = 'resolve';
+  S.intents = [];
+  script.length = 0; S.gen++;
+  after(1300, () => {
+    kickoff(team === 'us' ? 'them' : 'us');
+    SFX.whistle();
+    advanceTurn();
+  });
+}
+
+function advanceTurn() {
+  S.turn++;
+  if (S.turn > S.maxTurns) return endMatch();
+  beginTurn(false);
+}
+
+function endMatch() {
+  S.phase = 'over'; S.screen = 'over';
+  const won = S.score.us > S.score.them;
+  if (won && prog.beaten.indexOf(S.clubIx) < 0) { prog.beaten.push(S.clubIx); saveProg(); }
+  const drew = S.score.us === S.score.them;
+  el('resultScore').textContent = S.score.us + '–' + S.score.them;
+  el('resultTop').textContent = 'full time · ' + S.club.name;
+  el('resultSub').textContent = won ? 'you win' : drew ? 'draw — not enough' : 'defeat';
+  el('resultSub').style.color = won ? 'var(--good)' : 'var(--them)';
+  const nxt = S.clubIx + 1;
+  el('resultCopy').innerHTML = won
+    ? (nxt < CLUBS.length
+        ? '<b>' + CLUBS[nxt].name + '</b> is unlocked. ' + CLUBS[nxt].brief
+        : 'You have beaten the whole ladder, <b>Blackpond</b> included. There is nothing left to press.')
+    : (drew
+        ? 'A draw counts as a loss here. You need a goal — get a player into the box at row one or closer, where the keeper can only save the exact square it stands on.'
+        : 'Read their telegraph again: every red arrow is a promise. Put a body in the lane and it breaks.');
+  el('btnAgain').textContent = won && nxt < CLUBS.length ? 'Next: ' + CLUBS[nxt].name : 'Play again';
+  show('sheetResult');
+  SFX.whistle();
+}
+
+/* ============================================================ opposition planning (the telegraph) */
+/*  Everything the AI decides here is drawn on the pitch and then executed verbatim.  */
+
+// Two opponents must never declare the same destination — the telegraph would draw
+// two arrows into one square and the second run would silently stop short.
+let TAKEN = new Set();
+function avail(n, p) {
+  if (n.c === p.col && n.r === p.row) return true;
+  return !TAKEN.has(key(n.c, n.r));
+}
+function keep(it) { if (it) TAKEN.add(key(it.to[0], it.to[1])); return it; }
+
+function planThem() {
+  const ints = [];
+  TAKEN = new Set();
+  const mine = squad('them');
+  const attacking = owner() === 'them';
+  const ball = carrier();
+
+  // ---- danger read: which squares would let US score, so they can be covered.
+  // Weak clubs only read whoever holds the ball; the good ones read every attacker.
+  let cover = [];
+  if (!attacking && ball) {
+    for (const a of readers()) {
+      for (const n of reach(a, a.id !== S.ball).values()) {
+        for (const s of shotOptions(a, { c: n.c, r: n.r })) {
+          if (s.verdict !== 'goal' && !(s.verdict === 'blocked' && s.by.team === 'us')) continue;
+          for (const t of s.lane) cover.push(t);
+          // point-blank shots have no lane to block, so deny the square itself
+          if (s.dist <= 2) { cover.push(s.from); cover.push(s.from); }
+        }
+      }
+    }
+  }
+
+  // ---- keeper first: it commits its line position by reading the current carrier
+  const gk = keeperOf('them');
+  if (gk) ints.push(keep(planKeeper(gk, attacking, ball)));
+
+  const rest = mine.filter(p => p.role !== 'gk');
+
+  if (attacking && ball && ball.team === 'them') {
+    ints.push(keep(planCarrier(ball)));
+    for (const p of rest) if (p.id !== ball.id) ints.push(keep(planSupport(p, ball)));
+  } else {
+    // defending: closest two hunt the carrier, the others seal lanes
+    const ranked = rest.slice().sort((a, b) => {
+      const d = ball ? cheb(a.col, a.row, ball.col, ball.row) - cheb(b.col, b.row, ball.col, ball.row) : 0;
+      return d || a.id - b.id;
+    });
+    const hunters = ranked.slice(0, 2), sealers = ranked.slice(2);
+    const dints = hunters.map(p => keep(planHunt(p, ball)));
+    // who declares the tackle? count how many will actually end up adjacent
+    let adj = 0;
+    for (const it of dints) if (ball && cheb(it.to[0], it.to[1], ball.col, ball.row) === 1) adj++;
+    // a solo tackler who gets goal-side is the best claim; otherwise any body in a pair
+    const touching = dints.filter(it => ball && cheb(it.to[0], it.to[1], ball.col, ball.row) === 1);
+    const claimant = touching.find(it => {
+      const p = byId(it.id);
+      return roleOf(p).solo && goalSide(p, ball, it.to[1]);
+    }) || (adj >= 2 ? touching[0] : null);
+    if (claimant) claimant.act = { type: 'tackle', target: ball.id };
+    ints.push.apply(ints, dints);
+    for (const p of sealers) ints.push(keep(planSeal(p, ball, cover)));
+  }
+  return ints.filter(Boolean);
+}
+
+function stalled(p) { return { id: p.id, path: [], to: [p.col, p.row], act: null, beaten: p.beaten > 0 }; }
+
+// Whose threat the defence models. Ordinary clubs only watch the ball; the
+// better ones read every attacker, which is what makes a switch of play hard.
+function readers() {
+  const b = carrier();
+  if (S.club.deepRead) return squad('us').filter(p => p.role !== 'gk' && p.beaten <= 0);
+  return b && b.team === 'us' ? [b] : [];
+}
+
+function planKeeper(gk, attacking, ball) {
+  if (gk.beaten > 0) return stalled(gk);
+  const lr = lineRow('them');
+  if (!attacking && ball && ball.team === 'us') {
+    // rush out at a carrier that has got in behind
+    if (ball.row <= 1) {
+      const spots = reach(gk);
+      let best = null, bd = 9;
+      for (const n of spots.values()) {
+        const d = cheb(n.c, n.r, ball.col, ball.row);
+        if (d <= 1 && (d < bd || (d === bd && n.steps < (best ? best.steps : 9)))) { bd = d; best = n; }
+      }
+      if (best) return { id: gk.id, path: best.path, to: [best.c, best.r], act: { type: 'claim' } };
+    }
+    // otherwise pick the goal-line column that snuffs out the most scoring shots
+    const threats = [];
+    for (const a of readers()) {
+      for (const n of reach(a, a.id !== S.ball).values()) {
+        for (const s of shotOptions(a, { c: n.c, r: n.r, ignore: gk })) {
+          if (s.verdict === 'blocked') continue;      // a body already stops that one
+          threats.push(s);
+        }
+      }
+    }
+    let bestCol = clamp(ball.col, 1, COLS - 2), bestScore = 1e9;
+    for (let c = 1; c <= COLS - 2; c++) {
+      let leaks = 0;
+      for (const s of threats) {
+        if (Math.abs(c - s.target[0]) > reachFor(s.dist) + S.club.gkBonus) leaks++;
+      }
+      const sc = leaks * 100 + Math.abs(c - ball.col);
+      if (sc < bestScore) { bestScore = sc; bestCol = c; }
+    }
+    return moveToward(gk, bestCol, lr, null);
+  }
+  return moveToward(gk, clamp(ball ? ball.col : 3, 1, COLS - 2), lr, null);
+}
+
+// Where each of the opposing outfielders could get to next phase. Computed once
+// per turn so the carrier can judge which squares are actually safe to occupy.
+function pressMap(defTeam) {
+  return S.players
+    .filter(q => q.team === defTeam && q.beaten <= 0 && q.role !== 'gk')
+    .map(q => ({ q, spots: Array.from(reach(q, true).values()) }));
+}
+
+// How exposed a carrier standing on (c,r) would be: a solo tackler getting
+// goal-side is fatal, two bodies arriving is nearly as bad.
+function tackleRisk(team, c, r, map) {
+  let bodies = 0, front = 0;
+  const g = goalRow(team), mine = Math.abs(r - g);
+  for (const { q, spots } of map) {
+    let adj = false, ahead = false;
+    for (const n of spots) {
+      if (cheb(n.c, n.r, c, r) !== 1) continue;
+      adj = true;
+      if (roleOf(q).solo && Math.abs(n.r - g) < mine) { ahead = true; break; }
+    }
+    if (adj) bodies++;
+    if (ahead) front++;
+  }
+  return front > 0 ? 110 : bodies >= 2 ? 70 : bodies * 12;
+}
+
+function planCarrier(p) {
+  const spots = reach(p);
+  const map = pressMap(foe(p.team));
+  let best = null;
+  for (const n of spots.values()) {
+    if (!avail(n, p)) continue;
+    // shots available from this square, discounting the carrier's own body
+    const shots = shotOptions(p, { c: n.c, r: n.r });
+    const g = shots.filter(s => s.verdict === 'goal');
+    const press = pressureOn('them', n.c, n.r);
+    let sc, act = null;
+
+    if (g.length) {
+      g.sort((a, b) => b.margin - a.margin);
+      sc = 1000 + g[0].margin * 4 - n.steps;
+      act = { type: 'shoot', dir: g[0].dir };
+    } else {
+      // best pass that finds a teammate further forward
+      let bestPass = null, bestPassSc = -1e9;
+      const save = [p.col, p.row]; p.col = n.c; p.row = n.r;
+      for (const o of passOptions(p, false)) {
+        if (o.kind !== 'receive') continue;
+        const gain = progress('them', p.col, p.row) - progress('them', o.who.col, o.who.row);
+        const threat = scoringShots(o.who).length ? 60 : 0;
+        const s = 300 + gain * 14 + threat - pressureOn('them', o.who.col, o.who.row) * 18;
+        if (s > bestPassSc) { bestPassSc = s; bestPass = o; }
+      }
+      p.col = save[0]; p.row = save[1];
+
+      const risk = tackleRisk('them', n.c, n.r, map);
+      const dribble = 120 + (progress('them', p.col, p.row) - progress('them', n.c, n.r)) * 16
+                    - press * 30 - risk - Math.abs(n.c - 3) * 2;
+      // laying it off also escapes the press, so it is judged from the same square
+      if (bestPass && bestPassSc - press * 12 - risk * .5 > dribble) {
+        sc = bestPassSc - press * 12 - risk * .5; act = { type: 'pass', dir: bestPass.dir };
+      } else sc = dribble;
+    }
+    if (!best || sc > best.sc) best = { sc, n, act };
+  }
+  if (!best) return stalled(p);
+  return { id: p.id, path: best.n.path, to: [best.n.c, best.n.r], act: best.act };
+}
+
+function planSupport(p, ball) {
+  if (p.beaten > 0) return stalled(p);
+  const spots = reach(p);
+  let best = null;
+  for (const n of spots.values()) {
+    if (!avail(n, p)) continue;
+    let sc = (ROWS - progress('them', n.c, n.r)) * 9;
+    sc -= pressureOn('them', n.c, n.r) * 16;
+    // reward standing on a clean ray from the carrier
+    const dc = Math.sign(n.c - ball.col), dr = Math.sign(n.r - ball.row);
+    const dd = Math.max(Math.abs(n.c - ball.col), Math.abs(n.r - ball.row));
+    const aligned = dd > 0 && dd <= PASS_RANGE &&
+      (n.c === ball.col || n.r === ball.row || Math.abs(n.c - ball.col) === Math.abs(n.r - ball.row));
+    if (aligned) {
+      let clear = true;
+      for (let i = 1; i < dd; i++) if (at(ball.col + dc * i, ball.row + dr * i)) { clear = false; break; }
+      if (clear) sc += 46;
+    }
+    // spread out
+    for (const q of squad('them')) if (q.id !== p.id && cheb(q.col, q.row, n.c, n.r) <= 1) sc -= 14;
+    if (scoringShots(p, { c: n.c, r: n.r }).length) sc += 40;
+    if (!best || sc > best.sc) best = { sc, n };
+  }
+  return { id: p.id, path: best.n.path, to: [best.n.c, best.n.r], act: null };
+}
+
+function planHunt(p, ball) {
+  if (p.beaten > 0 || !ball) return stalled(p);
+  const spots = reach(p);
+  let best = null;
+  for (const n of spots.values()) {
+    if (!avail(n, p)) continue;
+    const d = cheb(n.c, n.r, ball.col, ball.row);
+    let sc = -d * 30 - n.steps;
+    if (d === 1) sc += 80;
+    // stay between the ball and their own goal
+    if (Math.abs(n.r - goalRow('us')) < Math.abs(ball.row - goalRow('us'))) sc += 10;
+    if (!best || sc > best.sc) best = { sc, n };
+  }
+  return { id: p.id, path: best.n.path, to: [best.n.c, best.n.r], act: null };
+}
+
+function planSeal(p, ball, cover) {
+  if (p.beaten > 0) return stalled(p);
+  const spots = reach(p);
+  const laneHits = new Map();
+  for (const t of cover) laneHits.set(key(t[0], t[1]), (laneHits.get(key(t[0], t[1])) || 0) + 1);
+  let best = null;
+  for (const n of spots.values()) {
+    if (!avail(n, p)) continue;
+    let sc = (laneHits.get(key(n.c, n.r)) || 0) * 30;
+    if (ball) {
+      sc -= cheb(n.c, n.r, ball.col, ball.row) * 6;
+      // sit in a passing lane between the carrier and one of our other players
+      for (const q of squad('us')) {
+        if (q.id === ball.id) continue;
+        if (onSegment(ball.col, ball.row, q.col, q.row, n.c, n.r)) sc += 24;
+      }
+    }
+    for (const q of squad('them')) if (q.id !== p.id && cheb(q.col, q.row, n.c, n.r) === 0) sc -= 50;
+    if (!best || sc > best.sc) best = { sc, n };
+  }
+  return { id: p.id, path: best.n.path, to: [best.n.c, best.n.r], act: null };
+}
+
+function onSegment(ax, ay, bx, by, cx, cy) {
+  const dx = bx - ax, dy = by - ay;
+  if (dx !== 0 && dy !== 0 && Math.abs(dx) !== Math.abs(dy)) return false;
+  const n = Math.max(Math.abs(dx), Math.abs(dy));
+  if (n < 2) return false;
+  const sx = Math.sign(dx), sy = Math.sign(dy);
+  for (let i = 1; i < n; i++) if (ax + sx * i === cx && ay + sy * i === cy) return true;
+  return false;
+}
+
+function moveToward(p, tc, tr, act) {
+  const spots = reach(p);
+  let best = null, bd = 1e9;
+  for (const n of spots.values()) {
+    if (!avail(n, p)) continue;
+    const d = Math.abs(n.c - tc) + Math.abs(n.r - tr);
+    if (d < bd || (d === bd && n.steps < best.steps)) { bd = d; best = n; }
+  }
+  return { id: p.id, path: best.path, to: [best.c, best.r], act: act };
+}
+
+/* ============================================================ resolution */
+
+let script = [], scriptAt = 0;
+function after(ms, fn) { script.push({ delay: ms, fn: fn }); if (script.length === 1) scriptAt = performance.now() + ms; }
+function runScript(now) {
+  while (script.length && now >= scriptAt) {
+    const s = script.shift();
+    scriptAt = now + (script.length ? script[0].delay : 0);
+    s.fn();
+    if (script.length) scriptAt = now + script[0].delay;
+  }
+}
+
+function endTurn() {
+  if (S.phase !== 'plan') return;
+  S.phase = 'resolve'; S.sel = null; S.armed = null;
+  hideTip();
+  syncHUD();
+  const list = S.intents.slice();
+  const gen = ++S.gen;                          // a goal bumps S.gen and cancels the rest
+  let i = 0;
+  const step = () => {
+    if (S.gen !== gen) return;
+    if (i >= list.length) { after(150, () => { if (S.gen === gen) advanceTurn(); }); return; }
+    execIntent(list[i++]);
+    after(360, step);
+  };
+  after(180, step);
+}
+
+function execIntent(it) {
+  const p = byId(it.id);
+  if (!p || p.beaten > 0) return;
+
+  // walk the declared path, stopping short of anything now in the way
+  let moved = false;
+  for (const [c, r] of it.path) {
+    if (at(c, r)) break;
+    slide(p, c, r); moved = true;
+  }
+  if (moved) SFX.step();
+
+  if (!it.act) return;
+  const a = it.act;
+
+  if (a.type === 'shoot') {
+    if (S.ball !== p.id) return;               // no longer has it
+    const opt = shotOptions(p).find(s => s.dir === a.dir);
+    if (!opt) { fx(p.col, p.row, 'wide', '#ffc857'); return; }
+    resolveShot(p, opt);
+  } else if (a.type === 'pass') {
+    if (S.ball !== p.id) return;
+    resolvePass(p, a.dir, false);
+  } else if (a.type === 'tackle') {
+    const t = byId(a.target);
+    if (!t || S.ball !== t.id || cheb(p.col, p.row, t.col, t.row) !== 1) {
+      p.beaten = 2; fx(p.col, p.row, 'DODGED', '#6fe08a'); SFX.block();
+      return;
+    }
+    resolveTackle(p, t);
+  } else if (a.type === 'claim') {
+    const b = carrier();
+    if (b && b.team !== p.team && cheb(p.col, p.row, b.col, b.row) <= 1) giveBall(p, 'keeper claims');
+    else { fx(p.col, p.row, 'miss', '#ffc857'); }
+  }
+}
+
+function slide(p, c, r) {
+  p.tw = { c0: p.col, r0: p.row, t: 0, dur: 190 };
+  p.col = c; p.row = r;
+}
+
+function tackleWorks(p, t) {
+  return (roleOf(p).solo && goalSide(p, t)) || pressureOn(t.team, t.col, t.row) >= 2;
+}
+
+function resolveTackle(p, t) {
+  const press = pressureOn(t.team, t.col, t.row);
+  if (tackleWorks(p, t)) {
+    giveBall(p, press >= 2 ? 'double-teamed' : roleOf(p).name + ' got in front');
+    fx(t.col, t.row, 'WON IT', '#6fe08a');
+  } else {
+    p.beaten = 2;
+    fx(p.col, p.row, 'BEATEN', '#ffc857');
+    SFX.block();
+  }
+}
+
+function resolvePass(p, dirIx, thread) {
+  const o = passOutcome(p, dirIx, thread);
+  const from = [p.col, p.row], dest = o.at;
+  SFX.kick();
+  // possession first, then the flight tween — giveBall must not clobber it
+  if (o.kind === 'receive') { S.ball = o.who.id; fx(dest[0], dest[1], null, null); }
+  else if (o.kind === 'intercept') { giveBall(o.who, 'intercepted'); fx(dest[0], dest[1], 'CUT OUT', '#ffc857'); }
+  else { fx(dest[0], dest[1], 'OUT', '#ffc857'); outOfPlay(p.team, dest[0], dest[1]); }
+  S.ballTw = { c0: from[0], r0: from[1], c1: dest[0], r1: dest[1], t: 0, dur: 230 };
+}
+
+function resolveShot(p, opt) {
+  SFX.kick();
+  const t = opt.target;
+  S.ballTw = { c0: p.col, r0: p.row, c1: t[0], r1: t[1], t: 0, dur: 260 };
+  if (opt.verdict === 'goal') {
+    after(240, () => scored(p.team));
+  } else if (opt.verdict === 'saved') {
+    const gk = opt.by || keeperOf(foe(p.team));
+    after(230, () => {
+      SFX.save();
+      fx(gk ? gk.col : t[0], gk ? gk.row : clamp(t[1], 0, ROWS - 1), 'SAVED', '#ffc857');
+      if (gk) giveBall(gk, 'saved');
+    });
+  } else {
+    after(200, () => {
+      SFX.block();
+      fx(opt.by.col, opt.by.row, 'BLOCKED', '#ffc857');
+      giveBall(opt.by, 'blocked');
+    });
+  }
+}
+
+/* ============================================================ player actions */
+
+function selectable(p) { return p.team === 'us' && p.beaten <= 0; }
+
+function pick(p) {
+  if (S.phase !== 'plan') return;
+  S.sel = p.id; S.armed = null; syncHUD();
+}
+
+function doMove(p, node) {
+  if (p.moved || S.phase !== 'plan') return;
+  p.origin = [p.col, p.row];
+  slide(p, node.c, node.r);
+  p.moved = true;
+  SFX.step();
+  S.armed = null;
+  syncHUD();
+}
+
+function undoMove(p) {
+  if (!p.moved || p.acted || !p.origin) return;
+  const [c, r] = p.origin;
+  if (at(c, r)) return;                       // somebody else took the square
+  p.tw = { c0: p.col, r0: p.row, t: 0, dur: 140 };
+  p.col = c; p.row = r; p.moved = false; p.origin = null;
+  S.armed = null; syncHUD();
+}
+
+function actionsFor(p) {
+  const list = [];
+  const has = S.ball === p.id;
+  const b = carrier();
+  if (has) {
+    if (passOptions(p, p.role === 'maker').length) {
+      list.push({ id: 'pass', label: p.role === 'maker' ? 'Thread' : 'Pass', ok: true });
+    }
+    if (shotOptions(p).length) list.push({ id: 'shoot', label: 'Shoot', ok: true });
+  }
+  if (b && b.team === 'them' && cheb(p.col, p.row, b.col, b.row) === 1) {
+    const press = pressureOn('them', b.col, b.row);
+    const sub = press >= 2 ? press + ' on him'
+              : roleOf(p).solo ? (goalSide(p, b) ? 'in front of him' : 'get goal-side')
+              : 'needs help';
+    list.push({ id: 'tackle', label: 'Tackle', sub, ok: tackleWorks(p, b) });
+  }
+  if (p.role === 'sweeper') {
+    const near = S.players.some(q => q.team === 'them' && cheb(q.col, q.row, p.col, p.row) === 1);
+    if (near) list.push({ id: 'shove', label: 'Shove', ok: true });
+  }
+  if (p.role === 'gk' && b && b.team === 'them' && cheb(p.col, p.row, b.col, b.row) <= 1) {
+    list.push({ id: 'claim', label: 'Claim', ok: true });
+  }
+  return list;
+}
+
+function arm(id) {
+  const p = byId(S.sel); if (!p || p.acted) return;
+  // tackle and claim need no target, so they fire straight away
+  if (id === 'tackle' || id === 'claim') {
+    const b = carrier();
+    if (!b || b.team !== 'them' || cheb(p.col, p.row, b.col, b.row) > 1) return;
+    if (id === 'tackle') resolveTackle(p, b); else giveBall(p, 'keeper claims');
+    p.acted = true; S.armed = null; syncHUD(); return;
+  }
+  S.armed = S.armed === id ? null : id;
+  syncHUD();
+}
+
+// targets for the currently armed action, as clickable markers
+function armedTargets() {
+  const p = byId(S.sel); if (!p || !S.armed) return [];
+  if (S.armed === 'pass') {
+    return passOptions(p, p.role === 'maker').map(o => ({
+      kind: 'pass', at: o.at, o: o,
+      good: o.kind === 'receive', label: o.kind === 'receive' ? '' : o.kind === 'intercept' ? 'CUT' : 'OUT',
+    }));
+  }
+  if (S.armed === 'shoot') {
+    return shotOptions(p).map(s => ({
+      kind: 'shoot', at: s.target, o: s,
+      good: s.verdict === 'goal',
+      label: s.verdict === 'goal' ? 'GOAL' : s.verdict === 'saved' ? 'SAVED' : 'BLOCK',
+    }));
+  }
+  if (S.armed === 'shove') {
+    const out = [];
+    for (const q of S.players) {
+      if (q.team !== 'them' || cheb(q.col, q.row, p.col, p.row) !== 1) continue;
+      const dc = q.col - p.col, dr = q.row - p.row;
+      const tc = q.col + dc, tr = q.row + dr;
+      const offPitch = !inB(tc, tr);
+      const blocked = !offPitch && !!at(tc, tr);
+      const throwIn = offPitch && S.ball === q.id;
+      out.push({
+        kind: 'shove', at: [q.col, q.row], o: { q, tc, tr, offPitch, throwIn },
+        good: throwIn || (!blocked && !offPitch),
+        label: throwIn ? 'THROW-IN' : (blocked || offPitch) ? 'NO ROOM' : '',
+      });
+    }
+    return out;
+  }
+  return [];
+}
+
+function fireTarget(t) {
+  const p = byId(S.sel); if (!p) return;
+  if (t.kind === 'pass') { resolvePass(p, t.o.dir, p.role === 'maker'); p.acted = true; }
+  else if (t.kind === 'shoot') { resolveShot(p, t.o); p.acted = true; }
+  else if (t.kind === 'shove') {
+    const { q, tc, tr, offPitch, throwIn } = t.o;
+    if (throwIn) {
+      // shoved over the touchline — the body stays on, the throw-in is ours
+      fx(q.col, q.row, 'OUT!', '#ffc857');
+      giveBall(p, 'shoved over the touchline');
+    } else if (offPitch || at(tc, tr)) { return; }   // nowhere to push them: action not spent
+    else { slide(q, tc, tr); SFX.block(); fx(tc, tr, null, null); }
+    p.acted = true;
+  }
+  S.armed = null;
+  syncHUD();
+}
+
+/* ============================================================ effects */
+
+function fx(c, r, text, col) {
+  S.fx.push({ c, r, text, col: col || '#fff', t: 0, dur: text ? 900 : 420 });
+}
+function flash(a, b, col, ms) {
+  const n = el('banner');
+  n.querySelector('.b1').textContent = a;
+  n.querySelector('.b1').style.color = col;
+  n.querySelector('.b2').textContent = b || '';
+  n.classList.add('on');
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => n.classList.remove('on'), ms || 900);
+}
+let conf = [];
+function confetti(col) {
+  for (let i = 0; i < 90; i++) {
+    conf.push({
+      x: Math.random(), y: -.1 - Math.random() * .3,
+      vx: (Math.random() - .5) * .004, vy: .003 + Math.random() * .006,
+      rot: Math.random() * 6.28, vr: (Math.random() - .5) * .3, life: 1,
+      col: i % 3 === 0 ? col : (i % 3 === 1 ? '#ffffff' : US.col),
+    });
+  }
+}
+
+/* ============================================================ canvas */
+
+const cv = el('c'), cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, T = 40, OX = 0, OY = 0;
+
+function resize() {
+  const w = cv.parentNode.clientWidth, h = cv.parentNode.clientHeight;
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = w; H = h;
+  cv.width = Math.max(1, w * DPR); cv.height = Math.max(1, h * DPR);
+  cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  T = Math.floor(Math.min((w - 16) / COLS, (h - 14) / (ROWS + 2)));
+  T = Math.max(18, T);
+  OX = Math.round((w - COLS * T) / 2);
+  OY = Math.round((h - (ROWS + 2) * T) / 2) + T;   // one spare row for each goal
+}
+new ResizeObserver(resize).observe(cv.parentNode);
+window.addEventListener('resize', resize);
+
+const tx = c => OX + c * T;
+const ty = r => OY + r * T;
+const cxx = c => OX + (c + .5) * T;
+const cyy = r => OY + (r + .5) * T;
+
+function rr(x, y, w, h, r) {
+  cx.beginPath();
+  if (cx.roundRect) cx.roundRect(x, y, w, h, r);
+  else {
+    cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
+    cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath();
+  }
+}
+
+/* ---------- drawing: pitch ---------- */
+
+function drawPitch() {
+  cx.fillStyle = '#0d1411';
+  cx.fillRect(0, 0, W, H);
+
+  // mown stripes
+  for (let r = 0; r < ROWS; r++) {
+    cx.fillStyle = r % 2 ? '#1d3a29' : '#1a3325';
+    cx.fillRect(tx(0), ty(r), COLS * T, T);
+  }
+  // goal areas
+  cx.fillStyle = 'rgba(255,255,255,.028)';
+  cx.fillRect(tx(1), ty(0), 5 * T, 3 * T);
+  cx.fillRect(tx(1), ty(ROWS - 3), 5 * T, 3 * T);
+
+  const wl = 'rgba(255,255,255,.16)';
+  cx.strokeStyle = wl; cx.lineWidth = 1;
+  // faint grid
+  for (let c = 1; c < COLS; c++) { cx.beginPath(); cx.moveTo(tx(c), ty(0)); cx.lineTo(tx(c), ty(ROWS)); cx.stroke(); }
+  for (let r = 1; r < ROWS; r++) { cx.beginPath(); cx.moveTo(tx(0), ty(r)); cx.lineTo(tx(COLS), ty(r)); cx.stroke(); }
+
+  // markings
+  cx.strokeStyle = 'rgba(255,255,255,.4)'; cx.lineWidth = 2;
+  cx.strokeRect(tx(0) + 1, ty(0) + 1, COLS * T - 2, ROWS * T - 2);
+  cx.beginPath(); cx.moveTo(tx(0), ty(4.5)); cx.lineTo(tx(COLS), ty(4.5)); cx.stroke();
+  cx.beginPath(); cx.arc(cxx(3), ty(4.5), T * 1.15, 0, 6.2832); cx.stroke();
+  cx.strokeRect(tx(1) + 1, ty(0) + 1, 5 * T - 2, 3 * T - 2);
+  cx.strokeRect(tx(1) + 1, ty(ROWS - 3) + 1, 5 * T - 2, 3 * T - 2);
+  cx.fillStyle = 'rgba(255,255,255,.35)';
+  cx.beginPath(); cx.arc(cxx(3), cyy(4), 2.5, 0, 6.2832); cx.fill();
+
+  // goal mouths, tinted by whoever is defending them
+  drawGoal(-1, S.club.col);   // top: the goal we attack
+  drawGoal(ROWS, US.col);
+}
+
+function drawGoal(r, tint) {
+  const x = tx(GOAL[0]), w = GOAL.length * T, y = ty(r);
+  const up = r < 0;
+  cx.fillStyle = 'rgba(255,255,255,.05)'; cx.fillRect(x, y, w, T);
+  const g = cx.createLinearGradient(0, y, 0, y + T);
+  g.addColorStop(up ? 0 : 1, hexa(tint, .30));
+  g.addColorStop(up ? 1 : 0, hexa(tint, 0));
+  cx.fillStyle = g; cx.fillRect(x, y, w, T);
+  // netting
+  cx.strokeStyle = 'rgba(255,255,255,.16)'; cx.lineWidth = 1;
+  for (let i = 0; i <= GOAL.length * 3; i++) {
+    const xx = x + i * (w / (GOAL.length * 3));
+    cx.beginPath(); cx.moveTo(xx, y); cx.lineTo(xx, y + T); cx.stroke();
+  }
+  for (let i = 1; i < 3; i++) {
+    const yy = y + i * (T / 3);
+    cx.beginPath(); cx.moveTo(x, yy); cx.lineTo(x + w, yy); cx.stroke();
+  }
+  // posts and crossbar, in the defending club's colour
+  cx.strokeStyle = tint; cx.lineWidth = 3.5; cx.lineJoin = 'round';
+  cx.beginPath();
+  cx.moveTo(x, up ? y + T : y); cx.lineTo(x, up ? y : y + T);
+  cx.lineTo(x + w, up ? y : y + T); cx.lineTo(x + w, up ? y + T : y);
+  cx.stroke();
+  // column ticks so shot targets are legible
+  cx.strokeStyle = 'rgba(255,255,255,.22)'; cx.lineWidth = 1;
+  for (let i = 1; i < GOAL.length; i++) {
+    const xx = x + i * T;
+    cx.beginPath(); cx.moveTo(xx, y + 3); cx.lineTo(xx, y + T - 3); cx.stroke();
+  }
+}
+
+/* ---------- drawing: overlays ---------- */
+
+function drawMoveRange() {
+  const p = byId(S.sel);
+  if (!p || p.moved || S.armed || S.phase !== 'plan') return;
+  const spots = reach(p);
+  const pulse = .09 + .05 * Math.sin(performance.now() / 320);
+  for (const n of spots.values()) {
+    if (n.c === p.col && n.r === p.row) continue;
+    cx.fillStyle = 'rgba(120,200,255,' + pulse.toFixed(3) + ')';
+    rr(tx(n.c) + 3, ty(n.r) + 3, T - 6, T - 6, 5); cx.fill();
+    cx.strokeStyle = 'rgba(140,210,255,.28)'; cx.lineWidth = 1;
+    rr(tx(n.c) + 3, ty(n.r) + 3, T - 6, T - 6, 5); cx.stroke();
+  }
+}
+
+function dash(x0, y0, x1, y1, col, wd, phase) {
+  cx.save();
+  cx.strokeStyle = col; cx.lineWidth = wd; cx.lineCap = 'round';
+  cx.setLineDash([6, 5]); cx.lineDashOffset = -(phase || 0);
+  cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x1, y1); cx.stroke();
+  cx.restore();
+}
+function head(x, y, ang, col, s) {
+  cx.save(); cx.translate(x, y); cx.rotate(ang);
+  cx.fillStyle = col; cx.beginPath();
+  cx.moveTo(s, 0); cx.lineTo(-s * .8, s * .68); cx.lineTo(-s * .8, -s * .68); cx.closePath(); cx.fill();
+  cx.restore();
+}
+
+function drawTelegraph() {
+  if (S.phase !== 'plan') return;
+  const ph = (performance.now() / 42) % 11;
+  const R = 'rgba(255,91,77,';
+  for (const it of S.intents) {
+    const p = byId(it.id); if (!p || it.beaten) continue;
+
+    // the run
+    if (it.path.length) {
+      let px = cxx(p.col), py = cyy(p.row);
+      for (const [c, r] of it.path) {
+        const nx = cxx(c), ny = cyy(r);
+        dash(px, py, nx, ny, R + '.55)', 2, ph);
+        px = nx; py = ny;
+      }
+      const last = it.path[it.path.length - 1];
+      const prev = it.path.length > 1 ? it.path[it.path.length - 2] : [p.col, p.row];
+      head(cxx(last[0]), cyy(last[1]), Math.atan2(last[1] - prev[1], last[0] - prev[0]), R + '.8)', T * .17);
+      cx.strokeStyle = R + '.5)'; cx.lineWidth = 1.5;
+      cx.setLineDash([]);
+      rr(tx(last[0]) + 4, ty(last[1]) + 4, T - 8, T - 8, 5); cx.stroke();
+    }
+
+    if (!it.act) continue;
+    const to = it.to;
+    const ax = cxx(to[0]), ay = cyy(to[1]);
+
+    if (it.act.type === 'tackle') {
+      const t = byId(it.act.target); if (!t) continue;
+      dash(ax, ay, cxx(t.col), cyy(t.row), R + '.9)', 2.5, ph);
+      badge(cxx(t.col), cyy(t.row) - T * .6, 'TACKLE', '#ff5b4d');
+    } else if (it.act.type === 'claim') {
+      badge(ax, ay - T * .48, 'CLAIM', '#ffc857');
+    } else if (it.act.type === 'pass' || it.act.type === 'shoot') {
+      // preview it from the declared destination against the board as it stands now
+      const save = [p.col, p.row]; p.col = to[0]; p.row = to[1];
+      let end = null, label = '', col = '#ff5b4d';
+      if (it.act.type === 'pass') {
+        const o = passOutcome(p, it.act.dir, false);
+        end = o.at;
+        label = o.kind === 'receive' ? 'PASS' : o.kind === 'intercept' ? 'YOU CUT IT' : 'OUT';
+        col = o.kind === 'receive' ? '#ff5b4d' : '#6fe08a';
+      } else {
+        const s = shotOptions(p).find(q => q.dir === it.act.dir);
+        if (s) {
+          end = s.target;
+          label = s.verdict === 'goal' ? 'GOAL!' : s.verdict === 'saved' ? 'SAVED' : 'BLOCKED';
+          col = s.verdict === 'goal' ? '#ff5b4d' : '#6fe08a';
+        } else { label = 'NO SHOT'; col = '#6fe08a'; end = [to[0], to[1]]; }
+      }
+      p.col = save[0]; p.row = save[1];
+      if (end) {
+        dash(ax, ay, cxx(end[0]), cyy(end[1]), col === '#6fe08a' ? 'rgba(111,224,138,.75)' : R + '.85)', 2.5, ph);
+        cx.fillStyle = col; cx.globalAlpha = .22;
+        rr(tx(end[0]) + 4, ty(end[1]) + 4, T - 8, T - 8, 5); cx.fill();
+        cx.globalAlpha = 1;
+        badge(cxx(end[0]), cyy(end[1]) - T * .1, label, col);
+      }
+    }
+  }
+}
+
+// Badges are queued and flushed after the tokens, otherwise a verdict sitting on an
+// occupied square (an interception marker, a blocked shot) disappears under the player.
+let BADGES = [];
+function badge(x, y, text, col) { BADGES.push([x, y, text, col]); }
+function flushBadges() {
+  for (const b of BADGES) drawBadge(b[0], b[1], b[2], b[3]);
+  BADGES.length = 0;
+}
+
+function drawBadge(x, y, text, col) {
+  cx.save();
+  cx.font = '700 ' + Math.max(8, Math.round(T * .215)) + 'px "Geist Mono", ui-monospace, monospace';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  const w = cx.measureText(text).width + 10, h = Math.round(T * .34);
+  cx.fillStyle = 'rgba(8,13,11,.9)';
+  rr(x - w / 2, y - h / 2, w, h, 4); cx.fill();
+  cx.strokeStyle = col; cx.lineWidth = 1; cx.stroke();
+  cx.fillStyle = col; cx.fillText(text, x, y + .5);
+  cx.restore();
+}
+
+function drawArmed() {
+  const list = armedTargets();
+  if (!list.length) return;
+  const p = byId(S.sel);
+  const ph = (performance.now() / 34) % 11;
+  for (const t of list) {
+    const col = t.good ? '#6fe08a' : '#8b9a92';
+    dash(cxx(p.col), cyy(p.row), cxx(t.at[0]), cyy(t.at[1]), t.good ? 'rgba(111,224,138,.8)' : 'rgba(150,168,158,.45)', 2.5, ph);
+    cx.fillStyle = col; cx.globalAlpha = t.good ? .3 : .13;
+    rr(tx(t.at[0]) + 3, ty(t.at[1]) + 3, T - 6, T - 6, 5); cx.fill();
+    cx.globalAlpha = 1;
+    cx.strokeStyle = col; cx.lineWidth = t.good ? 2 : 1;
+    rr(tx(t.at[0]) + 3, ty(t.at[1]) + 3, T - 6, T - 6, 5); cx.stroke();
+    if (t.label) badge(cxx(t.at[0]), cyy(t.at[1]) - T * .06, t.label, col);
+  }
+}
+
+/* ---------- drawing: players ---------- */
+
+// tweens advance exactly once per frame, here — never inside a draw call
+function stepTweens(dt) {
+  for (const p of S.players) if (p.tw) { p.tw.t += dt; if (p.tw.t >= p.tw.dur) p.tw = null; }
+  if (S.ballTw) { S.ballTw.t += dt; if (S.ballTw.t >= S.ballTw.dur) S.ballTw = null; }
+  for (let i = S.fx.length - 1; i >= 0; i--) { S.fx[i].t += dt; if (S.fx[i].t >= S.fx[i].dur) S.fx.splice(i, 1); }
+}
+
+function drawPlayers() {
+  const now = performance.now();
+  // shadows first, so tokens never sit under a neighbour's shadow
+  for (const p of S.players) {
+    const [x, y] = renderPos(p);
+    cx.fillStyle = 'rgba(0,0,0,.3)';
+    cx.beginPath(); cx.ellipse(x, y + T * .3, T * .3, T * .11, 0, 0, 6.2832); cx.fill();
+  }
+  for (const p of S.players) drawPlayer(p, now);
+}
+
+function renderPos(p) {
+  let c = p.col, r = p.row;
+  if (p.tw) {
+    const e = ease(Math.min(1, p.tw.t / p.tw.dur));
+    c = lerp(p.tw.c0, p.col, e); r = lerp(p.tw.r0, p.row, e);
+  }
+  return [cxx(c), cyy(r)];
+}
+
+function drawPlayer(p, now) {
+  const [x, y] = renderPos(p);
+  const rad = T * .33;
+  const us = p.team === 'us';
+  const base = us ? US.col : S.club.col;
+  const sel = S.sel === p.id;
+  const has = S.ball === p.id;
+
+  // selection ring
+  if (sel && S.phase === 'plan') {
+    cx.strokeStyle = 'rgba(255,255,255,' + (.5 + .3 * Math.sin(now / 200)).toFixed(3) + ')';
+    cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(x, y, rad + 4.5, 0, 6.2832); cx.stroke();
+  }
+  // spent marker
+  const spent = us && p.moved && p.acted && S.phase === 'plan';
+
+  cx.save();
+  if (p.beaten > 0 || spent) cx.globalAlpha = .45;
+
+  // body
+  const g = cx.createLinearGradient(x, y - rad, x, y + rad);
+  g.addColorStop(0, shade(base, 1.22)); g.addColorStop(1, shade(base, .74));
+  cx.fillStyle = g;
+  cx.beginPath(); cx.arc(x, y, rad, 0, 6.2832); cx.fill();
+  cx.strokeStyle = p.role === 'gk' ? '#ffd98a' : 'rgba(0,0,0,.42)';
+  cx.lineWidth = p.role === 'gk' ? 2 : 1.5;
+  cx.beginPath(); cx.arc(x, y, rad, 0, 6.2832); cx.stroke();
+
+  // role glyph
+  cx.fillStyle = 'rgba(255,255,255,.92)';
+  cx.font = '700 ' + Math.max(8, Math.round(T * .27)) + 'px "Geist Mono", ui-monospace, monospace';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(glyph(p.role), x, y + .5);
+  cx.restore();
+
+  // beaten swirl
+  if (p.beaten > 0) {
+    cx.strokeStyle = '#ffc857'; cx.lineWidth = 1.6;
+    cx.beginPath();
+    for (let i = 0; i <= 26; i++) {
+      const a = i / 26 * 7 + now / 420, rr2 = rad * .3 + i / 26 * rad * .78;
+      const px = x + Math.cos(a) * rr2, py = y - rad - 5 + Math.sin(a) * rr2 * .3;
+      i ? cx.lineTo(px, py) : cx.moveTo(px, py);
+    }
+    cx.stroke();
+  }
+  // pressure pips on the carrier
+  if (has) {
+    const press = pressureOn(p.team, p.col, p.row);
+    if (press > 0) {
+      for (let i = 0; i < press; i++) {
+        cx.fillStyle = p.team === 'us' ? '#ff5b4d' : '#6fe08a';
+        cx.beginPath();
+        cx.arc(x - (press - 1) * 3.2 + i * 6.4, y + rad + 6, 2.3, 0, 6.2832); cx.fill();
+      }
+    }
+  }
+  if (has) drawBall(x, y, rad);
+}
+
+function glyph(r) {
+  return r === 'gk' ? 'G' : r === 'anchor' ? 'A' : r === 'sweeper' ? 'S' : r === 'maker' ? 'P'
+       : r === 'striker' ? '9' : r === 'winger' ? '7' : r === 'enforcer' ? '4' : '8';
+}
+
+function drawBall(px, py, rad) {
+  let x, y;
+  if (S.ballTw) {
+    const k = Math.min(1, S.ballTw.t / S.ballTw.dur);
+    x = cxx(lerp(S.ballTw.c0, S.ballTw.c1, k));
+    y = cyy(lerp(S.ballTw.r0, S.ballTw.r1, k));
+  } else { x = px + rad * .82; y = py - rad * .82; }
+  const br = Math.max(3.2, T * .13);
+  cx.fillStyle = 'rgba(0,0,0,.35)';
+  cx.beginPath(); cx.arc(x + 1, y + 1.5, br, 0, 6.2832); cx.fill();
+  cx.fillStyle = '#fff';
+  cx.beginPath(); cx.arc(x, y, br, 0, 6.2832); cx.fill();
+  cx.fillStyle = '#1a2b22';
+  cx.beginPath(); cx.arc(x, y, br * .34, 0, 6.2832); cx.fill();
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * 6.2832 + .5;
+    cx.beginPath(); cx.arc(x + Math.cos(a) * br * .62, y + Math.sin(a) * br * .62, br * .2, 0, 6.2832); cx.fill();
+  }
+}
+
+function hexa(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp(Math.round((n >> 16) * f), 0, 255);
+  const g = clamp(Math.round(((n >> 8) & 255) * f), 0, 255);
+  const b = clamp(Math.round((n & 255) * f), 0, 255);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+function drawFx() {
+  for (const f of S.fx) {
+    const k = Math.min(1, f.t / f.dur);
+    const x = cxx(f.c), y = cyy(clamp(f.r, -1, ROWS));
+    cx.save();
+    cx.globalAlpha = 1 - k;
+    if (f.text) {
+      cx.font = '700 ' + Math.max(10, Math.round(T * .3)) + 'px "Geist", sans-serif';
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillStyle = 'rgba(0,0,0,.6)';
+      cx.fillText(f.text, x + 1, y - T * .55 - k * T * .5 + 1);
+      cx.fillStyle = f.col;
+      cx.fillText(f.text, x, y - T * .55 - k * T * .5);
+    } else {
+      cx.strokeStyle = f.col; cx.lineWidth = 2;
+      cx.beginPath(); cx.arc(x, y, T * (.2 + k * .5), 0, 6.2832); cx.stroke();
+    }
+    cx.restore();
+  }
+}
+
+function drawConfetti() {
+  for (let i = conf.length - 1; i >= 0; i--) {
+    const p = conf[i];
+    p.x += p.vx; p.y += p.vy; p.vy += .00012; p.rot += p.vr; p.life -= .006;
+    if (p.y > 1.2 || p.life <= 0) { conf.splice(i, 1); continue; }
+    cx.save();
+    cx.translate(p.x * W, p.y * H); cx.rotate(p.rot);
+    cx.globalAlpha = Math.max(0, Math.min(1, p.life));
+    cx.fillStyle = p.col; cx.fillRect(-3, -1.6, 6, 3.2);
+    cx.restore();
+  }
+}
+
+/* ---------- frame ---------- */
+
+let lastT = 0;
+function frame(now) {
+  const dt = lastT ? Math.min(50, now - lastT) : 16;
+  lastT = now;
+  runScript(now);
+  stepTweens(dt);
+  if (S.screen !== 'title') {
+    drawPitch();
+    drawMoveRange();
+    drawTelegraph();
+    drawArmed();
+    drawPlayers();
+    flushBadges();
+    drawFx();
+  } else {
+    cx.fillStyle = '#0d1411'; cx.fillRect(0, 0, W, H);
+  }
+  drawConfetti();
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================ input */
+
+function hit(ev) {
+  const rect = cv.getBoundingClientRect();
+  const px = (ev.clientX != null ? ev.clientX : ev.touches[0].clientX) - rect.left;
+  const py = (ev.clientY != null ? ev.clientY : ev.touches[0].clientY) - rect.top;
+  return [Math.floor((px - OX) / T), Math.floor((py - OY) / T)];
+}
+
+cv.addEventListener('pointerdown', ev => {
+  if (S.screen !== 'match' || S.phase !== 'plan') return;
+  ev.preventDefault();
+  const [c, r] = hit(ev);
+
+  // armed action: is this one of the offered targets?
+  if (S.armed) {
+    for (const t of armedTargets()) {
+      if (t.at[0] === c && t.at[1] === r) { fireTarget(t); return; }
+    }
+  }
+
+  if (!inB(c, r)) { S.armed = null; syncHUD(); return; }
+  const p = at(c, r);
+  if (p && selectable(p)) { pick(p); return; }
+  if (p) { S.armed = null; syncHUD(); return; }
+
+  const s = byId(S.sel);
+  if (s && !s.moved && !S.armed) {
+    const spots = reach(s);
+    const n = spots.get(key(c, r));
+    if (n && n.steps > 0) { doMove(s, n); return; }
+  }
+  S.armed = null; S.sel = null; syncHUD();
+});
+
+window.addEventListener('keydown', ev => {
+  if (S.screen !== 'match') return;
+  if (document.querySelector('.sheet.on')) return;   // don't drive the match behind an overlay
+  const k = ev.key.toLowerCase();
+  if (k === ' ' || k === 'enter') { ev.preventDefault(); endTurn(); }
+  else if (k === 'r') { ev.preventDefault(); restore(); }
+  else if (k === 'u') { const p = byId(S.sel); if (p) undoMove(p); }
+  else if (k === 'escape') { S.armed = null; syncHUD(); }
+  else if (k === 'tab') {
+    ev.preventDefault();
+    const list = squad('us').filter(selectable);
+    if (!list.length) return;
+    const i = list.findIndex(p => p.id === S.sel);
+    pick(list[(i + 1) % list.length]);
+  }
+});
+
+/* ============================================================ HUD wiring */
+
+function el(id) { return document.getElementById(id); }
+function show(id) { el(id).classList.add('on'); }
+function hide(id) { el(id).classList.remove('on'); }
+
+function syncHUD() {
+  el('crestUs').style.background = US.col;
+  el('nameUs').textContent = US.name;
+  el('crestThem').style.background = S.club.col;
+  el('nameThem').textContent = S.club.name;
+  el('score').textContent = S.score.us + '–' + S.score.them;
+  el('clockBig').textContent = S.turn + '/' + S.maxTurns;
+
+  // threat strip
+  const strip = el('threat');
+  strip.innerHTML = '';
+  if (S.phase === 'plan') {
+    const own = owner();
+    const lead = document.createElement('div');
+    lead.className = 'chip calm';
+    lead.textContent = own === 'us' ? 'YOU HAVE THE BALL' : S.club.name.toUpperCase() + ' IN POSSESSION';
+    strip.appendChild(lead);
+    for (const c of threatChips()) {
+      const d = document.createElement('div');
+      d.className = 'chip' + (c.danger ? ' danger' : '');
+      d.textContent = c.text;
+      strip.appendChild(d);
+    }
+  } else {
+    const d = document.createElement('div');
+    d.className = 'chip calm'; d.textContent = 'RESOLVING…';
+    strip.appendChild(d);
+  }
+
+  // selected player card
+  const p = byId(S.sel);
+  const nm = el('who').querySelector('.nm'), rl = el('who').querySelector('.rl'), hn = el('who').querySelector('.hint');
+  if (p) {
+    nm.textContent = roleOf(p).name;
+    nm.style.color = US.col;
+    const steps = S.ball === p.id ? Math.max(1, roleOf(p).speed - 1) : roleOf(p).speed;
+    rl.textContent = (p.moved ? 'moved' : steps + ' squares') + (p.acted ? ' · acted' : '');
+    hn.textContent = S.armed ? 'pick a target on the pitch' : ABIL[p.role] || '';
+  } else {
+    nm.textContent = S.phase === 'plan' ? 'Tap one of your players' : '—';
+    nm.style.color = 'var(--ink)';
+    rl.textContent = ''; hn.textContent = S.phase === 'plan' ? 'read the red arrows first' : '';
+  }
+
+  // action buttons
+  const bar = el('acts');
+  bar.innerHTML = '';
+  if (p && S.phase === 'plan') {
+    for (const a of actionsFor(p)) {
+      const b = mk('act', a.label + (a.sub ? ' · ' + a.sub : ''));
+      if (p.acted) b.disabled = true;
+      if (S.armed === a.id) b.classList.add('armed');
+      if (a.id === 'tackle' && !a.ok) b.classList.add('ghost');   // will fail — shown, not hidden
+      b.onclick = () => arm(a.id);
+      bar.appendChild(b);
+    }
+    if (p.moved && !p.acted) {
+      const u = mk('act ghost', 'Undo move'); u.onclick = () => undoMove(p); bar.appendChild(u);
+    }
+  }
+  if (S.phase === 'plan') {
+    const rs = mk('act ghost', 'Reset'); rs.onclick = restore; bar.appendChild(rs);
+    const et = mk('act go', 'End Turn ▸'); et.onclick = endTurn; bar.appendChild(et);
+  } else {
+    const w = mk('act go', '…'); w.disabled = true; bar.appendChild(w);
+  }
+}
+
+const ABIL = {
+  gk: 'Claims any ball within one square',
+  anchor: 'Tackles without help',
+  sweeper: 'Shove pushes a body one square',
+  maker: 'Threaded pass slips past one body',
+};
+
+function mk(cls, text) {
+  const b = document.createElement('button');
+  b.className = 'act';
+  for (const c of cls.split(/\s+/)) if (c && c !== 'act') b.classList.add(c);
+  b.textContent = text;
+  return b;
+}
+
+function threatChips() {
+  const out = [];
+  for (const it of S.intents) {
+    const p = byId(it.id); if (!p) continue;
+    const nm = roleOf(p).name;
+    if (it.beaten) { out.push({ text: nm + ': beaten' }); continue; }
+    if (!it.act) {
+      const moved = it.path.length;
+      out.push({ text: nm + (moved ? ': runs ' + dirWord(p, it.to) : ': holds') });
+      continue;
+    }
+    if (it.act.type === 'tackle') { out.push({ text: nm + ': TACKLE', danger: true }); continue; }
+    if (it.act.type === 'claim') { out.push({ text: nm + ': rushes out', danger: true }); continue; }
+    // pass / shot verdicts, evaluated live
+    const save = [p.col, p.row]; p.col = it.to[0]; p.row = it.to[1];
+    if (it.act.type === 'shoot') {
+      const s = shotOptions(p).find(q => q.dir === it.act.dir);
+      out.push(s
+        ? { text: nm + ': SHOOTS · ' + (s.verdict === 'goal' ? 'GOAL' : s.verdict === 'saved' ? 'saved' : 'blocked'),
+            danger: s.verdict === 'goal' }
+        : { text: nm + ': shot gone' });
+    } else {
+      const o = passOutcome(p, it.act.dir, false);
+      out.push({ text: nm + ': pass ' + DNAME[it.act.dir] + (o.kind === 'receive' ? '' : o.kind === 'intercept' ? ' · you cut it' : ' · out'),
+                 danger: o.kind === 'receive' });
+    }
+    p.col = save[0]; p.row = save[1];
+  }
+  return out;
+}
+function dirWord(p, to) {
+  const dc = to[0] - p.col, dr = to[1] - p.row;
+  const v = Math.abs(dr) >= Math.abs(dc) ? (dr < 0 ? 'up' : 'down') : (dc < 0 ? 'left' : 'right');
+  return v;
+}
+
+/* ============================================================ tips (first match) */
+
+const TIPS = [
+  'Red arrows are <b>promises</b>. Everything the opposition will do this turn is already drawn — including whether their shot would be a <b>GOAL</b> or saved.',
+  'A <b>Tackle</b> needs two of your players next to the carrier. Your <b>Anchor</b> wins it alone, but only from <b>goal-side</b> — get in front of them, do not chase.',
+  'Bodies block rays. Stand in a passing lane and their pass reads <b>YOU CUT IT</b> instead.',
+  'Attacking: keeper reach shrinks as you close in. From <b>row 1 or the goal line</b> it can only cover a square or two.',
+  'Their keeper picks its spot by watching whoever holds the ball. <b>Pass to a teammate who has not acted</b>, then shoot with them.',
+];
+function showTip(html) {
+  const t = el('tip'); t.innerHTML = html + ' <span style="color:#5f6f66">(tap to dismiss)</span>';
+  t.classList.add('on');
+}
+function hideTip() { el('tip').classList.remove('on'); }
+el('tip').addEventListener('pointerdown', () => {
+  hideTip();
+  S.tips.shift();
+  if (S.tips.length) setTimeout(() => { if (S.phase === 'plan') showTip(S.tips[0]); }, 400);
+});
+
+/* ============================================================ menus */
+
+function buildLadder() {
+  const box = el('ladder'); box.innerHTML = '';
+  CLUBS.forEach((c, i) => {
+    const done = prog.beaten.indexOf(i) >= 0;
+    const open = i === 0 || prog.beaten.indexOf(i - 1) >= 0;
+    const b = document.createElement('button');
+    b.className = 'club'; b.disabled = !open;
+    b.innerHTML = '<div class="cr" style="background:' + c.col + '"></div>' +
+      '<div><div class="t1">' + c.name + '</div><div class="t2">' + (open ? c.note : 'locked') + '</div></div>' +
+      '<div class="tag' + (done ? ' won' : '') + '">' + (done ? 'beaten' : open ? c.turns + ' turns' : '—') + '</div>';
+    b.onclick = () => startMatch(i);
+    box.appendChild(b);
+  });
+}
+
+el('btnRules').onclick = () => show('sheetRules');
+el('btnRulesClose').onclick = () => hide('sheetRules');
+el('btnHelp').onclick = () => show('sheetRules');
+el('btnQuit').onclick = () => { S.screen = 'title'; script = []; buildLadder(); show('sheetTitle'); };
+el('btnSound').onclick = () => {
+  S.sound = !S.sound;
+  el('btnSound').style.color = S.sound ? 'var(--ink)' : '#3d4a44';
+  if (S.sound) SFX.step();
+};
+el('btnLadder').onclick = () => { hide('sheetResult'); S.screen = 'title'; script = []; buildLadder(); show('sheetTitle'); };
+el('btnAgain').onclick = () => {
+  const won = S.score.us > S.score.them, nxt = S.clubIx + 1;
+  hide('sheetResult');
+  startMatch(won && nxt < CLUBS.length ? nxt : S.clubIx);
+};
+
+/* ============================================================ boot */
+
+buildLadder();
+resize();
+syncHUD();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
