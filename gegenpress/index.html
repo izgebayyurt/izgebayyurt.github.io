@@ -132,6 +132,8 @@
     padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
   }
   .sheet.on { display: block; }
+  /* the ladder is a full stop, not an overlay — the match chrome must not show through */
+  #sheetTitle, #sheetRules { background: #0b110e; }
   .inner { max-width: 470px; margin: 0 auto; }
   h1.logo {
     font-size: clamp(34px, 12vw, 58px); font-weight: 700; letter-spacing: -.035em;
@@ -1702,6 +1704,7 @@ cv.addEventListener('pointerdown', ev => {
 
 window.addEventListener('keydown', ev => {
   if (S.screen !== 'match') return;
+  if (document.querySelector('.sheet.on')) return;   // don't drive the match behind an overlay
   const k = ev.key.toLowerCase();
   if (k === ' ' || k === 'enter') { ev.preventDefault(); endTurn(); }
   else if (k === 'r') { ev.preventDefault(); restore(); }
