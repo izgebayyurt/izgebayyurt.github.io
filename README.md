@@ -13,6 +13,9 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   the baked-in image data (`portrait-data.js`, `img-data.js`).
 - `directions/asteroidz.jsx` — the playable Asteroids port embedded on the homepage.
 - `games/` — game write-up pages (`asteroids`, `marblz`, `soviet-scoot`) and assets.
+- `swerve/` — mobile-first arcade free kicks. One swipe is the whole game: direction
+  aims, length powers, and the hook in your swipe becomes the ball's curve. Every set
+  piece is verified solvable before you see it. Single self-contained `index.html`.
 - `worldie/` — arcade soccer score attack. 45 seconds on the clock, one striker
   against a keeper and waves of defenders; every goal buys +4s and quick goals
   chain a combo multiplier. Single self-contained `index.html`.
