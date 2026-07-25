@@ -13,20 +13,6 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   the baked-in image data (`portrait-data.js`, `img-data.js`).
 - `directions/asteroidz.jsx` — the playable Asteroids port embedded on the homepage.
 - `games/` — game write-up pages (`asteroids`, `marblz`, `soviet-scoot`) and assets.
-- `rondo/` — tiki-taka as a one-thumb game. You never steer a player; you only
-  choose the pass. The opposition holds a zonal block that slides toward the ball
-  with inertia and presses with one or two players, never a chase. Moving the ball
-  faster than the shape reorganises is what opens a lane. Single self-contained
-  `index.html`.
-- `swerve/` — mobile-first arcade free kicks. One swipe is the whole game: direction
-  aims, length powers, and the hook in your swipe becomes the ball's curve. Every set
-  piece is verified solvable before you see it. Single self-contained `index.html`.
-- `worldie/` — arcade soccer score attack. 45 seconds on the clock, one striker
-  against a keeper and waves of defenders; every goal buys +4s and quick goals
-  chain a combo multiplier. Single self-contained `index.html`.
-- `gegenpress/` — turn-based soccer tactics on a 7×9 grid. Perfect information: the
-  opposition telegraphs every run, pass, shot and tackle before you commit, and
-  resolution is fully deterministic. Single self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
