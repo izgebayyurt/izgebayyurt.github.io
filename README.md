@@ -22,13 +22,17 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
 - `gegenpress/` — turn-based soccer tactics on a 7×9 grid. Perfect information: the
   opposition telegraphs every run, pass, shot and tackle before you commit, and
   resolution is fully deterministic. Single self-contained `index.html`.
-- `burnbridge/` — graph-theory puzzler. Drag a route between islands; every bridge
-  burns behind you, so the map is a resource you spend rather than a board you walk.
-  Reach every island under par (the true optimum, solved by branch-and-bound before
-  you see the level), or take on the gold levels where the rule flips to Euler's:
-  burn every bridge exactly once. Includes Königsberg itself as an unsolvable
-  interlude that shows you *why*. 17 hand-built crossings plus endless generated
-  ones. Single self-contained `index.html`.
+- `burnbridge/` — graph-theory puzzler for two travellers. They share one pool of
+  bridges and every crossing burns the bridge behind it, so each span one spends is
+  denied to the other forever. Formally: two edge-disjoint trails, one per traveller,
+  that jointly reach every island — with claimed islands that only their own
+  traveller can settle, so neither can idle. No distances and no numbers on the
+  board; par is the fewest crossings that can settle it. Starts and claims are not
+  hand-placed: a search certified every board against the solver (solvable, both
+  travellers required, and the obvious greedy line strands). The same solver runs
+  after each move, so the game says so the moment a board can no longer be finished.
+  14 certified crossings, endless generated ones, and Königsberg itself as an
+  interlude that shows you why it cannot be done. Single self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
