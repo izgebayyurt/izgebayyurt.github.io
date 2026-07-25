@@ -13,6 +13,9 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   the baked-in image data (`portrait-data.js`, `img-data.js`).
 - `directions/asteroidz.jsx` — the playable Asteroids port embedded on the homepage.
 - `games/` — game write-up pages (`asteroids`, `marblz`, `soviet-scoot`) and assets.
+- `gegenpress/` — turn-based soccer tactics on a 7×9 grid. Perfect information: the
+  opposition telegraphs every run, pass, shot and tackle before you commit, and
+  resolution is fully deterministic. Single self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
