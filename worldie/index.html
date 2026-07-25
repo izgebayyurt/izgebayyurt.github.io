@@ -119,8 +119,32 @@ const SFX = {
 
 const START_TIME = 45, TIME_PER_GOAL = 4, TIME_CAP = 60, COMBO_WINDOW = 8;
 const CONTROL_R = 62;          // how close the ball must be to strike it
-const MAX_CHARGE = .62;
-const WIND_UP = .28;           // tackle tell — your window to turn away
+const PLAYER_TOP = 336;
+const ASSIST = 72;             // how far wide a shot can be and still be pulled on target
+
+// Two difficulty settings. Defenders are never allowed to be faster than you —
+// being outrun by the chasing pack is what made this feel unfair.
+const DIFF = {
+  rookie: {
+    name: 'ROOKIE', blurb: 'forgiving · start here',
+    maxDefs: 4, pressers: 2,
+    defSpeed: l => Math.min(310, 230 + l * 7),
+    gkSpeed:  l => Math.min(470, 335 + l * 11),
+    gkReach:  l => Math.min(56, 45 + l),
+    windUp: .38, lunge: 440, maxCharge: .42, chargeSlow: .94,
+  },
+  pro: {
+    name: 'PRO', blurb: 'quicker, deeper, meaner',
+    maxDefs: 6, pressers: 3,
+    defSpeed: l => Math.min(326, 248 + l * 8),
+    gkSpeed:  l => Math.min(540, 365 + l * 13),
+    gkReach:  l => Math.min(64, 49 + l * 1.2),
+    windUp: .28, lunge: 520, maxCharge: .5, chargeSlow: .86,
+  },
+};
+let diffKey = 'rookie';
+try { const d = localStorage.getItem('worldie.diff'); if (d && DIFF[d]) diffKey = d; } catch (e) {}
+const D = () => DIFF[diffKey];
 
 let S = null;
 let best = 0;
@@ -137,7 +161,7 @@ function newGame() {
     score: 0, goals: 0, combo: 0, comboT: 0, bestCombo: 0,
     player: { x: FW / 2, y: 855, vx: 0, vy: 0, r: 21, face: -Math.PI / 2, stun: 0, trail: [] },
     ball:   { x: FW / 2, y: 800, vx: 0, vy: 0, r: 13, spin: 0, trail: [],
-              lastTouch: 0, noCollect: 0, shotFrom: null, shotPower: 0, controlSince: 0, live: true },
+              lastTouch: 0, noCollect: 0, gkLock: 0, shotFrom: null, shotPower: 0, controlSince: 0, live: true },
     keeper: { x: FW / 2, y: GOAL.y + 26, vx: 0, r: 22, dive: 0, diveDir: 0, target: FW / 2, react: 0 },
     defs: [],
     beaten: 0,
@@ -152,10 +176,10 @@ function newGame() {
 
 // difficulty scales purely with goals scored
 const lvl = () => S.goals;
-const defCount  = () => clamp(2 + Math.floor(lvl() / 2), 2, 7);
-const defSpeed  = () => Math.min(380, 236 + lvl() * 9);
-const gkSpeed   = () => Math.min(520, 300 + lvl() * 13);
-const gkReach   = () => Math.min(62, 44 + lvl() * 1.3);
+const defCount  = () => clamp(2 + Math.floor(lvl() / 3), 2, D().maxDefs);
+const defSpeed  = () => D().defSpeed(lvl());
+const gkSpeed   = () => D().gkSpeed(lvl());
+const gkReach   = () => D().gkReach(lvl());
 
 function syncDefenders() {
   const want = defCount();
@@ -175,7 +199,8 @@ function spawnDef(i) {
 /* ============================================================ input */
 
 const keys = {};
-let aimSrc = 'key', mouse = { x: FW / 2, y: 400, on: false, moved: 0 };
+let aimMode = ('ontouchstart' in window) ? 'run' : 'point';   // 'run' = run direction, 'point' = cursor
+let mouse = { x: FW / 2, y: 400, on: false, moved: 0 };
 let stick = { id: null, ox: 0, oy: 0, x: 0, y: 0, live: false };
 let shootTouch = null;
 let firePressed = false;
@@ -188,7 +213,7 @@ window.addEventListener('keydown', e => {
   if (k === ' ' || k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright') e.preventDefault();
   if (k === 'm') { muted = !muted; }
   if (screen !== 'play' && (k === ' ' || k === 'enter')) { actx(); start(); return; }
-  if (k === ' ' || k === 'j' || k === 'k') { firePressed = true; aimSrc = 'key'; }
+  if (k === ' ' || k === 'j' || k === 'k') { firePressed = true; aimMode = 'run'; }
 });
 window.addEventListener('keyup', e => {
   const k = e.key.toLowerCase();
@@ -199,18 +224,29 @@ window.addEventListener('keyup', e => {
 cv.addEventListener('mousemove', e => {
   const [x, y] = toLogical(e.clientX, e.clientY);
   mouse.x = x; mouse.y = y; mouse.moved = now();
-  if (!('ontouchstart' in window)) aimSrc = 'mouse';
 });
 cv.addEventListener('mousedown', e => {
   e.preventDefault(); actx();
-  if (screen !== 'play') { start(); return; }
-  firePressed = true; aimSrc = 'mouse';
+  if (screen !== 'play') {
+    const [lx, ly] = toLogical(e.clientX, e.clientY);
+    const k = screen === 'title' ? hitDiff(lx, ly) : null;
+    if (k) { pickDiff(k); start(); } else start();
+    return;
+  }
+  firePressed = true; aimMode = 'point';
 });
 window.addEventListener('mouseup', () => { firePressed = false; });
 
 cv.addEventListener('touchstart', e => {
   e.preventDefault(); actx();
-  if (screen !== 'play') { start(); return; }
+  if (screen !== 'play') {
+    const t0 = e.changedTouches[0];
+    const [lx, ly] = toLogical(t0.clientX, t0.clientY);
+    const k = screen === 'title' ? hitDiff(lx, ly) : null;
+    if (k) pickDiff(k);
+    start();
+    return;
+  }
   for (const t of e.changedTouches) {
     const [x, y] = toLogical(t.clientX, t.clientY);
     if (x < FW / 2 && stick.id === null) {
@@ -219,7 +255,7 @@ cv.addEventListener('touchstart', e => {
       shootTouch = t.identifier; firePressed = true;
     }
   }
-  aimSrc = 'key';
+  aimMode = 'run';
 }, { passive: false });
 
 cv.addEventListener('touchmove', e => {
@@ -259,17 +295,38 @@ function moveVec() {
   return [dx, dy, Math.min(1, d)];
 }
 
-// where a shot would go
-function aimVec() {
+// Where a shot would go. The aim source is locked to how you last shot — it used
+// to flip to the mouse for 3s after any mouse movement, so the same keypress
+// fired somewhere different depending on what you had touched recently.
+function rawAim() {
   const p = S.player;
-  if (aimSrc === 'mouse' && now() - mouse.moved < 3) {
+  if (aimMode === 'point') {
     const dx = mouse.x - p.x, dy = mouse.y - p.y, d = Math.hypot(dx, dy) || 1;
     return [dx / d, dy / d];
   }
   const [mx, my, mag] = moveVec();
   if (mag > .2) { const d = Math.hypot(mx, my) || 1; return [mx / d, my / d]; }
-  // idle: aim at the middle of the goal
   const dx = FW / 2 - p.x, dy = GOAL.y - p.y, d = Math.hypot(dx, dy) || 1;
+  return [dx / d, dy / d];   // idle: aim at the middle of the goal
+}
+
+// Pull a nearly-on-target shot onto the goal. Which side you picked still
+// decides whether you beat the keeper, so placement remains the skill.
+function goalLineCross(p, ax, ay) {
+  if (ay > -.12) return null;
+  const t = (GOAL.y - p.y) / ay;
+  return t > 0 ? p.x + ax * t : null;
+}
+function aimVec() {
+  const p = S.player;
+  const [ax, ay] = rawAim();
+  const cross = goalLineCross(p, ax, ay);
+  if (cross === null) return [ax, ay];
+  const lo = GOAL.x0 + 14, hi = GOAL.x1 - 14;
+  if (cross >= lo && cross <= hi) return [ax, ay];        // already on target
+  if (cross < lo - ASSIST || cross > hi + ASSIST) return [ax, ay];  // genuinely wide
+  const tx = clamp(cross, lo, hi);
+  const dx = tx - p.x, dy = GOAL.y - p.y, d = Math.hypot(dx, dy) || 1;
   return [dx / d, dy / d];
 }
 
@@ -329,6 +386,7 @@ function update(dt) {
 
   updatePlayer(dt);
   updateBall(dt);
+  assignRoles();
   for (const d of S.defs) updateDef(d, dt);
   updateKeeper(dt);
   checkGoal();
@@ -346,7 +404,7 @@ function serveBall() {
   const ang = Math.atan2(GOAL.y - p.y, FW / 2 - p.x);
   b.x = clamp(p.x + Math.cos(ang) * 60, WALL.x0 + 40, WALL.x1 - 40);
   b.y = clamp(p.y + Math.sin(ang) * 60, GOAL.y + 90, WALL.y1 - 40);
-  b.vx = 0; b.vy = 0; b.noCollect = .1; b.trail = [];
+  b.vx = 0; b.vy = 0; b.noCollect = .1; b.gkLock = .2; b.trail = [];
   b.shotFrom = null; b.firstTime = false; b.lastTouch = 0;
   // shove anyone standing on the restart out of the way
   for (const d of S.defs) {
@@ -370,7 +428,7 @@ function updatePlayer(dt) {
   const [mx, my, mag] = moveVec();
   const charging = S.charging;
   // committing to a shot costs a little pace — that is the trade
-  const top = 336 * (charging ? .68 : 1) * (p.stun > 0 ? .25 : 1);
+  const top = PLAYER_TOP * (charging ? D().chargeSlow : 1) * (p.stun > 0 ? .25 : 1);
   const acc = 2400 * (p.stun > 0 ? .3 : 1);
 
   if (mag > .05) {
@@ -406,7 +464,7 @@ function updatePlayer(dt) {
     // Holding shoot IS close control: the ball sticks to your feet so a charge
     // survives a run. Kicking it while charging made the charge cancel itself.
     S.charging = true;
-    S.shotCharge = Math.min(MAX_CHARGE, S.shotCharge + dt);
+    S.shotCharge = Math.min(D().maxCharge, S.shotCharge + dt);
     const ang = mag > .15 ? Math.atan2(my, mx) : p.face;
     const tx = p.x + Math.cos(ang) * (p.r + b.r + 5);
     const ty = p.y + Math.sin(ang) * (p.r + b.r + 5);
@@ -420,7 +478,7 @@ function updatePlayer(dt) {
     if (S.charging) {
       const chg = S.shotCharge;
       S.charging = false; S.shotCharge = 0;
-      if (has && p.stun <= 0 && chg > .05) shoot(chg / MAX_CHARGE);
+      if (has && p.stun <= 0 && chg > .04) shoot(chg / D().maxCharge);
     } else S.shotCharge = 0;
 
     // running touch — must barely outpace you or the ball rolls away
@@ -439,7 +497,7 @@ function updatePlayer(dt) {
 function shoot(power) {
   const p = S.player, b = S.ball;
   const [ax, ay] = aimVec();
-  const speed = lerp(600, 1320, power);
+  const speed = lerp(810, 1340, power);
   b.vx = ax * speed; b.vy = ay * speed;
   b.x = p.x + ax * (p.r + b.r + 2); b.y = p.y + ay * (p.r + b.r + 2);
   b.noCollect = .28;
@@ -452,13 +510,14 @@ function shoot(power) {
   addTrauma(.12 + power * .2);
   hitstop(power > .8 ? .045 : .02);
   burst(b.x, b.y, '#dfffe8', 8 + power * 10, 160 + power * 220, .7, Math.atan2(ay, ax) + Math.PI);
-  S.keeper.react = .1 + (1 - power) * .1;   // hard shots give the keeper less time
+  S.keeper.react = .07 + (1 - power) * .09;   // hard shots give the keeper less time
 }
 
 /* ---------- ball ---------- */
 
 function updateBall(dt) {
   const b = S.ball;
+  if (b.gkLock > 0) b.gkLock -= dt;
   b.x += b.vx * dt; b.y += b.vy * dt;
 
   // Grass drag: a constant term settles gentle touches fast, the speed term keeps
@@ -510,6 +569,15 @@ function wallHit(b) {
 
 /* ---------- defenders ---------- */
 
+// Only the nearest few actually press. The rest hold a zone in front of goal,
+// so the pack stops converging into one impassable blob.
+function assignRoles() {
+  const b = S.ball;
+  const order = S.defs.slice().sort((x, y) =>
+    dist(x.x, x.y, b.x, b.y) - dist(y.x, y.y, b.x, b.y));
+  order.forEach((d, i) => { d.press = i < D().pressers; });
+}
+
 function updateDef(d, dt) {
   const p = S.player, b = S.ball;
   const playerHas = dist(p.x, p.y, b.x, b.y) < CONTROL_R + 10;
@@ -525,7 +593,7 @@ function updateDef(d, dt) {
     if (d.wind <= 0) {
       d.lunge = .26;
       const a = Math.atan2(targetY - d.y, targetX - d.x);
-      d.vx = Math.cos(a) * 560; d.vy = Math.sin(a) * 560;
+      d.vx = Math.cos(a) * D().lunge; d.vy = Math.sin(a) * D().lunge;
       d.face = a;
     }
   } else if (d.lunge > 0) {
@@ -536,13 +604,17 @@ function updateDef(d, dt) {
     // steer to a goal-side interception point
     const sp = defSpeed() * (d.cool > 0 ? .42 : 1);
     let tx = targetX, ty = targetY;
-    if (playerHas) {
-      // sit goal-side, but offset per defender so they do not all stack in one lane
+    if (!d.press) {
+      // zone: spread across the edge of the box and wait
+      tx = clamp(FW / 2 + d.lane * 95, WALL.x0 + 50, WALL.x1 - 50);
+      ty = GOAL.y + 215;
+    } else if (playerHas) {
+      // sit goal-side, offset per defender so two pressers do not stack
       const gx = FW / 2, gy = GOAL.y;
       const a = Math.atan2(gy - p.y, gx - p.x);
-      const off = d.lane * 40;
-      tx = p.x + Math.cos(a) * 52 - Math.sin(a) * off;
-      ty = p.y + Math.sin(a) * 52 + Math.cos(a) * off;
+      const off = d.lane * 44;
+      tx = p.x + Math.cos(a) * 58 - Math.sin(a) * off;
+      ty = p.y + Math.sin(a) * 58 + Math.cos(a) * off;
     }
     const a = Math.atan2(ty - d.y, tx - d.x);
     d.vx += Math.cos(a) * 2000 * dt; d.vy += Math.sin(a) * 2000 * dt;
@@ -555,8 +627,9 @@ function updateDef(d, dt) {
     // Commit to a tackle — but only one defender may be committing at a time,
     // otherwise they alternate lunges and you never get a clean touch.
     const someoneCommitted = S.defs.some(o => o !== d && (o.wind > 0 || o.lunge > 0));
-    if (d.cool <= 0 && !someoneCommitted && dist(d.x, d.y, b.x, b.y) < 86 && b.noCollect <= 0) {
-      d.wind = WIND_UP; d.flash = WIND_UP;
+    if (d.press && d.cool <= 0 && !someoneCommitted &&
+        dist(d.x, d.y, b.x, b.y) < 86 && b.noCollect <= 0) {
+      d.wind = D().windUp; d.flash = D().windUp;
     }
   }
 
@@ -661,12 +734,12 @@ function updateKeeper(dt) {
   k.y += (wantY - k.y) * Math.min(1, dt * 6);
 
   // save: parry, never catch, so play keeps moving
-  if (dist(k.x, k.y, b.x, b.y) < gkReach() * .55 + b.r && b.vy < 0 && b.noCollect <= 0) {
+  if (dist(k.x, k.y, b.x, b.y) < gkReach() * .55 + b.r && b.vy < 0 && b.gkLock <= 0) {
     // parry, never catch — a rebound you can chase keeps the run alive
     const a = Math.atan2(b.y - k.y, b.x - k.x) + rnd(-.45, .45);
     const sp2 = clamp(Math.hypot(b.vx, b.vy) * .38, 240, 460);
     b.vx = Math.cos(a) * sp2; b.vy = Math.abs(Math.sin(a) * sp2) + 150;
-    b.noCollect = .16; b.lastTouch = 3;
+    b.noCollect = .16; b.gkLock = .25; b.lastTouch = 3;
     k.dive = .35;
     SFX.save(); addTrauma(.28); hitstop(.05);
     pop(k.x, k.y - 42, 'SAVED!', '#ffffff');
@@ -722,7 +795,7 @@ function checkGoal() {
   p.x = clamp(FW / 2 + rnd(-80, 80), WALL.x0 + 60, WALL.x1 - 60);
   p.y = 855; p.vx = 0; p.vy = 0; p.trail = []; p.stun = 0;
   b.x = p.x; b.y = p.y - 52;
-  b.vx = 0; b.vy = 0; b.noCollect = .12; b.trail = [];
+  b.vx = 0; b.vy = 0; b.noCollect = .12; b.gkLock = .3; b.trail = [];
   b.shotFrom = null; b.firstTime = false; b.lastTouch = 0;
   S.charging = false; S.shotCharge = 0;
   S.keeper.x = FW / 2; S.keeper.dive = 0; S.keeper.react = 0;
@@ -896,7 +969,7 @@ function drawPlayer() {
 
   // charge ring
   if (S.charging && S.shotCharge > .03) {
-    const t = S.shotCharge / MAX_CHARGE;
+    const t = S.shotCharge / D().maxCharge;
     cx.strokeStyle = t > .92 ? '#ff9f43' : C.gold;
     cx.lineWidth = 5;
     cx.beginPath(); cx.arc(p.x, p.y, p.r + 12, -Math.PI / 2, -Math.PI / 2 + TAU * t); cx.stroke();
@@ -910,20 +983,41 @@ function drawPlayer() {
 }
 
 function drawAim() {
-  if (!S.charging || S.shotCharge < .05) return;
-  const p = S.player, [ax, ay] = aimVec();
-  const t = S.shotCharge / MAX_CHARGE;
-  const len = 90 + t * 210;
+  const p = S.player, b = S.ball;
+  const has = dist(p.x, p.y, b.x, b.y) < CONTROL_R && b.noCollect <= 0;
+  if (!has) return;
+  const [ax, ay] = aimVec();
+  const t = S.charging ? S.shotCharge / D().maxCharge : 0;
+  const hot = t > .92;
+
+  // always visible while you have the ball — you should never have to guess
   cx.save();
-  cx.globalAlpha = .28 + t * .4;
-  cx.strokeStyle = t > .92 ? '#ff9f43' : C.gold;
-  cx.lineWidth = 4; cx.setLineDash([14, 10]);
+  cx.globalAlpha = S.charging ? .3 + t * .45 : .16;
+  cx.strokeStyle = hot ? '#ff9f43' : C.gold;
+  cx.lineWidth = S.charging ? 4 : 3;
+  cx.setLineDash([14, 10]);
   cx.lineDashOffset = -now() * 70;
+  const len = S.charging ? 100 + t * 230 : 80;
   cx.beginPath();
   cx.moveTo(p.x + ax * (p.r + 14), p.y + ay * (p.r + 14));
   cx.lineTo(p.x + ax * len, p.y + ay * len);
   cx.stroke();
   cx.restore();
+
+  // where it will actually cross the line, so placement is a decision not a guess
+  const cross = goalLineCross(p, ax, ay);
+  if (cross !== null && cross > GOAL.x0 - 20 && cross < GOAL.x1 + 20) {
+    const onTarget = cross >= GOAL.x0 && cross <= GOAL.x1;
+    cx.save();
+    cx.globalAlpha = S.charging ? .95 : .45;
+    cx.fillStyle = onTarget ? C.good : '#ffffff';
+    cx.beginPath();
+    cx.moveTo(cross, GOAL.y - 4);
+    cx.lineTo(cross - 9, GOAL.y - 20);
+    cx.lineTo(cross + 9, GOAL.y - 20);
+    cx.closePath(); cx.fill();
+    cx.restore();
+  }
 }
 
 function drawBall() {
@@ -954,7 +1048,7 @@ function drawDef(d) {
 
   // wind-up telegraph: the ring closing in is the cue to jink
   if (winding) {
-    const t = 1 - d.wind / WIND_UP;
+    const t = 1 - d.wind / D().windUp;
     cx.strokeStyle = '#ffffff'; cx.lineWidth = 4;
     cx.globalAlpha = .8;
     cx.beginPath(); cx.arc(d.x, d.y, d.r + 26 * (1 - t), 0, TAU); cx.stroke();
@@ -1120,19 +1214,19 @@ function drawTitle() {
   const bob = Math.sin(now() * 2) * 6;
   cx.save();
   cx.translate(FW / 2, 320 + bob);
-  cx.font = '900 118px system-ui, -apple-system, sans-serif';
-  cx.lineWidth = 14; cx.strokeStyle = 'rgba(0,0,0,.7)';
+  cx.font = '900 94px system-ui, -apple-system, sans-serif';
+  cx.lineWidth = 12; cx.strokeStyle = 'rgba(0,0,0,.7)';
   cx.strokeText('WORLDIE', 0, 0);
   const g = cx.createLinearGradient(0, -60, 0, 60);
   g.addColorStop(0, '#ffe98a'); g.addColorStop(1, '#ff9f43');
   cx.fillStyle = g; cx.fillText('WORLDIE', 0, 0);
   cx.restore();
 
-  cx.font = '700 24px system-ui, sans-serif';
+  cx.font = '700 19px system-ui, sans-serif';
   cx.fillStyle = 'rgba(255,255,255,.7)';
-  cx.fillText('45 SECONDS · SCORE AS MANY AS YOU CAN', FW / 2, 400);
+  cx.fillText('45 SECONDS · SCORE AS MANY AS YOU CAN', FW / 2, 392);
 
-  cx.font = '600 21px system-ui, sans-serif';
+  cx.font = '600 18px system-ui, sans-serif';
   cx.fillStyle = 'rgba(255,255,255,.82)';
   const lines = [
     'Every goal buys you +4 seconds.',
@@ -1146,21 +1240,57 @@ function drawTitle() {
     'Defenders flash white before they lunge —',
     'that is your moment to turn. Beating them scores.',
   ];
-  let y = 490;
-  for (const l of lines) { cx.fillText(l, FW / 2, y); y += 34; }
+  let y = 470;
+  for (const l of lines) { cx.fillText(l, FW / 2, y); y += 30; }
 
   if (best > 0) {
-    cx.font = '800 30px system-ui, sans-serif';
+    cx.font = '800 28px system-ui, sans-serif';
     cx.fillStyle = C.gold;
-    cx.fillText('BEST  ' + best, FW / 2, y + 26);
+    cx.fillText('BEST  ' + best, FW / 2, y + 20);
+  }
+
+  // difficulty buttons
+  for (const k of ['rookie', 'pro']) {
+    const r = diffBtn(k), on = diffKey === k;
+    cx.fillStyle = on ? 'rgba(95,240,138,.16)' : 'rgba(255,255,255,.05)';
+    rr(r.x, r.y, r.w, r.h, 14); cx.fill();
+    cx.strokeStyle = on ? C.good : 'rgba(255,255,255,.22)';
+    cx.lineWidth = on ? 3 : 1.5;
+    rr(r.x, r.y, r.w, r.h, 14); cx.stroke();
+    cx.textAlign = 'center';
+    cx.font = '900 30px system-ui, sans-serif';
+    cx.fillStyle = on ? C.good : 'rgba(255,255,255,.75)';
+    cx.fillText(DIFF[k].name, r.x + r.w / 2, r.y + 32);
+    cx.font = '600 15px system-ui, sans-serif';
+    cx.fillStyle = 'rgba(255,255,255,.5)';
+    cx.fillText(DIFF[k].blurb, r.x + r.w / 2, r.y + 60);
   }
 
   const a = .55 + .45 * Math.sin(now() * 4);
   cx.globalAlpha = a;
-  cx.font = '900 40px system-ui, sans-serif';
+  cx.font = '900 27px system-ui, sans-serif';
   cx.fillStyle = '#ffffff';
-  cx.fillText('TAP / PRESS SPACE TO PLAY', FW / 2, 940);
+  cx.textAlign = 'center';
+  cx.fillText('SPACE OR TAP TO KICK OFF', FW / 2, 1004);
   cx.globalAlpha = 1;
+}
+
+// hit boxes for the two difficulty buttons
+function diffBtn(k) {
+  const w = 250, h = 78, gap = 20;
+  const x = FW / 2 - w - gap / 2 + (k === 'pro' ? w + gap : 0);
+  return { x, y: 890, w, h };
+}
+function hitDiff(lx, ly) {
+  for (const k of ['rookie', 'pro']) {
+    const r = diffBtn(k);
+    if (lx >= r.x && lx <= r.x + r.w && ly >= r.y && ly <= r.y + r.h) return k;
+  }
+  return null;
+}
+function pickDiff(k) {
+  diffKey = k;
+  try { localStorage.setItem('worldie.diff', k); } catch (e) {}
 }
 
 function drawOver() {
