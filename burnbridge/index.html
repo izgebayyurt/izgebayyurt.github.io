@@ -7,11 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#061119" />
 <title>burnbridge</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23061119'/%3E%3Cpath d='M6 20 L16 11 L26 20' stroke='%23ff7a45' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='21' r='3.4' fill='%23d8ccb1'/%3E%3Ccircle cx='26' cy='21' r='3.4' fill='%23d8ccb1'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23061119'/%3E%3Cpath d='M6 20 L16 11 L26 20' stroke='%23ff7a45' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='21' r='3.4' fill='%23d8ccb1'/%3E%3Ccircle cx='26' cy='21' r='3.4' fill='%2345c8e8'/%3E%3C/svg%3E" />
 <style>
   :root {
     --sea:    #061119;
-    --sea2:   #0b1c27;
     --chrome: #0a1620;
     --chrome2:#10222e;
     --line:   #1b3441;
@@ -19,11 +18,11 @@
     --dim:    #7c96a1;
     --dimmer: #526874;
     --land:   #d8ccb1;
-    --span:   #7f9aa6;
-    --burn:   #24343d;
-    --ember:  #ff7a45;
+    --a:      #ff7a45;
+    --b:      #45c8e8;
     --gold:   #ffcf6b;
     --good:   #5fdca0;
+    --burn:   #24343d;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -37,7 +36,6 @@
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
   .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-  /* ---------- top bar ---------- */
   #hud {
     flex: 0 0 auto; display: flex; align-items: center; gap: 9px;
     padding: 9px 11px; background: var(--chrome);
@@ -53,49 +51,45 @@
   .iconbtn:active { background: #16303e; color: var(--ink); }
   .iconbtn[disabled] { opacity: .34; }
   #title { min-width: 0; flex: 1 1 auto; }
-  #lname {
-    font-size: 13px; font-weight: 600; letter-spacing: .01em;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  #lsub { font-size: 9.5px; color: var(--dim); letter-spacing: .11em; text-transform: uppercase; margin-top: 1px; }
-  #lsub .mode { color: var(--gold); }
+  #lname { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+  #lsub { font-size: 11px; color: var(--dim); margin-top: 2px; display: flex; gap: 11px; }
+  #lsub i { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+  #lsub .ca { color: var(--a); }
+  #lsub .cb { color: var(--b); }
+  #lsub .cn { color: var(--dim); }
+  #lsub .met { opacity: .34; }
   #tally { flex: 0 0 auto; text-align: right; }
   #cost { font-size: 19px; font-weight: 500; letter-spacing: .04em; }
-  #cost.over { color: var(--ember); }
-  #cost.under { color: var(--good); }
+  #cost.over { color: var(--a); }
   #par { font-size: 9.5px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; margin-top: 1px; }
 
-  /* ---------- board ---------- */
   #board { flex: 1 1 auto; position: relative; min-height: 0; }
   #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #hint {
-    position: absolute; left: 12px; right: 12px; bottom: 10px;
-    text-align: center; font-size: 11.5px; color: var(--dim);
-    pointer-events: none; transition: opacity .4s; line-height: 1.45;
+    position: absolute; left: 14px; right: 14px; bottom: 10px;
+    text-align: center; font-size: 12px; color: var(--dim);
+    pointer-events: none; transition: opacity .4s; line-height: 1.5;
   }
   #hint.gone { opacity: 0; }
+  #hint b { color: var(--ink); font-weight: 500; }
 
-  /* ---------- screens & overlays ---------- */
   .screen {
-    position: absolute; inset: 0; z-index: 5;
-    background: var(--sea);
+    position: absolute; inset: 0; z-index: 5; background: var(--sea);
     display: flex; flex-direction: column;
     padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
     overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   .ov {
-    position: absolute; inset: 0; z-index: 8;
-    background: rgba(4,11,16,.82);
+    position: absolute; inset: 0; z-index: 8; background: rgba(4,11,16,.82);
     display: flex; align-items: center; justify-content: center; padding: 22px;
     backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
   }
   .hidden { display: none !important; }
   .card {
-    width: 100%; max-width: 380px;
-    background: var(--chrome); border: 1px solid var(--line); border-radius: 16px;
-    padding: 20px 18px; text-align: center;
+    width: 100%; max-width: 380px; background: var(--chrome);
+    border: 1px solid var(--line); border-radius: 16px; padding: 20px 18px; text-align: center;
   }
-  .card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; letter-spacing: .01em; }
+  .card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
   .card p { margin: 0 0 14px; font-size: 13px; color: var(--dim); line-height: 1.6; }
   .card p.tight { margin-bottom: 8px; }
   .card p b { color: var(--ink); font-weight: 500; }
@@ -105,8 +99,7 @@
     color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
   }
   .btn:active { background: #17313f; }
-  .btn.primary { background: var(--ember); border-color: var(--ember); color: #1a0c05; font-weight: 600; }
-  .btn.primary:active { background: #ff8f61; }
+  .btn.primary { background: var(--a); border-color: var(--a); color: #1a0c05; font-weight: 600; }
   .btn.ghost { background: transparent; color: var(--dim); }
   .row2 { display: flex; gap: 9px; }
   .row2 .btn { margin-top: 9px; }
@@ -118,38 +111,37 @@
   .scoreline .v { font-size: 22px; font-weight: 500; }
   .scoreline .k { font-size: 9.5px; color: var(--dim); letter-spacing: .11em; text-transform: uppercase; margin-top: 2px; }
 
-  /* ---------- menu ---------- */
   #menu { justify-content: center; align-items: center; text-align: center; }
   #menu .wrap { width: 100%; max-width: 340px; }
   .logo { font-size: 40px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 2px; }
-  .logo span { color: var(--ember); }
+  .logo span { color: var(--a); }
+  .logo em { color: var(--b); font-style: normal; }
   .tag { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin-bottom: 26px; }
   .credit { margin-top: 24px; font-size: 10.5px; color: var(--dimmer); letter-spacing: .04em; }
-  .credit a { color: var(--dimmer); }
 
-  /* ---------- level select ---------- */
   #levels .head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   #levels .head h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1 1 auto; }
   #levels .head .tot { font-size: 12px; color: var(--gold); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 9px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 9px; }
   .tile {
     background: var(--chrome); border: 1px solid var(--line); border-radius: 12px;
-    padding: 10px 9px; text-align: left; cursor: pointer; color: var(--ink);
-    font-family: inherit; min-height: 74px; display: flex; flex-direction: column; justify-content: space-between;
+    padding: 10px 9px; cursor: pointer; color: var(--ink); font-family: inherit;
+    min-height: 62px; display: flex; flex-direction: column; justify-content: space-between;
   }
   .tile:active { background: var(--chrome2); }
-  .tile .n { font-size: 9.5px; color: var(--dimmer); letter-spacing: .1em; }
-  .tile .n b { color: var(--gold); font-weight: 500; }
-  .tile .nm { font-size: 12.5px; font-weight: 500; line-height: 1.25; margin: 3px 0 5px; }
-  .tile .st { font-size: 11px; letter-spacing: 3px; color: var(--burn); }
+  .tile .n { font-size: 15px; font-weight: 500; }
+  .tile .st { font-size: 10px; letter-spacing: 2px; color: var(--burn); margin-top: 6px; }
   .tile .st b { color: var(--gold); font-weight: 400; }
-  .tile .st.done { color: var(--good); letter-spacing: 0; font-size: 11.5px; }
-  .tile.locked { opacity: .38; }
-  .tile.euler { border-color: #3a3320; }
+  .tile .st.done { color: var(--good); letter-spacing: 0; }
+  .tile.locked { opacity: .34; }
+  .tile.mark { border-color: #3a3320; }
+  .tile.mark .n { color: var(--gold); font-size: 13px; }
 
   .howlist { text-align: left; font-size: 13px; color: var(--dim); line-height: 1.65; margin: 0 0 14px; padding-left: 18px; }
   .howlist li { margin-bottom: 7px; }
   .howlist b { color: var(--ink); font-weight: 500; }
+  .howlist .ca { color: var(--a); }
+  .howlist .cb { color: var(--b); }
 </style>
 </head>
 <body>
@@ -159,7 +151,7 @@
     <button class="iconbtn" id="bBack" aria-label="Back">‹</button>
     <div id="title">
       <div id="lname">—</div>
-      <div id="lsub">—</div>
+      <div id="lsub"></div>
     </div>
     <div id="tally">
       <div id="cost" class="mono">0</div>
@@ -173,20 +165,18 @@
     <canvas id="cv"></canvas>
     <div id="hint"></div>
 
-    <!-- ===== menu ===== -->
     <div class="screen" id="menu">
       <div class="wrap">
-        <div class="logo">burn<span>bridge</span></div>
-        <div class="tag">Reach every island.<br />Every bridge burns behind you.</div>
+        <div class="logo">burn<span>br</span><em>idge</em></div>
+        <div class="tag">Two travellers, one set of bridges.<br />Every crossing burns the bridge behind it.</div>
         <button class="btn primary" id="bPlay">Play</button>
         <button class="btn" id="bLevels">Crossings</button>
         <button class="btn" id="bDrift">Drift · endless</button>
         <button class="btn ghost" id="bHow">How to play</button>
-        <div class="credit">Euler, Königsberg, 1736 · and the salesman who came after</div>
+        <div class="credit">after Euler, Königsberg, 1736</div>
       </div>
     </div>
 
-    <!-- ===== level select ===== -->
     <div class="screen hidden" id="levels">
       <div class="head">
         <h2>Crossings</h2>
@@ -195,7 +185,6 @@
       <div class="grid" id="grid"></div>
     </div>
 
-    <!-- ===== overlays ===== -->
     <div class="ov hidden" id="ov"><div class="card" id="ovCard"></div></div>
   </div>
 </div>
@@ -210,98 +199,70 @@ var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
 
 /* ============================================================
    LEVELS
-   Coordinates are normalised to a unit square and rendered into
-   the largest square that fits the board, so distance on screen
-   is distance in the cost function. A third value on an edge
-   overrides its cost — a toll, or a ferry that undercuts its span.
+
+   nodes: [x, y, claim]  claim 0 = either traveller, 1 = amber only,
+                         2 = cyan only. Coordinates are normalised and
+                         are pure layout — a long bridge costs exactly
+                         what a short one does.
+   starts: [amber island, cyan island]
+
+   Starts and claims are not hand-picked — a search certified each
+   board against the solver (see §"certified" in the notes): solvable,
+   near-unique optimum, and provably resistant to the obvious greedy
+   line. Levels carry no names and no flavour text; the hint field is
+   used only where a rule appears for the first time.
    ============================================================ */
 
 var RAW = [
-  { id: 'wake', name: 'First Crossing', mode: 'cover', start: 0,
-    hint: 'Drag from the lit island. Each bridge burns behind you.',
-    nodes: [[0.20,0.62],[0.50,0.38],[0.80,0.62]],
-    edges: [[0,1],[1,2]] },
-
-  { id: 'fork', name: 'Three Ways', mode: 'cover', start: 3,
-    hint: 'Islands can be revisited. Bridges cannot.',
-    nodes: [[0.22,0.28],[0.22,0.74],[0.52,0.51],[0.86,0.44]],
-    edges: [[0,1],[0,2],[1,2],[2,3]] },
-
-  { id: 'ring', name: 'The Ring', mode: 'cover', start: 0,
-    hint: 'The short way across is not always the cheap way round.',
-    nodes: [[0.50,0.20],[0.785,0.407],[0.676,0.743],[0.324,0.743],[0.215,0.407]],
-    edges: [[0,1],[1,2],[2,3],[3,4],[4,0],[0,2]] },
-
-  { id: 'bowtie', name: 'Bowtie', mode: 'cover', start: 0,
-    hint: 'Burn the wrong span and the far side is unreachable.',
-    nodes: [[0.16,0.28],[0.16,0.76],[0.50,0.52],[0.84,0.28],[0.84,0.76]],
+  { id: 'c01', hint: 'Two travellers. Drag either one. Every bridge <b>burns behind whoever crosses it</b>.',
+    starts: [2, 4],
+    nodes: [[0.50,0.50],[0.50,0.14],[0.86,0.62],[0.50,0.88],[0.14,0.62]],
+    edges: [[0,1],[0,2],[0,3],[0,4]] },
+  { id: 'c02', hint: 'Marked islands belong to one traveller. <b>Every</b> island must be reached by someone.',
+    starts: [1, 4],
+    nodes: [[0.50,0.50],[0.50,0.14],[0.86,0.62,2],[0.50,0.88,1],[0.14,0.62]],
+    edges: [[0,1],[0,2],[0,3],[0,4],[1,2],[3,4]] },
+  { id: 'c03', starts: [4, 1],
+    nodes: [[0.16,0.28,1],[0.16,0.76],[0.50,0.52],[0.84,0.28,2],[0.84,0.76]],
     edges: [[0,1],[0,2],[1,2],[2,3],[2,4],[3,4]] },
+  { id: 'c04', starts: [6, 4],
+    nodes: [[0.50,0.16,2],[0.79,0.32],[0.79,0.68,1],[0.50,0.84],[0.21,0.68],[0.21,0.32],[0.50,0.50]],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[6,0],[6,2],[6,4]] },
+  { id: 'c05', starts: [0, 4],
+    nodes: [[0.12,0.50],[0.32,0.24],[0.32,0.76,2],[0.52,0.50],[0.72,0.24],[0.72,0.76,1],[0.92,0.50]],
+    edges: [[0,1],[0,2],[1,2],[1,3],[2,3],[3,4],[3,5],[4,5],[4,6],[5,6]] },
+  { id: 'c06', starts: [5, 4],
+    nodes: [[0.50,0.14,1],[0.78,0.30,2],[0.78,0.62],[0.50,0.78,2],[0.22,0.62],[0.22,0.30],[0.50,0.46,1]],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[6,0],[6,1],[6,3],[6,4]] },
+  { id: 'c07', starts: [8, 6],
+    nodes: [[0.22,0.22],[0.50,0.22],[0.78,0.22,2],[0.22,0.50],[0.50,0.50,1],[0.78,0.50,2],[0.22,0.78],[0.50,0.78,1],[0.78,0.78]],
+    edges: [[0,1],[1,2],[3,4],[4,5],[6,7],[7,8],[0,3],[3,6],[1,4],[4,7],[2,5],[5,8]] },
+  { id: 'c08', starts: [0, 6],
+    nodes: [[0.14,0.30],[0.36,0.15],[0.61,0.23,1],[0.86,0.36],[0.20,0.62,2],[0.45,0.50,1],[0.70,0.62],[0.42,0.85,2]],
+    edges: [[0,1],[1,2],[2,3],[0,4],[4,5],[1,5],[2,5],[5,6],[3,6],[4,7],[5,7],[6,7]] },
+  { id: 'c09', starts: [6, 3],
+    nodes: [[0.50,0.12,2],[0.26,0.36],[0.74,0.36],[0.50,0.47],[0.14,0.66,2],[0.86,0.66,1],[0.34,0.88],[0.66,0.88,1]],
+    edges: [[0,1],[0,2],[1,3],[2,3],[1,4],[2,5],[4,6],[5,7],[6,7],[3,6],[3,7]] },
+  { id: 'c10', starts: [5, 2],
+    nodes: [[0.10,0.72],[0.24,0.42],[0.38,0.68],[0.52,0.34],[0.66,0.68,2],[0.80,0.42],[0.92,0.72,1],[0.35,0.90,2],[0.68,0.90,1]],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[0,7],[7,2],[7,8],[8,4],[8,6],[1,3],[3,5]] },
+  { id: 'c11', starts: [6, 5],
+    nodes: [[0.14,0.24],[0.38,0.16,2],[0.62,0.16,1],[0.86,0.24],[0.14,0.52,1],[0.38,0.44],[0.62,0.44],[0.86,0.52,2],[0.38,0.80],[0.62,0.80]],
+    edges: [[0,1],[1,2],[2,3],[0,4],[1,5],[2,6],[3,7],[4,5],[5,6],[6,7],[4,8],[8,5],[6,9],[9,7],[8,9]] },
+  { id: 'c12', starts: [3, 5],
+    nodes: [[0.18,0.16,1],[0.50,0.16,2],[0.82,0.16],[0.18,0.42],[0.50,0.42],[0.82,0.42],[0.18,0.68,2],[0.50,0.68],[0.82,0.68,1],[0.50,0.90]],
+    edges: [[0,1],[1,2],[3,4],[4,5],[6,7],[7,8],[0,3],[3,6],[1,4],[4,7],[2,5],[5,8],[6,9],[9,8],[7,9]] },
+  { id: 'c13', starts: [4, 8],
+    nodes: [[0.50,0.10,2],[0.22,0.28],[0.78,0.28,2],[0.10,0.56,1],[0.38,0.48],[0.62,0.48],[0.90,0.56,1],[0.28,0.80,1],[0.72,0.80],[0.50,0.94,2]],
+    edges: [[0,1],[0,2],[1,3],[1,4],[2,5],[2,6],[4,5],[3,7],[4,7],[5,8],[6,8],[7,9],[8,9],[0,4],[0,5]] },
+  { id: 'c14', starts: [1, 7],
+    nodes: [[0.16,0.20,2],[0.44,0.14],[0.72,0.20,1],[0.88,0.44,2],[0.72,0.66],[0.44,0.74],[0.16,0.66,1],[0.08,0.44],[0.44,0.44],[0.28,0.92,2],[0.64,0.92,1]],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],[8,1],[8,3],[8,5],[8,7],[6,9],[9,5],[5,10],[10,4],[9,10]] },
 
-  { id: 'seven', name: 'Seven Bridges', mode: 'cover', start: 0,
-    hint: 'Königsberg. Four shores, seven bridges — touch them all.',
-    nodes: [[0.50,0.16],[0.50,0.84],[0.32,0.50],[0.77,0.50]],
-    edges: [[0,2],[0,2],[1,2],[1,2],[0,3],[1,3],[2,3]] },
-
-  { id: 'kbg', name: 'Königsberg, 1736', mode: 'euler', start: 0, interlude: true,
+  { id: 'kbg', solo: true, euler: true, interlude: true, starts: [0, 0],
     hint: 'Every bridge, exactly once. Nobody has ever done it.',
     nodes: [[0.50,0.16],[0.50,0.84],[0.32,0.50],[0.77,0.50]],
-    edges: [[0,2],[0,2],[1,2],[1,2],[0,3],[1,3],[2,3]] },
-
-  { id: 'envelope', name: 'The Envelope', mode: 'euler', start: 0,
-    hint: 'One stroke. Start where the bridges are odd.',
-    nodes: [[0.22,0.76],[0.78,0.76],[0.22,0.46],[0.78,0.46],[0.50,0.18]],
-    edges: [[0,1],[0,2],[1,3],[2,3],[2,4],[3,4],[0,3],[1,2]] },
-
-  { id: 'tollspan', name: 'Tollspan', mode: 'cover', start: 0,
-    hint: 'Some spans cost more than their length. Read the numbers.',
-    nodes: [[0.14,0.50],[0.40,0.22],[0.40,0.78],[0.66,0.22],[0.66,0.78],[0.90,0.50]],
-    edges: [[0,1],[0,2],[1,2,22],[1,3],[3,4,20],[3,5],[4,5]] },
-
-  { id: 'pentacle', name: 'Pentacle', mode: 'euler', start: 0,
-    hint: 'Ten bridges, five shores, one unbroken walk.',
-    nodes: [[0.50,0.18],[0.804,0.401],[0.688,0.759],[0.312,0.759],[0.196,0.401]],
-    edges: [[0,1],[1,2],[2,3],[3,4],[4,0],[0,2],[0,3],[1,3],[1,4],[2,4]] },
-
-  { id: 'narrows', name: 'The Narrows', mode: 'cover', start: 0,
-    hint: 'Two chambers, one gate between them.',
-    nodes: [[0.12,0.50],[0.32,0.26],[0.32,0.74],[0.52,0.50],[0.72,0.26],[0.72,0.74],[0.92,0.50]],
-    edges: [[0,1],[0,2],[1,2],[1,3],[2,3],[3,4],[3,5],[4,5],[4,6],[5,6]] },
-
-  { id: 'archipelago', name: 'Archipelago', mode: 'cover', start: 0,
-    hint: 'Eight islands. The order is the whole puzzle.',
-    nodes: [[0.14,0.30],[0.36,0.15],[0.61,0.23],[0.86,0.36],[0.20,0.62],[0.45,0.50],[0.70,0.62],[0.42,0.85]],
-    edges: [[0,1],[1,2],[2,3],[0,4],[4,5],[1,5],[2,5],[5,6],[3,6],[4,7],[5,7],[6,7]] },
-
-  { id: 'spindle', name: 'Spindle', mode: 'euler', start: 0,
-    hint: 'A ring with a scar through it.',
-    nodes: [[0.50,0.18],[0.777,0.34],[0.777,0.66],[0.50,0.82],[0.223,0.66],[0.223,0.34]],
-    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,3]] },
-
-  { id: 'lattice', name: 'Lattice', mode: 'cover', start: 0,
-    hint: 'Nine islands on a grid. Snake, do not wander.',
-    nodes: [[0.22,0.22],[0.50,0.22],[0.78,0.22],[0.22,0.50],[0.50,0.50],[0.78,0.50],[0.22,0.78],[0.50,0.78],[0.78,0.78]],
-    edges: [[0,1],[1,2],[3,4],[4,5],[6,7],[7,8],[0,3],[3,6],[1,4],[4,7],[2,5],[5,8]] },
-
-  { id: 'ferry', name: 'The Ferry', mode: 'cover', start: 0,
-    hint: 'A long crossing can be the cheap one.',
-    nodes: [[0.50,0.12],[0.26,0.36],[0.74,0.36],[0.50,0.47],[0.14,0.66],[0.86,0.66],[0.34,0.88],[0.66,0.88]],
-    edges: [[0,1],[0,2],[1,3],[2,3],[1,4],[2,5],[4,6],[5,7],[6,7],[3,6,4],[3,7,4]] },
-
-  { id: 'crown', name: 'Crown', mode: 'cover', start: 0,
-    hint: 'Peaks and hollows. Both must be walked.',
-    nodes: [[0.10,0.72],[0.24,0.42],[0.38,0.68],[0.52,0.34],[0.66,0.68],[0.80,0.42],[0.92,0.72],[0.35,0.90],[0.68,0.90]],
-    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[0,7],[7,2],[7,8],[8,4],[8,6],[1,3],[3,5]] },
-
-  { id: 'rose', name: 'Compass Rose', mode: 'euler', start: 0,
-    hint: 'Sixteen bridges. Every shore has four. Nothing is odd.',
-    nodes: [[0.50,0.17],[0.733,0.267],[0.83,0.50],[0.733,0.733],[0.50,0.83],[0.267,0.733],[0.17,0.50],[0.267,0.267]],
-    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],
-            [0,2],[2,4],[4,6],[6,0],[1,3],[3,5],[5,7],[7,1]] },
-
-  { id: 'lastlight', name: 'Lastlight', mode: 'cover', start: 0,
-    hint: 'Everything you have learned, in one crossing.',
-    nodes: [[0.10,0.50],[0.28,0.24],[0.28,0.76],[0.46,0.42],[0.46,0.62],[0.62,0.18],[0.62,0.86],[0.74,0.46],[0.74,0.62],[0.90,0.30],[0.90,0.74]],
-    edges: [[0,1],[0,2],[1,3],[2,4],[3,4],[1,5],[2,6],[3,5],[4,6],[5,7],[6,8],[7,8],[7,9],[8,10],[9,10],[3,7,5],[4,8,5]] }
+    edges: [[0,2],[0,2],[1,2],[1,2],[0,3],[1,3],[2,3]] }
 ];
 
 /* ============================================================
@@ -309,18 +270,15 @@ var RAW = [
    ============================================================ */
 
 function nDist(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); }
-function costOf(nodes, e) {
-  if (e.length > 2 && e[2] != null) return e[2];
-  return Math.max(1, Math.round(nDist(nodes[e[0]], nodes[e[1]]) * 24));
-}
 
 function buildLevel(raw) {
-  var nodes = raw.nodes.map(function (p) { return { x: p[0], y: p[1] }; });
+  var nodes = raw.nodes.map(function (p) { return { x: p[0], y: p[1], claim: p[2] || 0 }; });
+  // Every bridge counts the same. Distance is scenery, not currency —
+  // the puzzle is which spans you spend, never how long they are.
   var edges = raw.edges.map(function (e, i) {
-    return { i: i, a: e[0], b: e[1], w: costOf(raw.nodes, e), toll: (e.length > 2 && e[2] != null), bow: 0 };
+    return { i: i, a: e[0], b: e[1], bow: 0 };
   });
 
-  // Parallel bridges get bowed apart so they read as separate spans.
   var groups = {};
   edges.forEach(function (e) {
     var k = Math.min(e.a, e.b) + ':' + Math.max(e.a, e.b);
@@ -334,97 +292,164 @@ function buildLevel(raw) {
 
   var inc = nodes.map(function () { return []; });
   edges.forEach(function (e) { inc[e.a].push(e.i); inc[e.b].push(e.i); });
-  // Cheapest first: helps the solver find a good bound early.
-  inc.forEach(function (list) { list.sort(function (p, q) { return edges[p].w - edges[q].w; }); });
 
   var lv = {
-    id: raw.id, name: raw.name, mode: raw.mode, start: raw.start,
-    hint: raw.hint, interlude: !!raw.interlude,
+    id: raw.id, starts: raw.starts.slice(), hint: raw.hint || '',
+    solo: !!raw.solo, euler: !!raw.euler, interlude: !!raw.interlude,
     nodes: nodes, edges: edges, inc: inc
   };
-  lv.total = edges.reduce(function (s, e) { return s + e.w; }, 0);
+  // Claim lists, so a walker's outstanding duties fit in a few bits.
+  lv.claims = [[], []];
+  nodes.forEach(function (n, i) { if (n.claim) lv.claims[n.claim - 1].push(i); });
+  lv.total = edges.length;
   return lv;
 }
 
 /* ============================================================
-   Solvers
+   Solver
 
-   cover  — cheapest trail from the start that touches every island,
-            no bridge twice. Branch and bound over (node, burnt set).
-   euler  — every bridge exactly once. Euler's own criterion decides
-            it outright: connected, and no more than two odd shores.
+   Two walkers share one pool of bridges, so a position is
+   (where each stands, which bridges are ash, which claims are
+   settled). Islands visited need no separate tracking: crossing a
+   bridge means standing on both its ends, so the visited set is
+   always the starts plus the endpoints of every burnt bridge.
+
+   Cost is the number of crossings, so par is "how few bridges can
+   settle this board" — the bound below is therefore exact rather than
+   estimated, which is what keeps the dead-position check instant.
+
+   Used for three jobs — par at load, certification during level
+   generation, and the dead-position check after every move.
    ============================================================ */
 
-function solveCover(lv) {
+function solveFrom(lv, pa, pb, burnt, vis, metA, metB, cap) {
   var N = lv.nodes.length, E = lv.edges.length;
   var full = (1 << N) - 1;
+  var fullA = (1 << lv.claims[0].length) - 1, fullB = (1 << lv.claims[1].length) - 1;
+  var claimBit = [{}, {}];
+  lv.claims[0].forEach(function (n, i) { claimBit[0][n] = 1 << i; });
+  lv.claims[1].forEach(function (n, i) { claimBit[1][n] = 1 << i; });
+
   var best = Infinity, expansions = 0, capped = false;
-  var CAP = 900000;
+  var CAP = cap || 900000;
   var memo = new Map();
-  var stride = Math.pow(2, E);
+  var strideE = Math.pow(2, E), strideC = (fullA + 1) * (fullB + 1);
 
-  // Reaching k unvisited islands needs at least k more bridges, all
-  // distinct — so the k cheapest bridges on the board bound the rest.
-  var sorted = lv.edges.map(function (e) { return e.w; }).sort(function (a, b) { return a - b; });
-  var prefix = [0];
-  for (var i = 0; i < sorted.length; i++) prefix.push(prefix[i] + sorted[i]);
+  function popcount(x) { var c = 0; while (x) { x &= x - 1; c++; } return c; }
 
-  function dfs(node, used, cost, vis) {
-    if (vis === full) { if (cost < best) best = cost; return; }
+  function dfs(a, b, used, cost, v, mA, mB) {
+    if (v === full && mA === fullA && mB === fullB) { if (cost < best) best = cost; return; }
     if (++expansions > CAP) { capped = true; return; }
-    var k = 0;
-    for (var v = 0; v < N; v++) if (!((vis >> v) & 1)) k++;
-    if (cost + prefix[Math.min(k, E)] >= best) return;
-    var key = node * stride + used;
+
+    // Each island still unreached needs a crossing to reach it, and each
+    // unsettled claim needs its own walker to arrive — both are lower
+    // bounds on the number of bridges left to burn.
+    var unvisited = N - popcount(v);
+    var unclaimed = popcount(fullA & ~mA) + popcount(fullB & ~mB);
+    if (cost + Math.max(unvisited, unclaimed) >= best) return;
+
+    var key = ((a * N + b) * strideE + used) * strideC + (mA * (fullB + 1) + mB);
     var prev = memo.get(key);
     if (prev !== undefined && prev <= cost) return;
     memo.set(key, cost);
-    var list = lv.inc[node];
-    for (var ii = 0; ii < list.length; ii++) {
-      var ei = list[ii];
-      if ((used >> ei) & 1) continue;
-      var e = lv.edges[ei];
-      var nx = (e.a === node) ? e.b : e.a;
-      dfs(nx, used | (1 << ei), cost + e.w, vis | (1 << nx));
-      if (capped) return;
+
+    for (var w = 0; w < 2; w++) {
+      var here = w === 0 ? a : b;
+      var list = lv.inc[here];
+      for (var ii = 0; ii < list.length; ii++) {
+        var ei = list[ii];
+        if ((used >> ei) & 1) continue;
+        var e = lv.edges[ei];
+        var nx = (e.a === here) ? e.b : e.a;
+        var nA = mA, nB = mB;
+        if (w === 0 && claimBit[0][nx] !== undefined) nA |= claimBit[0][nx];
+        if (w === 1 && claimBit[1][nx] !== undefined) nB |= claimBit[1][nx];
+        if (w === 0) dfs(nx, b, used | (1 << ei), cost + 1, v | (1 << nx), nA, nB);
+        else         dfs(a, nx, used | (1 << ei), cost + 1, v | (1 << nx), nA, nB);
+        if (capped) return;
+      }
     }
   }
-  dfs(lv.start, 0, 0, 1 << lv.start);
+
+  dfs(pa, pb, burnt, 0, vis, metA, metB);
   return { ok: best < Infinity, par: best, capped: capped };
 }
 
+function initialState(lv) {
+  var vis = (1 << lv.starts[0]) | (1 << lv.starts[1]);
+  var mA = 0, mB = 0;
+  lv.claims[0].forEach(function (n, i) { if (n === lv.starts[0]) mA |= 1 << i; });
+  lv.claims[1].forEach(function (n, i) { if (n === lv.starts[1]) mB |= 1 << i; });
+  return { a: lv.starts[0], b: lv.starts[1], burnt: 0, vis: vis, mA: mA, mB: mB };
+}
+
 function solveEuler(lv) {
-  var N = lv.nodes.length;
-  var deg = new Array(N).fill(0);
+  var N = lv.nodes.length, deg = new Array(N).fill(0);
   lv.edges.forEach(function (e) { deg[e.a]++; deg[e.b]++; });
-
-  // Every bridge must sit in one component, reachable from the start.
-  var seen = new Array(N).fill(false);
-  var stack = [lv.start];
-  seen[lv.start] = true;
-  while (stack.length) {
-    var n = stack.pop();
-    lv.inc[n].forEach(function (ei) {
-      var e = lv.edges[ei];
-      var m = (e.a === n) ? e.b : e.a;
-      if (!seen[m]) { seen[m] = true; stack.push(m); }
-    });
-  }
-  for (var v = 0; v < N; v++) if (deg[v] > 0 && !seen[v]) return { ok: false, par: lv.total, odd: [] };
-
   var odd = [];
   for (var u = 0; u < N; u++) if (deg[u] % 2 === 1) odd.push(u);
-  var ok = (odd.length === 0 && deg[lv.start] > 0) ||
-           (odd.length === 2 && odd.indexOf(lv.start) >= 0);
+  var ok = (odd.length === 0 && deg[lv.starts[0]] > 0) ||
+           (odd.length === 2 && odd.indexOf(lv.starts[0]) >= 0);
   return { ok: ok, par: lv.total, odd: odd, deg: deg };
 }
 
-function solve(lv) {
-  return lv.mode === 'euler' ? solveEuler(lv) : solveCover(lv);
+function solveLevel(lv) {
+  if (lv.euler) return solveEuler(lv);
+  var s = initialState(lv);
+  return solveFrom(lv, s.a, s.b, s.burnt, s.vis, s.mA, s.mB, 2000000);
 }
 
 /* ============================================================
-   Drift — generated crossings, each one solved before you see it
+   The obvious line — used to reject levels that solve themselves.
+   Each walker steps toward whatever it still owes: its own unclaimed
+   island first, then any island nobody has reached, then anything.
+   A board this play settles at par is not a puzzle.
+   ============================================================ */
+
+function greedyPlay(lv) {
+  var burnt = {}, pos = lv.starts.slice(), cost = 0;
+  var vis = {}, met = [{}, {}];
+  vis[pos[0]] = 1; vis[pos[1]] = 1;
+  if (lv.nodes[pos[0]].claim === 1) met[0][pos[0]] = 1;
+  if (lv.nodes[pos[1]].claim === 2) met[1][pos[1]] = 1;
+
+  function owed(w) {
+    return lv.claims[w].some(function (n) { return !met[w][n]; });
+  }
+  function done() {
+    for (var i = 0; i < lv.nodes.length; i++) if (!vis[i]) return false;
+    return !owed(0) && !owed(1);
+  }
+
+  for (var step = 0; step < 80; step++) {
+    if (done()) return { won: true, cost: cost };
+    var bestMove = null;
+    for (var w = 0; w < 2; w++) {
+      var here = pos[w];
+      /* jshint loopfunc:true */
+      (function (w, here) {
+        lv.inc[here].forEach(function (ei) {
+          if (burnt[ei]) return;
+          var e = lv.edges[ei], nx = (e.a === here) ? e.b : e.a;
+          var rank = 2;
+          if (lv.nodes[nx].claim === w + 1 && !met[w][nx]) rank = 0;   // my own claim
+          else if (!vis[nx]) rank = 1;                                 // anyone's island
+          if (!bestMove || rank < bestMove.rank) bestMove = { w: w, ei: ei, nx: nx, rank: rank };
+        });
+      })(w, here);
+    }
+    if (!bestMove) return { won: false, cost: cost, stranded: true };
+    burnt[bestMove.ei] = 1;
+    cost += 1;
+    pos[bestMove.w] = bestMove.nx;
+    vis[bestMove.nx] = 1;
+    if (lv.nodes[bestMove.nx].claim === bestMove.w + 1) met[bestMove.w][bestMove.nx] = 1;
+  }
+  return { won: false, cost: cost };
+}
+
+/* ============================================================
+   Drift — generated boards, certified before you see them
    ============================================================ */
 
 function mulberry32(a) {
@@ -445,11 +470,10 @@ function segCross(p1, p2, p3, p4) {
 }
 
 function generate(seed, depth) {
-  var rnd = mulberry32(seed * 2654435761 % 2147483647);
-  var n = clamp(5 + Math.floor(depth / 2), 5, 11);
-  var sep = n > 8 ? 0.20 : 0.24;
+  var rnd = mulberry32((seed * 2654435761) % 2147483647);
+  var n = clamp(6 + Math.floor(depth / 3), 6, 10);
+  var sep = n > 8 ? 0.21 : 0.25;
 
-  // Scatter islands with breathing room.
   var pts = [], guard = 0;
   while (pts.length < n && guard++ < 4000) {
     var p = [0.12 + rnd() * 0.76, 0.12 + rnd() * 0.76];
@@ -459,7 +483,6 @@ function generate(seed, depth) {
   }
   if (pts.length < n) return null;
 
-  // Candidate spans, shortest first, discarding any that cross.
   var cand = [];
   for (var a = 0; a < n; a++) for (var b = a + 1; b < n; b++) cand.push([a, b, nDist(pts[a], pts[b])]);
   cand.sort(function (x, y) { return x[2] - y[2]; });
@@ -467,57 +490,57 @@ function generate(seed, depth) {
   var edges = [], deg = new Array(n).fill(0);
   var parent = pts.map(function (_, i) { return i; });
   function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
-
   function tryAdd(c) {
-    if (c[2] > 0.46) return false;
-    if (deg[c[0]] >= 4 || deg[c[1]] >= 4) return false;
+    if (c[2] > 0.46 || deg[c[0]] >= 4 || deg[c[1]] >= 4) return false;
     for (var e = 0; e < edges.length; e++) {
       var f = edges[e];
       if (f[0] === c[0] || f[0] === c[1] || f[1] === c[0] || f[1] === c[1]) continue;
       if (segCross(pts[c[0]], pts[c[1]], pts[f[0]], pts[f[1]])) return false;
     }
-    edges.push([c[0], c[1]]);
-    deg[c[0]]++; deg[c[1]]++;
+    edges.push([c[0], c[1]]); deg[c[0]]++; deg[c[1]]++;
     parent[find(c[0])] = find(c[1]);
     return true;
   }
 
-  // Connect everything, then loosen it up — a tree is almost never solvable.
   cand.forEach(function (c) { if (find(c[0]) !== find(c[1])) tryAdd(c); });
   for (var r = 1; r < n; r++) if (find(r) !== find(0)) return null;
+  var want = Math.min(17, n + 3 + Math.floor(depth / 4));
+  for (var ci = 0; ci < cand.length && edges.length < want; ci++) tryAdd(cand[ci]);
+  if (edges.length < n + 2) return null;
 
-  var want = Math.min(20, n + 2 + Math.floor(depth / 3));
-  for (var ci = 0; ci < cand.length && edges.length < want; ci++) {
-    var c = cand[ci];
-    var dup = edges.some(function (f) { return (f[0] === c[0] && f[1] === c[1]); });
-    if (!dup) tryAdd(c);
+  // Pick starts far apart, then hand each walker claims on the far side
+  // of the board from where it stands — that is what forces them to
+  // compete for the same bridges instead of tidying up their own corner.
+  var far = null;
+  for (var i2 = 0; i2 < n; i2++) for (var j2 = i2 + 1; j2 < n; j2++) {
+    var d = nDist(pts[i2], pts[j2]);
+    if (!far || d > far.d) far = { a: i2, b: j2, d: d };
   }
+  var order = [];
+  for (var k = 0; k < n; k++) if (k !== far.a && k !== far.b) order.push(k);
+  order.sort(function (p, q) {
+    return (nDist(pts[q], pts[far.a]) - nDist(pts[q], pts[far.b])) -
+           (nDist(pts[p], pts[far.a]) - nDist(pts[p], pts[far.b]));
+  });
+  var nClaim = clamp(1 + Math.floor(depth / 4), 1, 3);
+  var nodes = pts.map(function (p) { return [p[0], p[1], 0]; });
+  for (var q = 0; q < nClaim && q < order.length; q++) nodes[order[q]][2] = 1;
+  for (var q2 = 0; q2 < nClaim && q2 < order.length; q2++) nodes[order[order.length - 1 - q2]][2] = 2;
 
-  var start = Math.floor(rnd() * n);
-  var raw = { id: 'drift', name: 'Drift', mode: 'cover', start: start, nodes: pts, edges: edges };
-  var lv = buildLevel(raw), res = solve(lv);
+  var lv = buildLevel({ id: 'drift', starts: [far.a, far.b], nodes: nodes, edges: edges });
+  var res = solveLevel(lv);
+  if (!res.ok || res.capped) return null;
 
-  // Extra spans only ever make a crossing easier — add until it opens up.
-  var ci2 = 0;
-  while (!res.ok && ci2 < cand.length && edges.length < 22) {
-    var c2 = cand[ci2++];
-    if (edges.some(function (f) { return f[0] === c2[0] && f[1] === c2[1]; })) continue;
-    if (!tryAdd(c2)) continue;
-    lv = buildLevel(raw); res = solve(lv);
-  }
-  if (!res.ok) return null;
-
-  // A crossing with no wrong turns is not a puzzle.
-  if (edges.length < n + 1) return null;
+  var g = greedyPlay(lv);
+  if (g.won && g.cost === res.par) return null;   // solves itself — not a puzzle
   lv.par = res.par;
-  lv.parApprox = res.capped;
   return lv;
 }
 
 function driftLevel(depth) {
-  for (var s = 1; s <= 80; s++) {
-    var lv = generate(depth * 1000 + s, depth);
-    if (lv) { lv.name = 'Drift ' + depth; lv.id = 'drift' + depth; return lv; }
+  for (var s = 1; s <= 260; s++) {
+    var lv = generate(depth * 7919 + s, depth);
+    if (lv) { lv.id = 'drift' + depth; lv.depth = depth; return lv; }
   }
   return null;
 }
@@ -528,11 +551,11 @@ function driftLevel(depth) {
 
 var SAVE = { stars: {}, best: {}, drift: 0, seenHow: false };
 try {
-  var s = localStorage.getItem('burnbridge.v1');
-  if (s) { var p = JSON.parse(s); if (p && typeof p === 'object') SAVE = Object.assign(SAVE, p); }
+  var sv = localStorage.getItem('burnbridge.v2');
+  if (sv) { var pj = JSON.parse(sv); if (pj && typeof pj === 'object') SAVE = Object.assign(SAVE, pj); }
 } catch (err) {}
 function persist() {
-  try { localStorage.setItem('burnbridge.v1', JSON.stringify(SAVE)); } catch (err) {}
+  try { localStorage.setItem('burnbridge.v2', JSON.stringify(SAVE)); } catch (err) {}
 }
 
 /* ============================================================
@@ -542,33 +565,20 @@ function persist() {
 var LV = RAW.map(buildLevel);
 
 var G = {
-  screen: 'menu',      // menu | levels | play
-  mode: 'campaign',    // campaign | drift
-  index: 0,
-  lv: null,
-  par: 0, parApprox: false,
-  cur: 0,
-  path: [],            // island indices, in order
-  used: [],            // edge indices, in order
-  burnt: null,         // Uint8Array over edges
-  visited: null,       // Uint8Array over nodes
-  cost: 0,
-  undos: 0,
-  overlay: null,
-  revealOdd: false,
-  oddInfo: null,
-  parts: [],
-  t: 0
+  screen: 'menu', mode: 'campaign', index: 0, lv: null,
+  par: 0, oddInfo: null,
+  pos: [0, 0], paths: [[], []], used: [], burnt: null,
+  vis: 0, mA: 0, mB: 0, cost: 0, undos: 0,
+  sel: 0, overlay: null, revealOdd: false,
+  parts: [], t: 0
 };
 
 function loadLevel(lv, idx, mode) {
   G.lv = lv; G.index = idx; G.mode = mode || G.mode;
-  var res = (lv.par != null) ? { ok: true, par: lv.par, capped: !!lv.parApprox } : solve(lv);
+  var res = (lv.par != null) ? { ok: true, par: lv.par } : solveLevel(lv);
   G.par = res.par;
-  G.parApprox = !!res.capped;
-  G.oddInfo = (lv.mode === 'euler') ? res : null;
-  G.undos = 0;
-  G.revealOdd = false;
+  G.oddInfo = lv.euler ? res : null;
+  G.undos = 0; G.revealOdd = false;
   resetLevel();
   setOverlay(lv.interlude ? 'interludeIntro' : null);
   showHint(lv.hint);
@@ -576,79 +586,113 @@ function loadLevel(lv, idx, mode) {
 }
 
 function resetLevel() {
-  var lv = G.lv;
+  var lv = G.lv, s = initialState(lv);
   layout();
-  G.cur = lv.start;
-  G.path = [lv.start];
+  G.pos = [s.a, s.b];
+  G.paths = [[s.a], [s.b]];
   G.used = [];
   G.burnt = new Uint8Array(lv.edges.length);
-  G.visited = new Uint8Array(lv.nodes.length);
-  G.visited[lv.start] = 1;
-  G.cost = 0;
-  G.parts.length = 0;
+  G.vis = s.vis; G.mA = s.mA; G.mB = s.mB;
+  G.cost = 0; G.sel = 0; G.parts.length = 0;
   syncHud();
 }
 
+function walkerCount() { return G.lv.solo ? 1 : 2; }
 function availableFrom(n) {
   return G.lv.inc[n].filter(function (ei) { return !G.burnt[ei]; });
 }
 
 function isWon() {
-  if (G.lv.mode === 'euler') return G.used.length === G.lv.edges.length;
-  for (var i = 0; i < G.visited.length; i++) if (!G.visited[i]) return false;
-  return true;
+  var lv = G.lv;
+  if (lv.euler) return G.used.length === lv.edges.length;
+  var full = (1 << lv.nodes.length) - 1;
+  if (G.vis !== full) return false;
+  var fA = (1 << lv.claims[0].length) - 1, fB = (1 << lv.claims[1].length) - 1;
+  return G.mA === fA && G.mB === fB;
 }
 
-function cross(ei) {
+function anyMoveLeft() {
+  for (var w = 0; w < walkerCount(); w++) if (availableFrom(G.pos[w]).length) return true;
+  return false;
+}
+
+// Cheap enough to run every move: tells the player the position is lost
+// now, rather than letting them wander an already-dead board.
+function isDead() {
+  if (G.lv.euler) return false;
+  var r = solveFrom(G.lv, G.pos[0], G.pos[1], maskOfBurnt(), G.vis, G.mA, G.mB, 220000);
+  return !r.ok && !r.capped;
+}
+function maskOfBurnt() {
+  var m = 0;
+  for (var i = 0; i < G.burnt.length; i++) if (G.burnt[i]) m |= (1 << i);
+  return m;
+}
+
+function cross(w, ei) {
   if (G.overlay || G.burnt[ei]) return false;
-  var e = G.lv.edges[ei];
-  if (e.a !== G.cur && e.b !== G.cur) return false;
-  var nx = (e.a === G.cur) ? e.b : e.a;
+  var lv = G.lv, e = lv.edges[ei], here = G.pos[w];
+  if (e.a !== here && e.b !== here) return false;
+  var nx = (e.a === here) ? e.b : e.a;
+
   G.burnt[ei] = 1;
-  G.used.push(ei);
-  G.cost += e.w;
-  G.cur = nx;
-  G.visited[nx] = 1;
-  G.path.push(nx);
-  spawnEmbers(ei);
+  G.used.push({ w: w, ei: ei });
+  G.cost += 1;
+  G.pos[w] = nx;
+  G.paths[w].push(nx);
+  G.vis |= (1 << nx);
+  var ci = lv.claims[w].indexOf(nx);
+  if (ci >= 0) { if (w === 0) G.mA |= (1 << ci); else G.mB |= (1 << ci); }
+  G.sel = w;
+  spawnEmbers(ei, w);
   syncHud();
 
   if (isWon()) finishLevel();
-  else if (availableFrom(G.cur).length === 0) setOverlay('stranded');
+  else if (!anyMoveLeft()) setOverlay('stranded');
+  else if (isDead()) setOverlay('dead');
   return true;
 }
 
 function undo() {
   if (G.overlay === 'win' || !G.used.length) return;
-  var ei = G.used.pop();
-  G.burnt[ei] = 0;
-  G.cost -= G.lv.edges[ei].w;
-  G.path.pop();
-  G.cur = G.path[G.path.length - 1];
-  G.visited.fill(0);
-  G.path.forEach(function (n) { G.visited[n] = 1; });
+  var last = G.used.pop();
+  G.burnt[last.ei] = 0;
+  G.cost -= 1;
+  G.paths[last.w].pop();
+  G.pos[last.w] = G.paths[last.w][G.paths[last.w].length - 1];
+  recomputeMarks();
   G.undos++;
-  if (G.overlay === 'stranded') setOverlay(null);
+  G.sel = last.w;
+  if (G.overlay === 'stranded' || G.overlay === 'dead') setOverlay(null);
   syncHud();
+}
+
+function recomputeMarks() {
+  var lv = G.lv;
+  G.vis = 0; G.mA = 0; G.mB = 0;
+  for (var w = 0; w < 2; w++) {
+    G.paths[w].forEach(function (n) {
+      G.vis |= (1 << n);
+      var ci = lv.claims[w].indexOf(n);
+      if (ci >= 0) { if (w === 0) G.mA |= (1 << ci); else G.mB |= (1 << ci); }
+    });
+  }
 }
 
 function starsFor() {
   if (G.lv.interlude) return 0;
-  if (G.lv.mode === 'euler') return G.undos === 0 ? 3 : (G.undos <= 3 ? 2 : 1);
-  if (G.cost <= G.par) return 3;
-  if (G.cost <= Math.ceil(G.par * 1.2)) return 2;
+  if (G.lv.euler) return G.undos === 0 ? 3 : (G.undos <= 3 ? 2 : 1);
+  if (G.cost <= G.par) return 3;      // not a wasted crossing
+  if (G.cost <= G.par + 2) return 2;
   return 1;
 }
 
 function finishLevel() {
-  var st = starsFor();
-  var id = G.lv.id;
+  var st = starsFor(), id = G.lv.id;
   if (!G.lv.interlude) {
     if (!(SAVE.stars[id] >= st)) SAVE.stars[id] = st;
     if (!(SAVE.best[id] <= G.cost)) SAVE.best[id] = G.cost;
-  } else {
-    SAVE.stars[id] = 0;
-  }
+  } else SAVE.stars[id] = 0;
   if (G.mode === 'drift' && G.index > SAVE.drift) SAVE.drift = G.index;
   persist();
   setOverlay('win');
@@ -659,7 +703,8 @@ function finishLevel() {
    ============================================================ */
 
 var cv = $('cv'), ctx = cv.getContext('2d');
-var VW = 0, VH = 0, DPR = 1, S = 0, OX = 0, OY = 0, R = 14;
+var VW = 0, VH = 0, DPR = 1, S = 0, SX = 0, SY = 0, OX = 0, OY = 0, R = 14;
+var TEAM = ['#ff7a45', '#45c8e8'];
 
 function resize() {
   var r = cv.getBoundingClientRect();
@@ -672,11 +717,8 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-// Fit the level's own extent, not the unit square it was authored in —
-// otherwise a wide crossing shrinks to nothing on a tall phone. The scale
-// stays uniform, so distance on screen is still distance in the cost.
 function layout() {
-  var PADX = 40, PADT = 34, PADB = 52;   // clears the largest island radius
+  var PADX = 44, PADT = 38, PADB = 54;
   var x0 = 0, y0 = 0, bw = 1, bh = 1;
   if (G.lv) {
     var xs = G.lv.nodes.map(function (n) { return n.x; });
@@ -686,27 +728,30 @@ function layout() {
     bh = Math.max(0.12, Math.max.apply(null, ys) - y0);
   }
   var availW = Math.max(60, VW - PADX * 2), availH = Math.max(60, VH - PADT - PADB);
-  S = Math.min(availW / bw, availH / bh);
-  S = Math.min(S, Math.max(VW, VH) * 1.4);   // keep near-collinear levels sane
-  R = clamp(S * 0.034, 11, 25);
-  OX = PADX + (availW - bw * S) / 2 - x0 * S;
-  OY = PADT + (availH - bh * S) / 2 - y0 * S;
+  // Distance means nothing here, so the board may stretch to fill the screen
+  // rather than sit in a small square — capped so it still reads as a map.
+  var sx = availW / bw, sy = availH / bh;
+  var lo = Math.min(sx, sy);
+  sx = Math.min(sx, lo * 1.4); sy = Math.min(sy, lo * 1.4);
+  S = lo;
+  R = clamp(lo * 0.033, 11, 24);
+  SX = sx; SY = sy;
+  OX = PADX + (availW - bw * sx) / 2 - x0 * sx;
+  OY = PADT + (availH - bh * sy) / 2 - y0 * sy;
 }
 
-function PX(n) { return OX + n.x * S; }
-function PY(n) { return OY + n.y * S; }
+function PX(n) { return OX + n.x * SX; }
+function PY(n) { return OY + n.y * SY; }
 
 function ctrlOf(e) {
   var A = G.lv.nodes[e.a], B = G.lv.nodes[e.b];
   var ax = PX(A), ay = PY(A), bx = PX(B), by = PY(B);
   if (!e.bow) return [(ax + bx) / 2, (ay + by) / 2];
   var dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
-  // Quadratic control sits twice as far out as the curve's midpoint.
   return [(ax + bx) / 2 - dy / L * e.bow * S * 2, (ay + by) / 2 + dx / L * e.bow * S * 2];
 }
 function bezAt(e, t) {
-  var A = G.lv.nodes[e.a], B = G.lv.nodes[e.b], C = ctrlOf(e);
-  var u = 1 - t;
+  var A = G.lv.nodes[e.a], B = G.lv.nodes[e.b], C = ctrlOf(e), u = 1 - t;
   return [u * u * PX(A) + 2 * u * t * C[0] + t * t * PX(B),
           u * u * PY(A) + 2 * u * t * C[1] + t * t * PY(B)];
 }
@@ -715,6 +760,11 @@ function edgePath(e) {
   ctx.beginPath();
   ctx.moveTo(PX(A), PY(A));
   ctx.quadraticCurveTo(C[0], C[1], PX(B), PY(B));
+}
+function segDist(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+  var t = L2 ? clamp(((px - x1) * dx + (py - y1) * dy) / L2, 0, 1) : 0;
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 function distToEdge(e, px, py) {
   var best = Infinity, prev = bezAt(e, 0);
@@ -726,35 +776,24 @@ function distToEdge(e, px, py) {
   }
   return best;
 }
-function segDist(px, py, x1, y1, x2, y2) {
-  var dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
-  var t = L2 ? clamp(((px - x1) * dx + (py - y1) * dy) / L2, 0, 1) : 0;
-  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-}
 
-function spawnEmbers(ei) {
+function spawnEmbers(ei, w) {
   var e = G.lv.edges[ei];
   for (var i = 0; i < 16; i++) {
     var p = bezAt(e, i / 15);
     G.parts.push({
-      x: p[0], y: p[1],
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: -0.25 - Math.random() * 0.65,
-      life: 1, decay: 0.008 + Math.random() * 0.012,
-      r: 1 + Math.random() * 1.9
+      x: p[0], y: p[1], w: w,
+      vx: (Math.random() - 0.5) * 0.5, vy: -0.25 - Math.random() * 0.65,
+      life: 1, decay: 0.008 + Math.random() * 0.012, r: 1 + Math.random() * 1.9
     });
   }
 }
 
 function drawSea() {
   var g = ctx.createLinearGradient(0, 0, 0, VH);
-  g.addColorStop(0, '#08161f');
-  g.addColorStop(1, '#040d14');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, VW, VH);
-
-  ctx.strokeStyle = 'rgba(90,150,175,0.055)';
-  ctx.lineWidth = 1;
+  g.addColorStop(0, '#08161f'); g.addColorStop(1, '#040d14');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  ctx.strokeStyle = 'rgba(90,150,175,0.055)'; ctx.lineWidth = 1;
   for (var y = 18; y < VH; y += 26) {
     ctx.beginPath();
     for (var x = -10; x <= VW + 10; x += 14) {
@@ -766,117 +805,91 @@ function drawSea() {
 }
 
 function drawEdge(e, live) {
-  var burnt = !!G.burnt[e.i];
-  if (burnt) {
+  if (G.burnt[e.i]) {
     ctx.save();
     ctx.setLineDash([2, 7]);
-    ctx.strokeStyle = 'rgba(70,96,110,0.30)';
+    ctx.strokeStyle = 'rgba(70,96,110,0.28)';
     ctx.lineWidth = 1.5;
     edgePath(e); ctx.stroke();
     ctx.restore();
     return;
   }
-  if (live) {
+  if (live >= 0) {
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,122,69,0.16)';
-    ctx.lineWidth = 11;
-    ctx.lineCap = 'round';
+    ctx.strokeStyle = (live === 0 ? 'rgba(255,122,69,0.15)' : 'rgba(69,200,232,0.15)');
+    ctx.lineWidth = 11; ctx.lineCap = 'round';
     edgePath(e); ctx.stroke();
     ctx.restore();
   }
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.strokeStyle = live ? 'rgba(228,196,150,0.95)' : 'rgba(127,154,166,0.62)';
-  ctx.lineWidth = live ? 4.2 : 3.2;
+  ctx.strokeStyle = live >= 0 ? 'rgba(228,214,190,0.95)' : 'rgba(127,154,166,0.58)';
+  ctx.lineWidth = live >= 0 ? 4.2 : 3.2;
   edgePath(e); ctx.stroke();
-  // Tolled and ferried spans wear planks so the number is not a surprise.
-  if (e.toll) {
-    ctx.strokeStyle = live ? 'rgba(120,80,45,0.9)' : 'rgba(20,40,50,0.8)';
-    ctx.lineWidth = 1.4;
-    for (var i = 1; i < 9; i++) {
-      var p = bezAt(e, i / 9), q = bezAt(e, i / 9 + 0.012);
-      var dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1;
-      ctx.beginPath();
-      ctx.moveTo(p[0] - dy / L * 3.4, p[1] + dx / L * 3.4);
-      ctx.lineTo(p[0] + dy / L * 3.4, p[1] - dx / L * 3.4);
-      ctx.stroke();
-    }
-  }
   ctx.restore();
 }
 
-function drawLabel(e) {
-  var m = bezAt(e, 0.5);
-  var burnt = !!G.burnt[e.i];
-  var txt = String(e.w);
-  ctx.font = '600 ' + Math.round(clamp(S * 0.026, 9, 12)) + 'px "Geist Mono", ui-monospace, monospace';
-  var w = ctx.measureText(txt).width + 8, h = 13;
-  ctx.fillStyle = burnt ? 'rgba(9,22,30,0.6)' : 'rgba(6,17,25,0.9)';
-  ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(m[0] - w / 2, m[1] - h / 2, w, h, 4)
-                : ctx.rect(m[0] - w / 2, m[1] - h / 2, w, h);
-  ctx.fill();
-  ctx.fillStyle = burnt ? 'rgba(80,105,118,0.5)' : (e.toll ? '#ffcf6b' : 'rgba(150,180,192,0.92)');
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(txt, m[0], m[1] + 0.5);
-}
-
-function drawTrail() {
-  if (G.used.length === 0) return;
-  ctx.save();
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (var i = 0; i < G.used.length; i++) {
-    var e = G.lv.edges[G.used[i]];
-    var age = (i + 1) / G.used.length;
-    ctx.strokeStyle = 'rgba(255,122,69,' + (0.16 + 0.42 * age).toFixed(3) + ')';
+function drawTrails() {
+  ctx.save(); ctx.lineCap = 'round';
+  G.used.forEach(function (mv, i) {
+    var e = G.lv.edges[mv.ei], age = (i + 1) / G.used.length;
+    ctx.strokeStyle = mv.w === 0
+      ? 'rgba(255,122,69,' + (0.18 + 0.44 * age).toFixed(3) + ')'
+      : 'rgba(69,200,232,' + (0.18 + 0.44 * age).toFixed(3) + ')';
     ctx.lineWidth = 3;
     edgePath(e); ctx.stroke();
-  }
+  });
   ctx.restore();
+}
+
+// Claimed islands are shape-coded as well as coloured: a triangle for
+// amber, a square for cyan, so the two never rely on hue alone.
+function claimGlyph(x, y, claim, size, solid) {
+  ctx.beginPath();
+  if (claim === 1) {
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size * 0.92, y + size * 0.7);
+    ctx.lineTo(x - size * 0.92, y + size * 0.7);
+    ctx.closePath();
+  } else {
+    ctx.rect(x - size * 0.8, y - size * 0.8, size * 1.6, size * 1.6);
+  }
+  if (solid) { ctx.fillStyle = TEAM[claim - 1]; ctx.fill(); }
+  else { ctx.strokeStyle = TEAM[claim - 1]; ctx.lineWidth = 2; ctx.stroke(); }
 }
 
 function drawNode(i) {
-  var n = G.lv.nodes[i];
-  var x = PX(n), y = PY(n);
-  var visited = !!G.visited[i];
-  var isCur = (i === G.cur);
-  var dead = availableFrom(i).length === 0;
-
-  if (isCur) {
-    var pulse = 1 + Math.sin(G.t * 0.005) * 0.10;
-    ctx.beginPath();
-    ctx.arc(x, y, R * 1.85 * pulse, 0, TAU);
-    ctx.fillStyle = 'rgba(255,122,69,0.10)';
-    ctx.fill();
+  var n = G.lv.nodes[i], x = PX(n), y = PY(n);
+  var visited = !!((G.vis >> i) & 1);
+  var claim = n.claim;
+  var settled = false;
+  if (claim) {
+    var ci = G.lv.claims[claim - 1].indexOf(i);
+    settled = claim === 1 ? !!((G.mA >> ci) & 1) : !!((G.mB >> ci) & 1);
   }
 
-  ctx.beginPath();
-  ctx.arc(x, y, R, 0, TAU);
-  if (visited) {
-    ctx.fillStyle = isCur ? '#f0dfbd' : (dead ? '#5d6b6c' : '#b6ab93');
-    ctx.fill();
-  } else {
-    ctx.fillStyle = '#0e202a';
-    ctx.fill();
-    ctx.lineWidth = 2.2;
-    ctx.strokeStyle = 'rgba(216,204,177,0.72)';
-    ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, R, 0, TAU);
+  if (visited) { ctx.fillStyle = '#b6ab93'; ctx.fill(); }
+  else {
+    ctx.fillStyle = '#0e202a'; ctx.fill();
+    ctx.lineWidth = 2.2; ctx.strokeStyle = 'rgba(216,204,177,0.7)'; ctx.stroke();
   }
-  if (isCur) {
-    ctx.beginPath();
-    ctx.arc(x, y, R + 4.5, 0, TAU);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#ff7a45';
-    ctx.stroke();
+
+  // One visual channel each: a glyph means the island is claimed, a ring
+  // means a traveller is standing on it. Never both for the same thing.
+  if (claim) {
+    ctx.save();
+    ctx.globalAlpha = settled ? 1 : 0.5 + 0.4 * Math.sin(G.t * 0.004);
+    claimGlyph(x, y, claim, R * 0.52, settled);
+    ctx.restore();
   }
 
   if (G.revealOdd && G.oddInfo && G.oddInfo.deg) {
-    var d = G.oddInfo.deg[i];
-    var odd = d % 2 === 1;
-    ctx.beginPath();
-    ctx.arc(x, y, R + 9, 0, TAU);
+    var d = G.oddInfo.deg[i], odd = d % 2 === 1;
+    ctx.beginPath(); ctx.arc(x, y, R + 9, 0, TAU);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = odd ? 'rgba(255,207,107,' + (0.55 + 0.35 * Math.sin(G.t * 0.006)).toFixed(3) + ')' : 'rgba(95,220,160,0.35)';
+    ctx.strokeStyle = odd ? 'rgba(255,207,107,' + (0.55 + 0.35 * Math.sin(G.t * 0.006)).toFixed(3) + ')'
+                          : 'rgba(95,220,160,0.32)';
     ctx.stroke();
     ctx.font = '600 12px "Geist Mono", ui-monospace, monospace';
     ctx.fillStyle = odd ? '#ffcf6b' : '#5fdca0';
@@ -885,14 +898,33 @@ function drawNode(i) {
   }
 }
 
+function drawWalker(w) {
+  var n = G.lv.nodes[G.pos[w]], x = PX(n), y = PY(n);
+  var rad = R + 5 + w * 4.5;
+  var isSel = (G.sel === w) && !G.lv.solo;
+  if (isSel) {
+    var pulse = 1 + Math.sin(G.t * 0.005) * 0.09;
+    ctx.beginPath(); ctx.arc(x, y, rad * 1.5 * pulse, 0, TAU);
+    ctx.fillStyle = w === 0 ? 'rgba(255,122,69,0.10)' : 'rgba(69,200,232,0.10)';
+    ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
+  ctx.lineWidth = isSel ? 3.2 : 2;
+  ctx.strokeStyle = TEAM[w];
+  ctx.globalAlpha = isSel ? 1 : 0.62;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
 function drawParts() {
   for (var i = G.parts.length - 1; i >= 0; i--) {
     var p = G.parts[i];
     p.x += p.vx; p.y += p.vy; p.vy -= 0.008; p.life -= p.decay;
     if (p.life <= 0) { G.parts.splice(i, 1); continue; }
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r * p.life, 0, TAU);
-    ctx.fillStyle = 'rgba(255,' + Math.round(120 + 110 * p.life) + ',60,' + (p.life * 0.85).toFixed(3) + ')';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, TAU);
+    ctx.fillStyle = p.w === 0
+      ? 'rgba(255,' + Math.round(120 + 110 * p.life) + ',60,' + (p.life * 0.85).toFixed(3) + ')'
+      : 'rgba(' + Math.round(90 + 110 * p.life) + ',210,240,' + (p.life * 0.8).toFixed(3) + ')';
     ctx.fill();
   }
 }
@@ -902,20 +934,27 @@ function frame(ts) {
   drawSea();
   if (G.lv && G.screen === 'play') {
     var live = {};
-    if (!G.overlay) availableFrom(G.cur).forEach(function (ei) { live[ei] = true; });
-    G.lv.edges.forEach(function (e) { if (G.burnt[e.i]) drawEdge(e, false); });
-    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i]) drawEdge(e, !!live[e.i]); });
-    drawTrail();
-    G.lv.edges.forEach(drawLabel);
+    if (!G.overlay) {
+      for (var w = walkerCount() - 1; w >= 0; w--) {
+        availableFrom(G.pos[w]).forEach(function (ei) {
+          if (live[ei] === undefined || w === G.sel) live[ei] = w;
+        });
+      }
+    }
+    G.lv.edges.forEach(function (e) { if (G.burnt[e.i]) drawEdge(e, -1); });
+    G.lv.edges.forEach(function (e) {
+      if (!G.burnt[e.i]) drawEdge(e, live[e.i] === undefined ? -1 : live[e.i]);
+    });
+    drawTrails();
     drawParts();
     for (var i = 0; i < G.lv.nodes.length; i++) drawNode(i);
+    for (var k = 0; k < walkerCount(); k++) drawWalker(k);
   }
   requestAnimationFrame(frame);
 }
 
 /* ============================================================
-   Input — drag to chain crossings, tap a span to pick between
-   two bridges that share the same shores.
+   Input
    ============================================================ */
 
 var press = null;
@@ -924,20 +963,24 @@ function localPt(ev) {
   var r = cv.getBoundingClientRect();
   return [ev.clientX - r.left, ev.clientY - r.top];
 }
-
 function nodeHit(px, py) {
-  var bestI = -1, bestD = R * 2.3;
+  var bestI = -1, bestD = R * 2.2;
   for (var i = 0; i < G.lv.nodes.length; i++) {
-    var n = G.lv.nodes[i];
-    var d = Math.hypot(px - PX(n), py - PY(n));
+    var n = G.lv.nodes[i], d = Math.hypot(px - PX(n), py - PY(n));
     if (d < bestD) { bestD = d; bestI = i; }
   }
   return bestI;
 }
-
-function edgeTo(target, px, py) {
-  // Among parallel spans to the same island, take the one nearest the finger.
-  var opts = availableFrom(G.cur).filter(function (ei) {
+function walkerHit(px, py) {
+  var best = -1, bd = R * 2.2;
+  for (var w = 0; w < walkerCount(); w++) {
+    var n = G.lv.nodes[G.pos[w]], d = Math.hypot(px - PX(n), py - PY(n));
+    if (d < bd) { bd = d; best = w; }
+  }
+  return best;
+}
+function edgeFor(w, target, px, py) {
+  var opts = availableFrom(G.pos[w]).filter(function (ei) {
     var e = G.lv.edges[ei];
     return e.a === target || e.b === target;
   });
@@ -951,29 +994,40 @@ function edgeTo(target, px, py) {
   return best;
 }
 
-function tryMove(px, py) {
+// Move the selected walker where possible; if only the other one can
+// make the tapped crossing, move that one instead.
+function tryMove(px, py, forceW) {
   var hit = nodeHit(px, py);
-  if (hit >= 0 && hit !== G.cur) {
-    var ei = edgeTo(hit, px, py);
-    if (ei >= 0) return cross(ei);
+  if (hit < 0) return false;
+  var order = forceW !== undefined ? [forceW]
+            : [G.sel].concat(walkerCount() === 2 ? [1 - G.sel] : []);
+  for (var k = 0; k < order.length; k++) {
+    var w = order[k];
+    if (hit === G.pos[w]) continue;
+    var ei = edgeFor(w, hit, px, py);
+    if (ei >= 0) return cross(w, ei);
   }
   return false;
 }
-
 function trySpan(px, py) {
-  var opts = availableFrom(G.cur), best = -1, bd = Math.max(16, R * 1.1);
-  opts.forEach(function (ei) {
-    var d = distToEdge(G.lv.edges[ei], px, py);
-    if (d < bd) { bd = d; best = ei; }
-  });
-  if (best >= 0) return cross(best);
+  var order = [G.sel].concat(walkerCount() === 2 ? [1 - G.sel] : []);
+  for (var k = 0; k < order.length; k++) {
+    var w = order[k], best = -1, bd = Math.max(16, R * 1.05);
+    availableFrom(G.pos[w]).forEach(function (ei) {
+      var d = distToEdge(G.lv.edges[ei], px, py);
+      if (d < bd) { bd = d; best = ei; }
+    });
+    if (best >= 0) return cross(w, best);
+  }
   return false;
 }
 
 cv.addEventListener('pointerdown', function (ev) {
   if (G.screen !== 'play' || G.overlay) return;
   var p = localPt(ev);
-  press = { x: p[0], y: p[1], moved: 0 };
+  var w = walkerHit(p[0], p[1]);
+  if (w >= 0) G.sel = w;
+  press = { x: p[0], y: p[1], moved: 0, w: w >= 0 ? w : undefined };
   cv.setPointerCapture(ev.pointerId);
   hideHint();
   ev.preventDefault();
@@ -984,7 +1038,10 @@ cv.addEventListener('pointermove', function (ev) {
   var p = localPt(ev);
   press.moved += Math.hypot(p[0] - press.x, p[1] - press.y);
   press.x = p[0]; press.y = p[1];
-  if (press.moved > 8) tryMove(p[0], p[1]);
+  if (press.moved > 8) {
+    // A drag that began on a walker only ever moves that walker.
+    if (tryMove(p[0], p[1], press.w)) press.w = G.sel;
+  }
   ev.preventDefault();
 });
 
@@ -992,7 +1049,9 @@ function endPress(ev) {
   if (!press) return;
   var p = localPt(ev);
   if (press.moved <= 8 && G.screen === 'play' && !G.overlay) {
-    if (!tryMove(p[0], p[1])) trySpan(p[0], p[1]);
+    if (nodeHit(p[0], p[1]) !== G.pos[G.sel] || press.w === undefined) {
+      if (!tryMove(p[0], p[1])) trySpan(p[0], p[1]);
+    }
   }
   press = null;
 }
@@ -1001,7 +1060,8 @@ cv.addEventListener('pointercancel', function () { press = null; });
 
 window.addEventListener('keydown', function (ev) {
   if (ev.key === 'z' || ev.key === 'Z') undo();
-  if (ev.key === 'r' || ev.key === 'R') { resetLevel(); setOverlay(null); }
+  if (ev.key === 'r' || ev.key === 'R') { G.undos = 0; resetLevel(); setOverlay(null); }
+  if (ev.key === ' ' && walkerCount() === 2) { G.sel = 1 - G.sel; ev.preventDefault(); }
 });
 
 /* ============================================================
@@ -1011,25 +1071,30 @@ window.addEventListener('keydown', function (ev) {
 function syncHud() {
   var lv = G.lv;
   if (!lv) return;
-  $('lname').textContent = lv.name;
-  var left = lv.mode === 'euler'
-    ? '<span class="mode">Burn every bridge</span>'
-    : (G.lv.nodes.length - countVisited()) + ' islands left';
-  $('lsub').innerHTML = left;
+  $('lname').textContent = (G.mode === 'drift')
+    ? 'Drift ' + G.index
+    : (lv.interlude ? 'Königsberg, 1736' : String(G.index + 1).padStart(2, '0'));
+
+  if (lv.euler) {
+    $('lsub').innerHTML = '<i class="cn">every bridge, once</i>';
+    $('par').textContent = G.used.length + '/' + lv.edges.length + ' bridges';
+  } else {
+    var fA = (1 << lv.claims[0].length) - 1, fB = (1 << lv.claims[1].length) - 1;
+    var oA = lv.claims[0].length - popc(G.mA), oB = lv.claims[1].length - popc(G.mB);
+    var full = (1 << lv.nodes.length) - 1;
+    var unseen = lv.nodes.length - popc(G.vis);
+    // Only show a counter for something the board actually asks for.
+    $('lsub').innerHTML =
+      (lv.claims[0].length ? '<i class="ca' + (oA ? '' : ' met') + '">▲ ' + oA + '</i>' : '') +
+      (lv.claims[1].length ? '<i class="cb' + (oB ? '' : ' met') + '">■ ' + oB + '</i>' : '') +
+      '<i class="cn' + (unseen ? '' : ' met') + '">○ ' + unseen + '</i>';
+    $('par').textContent = 'par ' + G.par;
+  }
   $('cost').textContent = String(G.cost);
-  $('cost').className = 'mono' + (lv.mode === 'euler' ? '' :
-    (G.cost > G.par ? ' over' : (G.cost > 0 && countVisited() === lv.nodes.length ? ' under' : '')));
-  $('par').textContent = lv.mode === 'euler'
-    ? (G.used.length + '/' + lv.edges.length + ' bridges')
-    : ('par ' + G.par + (G.parApprox ? '~' : ''));
+  $('cost').className = 'mono' + (!lv.euler && G.cost > G.par ? ' over' : '');
   $('bUndo').disabled = G.used.length === 0;
 }
-
-function countVisited() {
-  var c = 0;
-  for (var i = 0; i < G.visited.length; i++) if (G.visited[i]) c++;
-  return c;
-}
+function popc(x) { var c = 0; while (x) { x &= x - 1; c++; } return c; }
 
 function setScreen(name) {
   G.screen = name;
@@ -1044,25 +1109,22 @@ var hintTimer = null;
 function showHint(txt) {
   var h = $('hint');
   if (!txt) { h.classList.add('gone'); return; }
-  h.textContent = txt;
+  h.innerHTML = txt;
   h.classList.remove('gone');
   clearTimeout(hintTimer);
-  hintTimer = setTimeout(hideHint, 6500);
+  hintTimer = setTimeout(hideHint, Math.max(4200, txt.length * 52));
 }
 function hideHint() { $('hint').classList.add('gone'); }
 
-function starStr(n, max) {
+function starStr(n) {
   var out = '';
-  for (var i = 0; i < (max || 3); i++) out += (i < n ? '<b>★</b>' : '★');
+  for (var i = 0; i < 3; i++) out += (i < n ? '<b>★</b>' : '★');
   return out;
 }
-
 function totalStars() {
   return Object.keys(SAVE.stars).reduce(function (s, k) { return s + (SAVE.stars[k] || 0); }, 0);
 }
-
 function unlockedUpTo() {
-  // A crossing opens once the one before it is behind you.
   var i = 0;
   while (i < LV.length && SAVE.stars[LV[i].id] !== undefined) i++;
   return Math.min(i, LV.length - 1);
@@ -1071,18 +1133,16 @@ function unlockedUpTo() {
 function buildGrid() {
   var open = unlockedUpTo();
   $('totStars').innerHTML = totalStars() + ' ★';
-  var html = LV.map(function (lv, i) {
-    var st = SAVE.stars[lv.id];
-    var locked = i > open;
+  $('grid').innerHTML = LV.map(function (lv, i) {
+    var st = SAVE.stars[lv.id], locked = i > open;
+    var label = lv.interlude ? '1736' : String(i + 1).padStart(2, '0');
     var stEl = lv.interlude
-      ? '<div class="st ' + (st !== undefined ? 'done' : '') + '">' + (st !== undefined ? '✓ read' : '—') + '</div>'
+      ? '<div class="st ' + (st !== undefined ? 'done' : '') + '">' + (st !== undefined ? '✓' : '—') + '</div>'
       : '<div class="st">' + starStr(st || 0) + '</div>';
-    return '<button class="tile' + (locked ? ' locked' : '') + (lv.mode === 'euler' ? ' euler' : '') + '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
-      '<div><div class="n">' + String(i + 1).padStart(2, '0') +
-      (lv.mode === 'euler' ? ' <b>EULER</b>' : '') + '</div>' +
-      '<div class="nm">' + lv.name + '</div></div>' + stEl + '</button>';
+    return '<button class="tile' + (locked ? ' locked' : '') + (lv.interlude ? ' mark' : '') +
+      '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
+      '<div class="n">' + label + '</div>' + stEl + '</button>';
   }).join('');
-  $('grid').innerHTML = html;
   Array.prototype.forEach.call($('grid').querySelectorAll('.tile'), function (t) {
     t.addEventListener('click', function () {
       var i = +t.getAttribute('data-i');
@@ -1090,8 +1150,6 @@ function buildGrid() {
     });
   });
 }
-
-/* ---------- overlays ---------- */
 
 function setOverlay(kind) {
   G.overlay = kind;
@@ -1109,17 +1167,16 @@ var OVERLAYS = {
     var lv = G.lv, st = starsFor();
     if (lv.interlude) return OVERLAYS.why();
     var diff = G.cost - G.par;
-    var verdict = lv.mode === 'euler'
-      ? (G.undos === 0 ? 'One clean stroke.' : 'Crossed — with ' + G.undos + ' step' + (G.undos === 1 ? '' : 's') + ' taken back.')
-      : (diff <= 0 ? (diff < 0 ? 'Under par. Nobody has walked it shorter.' : 'Par. The shortest crossing there is.')
-                   : (diff + ' over par.'));
-    var nextTxt = (G.mode === 'drift') ? 'Drift on' : (G.index + 1 < LV.length ? 'Next crossing' : 'Back to crossings');
-    return '<h2>Crossed</h2>' +
-      '<div class="stars">' + starStr(st) + '</div>' +
+    var verdict = lv.euler
+      ? (G.undos === 0 ? 'One clean stroke.' : 'Crossed.')
+      : (diff <= 0 ? 'Par. Not one bridge wasted.'
+                   : diff + ' bridge' + (diff === 1 ? '' : 's') + ' more than needed.');
+    var nextTxt = (G.mode === 'drift') ? 'Drift on'
+                : (G.index + 1 < LV.length ? 'Next' : 'Back to crossings');
+    return '<h2>Crossed</h2><div class="stars">' + starStr(st) + '</div>' +
       '<div class="scoreline">' +
-        '<div><div class="v mono">' + G.cost + '</div><div class="k">walked</div></div>' +
-        '<div><div class="v mono">' + G.par + '</div><div class="k">' + (lv.mode === 'euler' ? 'total' : 'par') + '</div></div>' +
-      '</div>' +
+        '<div><div class="v mono">' + G.cost + '</div><div class="k">burnt</div></div>' +
+        '<div><div class="v mono">' + G.par + '</div><div class="k">par</div></div></div>' +
       '<p class="tight">' + verdict + '</p>' +
       '<button class="btn primary" data-act="next">' + nextTxt + '</button>' +
       '<div class="row2"><button class="btn" data-act="replay">Again</button>' +
@@ -1127,25 +1184,26 @@ var OVERLAYS = {
   },
 
   stranded: function () {
-    var lv = G.lv;
-    var left = lv.mode === 'euler'
-      ? (lv.edges.length - G.used.length) + ' bridge' + (lv.edges.length - G.used.length === 1 ? '' : 's') + ' still standing'
-      : (lv.nodes.length - countVisited()) + ' island' + (lv.nodes.length - countVisited() === 1 ? '' : 's') + ' never reached';
-    var why = lv.interlude
-      ? '<button class="btn" data-act="why">Why can nobody do this?</button>'
-      : '';
+    var why = G.lv.interlude ? '<button class="btn" data-act="why">Why can nobody do this?</button>' : '';
     return '<h2>Stranded</h2>' +
-      '<p class="tight">Every bridge from here is ash. ' + left + '.</p>' +
+      '<p class="tight">Every bridge within reach is ash.</p>' +
+      '<button class="btn primary" data-act="undo">Step back</button>' +
+      '<button class="btn" data-act="replay">Restart</button>' + why +
+      '<button class="btn ghost" data-act="quit">Give up</button>';
+  },
+
+  dead: function () {
+    return '<h2>No way through</h2>' +
+      '<p class="tight">You can still move, but the islands left can no longer all be reached. A bridge you needed is gone.</p>' +
       '<button class="btn primary" data-act="undo">Step back</button>' +
       '<button class="btn" data-act="replay">Restart</button>' +
-      why +
       '<button class="btn ghost" data-act="quit">Give up</button>';
   },
 
   interludeIntro: function () {
     return '<h2>Königsberg, 1736</h2>' +
-      '<p>Seven bridges over the Pregel. The people of the city passed the winters arguing over a single question: <b>can you walk a route that crosses every bridge exactly once?</b></p>' +
-      '<p class="tight">Reaching every shore is easy. Burning every bridge is the puzzle. Try it.</p>' +
+      '<p>Seven bridges over the Pregel. The city argued for years over one question: <b>can you walk a route that crosses every bridge exactly once?</b></p>' +
+      '<p class="tight">One traveller this time. Try it.</p>' +
       '<button class="btn primary" data-act="close">Try the walk</button>' +
       '<button class="btn ghost" data-act="why">Just tell me</button>';
   },
@@ -1153,24 +1211,21 @@ var OVERLAYS = {
   why: function () {
     G.revealOdd = true;
     return '<h2>It cannot be done</h2>' +
-      '<p class="tight">Look at the numbers on the shores — that is how many bridges each one has.</p>' +
+      '<p class="tight">The number on each shore is how many bridges it has.</p>' +
       '<p class="tight">Every shore you pass <b>through</b> spends bridges in pairs: one to arrive, one to leave. So a shore with an odd count can only be where you <b>start</b> or where you <b>finish</b>.</p>' +
-      '<p class="tight">All four of Königsberg\'s shores are odd. A walk has two ends. Four will not fit into two — and no amount of cleverness changes that.</p>' +
-      '<p>Euler proved it by refusing to look at the map and looking only at the counts. Graph theory starts here.</p>' +
+      '<p class="tight">All four of Königsberg\'s shores are odd. A walk has two ends. Four will not fit into two.</p>' +
+      '<p>Euler proved it by ignoring the map entirely and looking only at the counts. Graph theory starts here.</p>' +
       '<button class="btn primary" data-act="passInterlude">Understood</button>';
   },
 
   how: function () {
-    return '<h2>How to play</h2>' +
-      '<ul class="howlist">' +
-      '<li><b>Drag</b> from the lit island to an island beside it, and keep dragging to chain crossings. <b>Tap</b> a single bridge when two of them share the same shores.</li>' +
-      '<li>Every bridge <b>burns behind you</b>. It never comes back.</li>' +
-      '<li>Reach <b>every island</b> to cross. Islands may be revisited freely — it is the bridges that run out.</li>' +
-      '<li>Each bridge shows its <b>cost</b>. <b>Par</b> is the cheapest crossing that exists. Match it for three stars.</li>' +
-      '<li>Gold levels flip the rule: <b>burn every bridge</b>, exactly once.</li>' +
-      '<li><b>Undo</b> is unlimited. Stranding yourself is a lesson, not a loss.</li>' +
-      '</ul>' +
-      '<button class="btn primary" data-act="close">Got it</button>';
+    return '<h2>How to play</h2><ul class="howlist">' +
+      '<li>Two travellers — <b class="ca">amber</b> and <b class="cb">cyan</b>. Tap one to pick it up, then drag or tap to move it.</li>' +
+      '<li>Every bridge <b>burns behind whoever crosses it</b>. One pool of bridges, shared between them.</li>' +
+      '<li><b>Every island must be reached.</b> Islands marked <b class="ca">▲</b> only count when amber stands on them; <b class="cb">■</b> only for cyan.</li>' +
+      '<li><b>Par</b> is the fewest bridges any pair of routes can settle the board in. Match it for three stars.</li>' +
+      '<li><b>Undo</b> is unlimited, and the game tells you the moment a board can no longer be finished.</li>' +
+      '</ul><button class="btn primary" data-act="close">Got it</button>';
   }
 };
 
@@ -1181,10 +1236,7 @@ var ACTIONS = {
   quit: function () { setScreen(G.mode === 'drift' ? 'menu' : 'levels'); },
   why: function () { setOverlay('why'); },
   passInterlude: function () {
-    SAVE.stars[G.lv.id] = 0;
-    persist();
-    setOverlay(null);
-    ACTIONS.next();
+    SAVE.stars[G.lv.id] = 0; persist(); setOverlay(null); ACTIONS.next();
   },
   next: function () {
     if (G.mode === 'drift') {
@@ -1198,8 +1250,6 @@ var ACTIONS = {
   }
 };
 
-/* ---------- buttons ---------- */
-
 $('bPlay').addEventListener('click', function () {
   var i = unlockedUpTo();
   loadLevel(LV[i], i, 'campaign');
@@ -1208,19 +1258,35 @@ $('bPlay').addEventListener('click', function () {
 $('bLevels').addEventListener('click', function () { setScreen('levels'); });
 $('bHow').addEventListener('click', function () { setScreen('menu'); setOverlay('how'); });
 $('bDrift').addEventListener('click', function () {
-  var d = Math.max(1, SAVE.drift ? SAVE.drift : 1);
-  var lv = driftLevel(d);
+  var d = Math.max(1, SAVE.drift || 1), lv = driftLevel(d);
   if (lv) loadLevel(lv, d, 'drift');
 });
 $('bBack').addEventListener('click', function () { setScreen(G.mode === 'drift' ? 'menu' : 'levels'); });
 $('bUndo').addEventListener('click', undo);
 $('bRestart').addEventListener('click', function () { G.undos = 0; resetLevel(); setOverlay(null); });
 
-/* ---------- boot ---------- */
-
 resize();
 setScreen('menu');
 requestAnimationFrame(frame);
+
+/* Test hook: the harness drives the real game and reads real state. */
+window.__bb = {
+  load: function (i) { loadLevel(LV[i], i, 'campaign'); },
+  drift: function (d) { var lv = driftLevel(d); if (lv) loadLevel(lv, d, 'drift'); },
+  state: function () {
+    return {
+      id: G.lv && G.lv.id, cost: G.cost, par: G.par, overlay: G.overlay,
+      pos: G.pos.slice(), sel: G.sel, used: G.used.length,
+      won: G.lv ? isWon() : false, screen: G.screen,
+      nodes: G.lv ? G.lv.nodes.length : 0, edges: G.lv ? G.lv.edges.length : 0
+    };
+  },
+  at: function (i) { var n = G.lv.nodes[i]; var r = cv.getBoundingClientRect(); return [r.left + PX(n), r.top + PY(n)]; },
+  move: function (w, target) {
+    var ei = edgeFor(w, target, 0, 0);
+    return ei >= 0 ? cross(w, ei) : false;
+  }
+};
 
 })();
 </script>
