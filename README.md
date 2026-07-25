@@ -22,6 +22,13 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
 - `gegenpress/` — turn-based soccer tactics on a 7×9 grid. Perfect information: the
   opposition telegraphs every run, pass, shot and tackle before you commit, and
   resolution is fully deterministic. Single self-contained `index.html`.
+- `burnbridge/` — graph-theory puzzler. Drag a route between islands; every bridge
+  burns behind you, so the map is a resource you spend rather than a board you walk.
+  Reach every island under par (the true optimum, solved by branch-and-bound before
+  you see the level), or take on the gold levels where the rule flips to Euler's:
+  burn every bridge exactly once. Includes Königsberg itself as an unsolvable
+  interlude that shows you *why*. 17 hand-built crossings plus endless generated
+  ones. Single self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
