@@ -155,6 +155,8 @@
     padding:0 12px 66px; min-height:0;
   }
   #board { display:block; width:100%; max-width:min(96vw, 62vh); aspect-ratio:1/1; touch-action:none; }
+  .thumb { transition:opacity .55s ease; }
+  .thumb.gone { opacity:0; pointer-events:none; }
   .thumb {
     position:absolute; right:16px; bottom:calc(20px + env(safe-area-inset-bottom));
     display:flex; flex-direction:column; gap:10px; align-items:center;
@@ -174,14 +176,6 @@
   .tbtn.undo[disabled] { opacity:0; pointer-events:none; }
   .tbtn.undo:not([disabled]) { opacity:0.42; }
 
-  /* ---------- solved ---------- */
-  #solved .inner { padding:20px 22px 22px; display:flex; flex-direction:column; height:100%; }
-  #solvedBoard { display:block; width:100%; aspect-ratio:1/1; }
-  .smeta { margin-top:20px; display:flex; align-items:baseline; gap:11px; }
-  .stime { font-family:var(--serif); font-size:42px; line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
-  .stier { font-size:10.5px; letter-spacing:0.15em; text-transform:uppercase; color:var(--pd); }
-  .sline { margin-top:12px; font-size:12px; color:var(--pd); line-height:1.5; }
-  .sacts { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
 
   /* ---------- sheets ---------- */
   .sheet { padding:2px 22px 24px; }
@@ -280,17 +274,6 @@
     </div>
   </section>
 
-  <section id="solved" class="screen">
-    <div class="inner">
-      <canvas id="solvedBoard"></canvas>
-      <div class="smeta"><span class="stime" id="sTime"></span><span class="stier" id="sName"></span></div>
-      <div class="sline" id="sLine"></div>
-      <div class="sacts">
-        <button class="pbtn" id="sNext">Another</button>
-        <button class="pbtn ghost" id="sHome">Home</button>
-      </div>
-    </div>
-  </section>
 
   <section id="rules" class="screen">
     <div class="bar">
@@ -959,8 +942,13 @@ function TapaCore() {
      an inward fillet. Without the fillets the shape reads as glued tiles. */
   var RADIUS = 0.17;
 
+  /* Every cell and every corner fillet goes into ONE path, filled once. Filling
+     them separately leaves hairline antialiasing seams where the sub-shapes
+     abut — invisible at thumbnail size, obvious on a solved board where the
+     wall is the only thing on screen. */
   function drawRegion(ctx, isInk, N, x0, y0, cell, q) {
     var e = 0.4;
+    ctx.beginPath();
     for (var r = 0; r < N; r++) {
       for (var c = 0; c < N; c++) {
         if (!isInk(r, c)) continue;
@@ -970,7 +958,6 @@ function TapaCore() {
         var xa = x - (lf ? e : 0), xb = x + cell + (rt ? e : 0);
         var ya = y - (up ? e : 0), yb = y + cell + (dn ? e : 0);
 
-        ctx.beginPath();
         if (!up && !lf) ctx.moveTo(xa + q, ya); else ctx.moveTo(xa, ya);
         if (!up && !rt) { ctx.lineTo(xb - q, ya); ctx.arc(xb - q, ya + q, q, -Math.PI / 2, 0); }
         else ctx.lineTo(xb, ya);
@@ -981,7 +968,6 @@ function TapaCore() {
         if (!up && !lf) { ctx.lineTo(xa, ya + q); ctx.arc(xa + q, ya + q, q, Math.PI, Math.PI * 1.5); }
         else ctx.lineTo(xa, ya);
         ctx.closePath();
-        ctx.fill();
 
         if (q > 0) {
           var cn = [
@@ -994,7 +980,6 @@ function TapaCore() {
             var o = cn[i];
             if (!(o[0] && o[1] && !o[2])) continue;
             var px = o[3], py = o[4], sx = o[5], sy = o[6];
-            ctx.beginPath();
             ctx.moveTo(px, py);
             ctx.lineTo(px, py - sy * q);
             ctx.arc(px - sx * q, py - sy * q, q,
@@ -1002,11 +987,11 @@ function TapaCore() {
                     sy === 1 ? Math.PI / 2 : -Math.PI / 2,
                     sx * sy < 0);
             ctx.closePath();
-            ctx.fill();
           }
         }
       }
     }
+    ctx.fill();
   }
 
   function cluePositions(k) {
@@ -1157,7 +1142,7 @@ function TapaCore() {
 
   /* ---------- screens ---------- */
   var screens = {};
-  ["home", "index", "play", "solved", "rules", "settings"].forEach(function (id) {
+  ["home", "index", "play", "rules", "settings"].forEach(function (id) {
     screens[id] = document.getElementById(id);
   });
   var currentScreen = "home";
@@ -1276,6 +1261,7 @@ function TapaCore() {
   var cells = null;        /* Uint8Array: 0 unknown, 1 ink, 2 mark */
   var undoStack = [];
   var verb = 1;            /* 1 = ink, 2 = mark */
+  var finished = false;    /* solved: the board becomes a picture, not a puzzle */
   var startedAt = 0, elapsed = 0, tickTimer = null;
   var boardEl = document.getElementById("board");
 
@@ -1306,6 +1292,14 @@ function TapaCore() {
 
   function drawBoard() {
     if (!G) return;
+    if (finished) {
+      /* a solved board keeps no scaffolding: no grid, no clues, no marks */
+      paint(boardEl, {
+        N: G.size, showGrid: false, showClues: false,
+        isInk: isInk
+      });
+      return;
+    }
     paint(boardEl, {
       N: G.size, isInk: isInk, isMark: isMark, clues: G.clues,
       quietClues: clueQuiet, breaks: ruleBreaks()
@@ -1326,6 +1320,8 @@ function TapaCore() {
             level: p.level, hard: p.hard, clueCount: p.clueCount };
       cells = new Uint8Array(size * size);
       undoStack = [];
+      finished = false;
+      document.querySelector(".thumb").classList.remove("gone");
       elapsed = 0;
       startClock();
       save.current = { size: size, num: num, cells: Array.from(cells),
@@ -1344,6 +1340,8 @@ function TapaCore() {
           level: c.level, hard: c.hard };
     cells = Uint8Array.from(c.cells || new Array(c.size * c.size).fill(0));
     undoStack = [];
+    finished = false;
+    document.querySelector(".thumb").classList.remove("gone");
     elapsed = c.elapsed || 0;
     document.getElementById("playTitle").textContent =
       c.size + " × " + c.size + " · №" + c.num;
@@ -1396,7 +1394,7 @@ function TapaCore() {
     return { r: r, c: c };
   }
   boardEl.addEventListener("pointerdown", function (ev) {
-    if (!G) return;
+    if (!G || finished) return;
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
     boardEl.setPointerCapture(ev.pointerId);
@@ -1406,7 +1404,7 @@ function TapaCore() {
     ev.preventDefault();
   });
   boardEl.addEventListener("pointermove", function (ev) {
-    if (!stroke || !G) return;
+    if (!stroke || !G || finished) return;
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
     applyCell(p.r, p.c);
@@ -1444,6 +1442,7 @@ function TapaCore() {
   }
 
   function checkWin() {
+    if (finished) return;
     for (var k = 0; k < G.size * G.size; k++) {
       if (G.clues.hasOwnProperty(k)) continue;
       var wantInk = G.region.has(k);
@@ -1471,10 +1470,16 @@ function TapaCore() {
     show("home");
   });
 
-  /* ---------- the solve moment ---------- */
-  var LEVEL_WORD = { 1: "one clue at a time", 2: "clues in pairs", 3: "the one-region rule" };
+  /* ---------- the solve moment ----------
+     Nothing is announced and nothing is thrown over the top of the board. The
+     scaffolding you solved with simply withdraws — clue numerals, then marks,
+     then the grid itself — and the finished wall is left alone on the paper to
+     be looked at. The only way on is the back chevron that was always there. */
   function win() {
+    if (finished) return;
+    finished = true;
     clearInterval(tickTimer);
+
     var secs = liveElapsed();
     var map = solvedMap(G.size);
     var prev = map[G.num];
@@ -1484,48 +1489,39 @@ function TapaCore() {
     save.current = null;
     persist();
 
-    document.getElementById("sTime").textContent = fmt(secs);
-    document.getElementById("sName").textContent = G.size + " × " + G.size + " · №" + G.num;
-    document.getElementById("sLine").textContent =
-      G.clueCount
-        ? "Solved from " + G.clueCount + " clues · needed " + (LEVEL_WORD[G.level] || "every rule")
-        : "Needed " + (LEVEL_WORD[G.level] || "every rule");
-    show("solved");
+    /* the controls have nothing left to do */
+    document.querySelector(".thumb").classList.add("gone");
+    document.getElementById("playClock").textContent = "";
     dissolve();
   }
 
-  /* The clues fade, then the grid itself goes, leaving the ink alone on the
-     paper. It is the only moment in the game worth animating. */
   function dissolve() {
-    var cv = document.getElementById("solvedBoard");
-    var size = G.size, region = G.region, clues = G.clues;
-    var opts = {
-      N: size, clues: clues,
-      isInk: function (r, c) { return r >= 0 && r < size && c >= 0 && c < size && region.has(r * size + c); },
+    var size = G.size, region = G.region;
+    var base = {
+      N: size, clues: G.clues,
+      isInk: function (r, c) {
+        return r >= 0 && r < size && c >= 0 && c < size && region.has(r * size + c);
+      },
       quietClues: function () { return true; }
     };
-    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      paint(cv, Object.assign({}, opts, { showGrid: false, showClues: false }));
+    var bare = Object.assign({}, base, { showGrid: false, showClues: false });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      paint(boardEl, bare);
       return;
     }
     var start = null, dur = 1400;
     function step(ts) {
       if (start === null) start = ts;
       var t = Math.min(1, (ts - start) / dur);
-      paint(cv, Object.assign({}, opts, {
+      paint(boardEl, Object.assign({}, base, {
         clueAlpha: 1 - Math.min(1, t / 0.38),
         gridAlpha: 1 - Math.max(0, Math.min(1, (t - 0.34) / 0.5))
       }));
       if (t < 1) requestAnimationFrame(step);
+      else paint(boardEl, bare);
     }
     requestAnimationFrame(step);
   }
-  document.getElementById("sNext").addEventListener("click", function () {
-    var size = G.size, next = G.num + 1;
-    openPuzzle(size, next);
-  });
-  document.getElementById("sHome").addEventListener("click", function () { show("home"); });
 
   /* ---------- rules ---------- */
   var RULES = [
