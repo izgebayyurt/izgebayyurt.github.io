@@ -22,17 +22,18 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
 - `gegenpress/` — turn-based soccer tactics on a 7×9 grid. Perfect information: the
   opposition telegraphs every run, pass, shot and tackle before you commit, and
   resolution is fully deterministic. Single self-contained `index.html`.
-- `burnbridge/` — graph-theory puzzler for two travellers. They share one pool of
-  bridges and every crossing burns the bridge behind it, so each span one spends is
-  denied to the other forever. Formally: two edge-disjoint trails, one per traveller,
-  that jointly reach every island — with claimed islands that only their own
-  traveller can settle, so neither can idle. No distances and no numbers on the
-  board; par is the fewest crossings that can settle it. Starts and claims are not
-  hand-placed: a search certified every board against the solver (solvable, both
-  travellers required, and the obvious greedy line strands). The same solver runs
-  after each move, so the game says so the moment a board can no longer be finished.
-  14 certified crossings, endless generated ones, and Königsberg itself as an
-  interlude that shows you why it cannot be done. Single self-contained `index.html`.
+- `burnbridge/` — graph-theory puzzler for two to four travellers. They share one
+  pool of bridges and every crossing burns the bridge behind it, so each span one
+  spends is denied to the others forever. Formally: edge-disjoint trails, one per
+  traveller, that jointly reach every island — with claimed islands only their own
+  traveller can settle, so nobody can idle. No distances anywhere; par is the fewest
+  crossings that settle the board. Bridges read in three states — standing, crossable
+  now by the picked traveller, or burnt (dashed in the colour of whoever crossed,
+  arrowed the way they went). Levels are generated and certified, never authored:
+  each is solvable, needs every traveller, and strands the obvious greedy line. The
+  same solver runs after every move, so a lost board says so immediately. 26 levels
+  across three acts plus endless Drift, and Königsberg as an interlude that shows why
+  it cannot be done. Single self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
