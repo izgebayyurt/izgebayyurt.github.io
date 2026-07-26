@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0b1017" />
+<title>carom</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; background: #0b1017;
+    overflow: hidden; overscroll-behavior: none;
+  }
+  canvas { display: block; touch-action: none; }
+  * { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+
+/* ===========================================================================
+   carom — 1v1 slingshot duel.
+
+   Drag to pull your circle back, release to fire it. Time crawls while you
+   hold, but the hold has a leash: run it out and you eat a longer cooldown.
+   Every launch costs a cooldown too, so you commit and then you are a
+   passenger for a beat. Neither side can cross halfway, so nobody chases.
+   =========================================================================== */
+
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+let VW = 0, VH = 0, DPR = 1, SC = 1, OX = 0, OY = 0;
+
+const FW = 640, FH = 1100;
+const WALL = 22;                        // side wall thickness
+const HALF = FH / 2;
+const GOAL_W = 210;
+const GOAL_X0 = (FW - GOAL_W) / 2, GOAL_X1 = (FW + GOAL_W) / 2;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  VW = window.innerWidth; VH = window.innerHeight;
+  cv.width = Math.max(1, VW * DPR); cv.height = Math.max(1, VH * DPR);
+  cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
+  SC = Math.min(VW / FW, VH / FH);
+  OX = (VW - FW * SC) / 2;
+  OY = (VH - FH * SC) / 2;
+}
+resize();
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const len = (x, y) => Math.hypot(x, y);
+const now = () => performance.now() / 1000;
+
+/* ---------- feel knobs: this is the whole game, tune here ---------- */
+
+const STEP = 1 / 120;
+const PULL_MAX = 190;          // drag distance that gives full power
+const LAUNCH_MIN = 260, LAUNCH_MAX = 1520;
+const HOLD_LEASH = 1.25;       // real seconds you may aim before it snaps
+const SLOWMO = .13;            // how far time crawls while aiming
+const COOL_LAUNCH = .78;       // cooldown after firing
+const COOL_TIMEOUT = 1.5;      // cooldown for running the leash out
+const P_FRICTION = 1.55;       // players coast a little after committing
+const B_FRICTION = .24;        // the ball keeps running -- it is a puck, not a football
+const WALL_BOUNCE = .93;
+const HIT_BALL = .92, HIT_BODY = .74;
+const P_MASS = 3.2, B_MASS = 1;
+const WIN_GOALS = 5;
+
+const C = {
+  bg: '#0b1017', floor: '#14202e', floor2: '#16273a',
+  line: 'rgba(255,255,255,.16)',
+  you: '#4fd6ff', youDark: '#1d7fa8',
+  foe: '#ff6b5b', foeDark: '#a83024',
+  ball: '#ffffff',
+  gold: '#ffd54a', good: '#5ff08a',
+};
+
+/* ============================================================ audio */
+
+let AC = null, muted = false;
+function actx() {
+  if (!AC) { const K = window.AudioContext || window.webkitAudioContext; if (K) AC = new K(); }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, dur, type, vol, slide) {
+  if (muted) return;
+  const a = actx(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(f, a.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), a.currentTime + dur);
+  g.gain.setValueAtTime(0, a.currentTime);
+  g.gain.linearRampToValueAtTime(vol == null ? .1 : vol, a.currentTime + .006);
+  g.gain.exponentialRampToValueAtTime(.0001, a.currentTime + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur + .02);
+}
+function noise(dur, vol, hp) {
+  if (muted) return;
+  const a = actx(); if (!a) return;
+  const n = Math.max(1, Math.floor(a.sampleRate * dur));
+  const buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(); s.buffer = buf;
+  const g = a.createGain(); g.gain.value = vol || .1;
+  if (hp) { const f = a.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+            s.connect(f); f.connect(g); } else s.connect(g);
+  g.connect(a.destination); s.start();
+}
+const SFX = {
+  charge: () => tone(160, .18, 'sine', .04, 320),
+  launch: p => { noise(.05, .05 + p * .07, 900); tone(150 + p * 90, .09, 'square', .05 + p * .05, 70); },
+  ball:   p => { noise(.04, .04 + p * .1, 1400); tone(420 + p * 380, .07, 'triangle', .05 + p * .06, 220); },
+  body:   p => { noise(.06, .05 + p * .08, 500); tone(120, .1, 'square', .05 + p * .05, 60); },
+  wall:   p => { noise(.03, .02 + p * .05, 1800); },
+  snap:   () => { tone(300, .16, 'sawtooth', .07, 120); noise(.06, .05); },
+  goal:   () => { tone(523, .1, 'triangle', .11); setTimeout(() => tone(784, .1, 'triangle', .11), 80);
+                  setTimeout(() => tone(1046, .3, 'triangle', .11), 165); noise(.25, .06); },
+  conceded: () => { tone(320, .18, 'sawtooth', .09, 200); setTimeout(() => tone(200, .34, 'sawtooth', .09, 120), 160); },
+  win:    () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, .22, 'triangle', .11), i * 110)); },
+  lose:   () => { [400, 330, 260, 190].forEach((f, i) => setTimeout(() => tone(f, .26, 'sawtooth', .09), i * 130)); },
+};
+
+/* ============================================================ state */
+
+let S = null, screen = 'title';
+let trauma = 0, freezeT = 0, flashT = 0, flashCol = '#fff';
+let timeScale = 1, wantScale = 1;
+let particles = [], pops = [];
+let best = 0;
+try { best = parseInt(localStorage.getItem('carom.best') || '0', 10) || 0; } catch (e) {}
+
+function body(x, y, r, m, team) {
+  return { x, y, vx: 0, vy: 0, r, m, team, cool: 0, tw: 0 };
+}
+
+function newGame() {
+  S = {
+    you: body(FW / 2, FH - 210, 27, P_MASS, 'you'),
+    foe: body(FW / 2, 210, 27, P_MASS, 'foe'),
+    ball: body(FW / 2, HALF, 16, B_MASS, 'ball'),
+    goals: { you: 0, foe: 0 },
+    aiming: false, pull: { x: 0, y: 0 }, holdT: 0,
+    foePlan: 0, foeThink: .7,
+    stall: 0, dead: 0, rally: 0,
+    aiError: 0, coolMax: { you: COOL_LAUNCH, foe: COOL_LAUNCH },
+    over: null,
+  };
+  particles = []; pops = [];
+  serve(Math.random() < .5 ? 1 : -1);
+}
+
+function serve(dir) {
+  const b = S.ball;
+  b.x = FW / 2; b.y = HALF; b.vx = rnd(-90, 90); b.vy = dir * rnd(120, 190);
+  S.you.x = FW / 2; S.you.y = FH - 210; S.you.vx = S.you.vy = 0; S.you.cool = .35;
+  S.foe.x = FW / 2; S.foe.y = 210; S.foe.vx = S.foe.vy = 0; S.foe.cool = .5;
+  S.aiming = false; S.holdT = 0; S.stall = 0; S.rally = 0;
+  wantScale = 1;
+}
+
+/* ============================================================ physics */
+
+function integrate(o, fr, h) {
+  o.x += o.vx * h; o.y += o.vy * h;
+  const d = Math.exp(-fr * h);
+  o.vx *= d; o.vy *= d;
+  if (len(o.vx, o.vy) < 4) { o.vx = 0; o.vy = 0; }
+  if (o.tw > 0) o.tw -= h;
+}
+
+// walls, halfway line, and the goal mouths
+function bounds(o) {
+  const isBall = o.team === 'ball';
+  let hit = 0;
+  if (o.x < WALL + o.r) { o.x = WALL + o.r; o.vx = Math.abs(o.vx) * WALL_BOUNCE; hit = Math.abs(o.vx); }
+  if (o.x > FW - WALL - o.r) { o.x = FW - WALL - o.r; o.vx = -Math.abs(o.vx) * WALL_BOUNCE; hit = Math.abs(o.vx); }
+
+  if (isBall) {
+    const inMouth = o.x > GOAL_X0 && o.x < GOAL_X1;
+    if (o.y < WALL + o.r && !inMouth) { o.y = WALL + o.r; o.vy = Math.abs(o.vy) * WALL_BOUNCE; hit = Math.abs(o.vy); }
+    if (o.y > FH - WALL - o.r && !inMouth) { o.y = FH - WALL - o.r; o.vy = -Math.abs(o.vy) * WALL_BOUNCE; hit = Math.abs(o.vy); }
+  } else {
+    // players are penned into their own half — this is why nobody can chase
+    if (o.team === 'you') {
+      if (o.y < HALF + o.r) { o.y = HALF + o.r; o.vy = Math.abs(o.vy) * .7; hit = Math.abs(o.vy); }
+      if (o.y > FH - WALL - o.r) { o.y = FH - WALL - o.r; o.vy = -Math.abs(o.vy) * .7; hit = Math.abs(o.vy); }
+    } else {
+      if (o.y > HALF - o.r) { o.y = HALF - o.r; o.vy = -Math.abs(o.vy) * .7; hit = Math.abs(o.vy); }
+      if (o.y < WALL + o.r) { o.y = WALL + o.r; o.vy = Math.abs(o.vy) * .7; hit = Math.abs(o.vy); }
+    }
+  }
+  if (hit > 260) { SFX.wall(clamp(hit / 1200, 0, 1)); puff(o.x, o.y, '#9fd8ff', 4, hit * .2); }
+}
+
+function collide(a, b, rest) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let d = len(dx, dy);
+  if (d === 0) { d = .01; }
+  const minD = a.r + b.r;
+  if (d >= minD) return 0;
+  const nx = dx / d, ny = dy / d;
+  const invA = 1 / a.m, invB = 1 / b.m, invT = invA + invB;
+  const push = (minD - d) / invT;
+  a.x -= nx * push * invA; a.y -= ny * push * invA;
+  b.x += nx * push * invB; b.y += ny * push * invB;
+  const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+  if (vn > 0) return 0;
+  const j = -(1 + rest) * vn / invT;
+  a.vx -= j * nx * invA; a.vy -= j * ny * invA;
+  b.vx += j * nx * invB; b.vy += j * ny * invB;
+  return Math.abs(vn);
+}
+
+/* ============================================================ launching */
+
+function canLaunch(o) { return o.cool <= 0; }
+
+function beginAim() {
+  if (!canLaunch(S.you) || S.dead > 0) return;
+  S.aiming = true; S.holdT = 0;
+  S.pull.x = 0; S.pull.y = 0;
+  wantScale = SLOWMO;
+  SFX.charge();
+}
+
+function fire() {
+  const p = S.pull;
+  const d = len(p.x, p.y);
+  S.aiming = false;
+  wantScale = 1;
+  if (d < 16) { S.you.cool = .12; S.coolMax.you = .12; return; }   // a tap is a cancel, cheap
+  const power = clamp(d / PULL_MAX, 0, 1);
+  const speed = lerp(LAUNCH_MIN, LAUNCH_MAX, power);
+  // slingshot: drag back, fly forward
+  const ux = -p.x / d, uy = -p.y / d;
+  S.you.vx = ux * speed; S.you.vy = uy * speed;
+  S.you.cool = COOL_LAUNCH; S.coolMax.you = COOL_LAUNCH;
+  SFX.launch(power);
+  addTrauma(.1 + power * .22);
+  puff(S.you.x - ux * 20, S.you.y - uy * 20, C.you, 10 + power * 12, 160 + power * 320);
+}
+
+function snapLeash() {
+  S.aiming = false;
+  wantScale = 1;
+  S.you.cool = COOL_TIMEOUT; S.coolMax.you = COOL_TIMEOUT;
+  SFX.snap();
+  addTrauma(.2);
+  pop(S.you.x, S.you.y - 46, 'TOO SLOW', C.gold);
+}
+
+/* ============================================================ opponent
+
+   Same rules as you: penned into its half, same cooldown after every launch.
+   It cannot chase you and it cannot cheat the timer.
+   ========================================================================= */
+
+function foeBrain(h) {
+  const f = S.foe, b = S.ball;
+  if (f.cool > 0) { f.cool -= h; return; }
+  S.foePlan -= h;
+  if (S.foePlan > 0) return;
+
+  // where the ball will be shortly — lead it a little
+  const lead = clamp(len(b.vx, b.vy) / 900, 0, 1) * .22;
+  const tx = b.x + b.vx * lead, ty = b.y + b.vy * lead;
+
+  // line up behind the ball relative to OUR goal, so contact sends it downfield
+  const gx = FW / 2, gy = FH;
+  const a = Math.atan2(ty - gy, tx - gx);
+  const standX = tx + Math.cos(a) * (f.r + b.r + 4);
+  const standY = ty + Math.sin(a) * (f.r + b.r + 4);
+
+  let aimX, aimY;
+  if (ty > HALF - 40) {
+    // ball is out of reach in our half — reposition centrally and wait
+    aimX = FW / 2 + rnd(-60, 60); aimY = 190;
+  } else {
+    aimX = standX; aimY = standY;
+  }
+  let dx = aimX - f.x, dy = aimY - f.y;
+  const d = len(dx, dy) || 1;
+  const wobble = rnd(-.16, .16) * (1 - S.aiError);
+  const ang = Math.atan2(dy, dx) + wobble;
+  const power = clamp(d / 300, .35, 1);
+  const speed = lerp(LAUNCH_MIN, LAUNCH_MAX * .92, power);
+  f.vx = Math.cos(ang) * speed; f.vy = Math.sin(ang) * speed;
+  f.cool = COOL_LAUNCH * rnd(1, 1.25); S.coolMax.foe = f.cool;
+  S.foePlan = S.foeThink * rnd(.7, 1.3);
+  puff(f.x, f.y, C.foe, 8, 160);
+  SFX.launch(power * .7);
+}
+
+/* ============================================================ update */
+
+function update(h) {
+  if (screen !== 'play') return;
+
+  if (S.dead > 0) {
+    S.dead -= h;
+    if (S.dead <= 0) {
+      if (S.over) { finish(); return; }
+      serve(S.pending || 1);
+    }
+    return;
+  }
+
+  if (S.you.cool > 0) S.you.cool -= h;
+
+  // aiming runs on REAL time, so slow motion does not buy you extra thinking
+  foeBrain(h);
+
+  integrate(S.you, P_FRICTION, h);
+  integrate(S.foe, P_FRICTION, h);
+  integrate(S.ball, B_FRICTION, h);
+  bounds(S.you); bounds(S.foe); bounds(S.ball);
+
+  const i1 = collide(S.you, S.ball, HIT_BALL);
+  if (i1 > 60) { onBallHit(i1, 'you'); }
+  const i2 = collide(S.foe, S.ball, HIT_BALL);
+  if (i2 > 60) { onBallHit(i2, 'foe'); }
+  // bodies can meet at the halfway line — a legitimate way to spoil a shot
+  const i3 = collide(S.you, S.foe, HIT_BODY);
+  if (i3 > 60) { SFX.body(clamp(i3 / 1100, 0, 1)); addTrauma(.16); hitstop(.03);
+                 puff((S.you.x + S.foe.x) / 2, (S.you.y + S.foe.y) / 2, '#ffffff', 10, i3 * .3); }
+
+  // goals
+  const b = S.ball;
+  if (b.y < WALL - b.r * .5 && b.x > GOAL_X0 && b.x < GOAL_X1) return scoreGoal('you');
+  if (b.y > FH - WALL + b.r * .5 && b.x > GOAL_X0 && b.x < GOAL_X1) return scoreGoal('foe');
+
+  // never let a rally die in a corner
+  if (len(b.vx, b.vy) < 20) { S.stall += h; if (S.stall > 2.6) { nudgeBall(); S.stall = 0; } }
+  else S.stall = 0;
+}
+
+function onBallHit(imp, who) {
+  const p = clamp(imp / 1200, 0, 1);
+  SFX.ball(p);
+  addTrauma(.12 + p * .3);
+  hitstop(.012 + p * .05);
+  S.ball.tw = .16;
+  S.rally++;
+  puff(S.ball.x, S.ball.y, who === 'you' ? C.you : C.foe, 8 + p * 14, 180 + p * 380);
+}
+
+function nudgeBall() {
+  const b = S.ball;
+  const a = Math.atan2(HALF - b.y, FW / 2 - b.x) + rnd(-.5, .5);
+  b.vx = Math.cos(a) * 240; b.vy = Math.sin(a) * 240;
+  pop(b.x, b.y - 34, 'LOOSE BALL', 'rgba(255,255,255,.8)');
+  puff(b.x, b.y, '#ffffff', 10, 200);
+}
+
+function scoreGoal(who) {
+  S.goals[who]++;
+  const mine = who === 'you';
+  if (mine) { SFX.goal(); pop(FW / 2, HALF - 40, 'GOAL', C.good, true); }
+  else { SFX.conceded(); pop(FW / 2, HALF + 40, 'CONCEDED', C.foe, true); }
+  addTrauma(.75); hitstop(.11); flash(mine ? '#ffffff' : '#ff6b5b', .12);
+  puff(S.ball.x, S.ball.y, mine ? C.good : C.foe, 40, 520);
+  S.ball.vx = S.ball.vy = 0;
+  S.aiming = false; wantScale = 1;
+  S.pending = mine ? 1 : -1;      // serve toward whoever conceded
+  S.dead = 1.15;
+  if (S.goals[who] >= WIN_GOALS) { S.over = who; S.dead = 1.4; }
+}
+
+function finish() {
+  screen = 'over';
+  const won = S.over === 'you';
+  if (won) { S.diff = S.goals.you - S.goals.foe; if (S.diff > best) { best = S.diff;
+    try { localStorage.setItem('carom.best', String(best)); } catch (e) {} } }
+  won ? SFX.win() : SFX.lose();
+}
+
+/* ============================================================ input */
+
+function toLogical(px, py) {
+  const r = cv.getBoundingClientRect();
+  return [(px - r.left - OX) / SC, (py - r.top - OY) / SC];
+}
+
+let pid = null;
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault(); actx();
+  if (screen !== 'play') { start(); return; }
+  if (pid !== null) return;
+  pid = e.pointerId;
+  S.anchor = toLogical(e.clientX, e.clientY);
+  beginAim();
+  if (cv.setPointerCapture) { try { cv.setPointerCapture(e.pointerId); } catch (err) {} }
+});
+cv.addEventListener('pointermove', e => {
+  if (pid !== e.pointerId || !S || !S.aiming) return;
+  e.preventDefault();
+  const [x, y] = toLogical(e.clientX, e.clientY);
+  let dx = x - S.anchor[0], dy = y - S.anchor[1];
+  const d = len(dx, dy);
+  if (d > PULL_MAX) { dx = dx / d * PULL_MAX; dy = dy / d * PULL_MAX; }
+  S.pull.x = dx; S.pull.y = dy;
+});
+function release(e) {
+  if (pid !== e.pointerId) return;
+  pid = null;
+  if (e) e.preventDefault();
+  if (S && S.aiming) fire();
+}
+cv.addEventListener('pointerup', release);
+cv.addEventListener('pointercancel', release);
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'm') muted = !muted;
+  if ((k === ' ' || k === 'enter') && screen !== 'play') { e.preventDefault(); actx(); start(); }
+});
+
+/* ============================================================ effects */
+
+function addTrauma(t) { trauma = Math.min(1, trauma + t); }
+function hitstop(t) { freezeT = Math.max(freezeT, t); }
+function flash(col, t) { flashCol = col; flashT = Math.max(flashT, t); }
+function puff(x, y, col, n, power) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, s = rnd(power * .25, power);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(.2, .6), max: .6, col, r: rnd(2, 5) });
+  }
+}
+function pop(x, y, text, col, big) {
+  pops.push({ x, y, text, col, life: big ? 1.15 : .85, max: big ? 1.15 : .85, big: !!big });
+}
+function stepFx(rdt) {
+  trauma = Math.max(0, trauma - rdt * 1.7);
+  flashT = Math.max(0, flashT - rdt * 4);
+  timeScale = lerp(timeScale, wantScale, Math.min(1, rdt * 14));
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const q = particles[i]; q.life -= rdt;
+    if (q.life <= 0) { particles.splice(i, 1); continue; }
+    q.x += q.vx * rdt; q.y += q.vy * rdt;
+    q.vx *= Math.exp(-3.4 * rdt); q.vy *= Math.exp(-3.4 * rdt);
+  }
+  for (let i = pops.length - 1; i >= 0; i--) { pops[i].life -= rdt; if (pops[i].life <= 0) pops.splice(i, 1); }
+}
+
+/* ============================================================ flow */
+
+function start() { newGame(); screen = 'play'; timeScale = wantScale = 1; freezeT = 0; trauma = 0; }
+
+/* ============================================================ render */
+
+function rr(x, y, w, h, r) {
+  cx.beginPath();
+  if (cx.roundRect) cx.roundRect(x, y, w, h, r);
+  else { cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
+         cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath(); }
+}
+
+function render() {
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  cx.fillStyle = C.bg; cx.fillRect(0, 0, VW, VH);
+  const sh = trauma * trauma * 22;
+  cx.setTransform(SC * DPR, 0, 0, SC * DPR,
+    (OX + (Math.random() - .5) * sh * SC) * DPR,
+    (OY + (Math.random() - .5) * sh * SC) * DPR);
+
+  drawArena();
+  if (S) {
+    drawAim();
+    drawBody(S.foe, C.foe, C.foeDark);
+    drawBody(S.you, C.you, C.youDark);
+    drawBall();
+    drawParticles();
+    drawPops();
+    if (screen === 'play') drawHUD();
+  }
+  if (screen === 'title') drawTitle();
+  if (screen === 'over') drawOver();
+
+  if (flashT > 0) {
+    cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    cx.globalAlpha = Math.min(.55, flashT * 3);
+    cx.fillStyle = flashCol; cx.fillRect(0, 0, VW, VH);
+    cx.globalAlpha = 1;
+  }
+}
+
+function drawArena() {
+  cx.fillStyle = C.floor;
+  cx.fillRect(0, 0, FW, FH);
+  cx.fillStyle = C.floor2;
+  cx.fillRect(WALL, WALL, FW - WALL * 2, HALF - WALL);
+
+  // halfway line
+  cx.strokeStyle = 'rgba(255,255,255,.22)'; cx.lineWidth = 3;
+  cx.setLineDash([16, 12]);
+  cx.beginPath(); cx.moveTo(WALL, HALF); cx.lineTo(FW - WALL, HALF); cx.stroke();
+  cx.setLineDash([]);
+  cx.strokeStyle = C.line; cx.lineWidth = 2;
+  cx.beginPath(); cx.arc(FW / 2, HALF, 78, 0, TAU); cx.stroke();
+
+  // rails
+  cx.fillStyle = '#0d1622';
+  cx.fillRect(0, 0, WALL, FH); cx.fillRect(FW - WALL, 0, WALL, FH);
+  cx.fillRect(0, 0, FW, WALL); cx.fillRect(0, FH - WALL, FW, WALL);
+
+  // goal mouths
+  for (const [y, col] of [[0, C.foe], [FH - WALL, C.you]]) {
+    cx.fillStyle = col;
+    cx.globalAlpha = .85; cx.fillRect(GOAL_X0, y, GOAL_W, WALL); cx.globalAlpha = 1;
+    cx.fillStyle = 'rgba(0,0,0,.35)';
+    for (let x = GOAL_X0; x < GOAL_X1; x += 16) cx.fillRect(x, y, 2, WALL);
+  }
+  cx.strokeStyle = 'rgba(255,255,255,.1)'; cx.lineWidth = 2;
+  cx.strokeRect(WALL, WALL, FW - WALL * 2, FH - WALL * 2);
+}
+
+function drawBody(o, col, dark) {
+  // cooldown is the thing you must read, so it gets the loudest treatment
+  const ready = o.cool <= 0;
+  cx.fillStyle = 'rgba(0,0,0,.3)';
+  cx.beginPath(); cx.ellipse(o.x, o.y + o.r * .55, o.r * .95, o.r * .4, 0, 0, TAU); cx.fill();
+
+  const g = cx.createLinearGradient(o.x, o.y - o.r, o.x, o.y + o.r);
+  g.addColorStop(0, ready ? col : dark); g.addColorStop(1, dark);
+  cx.fillStyle = g;
+  cx.beginPath(); cx.arc(o.x, o.y, o.r, 0, TAU); cx.fill();
+  cx.strokeStyle = ready ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.22)';
+  cx.lineWidth = ready ? 3 : 2;
+  cx.beginPath(); cx.arc(o.x, o.y, o.r, 0, TAU); cx.stroke();
+
+  if (!ready) {
+    const base = S.coolMax[o.team] || COOL_LAUNCH;
+    const t = clamp(1 - o.cool / base, 0, 1);
+    cx.strokeStyle = col; cx.lineWidth = 4; cx.globalAlpha = .85;
+    cx.beginPath(); cx.arc(o.x, o.y, o.r + 8, -Math.PI / 2, -Math.PI / 2 + TAU * t); cx.stroke();
+    cx.globalAlpha = 1;
+  } else if (o.team === 'you' && !S.aiming) {
+    cx.strokeStyle = 'rgba(255,255,255,' + (.25 + .2 * Math.sin(now() * 5)).toFixed(3) + ')';
+    cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(o.x, o.y, o.r + 11, 0, TAU); cx.stroke();
+  }
+}
+
+function drawBall() {
+  const b = S.ball;
+  const squash = b.tw > 0 ? 1 + b.tw * .9 : 1;
+  cx.fillStyle = 'rgba(0,0,0,.3)';
+  cx.beginPath(); cx.ellipse(b.x, b.y + b.r * .6, b.r * .9, b.r * .36, 0, 0, TAU); cx.fill();
+  cx.save();
+  cx.translate(b.x, b.y);
+  const ang = Math.atan2(b.vy, b.vx);
+  cx.rotate(ang); cx.scale(squash, 1 / squash); cx.rotate(-ang);
+  cx.fillStyle = C.ball;
+  cx.beginPath(); cx.arc(0, 0, b.r, 0, TAU); cx.fill();
+  cx.fillStyle = '#16273a';
+  cx.beginPath(); cx.arc(0, 0, b.r * .34, 0, TAU); cx.fill();
+  cx.restore();
+}
+
+// the slingshot: pull back, a ghost shows where you will end up
+function drawAim() {
+  if (!S.aiming) return;
+  const p = S.pull, d = len(p.x, p.y);
+  const you = S.you;
+  if (d < 6) return;
+  const power = clamp(d / PULL_MAX, 0, 1);
+  const ux = -p.x / d, uy = -p.y / d;
+
+  // predicted path, integrated with the real friction so it cannot lie
+  const st = { x: you.x, y: you.y, vx: ux * lerp(LAUNCH_MIN, LAUNCH_MAX, power),
+               vy: uy * lerp(LAUNCH_MIN, LAUNCH_MAX, power), r: you.r, m: you.m, team: 'you' };
+  cx.save();
+  cx.globalAlpha = .5;
+  cx.fillStyle = power > .93 ? C.gold : C.you;
+  for (let i = 0; i < 46; i++) {
+    integrate(st, P_FRICTION, STEP * 2.4);
+    bounds(st);
+    if (i % 3 === 0) {
+      const k = 1 - i / 46;
+      cx.beginPath(); cx.arc(st.x, st.y, 2 + k * 4, 0, TAU); cx.fill();
+    }
+  }
+  cx.restore();
+  // landing ghost
+  cx.save();
+  cx.globalAlpha = .3; cx.strokeStyle = C.you; cx.lineWidth = 2;
+  cx.beginPath(); cx.arc(st.x, st.y, you.r, 0, TAU); cx.stroke();
+  cx.restore();
+
+  // the drawn band, opposite the launch
+  cx.save();
+  cx.strokeStyle = power > .93 ? C.gold : 'rgba(255,255,255,.75)';
+  cx.lineWidth = 5; cx.lineCap = 'round';
+  cx.beginPath();
+  cx.moveTo(you.x, you.y); cx.lineTo(you.x + p.x, you.y + p.y);
+  cx.stroke();
+  cx.restore();
+
+  // leash: how long you may keep thinking
+  const leash = 1 - S.holdT / HOLD_LEASH;
+  cx.save();
+  cx.strokeStyle = leash < .3 ? '#ff6b5b' : 'rgba(255,255,255,.85)';
+  cx.lineWidth = 5;
+  cx.beginPath(); cx.arc(you.x, you.y, you.r + 16, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(leash, 0, 1)); cx.stroke();
+  cx.restore();
+}
+
+function drawParticles() {
+  for (const q of particles) {
+    cx.globalAlpha = Math.max(0, q.life / q.max);
+    cx.fillStyle = q.col;
+    cx.beginPath(); cx.arc(q.x, q.y, q.r, 0, TAU); cx.fill();
+  }
+  cx.globalAlpha = 1;
+}
+function drawPops() {
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (const q of pops) {
+    const t = 1 - q.life / q.max;
+    const sc = q.big ? 1 + Math.max(0, .3 - t) * 1.8 : 1;
+    cx.globalAlpha = Math.min(1, q.life * 3.5);
+    cx.save();
+    cx.translate(q.x, q.y - t * (q.big ? 22 : 38)); cx.scale(sc, sc);
+    cx.font = (q.big ? '900 74px ' : '800 27px ') + 'system-ui, -apple-system, sans-serif';
+    cx.lineWidth = q.big ? 9 : 6; cx.strokeStyle = 'rgba(0,0,0,.7)';
+    cx.strokeText(q.text, 0, 0);
+    cx.fillStyle = q.col; cx.fillText(q.text, 0, 0);
+    cx.restore();
+  }
+  cx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  cx.textAlign = 'left'; cx.textBaseline = 'middle';
+  // scores tuck into the outer corners so nothing sits over the play
+  cx.font = '900 42px system-ui, -apple-system, sans-serif';
+  cx.lineWidth = 8; cx.strokeStyle = 'rgba(0,0,0,.55)';
+  cx.strokeText(String(S.goals.foe), 40, 62);
+  cx.fillStyle = C.foe; cx.fillText(String(S.goals.foe), 40, 62);
+  cx.strokeText(String(S.goals.you), 40, FH - 62);
+  cx.fillStyle = C.you; cx.fillText(String(S.goals.you), 40, FH - 62);
+
+  cx.textAlign = 'right';
+  cx.font = '600 13px system-ui, sans-serif';
+  cx.fillStyle = 'rgba(255,255,255,.35)';
+  cx.fillText('FIRST TO ' + WIN_GOALS, FW - 40, FH - 62);
+}
+
+function veil(a) { cx.fillStyle = 'rgba(7,11,17,' + a + ')'; cx.fillRect(-2000, -2000, 6000, 6000); }
+
+function drawTitle() {
+  veil(.86);
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.save();
+  cx.translate(FW / 2, 290 + Math.sin(now() * 2) * 5);
+  cx.font = '900 106px system-ui, -apple-system, sans-serif';
+  cx.lineWidth = 12; cx.strokeStyle = 'rgba(0,0,0,.7)';
+  cx.strokeText('CAROM', 0, 0);
+  const g = cx.createLinearGradient(0, -52, 0, 52);
+  g.addColorStop(0, '#bff0ff'); g.addColorStop(1, '#4fd6ff');
+  cx.fillStyle = g; cx.fillText('CAROM', 0, 0);
+  cx.restore();
+
+  cx.font = '700 20px system-ui, sans-serif';
+  cx.fillStyle = 'rgba(255,255,255,.7)';
+  cx.fillText('1v1 · DRAG BACK, LET GO', FW / 2, 364);
+
+  cx.font = '600 18px system-ui, sans-serif';
+  cx.fillStyle = 'rgba(255,255,255,.85)';
+  const lines = [
+    'Drag anywhere to pull your circle back.',
+    'Time crawls while you hold — but not for long.',
+    'Hold too long and the band snaps: long cooldown.',
+    '',
+    'Every launch costs a cooldown too, so you',
+    'commit and then you just have to watch.',
+    '',
+    'Neither of you can cross the halfway line.',
+  ];
+  let y = 424;
+  for (const l of lines) { cx.fillText(l, FW / 2, y); y += 30; }
+
+  const a = .55 + .45 * Math.sin(now() * 4);
+  cx.globalAlpha = a;
+  cx.font = '900 30px system-ui, sans-serif';
+  cx.fillStyle = '#ffffff';
+  cx.fillText('TAP TO PLAY', FW / 2, 900);
+  cx.globalAlpha = 1;
+}
+
+function drawOver() {
+  veil(.84);
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  const won = S.over === 'you';
+  cx.font = '900 66px system-ui, sans-serif';
+  cx.lineWidth = 11; cx.strokeStyle = 'rgba(0,0,0,.6)';
+  cx.strokeText(won ? 'YOU WIN' : 'YOU LOSE', FW / 2, 400);
+  cx.fillStyle = won ? C.good : C.foe;
+  cx.fillText(won ? 'YOU WIN' : 'YOU LOSE', FW / 2, 400);
+
+  cx.font = '900 76px system-ui, sans-serif';
+  cx.lineWidth = 10; cx.strokeStyle = 'rgba(0,0,0,.6)';
+  const sc = S.goals.you + ' – ' + S.goals.foe;
+  cx.strokeText(sc, FW / 2, 500);
+  cx.fillStyle = '#ffffff'; cx.fillText(sc, FW / 2, 500);
+
+  const a = .55 + .45 * Math.sin(now() * 4);
+  cx.globalAlpha = a;
+  cx.font = '900 30px system-ui, sans-serif';
+  cx.fillStyle = '#ffffff';
+  cx.fillText('TAP TO GO AGAIN', FW / 2, 700);
+  cx.globalAlpha = 1;
+}
+
+/* ============================================================ loop */
+
+let last = performance.now(), acc = 0;
+function frame(t) {
+  let rdt = (t - last) / 1000;
+  last = t;
+  rdt = Math.min(.1, rdt);
+
+  // the aim leash ticks on WALL-CLOCK time — slow motion must not buy thinking
+  if (S && S.aiming && screen === 'play') {
+    S.holdT += rdt;
+    if (S.holdT >= HOLD_LEASH) { pid = null; snapLeash(); }
+  }
+
+  if (freezeT > 0) freezeT -= rdt;
+  else {
+    acc += rdt * timeScale;
+    let guard = 0;
+    while (acc >= STEP && guard++ < 20) { update(STEP); acc -= STEP; }
+  }
+  stepFx(rdt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+newGame();
+screen = 'title';
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -13,6 +13,10 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   the baked-in image data (`portrait-data.js`, `img-data.js`).
 - `directions/asteroidz.jsx` — the playable Asteroids port embedded on the homepage.
 - `games/` — game write-up pages (`asteroids`, `marblz`, `soviet-scoot`) and assets.
+- `carom/` — 1v1 slingshot duel. Drag to pull your circle back and release to fire
+  it; time crawls while you aim but the hold is on a leash, and every launch costs
+  a cooldown. Neither side may cross halfway, so nobody chases. Single
+  self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
