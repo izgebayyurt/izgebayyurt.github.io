@@ -583,19 +583,35 @@ function TapaCore() {
       return 0;
     }
 
+    /* Round accounting is what tells a real puzzle from a trivial one: how
+       much of the board falls out in the very first sweep, and how long the
+       chain runs afterwards. The generator selects on exactly this. */
+    function countKnown() {
+      var n = 0;
+      for (var k = 0; k < N * N; k++) if (state[k] !== UNKNOWN) n++;
+      return n;
+    }
+    var rounds = 0, firstGain = 0, prevKnown = countKnown();
+    function noteRound() {
+      rounds++;
+      var nk = countKnown();
+      if (rounds === 1) firstGain = nk - prevKnown;
+      prevKnown = nk;
+    }
+
     for (;;) {
       var res = single();
       if (res < 0) return { solved:false, bad:true };
-      if (res) { level = Math.max(level, L_SINGLE); continue; }
+      if (res) { level = Math.max(level, L_SINGLE); noteRound(); continue; }
       if (maxLevel >= L_PAIR) {
         res = pair();
         if (res < 0) return { solved:false, bad:true };
-        if (res) { level = Math.max(level, L_PAIR); hard++; continue; }
+        if (res) { level = Math.max(level, L_PAIR); hard++; noteRound(); continue; }
       }
       if (maxLevel >= L_CONNECT) {
         res = connect();
         if (res < 0) return { solved:false, bad:true };
-        if (res) { level = Math.max(level, L_CONNECT); hard++; continue; }
+        if (res) { level = Math.max(level, L_CONNECT); hard++; noteRound(); continue; }
       }
       break;
     }
@@ -608,15 +624,22 @@ function TapaCore() {
     var ok = unknown === 0 &&
              no2x2(G, function (r3, c3) { return region.has(r3 * N + c3); }) &&
              connectedSet(G, region);
-    return { solved:ok, bad:false, level:level, hard:hard, region:region, state:state };
+    return { solved:ok, bad:false, level:level, hard:hard, region:region,
+             state:state, rounds:rounds, firstGain:firstGain };
   }
 
-  /* ---------- region painting ---------- */
-  function randomRegion(G, rnd, target) {
+  /* ---------- region painting ----------
+     Tapa's shaded cells are a wall, and the wall is the whole puzzle: fill it
+     too densely and the no-2x2 rule leaves it no freedom, so it sets into a
+     regular mesh where every white cell is ringed by black and every clue
+     collapses to a giveaway. So grow it THIN — prefer the candidate with the
+     fewest filled neighbours — while steering toward rows and columns the wall
+     has not reached, so a sparse wall still spans the grid instead of curling
+     up in one corner. */
+  function wallRegion(G, rnd, target) {
     var N = G.N, filled = new Set();
-    var start = ((rnd() * N) | 0) * N + ((rnd() * N) | 0);
-    filled.add(start);
-    var frontier = [start], guard = 0;
+    filled.add(((rnd() * N) | 0) * N + ((rnd() * N) | 0));
+
     function ok2(k) {
       var r = (k / N) | 0, c = k % N;
       for (var dr = -1; dr <= 0; dr++) {
@@ -629,40 +652,183 @@ function TapaCore() {
       }
       return true;
     }
-    while (filled.size < target && frontier.length && guard++ < 40000) {
-      var pi = (rnd() * frontier.length) | 0, k = frontier[pi];
-      var r = (k / N) | 0, c = k % N, grew = false;
-      var order = [0, 1, 2, 3];
-      for (var i = 3; i > 0; i--) { var j = (rnd() * (i + 1)) | 0, t = order[i]; order[i] = order[j]; order[j] = t; }
-      for (var d = 0; d < 4; d++) {
-        var nr = r + DIRS4[order[d]][0], nc = c + DIRS4[order[d]][1];
-        if (!G.inside(nr, nc)) continue;
-        var nk = nr * N + nc;
-        if (filled.has(nk)) continue;
-        filled.add(nk);
-        if (ok2(nk)) { frontier.push(nk); grew = true; break; }
-        filled.delete(nk);
+    function around8(k) {
+      var r = (k / N) | 0, c = k % N, n = 0;
+      for (var i = 0; i < 8; i++) {
+        var a = r + DIRS8[i][0], b = c + DIRS8[i][1];
+        if (G.inside(a, b) && filled.has(a * N + b)) n++;
       }
-      if (!grew) frontier.splice(pi, 1);
+      return n;
+    }
+
+    var guard = 0;
+    while (filled.size < target && guard++ < 60000) {
+      var seen = new Set(), cands = [];
+      filled.forEach(function (k) {
+        var r = (k / N) | 0, c = k % N;
+        for (var i = 0; i < 4; i++) {
+          var a = r + DIRS4[i][0], b = c + DIRS4[i][1];
+          if (!G.inside(a, b)) continue;
+          var nk = a * N + b;
+          if (filled.has(nk) || seen.has(nk)) continue;
+          seen.add(nk); cands.push(nk);
+        }
+      });
+      if (!cands.length) break;
+
+      var rowN = new Array(N).fill(0), colN = new Array(N).fill(0);
+      filled.forEach(function (k) { rowN[(k / N) | 0]++; colN[k % N]++; });
+
+      var valid = [], scored = [], bestScore = 1e9;
+      for (var i2 = 0; i2 < cands.length; i2++) {
+        var k2 = cands[i2];
+        filled.add(k2);
+        var good = ok2(k2);
+        filled.delete(k2);
+        if (!good) continue;
+        /* Strictly-minimal neighbour count grows dead straight and turns the
+           wall into stripes; the +1.2 band lets it turn. */
+        var s = around8(k2) * 2 + (rowN[(k2 / N) | 0] + colN[k2 % N]) * 0.42;
+        valid.push(k2); scored.push(s);
+        if (s < bestScore) bestScore = s;
+      }
+      if (!valid.length) break;
+      var near = [];
+      for (var v = 0; v < valid.length; v++) if (scored[v] <= bestScore + 1.2) near.push(valid[v]);
+      var pool = (rnd() < 0.25) ? valid : near;
+      filled.add(pool[(rnd() * pool.length) | 0]);
     }
     return filled;
   }
 
+  /* How many search candidates each size can afford. A 12x12 reduction is an
+     order of magnitude dearer than a 6x6, so the budget shrinks with size. */
+  var BUDGET = {
+    6:  { regions: 14, orders: 4 },
+    8:  { regions: 12, orders: 4 },
+    10: { regions: 10, orders: 3 },
+    12: { regions: 6,  orders: 2 }
+  };
+
+  function listOf(set, N) {
+    var out = [];
+    set.forEach(function (kk) { out.push({ k: kk, r: (kk / N) | 0, c: kk % N }); });
+    return out;
+  }
+
+  /* ---------- reduction ----------
+     Greedy stripping keeps whatever it cannot remove, so the order clues are
+     OFFERED UP decides which survive — it is a design lever, not bookkeeping.
+     Rank by how many neighbourhood arrangements a clue admits unaided: one
+     arrangement means it hands over all its neighbours the instant you read
+     it. That is a property of position as much as value — a "2 2" looks rich
+     but on an edge cell, with five neighbours, it is fully forced. Offering
+     the most self-forcing up first leaves the clues that must be worked out. */
+  function reduceClues(G, region, tables, meta, clueKeys, rnd, maxLevel) {
+    var N = G.N;
+    var order = clueKeys.slice(), rank = {};
+    for (var z = 0; z < clueKeys.length; z++) {
+      rank[clueKeys[z]] = tables[clueKeys[z]].pats.length + rnd() * 1.5;
+    }
+    order.sort(function (a, b) { return rank[a] - rank[b]; });
+
+    var keep = new Set(clueKeys);
+    for (var o = 0; o < order.length; o++) {
+      var cand = order[o];
+      keep.delete(cand);
+      var rr = keep.size ? solveLogic(G, listOf(keep, N), tables, maxLevel)
+                         : { solved:false };
+      if (!rr.solved) keep.add(cand);
+    }
+    return keep;
+  }
+
+  /* ---------- candidate scoring ----------
+     Clue statistics alone were the wrong objective: the same region reduced in
+     different orders yields clue sets of near-identical size whose openings
+     differ threefold. So score the SOLVE — how little falls out in round one,
+     how long the chain runs — and reject outright any board carrying a clue
+     that gives itself away. */
+  function scoreCandidate(G, size, regionArr, keep, tables, meta, maxLevel) {
+    var N = size, cells = size * size;
+    var list = listOf(keep, N);
+    /* Must score under the SAME technique level the reduction used, or the
+       board is judged by logic it was never stripped against. */
+    var fin = solveLogic(G, list, tables, maxLevel);
+    if (!fin.solved) return null;
+
+    var forced = 0, near = 0, multi = 0, three = 0;
+    for (var i = 0; i < list.length; i++) {
+      var np = tables[list[i].k].pats.length;
+      if (np <= 1) return null;              /* a pure giveaway: reject */
+      if (np === 2) near++;
+      var v = meta[list[i].k];
+      if (v.length > 1) multi++;
+      if (v.length > 2) three++;
+    }
+    var n = list.length;
+    var multiF = multi / n, threeF = three / n, nearF = near / n;
+    var clueF = n / cells;
+    var open = fin.firstGain / cells;
+    var chain = Math.min(1, fin.rounds / 25);
+
+    /* long straight runs are the striped failure mode */
+    var set = new Set(regionArr), longRuns = 0;
+    for (var a = 0; a < size; a++) {
+      var hr = 0, vr = 0;
+      for (var b = 0; b < size; b++) {
+        hr = set.has(a * size + b) ? hr + 1 : 0;
+        if (hr === 5) longRuns++;
+        vr = set.has(b * size + a) ? vr + 1 : 0;
+        if (vr === 5) longRuns++;
+      }
+    }
+    var runF = Math.min(1, longRuns / (size * 0.6));
+
+    return {
+      score: 3.2 * multiF + 0.8 * threeF - 1.2 * clueF + 2.2 - 1.8 * runF
+             - 5.2 * open + 2.0 * chain - 1.6 * clueF - 2.0 * nearF,
+      level: fin.level, hard: fin.hard,
+      first: fin.firstGain, rounds: fin.rounds, clueCount: n
+    };
+  }
+
   /* ---------- the generator ----------
-     Pattern first, then strip clues while the deduction solver can still
-     finish. Uniqueness comes free: a guess-free complete solve admits no
-     alternative. `floor` stops the stripping early to make an easier board. */
+     Wall first, every empty cell seeded as a clue, then stripped for as long
+     as the deduction solver can still finish. Uniqueness comes free: a
+     guess-free complete solve admits no alternative. Several candidates are
+     built and the best kept, because the first correct board is rarely a good
+     one. */
   function generate(size, num, opts) {
     opts = opts || {};
     var G = makeGeom(size), N = size;
     var rnd = mulberry32(seedFor(size, num));
     var maxLevel = opts.maxLevel || L_CONNECT;
+    var budget = BUDGET[size] || { regions: 10, orders: 3 };
+    var regions = opts.regions || budget.regions;
+    var orders = opts.orders || budget.orders;
+    var best = null;
 
-    for (var attempt = 0; attempt < 60; attempt++) {
-      var target = Math.round(N * N * 0.52);
-      var region = randomRegion(G, rnd, target);
-      if (region.size < target * 0.75) continue;
+    /* Puzzle numbers are permanent, so a number that fails to generate is a
+       hole in the book forever. If the normal budget finds nothing, keep
+       searching rather than handing back an error — the PRNG stream carries
+       on, so the result stays deterministic. */
+    var pass = 0;
+    for (;;) {
+    for (var t = 0; t < regions; t++) {
+      var density = 0.26 + rnd() * 0.10;
+      var target = Math.round(N * N * density);
+      var region = wallRegion(G, rnd, target);
+      if (region.size < target * 0.8) continue;
       if (!connectedSet(G, region)) continue;
+
+      /* The wall must touch every row and column, or the board reads as a
+         mistake however good its solve path is. */
+      var rw = new Array(N).fill(0), cw = new Array(N).fill(0);
+      region.forEach(function (k) { rw[(k / N) | 0]++; cw[k % N]++; });
+      var starved = false;
+      for (var q = 0; q < N; q++) if (rw[q] === 0 || cw[q] === 0) { starved = true; break; }
+      if (starved) continue;
 
       var clueKeys = [];
       for (var k = 0; k < N * N; k++) if (!region.has(k)) clueKeys.push(k);
@@ -670,56 +836,36 @@ function TapaCore() {
 
       var tables = {}, meta = {};
       for (var i = 0; i < clueKeys.length; i++) {
-        var kk = clueKeys[i], r = (kk / N) | 0, c = kk % N;
-        var bits = [];
+        var kk = clueKeys[i], r = (kk / N) | 0, c = kk % N, bits = [];
         for (var d = 0; d < 8; d++) {
           var nr = r + DIRS8[d][0], nc = c + DIRS8[d][1];
           bits.push(G.inside(nr, nc) && region.has(nr * N + nc));
         }
-        var clue = sigOf(bits);
-        meta[kk] = clue;
-        tables[kk] = patternTable(G, r, c, clue);
+        meta[kk] = sigOf(bits);
+        tables[kk] = patternTable(G, r, c, meta[kk]);
       }
+      if (!solveLogic(G, listOf(new Set(clueKeys), N), tables, maxLevel).solved) continue;
 
-      var list = clueKeys.map(function (kk) {
-        return { k: kk, r: (kk / N) | 0, c: kk % N };
-      });
-      var first = solveLogic(G, list, tables, maxLevel);
-      if (!first.solved) continue;
-
-      var order = clueKeys.slice();
-      for (var q = order.length - 1; q > 0; q--) {
-        var j2 = (rnd() * (q + 1)) | 0, tmp = order[q]; order[q] = order[j2]; order[j2] = tmp;
+      var regionArr = Array.from(region);
+      for (var o = 0; o < orders; o++) {
+        var keep = reduceClues(G, region, tables, meta, clueKeys, rnd, maxLevel);
+        var sc = scoreCandidate(G, size, regionArr, keep, tables, meta, maxLevel);
+        if (!sc) continue;
+        if (!best || sc.score > best.score) {
+          var clues = {};
+          keep.forEach(function (kk2) { clues[kk2] = meta[kk2]; });
+          best = {
+            size: size, num: num, region: regionArr, clues: clues,
+            level: sc.level, hard: sc.hard, clueCount: sc.clueCount,
+            first: sc.first, rounds: sc.rounds, score: sc.score
+          };
+        }
       }
-      var keep = new Set(clueKeys);
-      var floor = opts.floor || 0;
-      for (var o = 0; o < order.length; o++) {
-        if (keep.size <= floor) break;
-        var cand = order[o];
-        keep.delete(cand);
-        var trial = [];
-        keep.forEach(function (kk2) { trial.push({ k: kk2, r: (kk2 / N) | 0, c: kk2 % N }); });
-        var rr = trial.length ? solveLogic(G, trial, tables, maxLevel) : { solved:false };
-        if (!rr.solved) keep.add(cand);
-      }
-
-      var finalList = [];
-      keep.forEach(function (kk2) { finalList.push({ k: kk2, r: (kk2 / N) | 0, c: kk2 % N }); });
-      var fin = solveLogic(G, finalList, tables, maxLevel);
-      if (!fin.solved) continue;
-
-      var clues = {};
-      keep.forEach(function (kk2) { clues[kk2] = meta[kk2]; });
-      return {
-        size: size, num: num,
-        region: Array.from(region),
-        clues: clues,
-        level: fin.level,
-        hard: fin.hard,
-        clueCount: keep.size
-      };
     }
-    return null;
+      if (best || ++pass >= 4) break;
+      regions = regions * 3;
+    }
+    return best;
   }
 
   return {
@@ -992,17 +1138,14 @@ function TapaCore() {
     worker.onerror = function () { worker = null; };
   }
 
-  /* Difficulty ramps with the puzzle number by leaving more clues on early
-     boards. Stripping to the bone is what makes a board hard. */
-  function floorFor(size, num) {
-    var cells = size * size;
-    var t = Math.min(1, (num - 1) / 50);
-    var easy = Math.round(cells * 0.30);
-    return Math.round(easy * (1 - t));
-  }
-
+  /* Every board is built with the full technique set. Restricting the solver
+     to weaker logic to make an "easy" book sounds right and is not: a Tapa
+     almost always needs the one-region rule to close, so reduction under
+     single-clue logic alone strips almost nothing and leaves bloated boards
+     that collapse in three rounds. Board size is the difficulty axis, which is
+     what the four books already are. */
   function getPuzzle(size, num, done) {
-    var opts = { floor: floorFor(size, num), maxLevel: core.L_CONNECT };
+    var opts = { maxLevel: core.L_CONNECT };
     if (worker) {
       var id = ++jobId;
       jobs[id] = done;

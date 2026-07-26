@@ -34,11 +34,20 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   filled cells in the eight around it, with no 2×2 block ever filled entirely.
   Four books by board size, 6×6 to 12×12, each numbered and endless — the number
   seeds the generator, so №47 is the same board on every device, forever, with
-  nothing stored on a server. Boards are generated pattern-first and then stripped
+  nothing stored on a server. Boards are generated wall-first and then stripped
   clue by clue for exactly as long as a deduction-only solver can still finish, so
   no puzzle here needs a guess; uniqueness comes free, since a guess-free complete
-  solve admits no alternative. That same solver rates the difficulty and would
-  drive hints. Filled cells merge into a single shape — convex corners rounded,
+  solve admits no alternative. Correct is not the same as good, though, so the
+  generator builds many candidates and keeps the best: it scores the *shape of the
+  solve* — how few cells fall out of the opening sweep, how long the deduction
+  chain runs afterwards — and rejects outright any board containing a clue that
+  gives itself away. A clue is a giveaway by position as much as by value: `2 2`
+  reads as rich, but on an edge cell with five neighbours it admits exactly one
+  arrangement, so clues are ranked for removal by how many arrangements they
+  allow unaided rather than by the numbers printed in them. Board size is the
+  difficulty axis; restricting the solver to weaker logic to make an easy book
+  does not work, because a Tapa nearly always needs the one-region rule to close.
+  Filled cells merge into a single shape — convex corners rounded,
   concave corners filleted — so a solved board reads as a painted form rather than
   forty black squares, and on the last correct cell the clues fade and then the
   grid itself dissolves, leaving the ink alone on the paper. Ink-on-paper palette
