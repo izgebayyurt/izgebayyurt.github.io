@@ -1,0 +1,1691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#061119" />
+<title>burnbridge</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23061119'/%3E%3Cpath d='M6 20 L16 11 L26 20' stroke='%23ff8a4c' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='21' r='3.4' fill='%23d8ccb1'/%3E%3Ccircle cx='26' cy='21' r='3.4' fill='%234ec9e8'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --sea:    #061119;
+    --chrome: #0a1620;
+    --chrome2:#10222e;
+    --line:   #1b3441;
+    --ink:    #e9f2f5;
+    --dim:    #7c96a1;
+    --dimmer: #526874;
+    --t0:     #ff8a4c;
+    --t1:     #4ec9e8;
+    --t2:     #b98cff;
+    --t3:     #8fdc6a;
+    --gold:   #ffcf6b;
+    --good:   #5fdca0;
+    --burn:   #24343d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: var(--sea); color: var(--ink);
+    font-family: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none;
+    overscroll-behavior: none;
+  }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---------- top bar ---------- */
+  #hud {
+    flex: 0 0 auto; background: var(--chrome);
+    border-bottom: 1px solid var(--line);
+    padding: 8px 11px 0;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  #hudTop { display: flex; align-items: center; gap: 9px; }
+  .iconbtn {
+    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px;
+    background: var(--chrome2); border: 1px solid var(--line); color: var(--dim);
+    font-size: 14px; cursor: pointer; display: grid; place-items: center; padding: 0;
+    font-family: inherit; line-height: 1;
+  }
+  .iconbtn:active { background: #16303e; color: var(--ink); }
+  .iconbtn[disabled] { opacity: .34; }
+  #lname { flex: 1 1 auto; font-size: 14px; font-weight: 600; }
+  #tally { flex: 0 0 auto; text-align: right; }
+  #cost { font-size: 18px; font-weight: 500; letter-spacing: .04em; line-height: 1.1; }
+  #cost.over { color: var(--t0); }
+  #par { font-size: 9.5px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+
+  /* ---------- traveller chips: legend and selector in one ---------- */
+  #chips { display: flex; gap: 6px; padding: 7px 0 8px; overflow-x: auto; scrollbar-width: none; }
+  #chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 9px 4px 7px; border-radius: 8px; cursor: pointer;
+    background: transparent; border: 1px solid var(--line);
+    font-family: inherit; font-size: 11.5px; font-weight: 500; color: var(--dim);
+    line-height: 1;
+  }
+  .chip .gl { font-size: 10px; }
+  .chip.on { background: var(--chrome2); color: var(--ink); }
+  .chip.done { opacity: .4; }
+  .chip.neutral { border-style: dashed; cursor: default; }
+  .chip.stuck { text-decoration: line-through; opacity: .45; }
+
+  /* ---------- board ---------- */
+  #board { flex: 1 1 auto; position: relative; min-height: 0; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hint {
+    position: absolute; left: 14px; right: 14px; bottom: 10px;
+    text-align: center; font-size: 12px; color: var(--dim);
+    pointer-events: none; transition: opacity .4s; line-height: 1.5;
+  }
+  #hint.gone { opacity: 0; }
+  #hint b { color: var(--ink); font-weight: 500; }
+
+  /* A bar, not a modal — the board stays playable while it is up. */
+  #warn {
+    position: absolute; left: 10px; right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 9px 9px 12px; border-radius: 12px;
+    background: rgba(14,28,36,.94); border: 1px solid #4a3a22;
+    box-shadow: 0 6px 22px rgba(0,0,0,.4);
+    transition: opacity .3s, transform .3s;
+  }
+  #warn.gone { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  #warnText { flex: 1 1 auto; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
+  #warnText b { color: var(--gold); font-weight: 500; }
+  #warn button {
+    flex: 0 0 auto; font-family: inherit; font-size: 11.5px; font-weight: 500;
+    border-radius: 8px; cursor: pointer; padding: 7px 11px;
+    background: var(--gold); border: 1px solid var(--gold); color: #241a06;
+  }
+  #warn button:active { filter: brightness(1.1); }
+  #warn #warnX {
+    background: transparent; border-color: transparent; color: var(--dimmer);
+    padding: 7px 6px; font-size: 12px;
+  }
+
+  /* ---------- screens & overlays ---------- */
+  .screen {
+    position: absolute; inset: 0; z-index: 5; background: var(--sea);
+    display: flex; flex-direction: column;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+  .ov {
+    position: absolute; inset: 0; z-index: 8; background: rgba(4,11,16,.82);
+    display: flex; align-items: center; justify-content: center; padding: 22px;
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  }
+  .hidden { display: none !important; }
+  .card {
+    width: 100%; max-width: 380px; background: var(--chrome);
+    border: 1px solid var(--line); border-radius: 16px; padding: 20px 18px; text-align: center;
+  }
+  .card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
+  .card p { margin: 0 0 14px; font-size: 13px; color: var(--dim); line-height: 1.6; }
+  .card p.tight { margin-bottom: 8px; }
+  .card p b { color: var(--ink); font-weight: 500; }
+  .btn {
+    display: block; width: 100%; margin-top: 9px; padding: 12px 14px;
+    border-radius: 11px; border: 1px solid var(--line); background: var(--chrome2);
+    color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .btn:active { background: #17313f; }
+  .btn.primary { background: var(--t0); border-color: var(--t0); color: #1a0c05; font-weight: 600; }
+  .btn.ghost { background: transparent; color: var(--dim); }
+  .row2 { display: flex; gap: 9px; }
+  .row2 .btn { margin-top: 9px; }
+
+  .stars { font-size: 24px; letter-spacing: 6px; margin: 4px 0 12px; color: var(--burn); }
+  .stars b { color: var(--gold); font-weight: 400; }
+  .scoreline { display: flex; justify-content: center; gap: 22px; margin: 2px 0 14px; }
+  .scoreline div { text-align: center; }
+  .scoreline .v { font-size: 22px; font-weight: 500; }
+  .scoreline .k { font-size: 9.5px; color: var(--dim); letter-spacing: .11em; text-transform: uppercase; margin-top: 2px; }
+
+  #menu { justify-content: center; align-items: center; text-align: center; }
+  #menu .wrap { width: 100%; max-width: 340px; }
+  .logo { font-size: 40px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 2px; }
+  .logo span { color: var(--t0); }
+  .logo em { color: var(--t1); font-style: normal; }
+  .tag { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin-bottom: 26px; }
+  .credit { margin-top: 24px; font-size: 10.5px; color: var(--dimmer); letter-spacing: .04em; }
+
+  #levels .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  #levels .head h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1 1 auto; }
+  #levels .head .tot { font-size: 12px; color: var(--gold); }
+  .actlabel {
+    font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--dimmer); margin: 16px 0 8px;
+  }
+  .actlabel:first-of-type { margin-top: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+  .tile {
+    background: var(--chrome); border: 1px solid var(--line); border-radius: 12px;
+    padding: 9px 8px; cursor: pointer; color: var(--ink); font-family: inherit;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .tile:active { background: var(--chrome2); }
+  .tile .n { font-size: 14px; font-weight: 500; }
+  .tile .st { font-size: 9.5px; letter-spacing: 2px; color: var(--burn); margin-top: 5px; }
+  .tile .st b { color: var(--gold); font-weight: 400; }
+  .tile .st.done { color: var(--good); letter-spacing: 0; }
+  .tile.locked { opacity: .32; }
+  .tile.mark { border-color: #3a3320; }
+  .tile.mark .n { color: var(--gold); font-size: 12px; }
+
+  .howlist { text-align: left; font-size: 13px; color: var(--dim); line-height: 1.65; margin: 0 0 14px; padding-left: 18px; }
+  .howlist li { margin-bottom: 7px; }
+  .howlist b { color: var(--ink); font-weight: 500; }
+  .key { display: flex; flex-direction: column; gap: 7px; margin: 0 0 15px; }
+  .keyrow { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); text-align: left; }
+  .keyrow canvas { flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="hud">
+    <div id="hudTop">
+      <button class="iconbtn" id="bBack" aria-label="Back">‹</button>
+      <div id="lname">—</div>
+      <div id="tally"><div id="cost" class="mono">0</div><div id="par">par —</div></div>
+      <button class="iconbtn" id="bUndo" aria-label="Undo">↶</button>
+      <button class="iconbtn" id="bRestart" aria-label="Restart">↺</button>
+    </div>
+    <div id="chips"></div>
+  </div>
+
+  <div id="board">
+    <canvas id="cv"></canvas>
+    <div id="hint"></div>
+    <div id="warn" class="gone">
+      <div id="warnText"></div>
+      <button id="warnGo">Rewind</button>
+      <button id="warnX" aria-label="Dismiss">✕</button>
+    </div>
+
+    <div class="screen" id="menu">
+      <div class="wrap">
+        <div class="logo">burn<span>br</span><em>idge</em></div>
+        <div class="tag">Travellers who share one set of bridges.<br />Every crossing burns the bridge behind it.</div>
+        <button class="btn primary" id="bPlay">Play</button>
+        <button class="btn" id="bLevels">Crossings</button>
+        <button class="btn" id="bDrift">Drift · endless</button>
+        <button class="btn ghost" id="bHow">How to play</button>
+        <div class="credit">after Euler, Königsberg, 1736</div>
+      </div>
+    </div>
+
+    <div class="screen hidden" id="levels">
+      <div class="head"><h2>Crossings</h2><div class="tot" id="totStars">0 ★</div></div>
+      <div id="acts"></div>
+    </div>
+
+    <div class="ov hidden" id="ov"><div class="card" id="ovCard"></div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+var $ = function (id) { return document.getElementById(id); };
+var TAU = Math.PI * 2;
+var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
+
+/* ============================================================
+   LEVELS
+
+   nodes:  [x, y, claim]   claim 0 = any traveller, otherwise the
+                           1-based index of the traveller who must
+                           reach it. Coordinates are pure layout —
+                           every bridge costs exactly one crossing.
+   starts: one island per traveller; its length sets how many there are.
+
+   Starts and claims are certified, not authored: a search kept only
+   configurations that are solvable, need every traveller, and strand
+   the obvious greedy line.
+   ============================================================ */
+
+var RAW = [
+  { id: 'c01', hint: 'Two travellers. Tap one to pick it up, then drag. Every bridge <b>burns behind whoever crosses it</b>.',
+    starts: [1, 0],
+    nodes: [[0.670,0.183],[0.504,0.771],[0.556,0.484],[0.883,0.562],[0.252,0.341,1],[0.217,0.769,2]],
+    edges: [[1,5],[1,2],[0,2],[2,4],[2,3],[1,5],[4,5],[1,3],[0,3]] },
+
+  { id: 'c02', hint: 'A shape on an island means only <b>that</b> traveller can settle it. Every island must be reached by someone.',
+    starts: [2, 5],
+    nodes: [[0.528,0.309],[0.691,0.742,1],[0.153,0.584],[0.295,0.817,2],[0.475,0.621],[0.813,0.326]],
+    edges: [[1,4],[3,4],[2,3],[0,5],[0,4],[1,4],[2,3],[0,5],[1,3]] },
+
+  { id: 'c03', starts: [5, 3],
+    nodes: [[0.660,0.230,2],[0.621,0.468],[0.153,0.422],[0.566,0.876],[0.154,0.788,1],[0.372,0.185]],
+    edges: [[0,1],[0,5],[2,5],[2,4],[1,3],[0,1],[0,5],[2,5],[2,4],[3,4]] },
+
+  { id: 'c04', starts: [3, 6],
+    nodes: [[0.800,0.217],[0.468,0.177,1],[0.228,0.869],[0.615,0.685],[0.888,0.664,2],[0.315,0.560],[0.216,0.257]],
+    edges: [[1,6],[3,4],[5,6],[2,5],[3,5],[0,1],[1,6],[3,4],[5,6],[0,1],[2,3]] },
+
+  { id: 'c05', starts: [6, 4],
+    nodes: [[0.260,0.620],[0.827,0.260],[0.397,0.830,1],[0.226,0.286,2],[0.880,0.682],[0.586,0.646],[0.462,0.396]],
+    edges: [[0,2],[3,6],[2,5],[5,6],[4,5],[1,6],[0,2],[3,6],[2,5],[0,3],[1,4]] },
+
+  { id: 'c06', starts: [4, 5],
+    nodes: [[0.449,0.271],[0.343,0.767,1],[0.896,0.603,2],[0.216,0.149],[0.890,0.173],[0.148,0.564],[0.663,0.881]],
+    edges: [[0,3],[1,5],[1,6],[2,6],[3,5],[2,4],[0,3],[1,5],[1,6],[2,6],[3,5],[0,4]] },
+
+  { id: 'c07', starts: [3, 5],
+    nodes: [[0.278,0.601,1],[0.806,0.624,1],[0.564,0.593],[0.409,0.147],[0.771,0.245,2],[0.668,0.879],[0.134,0.198,2]],
+    edges: [[1,2],[3,6],[0,2],[1,5],[3,4],[1,4],[1,2],[3,6],[0,2],[3,4],[0,6],[0,5]] },
+
+  { id: 'c08', starts: [4, 6],
+    nodes: [[0.256,0.322,2],[0.566,0.151,1],[0.750,0.759],[0.739,0.385,1],[0.391,0.625],[0.325,0.890,2],[0.893,0.185]],
+    edges: [[3,6],[4,5],[1,3],[0,4],[0,1],[2,3],[3,6],[4,5],[1,6],[0,4],[0,1],[2,5]] },
+
+  { id: 'c09', starts: [6, 3],
+    nodes: [[0.240,0.780,2],[0.509,0.418],[0.165,0.157,2],[0.829,0.827],[0.809,0.509,1],[0.518,0.807,1],[0.205,0.508]],
+    edges: [[0,6],[0,5],[3,5],[1,4],[1,6],[2,6],[0,6],[0,5],[3,5],[1,4],[3,4],[1,2]] },
+
+  { id: 'c10', starts: [6, 5],
+    nodes: [[0.585,0.362],[0.521,0.702,1],[0.756,0.127,2],[0.227,0.683],[0.882,0.506,1],[0.747,0.829],[0.268,0.224],[0.498,0.109,2]],
+    edges: [[6,7],[2,7],[1,5],[0,7],[1,3],[0,4],[0,1],[6,7],[1,5],[0,2],[4,5],[2,4],[3,6]] },
+
+  { id: 'c11', starts: [3, 4],
+    nodes: [[0.393,0.296],[0.127,0.804,2],[0.709,0.762,2],[0.376,0.725],[0.866,0.174],[0.884,0.482,1],[0.630,0.486],[0.126,0.327,1]],
+    edges: [[5,6],[1,3],[0,7],[2,6],[0,6],[4,5],[2,3],[5,6],[1,3],[0,7],[4,5],[2,3],[1,7]] },
+
+  { id: 'c12', starts: [6, 7],
+    nodes: [[0.722,0.205,2],[0.729,0.733,2],[0.314,0.811,1],[0.570,0.408],[0.330,0.367],[0.197,0.154,1],[0.850,0.431],[0.107,0.474]],
+    edges: [[3,4],[4,7],[4,5],[0,3],[0,6],[1,6],[2,7],[3,4],[0,3],[0,6],[1,6],[5,7],[2,7]] },
+
+  { id: 'c13', starts: [3, 4],
+    nodes: [[0.233,0.286,1],[0.837,0.862],[0.563,0.126,2],[0.656,0.460],[0.246,0.838],[0.230,0.558],[0.896,0.273,2],[0.561,0.895,1],[0.886,0.587]],
+    edges: [[3,8],[0,5],[1,7],[1,8],[4,5],[3,6],[4,7],[2,3],[3,8],[0,5],[1,7],[1,8],[4,5],[4,7],[2,6]] },
+
+  { id: 'c14', starts: [4, 1],
+    nodes: [[0.794,0.339,1],[0.642,0.146],[0.642,0.774],[0.393,0.866,2],[0.119,0.851],[0.230,0.255],[0.461,0.552],[0.837,0.605,1],[0.130,0.608,2]],
+    edges: [[4,8],[0,1],[2,7],[2,3],[0,7],[3,4],[2,6],[5,8],[4,8],[0,1],[2,7],[0,7],[3,4],[3,6],[5,6]] },
+
+  { id: 'c15', starts: [4, 0],
+    nodes: [[0.236,0.181],[0.232,0.462],[0.802,0.168,1],[0.792,0.445],[0.611,0.776],[0.882,0.779,2],[0.313,0.797,2],[0.478,0.509],[0.504,0.168,1]],
+    edges: [[1,7],[0,8],[4,5],[2,3],[0,1],[2,8],[4,6],[4,7],[1,7],[0,8],[4,5],[2,3],[0,1],[2,8],[6,7]] },
+
+  { id: 'c16', starts: [4, 3],
+    nodes: [[0.559,0.682],[0.728,0.133],[0.408,0.268,2],[0.879,0.838],[0.247,0.135],[0.309,0.550],[0.175,0.860,1],[0.121,0.355,2],[0.835,0.540,1],[0.401,0.826]],
+    edges: [[2,4],[0,9],[6,9],[4,7],[5,7],[0,5],[3,8],[0,8],[1,2],[2,4],[0,9],[6,9],[4,7],[5,7],[2,5],[3,8],[1,8]] },
+
+  { id: 'c17', starts: [1, 4],
+    nodes: [[0.162,0.186,1],[0.869,0.461],[0.288,0.650],[0.670,0.749],[0.205,0.870],[0.684,0.178,2],[0.596,0.375],[0.469,0.114,2],[0.101,0.379,1],[0.333,0.411]],
+    edges: [[0,8],[5,6],[5,7],[2,4],[8,9],[2,9],[6,9],[1,6],[1,3],[0,8],[5,6],[5,7],[2,4],[8,9],[0,7],[1,3]] },
+
+  { id: 'c18', starts: [0, 2],
+    nodes: [[0.312,0.343],[0.800,0.472,1],[0.687,0.898],[0.286,0.797],[0.320,0.101,2],[0.596,0.476],[0.513,0.795,1],[0.514,0.162,2],[0.130,0.498],[0.774,0.189]],
+    edges: [[2,6],[4,7],[1,5],[3,6],[0,8],[0,4],[7,9],[1,9],[5,6],[2,6],[4,7],[1,5],[0,8],[0,4],[7,9],[1,9],[3,8]] },
+
+  { id: 'kbg', euler: true, interlude: true, starts: [0],
+    hint: 'Every bridge, exactly once. Nobody has ever done it.',
+    nodes: [[0.50,0.16],[0.50,0.84],[0.32,0.50],[0.77,0.50]],
+    edges: [[0,2],[0,2],[1,2],[1,2],[0,3],[1,3],[2,3]] },
+
+  { id: 'c19', starts: [2, 5, 0],
+    nodes: [[0.206,0.213],[0.646,0.834,1],[0.875,0.247],[0.416,0.484],[0.501,0.122,2],[0.331,0.783],[0.859,0.642,3]],
+    edges: [[1,6],[0,4],[3,5],[1,5],[0,3],[2,4],[1,6],[0,4],[3,5],[1,5],[0,3],[2,6]] },
+
+  { id: 'c20', starts: [4, 6, 3],
+    nodes: [[0.537,0.242,2],[0.340,0.642,1],[0.636,0.644],[0.216,0.392],[0.793,0.312],[0.880,0.640,3],[0.662,0.888]],
+    edges: [[2,5],[2,6],[0,4],[1,3],[1,2],[4,5],[2,5],[0,4],[1,3],[5,6],[0,3]] },
+
+  { id: 'c21', starts: [6, 2, 4],
+    nodes: [[0.824,0.534,3],[0.258,0.252,2],[0.847,0.793],[0.500,0.646,1],[0.182,0.593],[0.454,0.110],[0.609,0.303]],
+    edges: [[1,5],[5,6],[0,2],[0,6],[3,4],[0,3],[1,5],[5,6],[0,2],[3,4],[1,4]] },
+
+  { id: 'c22', starts: [4, 5, 1],
+    nodes: [[0.173,0.606],[0.316,0.121],[0.608,0.242,2],[0.686,0.800,3],[0.746,0.491],[0.110,0.866],[0.143,0.360,1],[0.400,0.715]],
+    edges: [[0,6],[0,7],[0,5],[2,4],[1,6],[3,7],[3,4],[0,6],[2,4],[1,6],[3,7],[3,4],[1,2],[5,7]] },
+
+  { id: 'c23', starts: [7, 5, 2],
+    nodes: [[0.473,0.260,1],[0.831,0.753,3],[0.188,0.435],[0.246,0.863,2],[0.814,0.414],[0.686,0.120],[0.399,0.625],[0.546,0.834]],
+    edges: [[0,5],[6,7],[3,6],[2,6],[1,7],[4,5],[0,2],[0,5],[6,7],[1,7],[4,5],[0,2],[1,4],[2,3]] },
+
+  { id: 'c24', starts: [3, 5, 1],
+    nodes: [[0.709,0.337,1],[0.340,0.141],[0.105,0.298,2],[0.261,0.742],[0.501,0.559],[0.879,0.513],[0.687,0.776,3],[0.234,0.501]],
+    edges: [[2,7],[3,7],[0,5],[4,7],[1,2],[4,6],[0,4],[2,7],[0,5],[1,2],[4,6],[5,6],[0,1],[3,6]] },
+
+  { id: 'c25', starts: [0, 8, 5],
+    nodes: [[0.591,0.401],[0.798,0.263,2],[0.705,0.764,1],[0.324,0.657,3],[0.478,0.880,1],[0.166,0.477],[0.871,0.584,3],[0.301,0.180,2],[0.217,0.883]],
+    edges: [[3,5],[2,6],[0,1],[3,8],[2,4],[4,8],[5,7],[1,6],[3,5],[2,6],[0,1],[3,8],[2,4],[4,8],[0,7]] },
+
+  { id: 'c26', starts: [4, 8, 3],
+    nodes: [[0.586,0.893,1],[0.418,0.713,3],[0.416,0.280,2],[0.132,0.336],[0.805,0.294],[0.807,0.755,3],[0.142,0.652,1],[0.598,0.527,2],[0.180,0.896]],
+    edges: [[6,8],[0,1],[1,7],[0,5],[1,6],[2,3],[2,7],[4,7],[6,8],[0,1],[0,5],[2,3],[2,7],[3,6],[4,5]] },
+
+  { id: 'c27', starts: [5, 4, 3],
+    nodes: [[0.306,0.675,2],[0.586,0.430,3],[0.504,0.189,1],[0.534,0.862],[0.807,0.258],[0.192,0.454],[0.771,0.658,1],[0.244,0.179,3],[0.148,0.862,2]],
+    edges: [[0,8],[0,5],[1,2],[2,7],[1,4],[5,7],[1,6],[0,3],[0,8],[1,2],[2,7],[5,7],[3,6],[3,8],[4,6]] },
+
+  { id: 'c28', starts: [8, 4, 2],
+    nodes: [[0.529,0.438,3],[0.757,0.842,3],[0.131,0.272],[0.431,0.166,1],[0.795,0.131],[0.480,0.688,2],[0.163,0.682,2],[0.846,0.444,1],[0.294,0.884]],
+    edges: [[6,8],[0,5],[5,8],[0,3],[0,7],[1,5],[4,7],[2,3],[6,8],[0,5],[4,7],[2,3],[3,4],[1,7],[2,6]] },
+
+  { id: 'c29', starts: [7, 5, 4],
+    nodes: [[0.139,0.519,1],[0.512,0.847,2],[0.616,0.198,1],[0.881,0.456,3],[0.161,0.806],[0.314,0.185],[0.626,0.456,2],[0.747,0.778],[0.389,0.496,3]],
+    edges: [[6,8],[1,7],[0,8],[3,6],[2,6],[0,4],[2,5],[6,7],[1,7],[0,8],[0,4],[2,5],[5,8],[3,7],[1,4]] },
+
+  { id: 'c30', starts: [2, 8, 1],
+    nodes: [[0.825,0.861,2],[0.384,0.719],[0.897,0.481],[0.619,0.544,2],[0.223,0.383,1],[0.810,0.210,3],[0.503,0.156,3],[0.108,0.649,1],[0.136,0.117]],
+    edges: [[4,8],[1,7],[2,5],[2,3],[4,7],[1,3],[5,6],[0,3],[4,8],[1,7],[2,5],[2,3],[4,7],[5,6],[6,8],[0,1]] },
+
+  { id: 'c31', starts: [8, 4, 5],
+    nodes: [[0.869,0.337,1],[0.273,0.861,3],[0.208,0.239,2],[0.434,0.493],[0.846,0.695],[0.611,0.284],[0.242,0.619,3],[0.640,0.884,1],[0.123,0.434],[0.406,0.117,2]],
+    edges: [[2,8],[6,8],[3,6],[2,9],[1,6],[0,5],[5,9],[4,7],[0,4],[2,8],[6,8],[2,9],[0,5],[5,9],[4,7],[0,4],[1,7],[1,3]] },
+
+  { id: 'c32', starts: [0, 4, 3],
+    nodes: [[0.574,0.282],[0.501,0.886,1],[0.379,0.683,1],[0.688,0.745],[0.170,0.805],[0.769,0.338,2],[0.284,0.470,3],[0.509,0.490,3],[0.810,0.100,2],[0.767,0.545]],
+    edges: [[0,5],[5,9],[3,9],[0,7],[6,7],[2,6],[1,3],[5,8],[2,4],[0,5],[3,9],[0,7],[6,7],[2,6],[1,3],[1,2],[1,4],[8,9]] },
+
+  { id: 'c33', starts: [5, 4, 8],
+    nodes: [[0.521,0.295,1],[0.605,0.738,3],[0.308,0.784,2],[0.211,0.461,2],[0.875,0.519],[0.103,0.714],[0.718,0.332,1],[0.840,0.859,1],[0.175,0.206],[0.441,0.568,3]],
+    edges: [[0,6],[2,5],[1,9],[4,6],[3,9],[2,9],[3,8],[1,7],[0,9],[0,6],[2,5],[4,6],[3,8],[1,7],[3,5],[1,2],[4,7]] },
+
+  { id: 'c34', starts: [7, 3, 9],
+    nodes: [[0.505,0.859,1],[0.280,0.195,2],[0.704,0.282,2],[0.868,0.879],[0.801,0.531,3],[0.272,0.718,1],[0.123,0.526,1],[0.480,0.470],[0.559,0.105,3],[0.140,0.872]],
+    edges: [[5,9],[2,8],[5,6],[2,4],[0,5],[2,7],[1,8],[5,7],[3,4],[2,8],[1,8],[4,7],[1,7],[6,9],[3,4],[0,3],[0,9]] },
+
+  { id: 'c35', starts: [3, 2, 7, 6],
+    nodes: [[0.522,0.844,1],[0.464,0.341,4],[0.267,0.730],[0.837,0.119],[0.186,0.341,3],[0.723,0.591,2],[0.371,0.103],[0.768,0.853]],
+    edges: [[0,7],[1,6],[5,7],[1,4],[0,2],[1,5],[1,3],[0,7],[5,7],[0,2],[4,6],[2,4],[3,6]] },
+
+  { id: 'c36', starts: [1, 4, 0, 3],
+    nodes: [[0.741,0.665],[0.574,0.270],[0.831,0.252,2],[0.172,0.395],[0.133,0.805],[0.394,0.768,1],[0.400,0.101,3],[0.467,0.515,4]],
+    edges: [[1,6],[1,2],[5,7],[4,5],[1,7],[0,7],[3,7],[1,6],[4,5],[0,5],[3,6],[3,4],[0,2]] },
+
+  { id: 'c37', starts: [3, 5, 2, 4],
+    nodes: [[0.488,0.306,1],[0.288,0.728,2],[0.774,0.273],[0.481,0.887],[0.826,0.663],[0.330,0.125],[0.312,0.484,3],[0.562,0.549,4]],
+    edges: [[0,5],[1,6],[0,6],[1,3],[0,7],[0,2],[4,7],[1,6],[1,3],[6,7],[4,7],[2,4],[3,4],[2,5]] },
+
+  { id: 'c38', starts: [5, 3, 1, 0],
+    nodes: [[0.236,0.723],[0.610,0.177],[0.549,0.888,3],[0.119,0.309],[0.483,0.627],[0.900,0.663],[0.899,0.254,2],[0.719,0.499,4],[0.433,0.356,1]],
+    edges: [[5,7],[1,8],[0,4],[2,4],[4,7],[4,8],[1,6],[3,8],[5,7],[1,8],[1,6],[6,7],[0,2],[5,6],[2,5],[0,3]] },
+
+  { id: 'c39', starts: [3, 0, 5, 1],
+    nodes: [[0.168,0.713],[0.703,0.864],[0.539,0.610,3],[0.869,0.224],[0.495,0.320],[0.110,0.140],[0.872,0.522,2],[0.417,0.841,1],[0.208,0.440,4]],
+    edges: [[2,7],[0,8],[0,7],[1,7],[2,4],[3,6],[5,8],[2,6],[2,7],[0,8],[3,6],[4,8],[1,6],[3,4],[4,5]] },
+
+  { id: 'c40', starts: [7, 2, 4, 1],
+    nodes: [[0.440,0.234,3],[0.181,0.302],[0.166,0.758],[0.876,0.478,2],[0.816,0.840],[0.630,0.550,4],[0.412,0.669],[0.734,0.128],[0.567,0.881,1]],
+    edges: [[5,6],[4,8],[3,5],[6,8],[2,6],[0,1],[0,7],[0,5],[5,6],[4,8],[0,1],[3,4],[3,7],[2,8],[1,2]] },
+
+  { id: 'c41', starts: [1, 8, 4, 7],
+    nodes: [[0.450,0.824,2],[0.144,0.707],[0.331,0.480,1],[0.524,0.162,3],[0.879,0.759],[0.586,0.527,4],[0.883,0.480,1],[0.134,0.248],[0.798,0.118]],
+    edges: [[2,5],[3,8],[4,6],[1,2],[5,6],[2,7],[0,5],[3,5],[3,8],[4,6],[1,2],[0,1],[6,8],[3,7],[0,4]] },
+
+  { id: 'c42', starts: [5, 2, 4, 0],
+    nodes: [[0.205,0.324],[0.506,0.716,1],[0.228,0.771],[0.529,0.229,3],[0.769,0.679],[0.875,0.188],[0.336,0.538,1],[0.576,0.478,4],[0.829,0.439,2]],
+    edges: [[1,6],[6,7],[4,8],[0,6],[3,7],[5,8],[7,8],[2,6],[4,8],[1,7],[1,4],[1,2],[0,3],[3,5],[0,2]] },
+
+  { id: 'c43', starts: [1, 8, 4, 3],
+    nodes: [[0.413,0.729,2],[0.816,0.739],[0.610,0.128,3],[0.830,0.263],[0.162,0.870],[0.375,0.333,4],[0.130,0.395,1],[0.630,0.486,1],[0.223,0.143]],
+    edges: [[5,8],[5,6],[2,3],[0,4],[5,7],[3,7],[1,7],[0,7],[5,8],[2,3],[6,8],[0,4],[2,8],[0,1],[4,6]] },
+
+  { id: 'c44', starts: [4, 8, 3, 0],
+    nodes: [[0.457,0.375],[0.683,0.847,1],[0.761,0.402,3],[0.349,0.884],[0.140,0.245],[0.374,0.564,2],[0.163,0.608,4],[0.632,0.649,1],[0.863,0.674],[0.320,0.157,2]],
+    edges: [[4,9],[1,7],[0,5],[5,6],[7,8],[0,9],[5,7],[2,7],[3,5],[4,9],[1,8],[0,9],[2,8],[0,2],[3,6],[1,3],[4,6]] },
+
+  { id: 'c45', starts: [3, 9, 2, 6],
+    nodes: [[0.798,0.416,4],[0.174,0.673,1],[0.890,0.163],[0.627,0.530],[0.758,0.835,2],[0.308,0.285,1],[0.456,0.146],[0.472,0.865,3],[0.375,0.475,2],[0.114,0.396]],
+    edges: [[5,8],[5,6],[0,3],[5,9],[3,8],[0,2],[1,8],[4,7],[3,4],[5,8],[0,3],[0,2],[1,9],[4,7],[1,7],[6,9],[2,6]] },
+
+  { id: 'c46', starts: [4, 5, 7, 6],
+    nodes: [[0.380,0.743,3],[0.194,0.312,1],[0.654,0.193,4],[0.465,0.366,1],[0.762,0.483],[0.174,0.739],[0.634,0.849],[0.352,0.144],[0.840,0.106,2],[0.540,0.577,2]],
+    edges: [[0,5],[2,8],[3,9],[0,9],[1,7],[4,9],[3,7],[2,3],[0,6],[0,5],[2,8],[3,9],[1,7],[2,7],[4,8],[4,6],[1,5]] },
+
+  { id: 'c47', starts: [5, 8, 0, 6],
+    nodes: [[0.133,0.197],[0.445,0.663,3],[0.442,0.267,4],[0.860,0.503,2],[0.236,0.699,1],[0.757,0.169],[0.657,0.737],[0.370,0.899,1],[0.142,0.882],[0.262,0.499,3],[0.616,0.472,2]],
+    edges: [[4,9],[4,8],[1,4],[1,6],[7,8],[3,10],[1,10],[2,10],[0,2],[2,5],[4,9],[1,6],[7,8],[3,10],[2,9],[3,6],[0,9],[6,7],[3,5]] },
+
+  { id: 'c48', starts: [2, 7, 6, 5],
+    nodes: [[0.384,0.756,1],[0.534,0.484,3],[0.886,0.206],[0.843,0.468,2],[0.144,0.350,1],[0.433,0.202],[0.884,0.857],[0.155,0.631],[0.625,0.821,4],[0.671,0.259,3],[0.683,0.628,2]],
+    edges: [[8,10],[1,10],[2,9],[3,10],[5,9],[0,8],[6,8],[0,7],[1,9],[4,7],[8,10],[2,9],[0,7],[2,3],[4,7],[1,5],[1,3],[4,5],[3,6]] },
+
+  { id: 'c49', starts: [4, 7, 5, 3],
+    nodes: [[0.878,0.324,2],[0.585,0.795,1],[0.196,0.625,1],[0.113,0.219],[0.549,0.234],[0.801,0.689],[0.343,0.422,2],[0.315,0.825],[0.574,0.448,4],[0.325,0.209,3],[0.396,0.622,3]],
+    edges: [[2,10],[6,10],[3,9],[6,9],[4,8],[7,10],[4,9],[1,5],[1,10],[0,8],[3,9],[4,8],[6,8],[2,7],[1,5],[2,6],[1,7],[0,4],[0,5]] },
+
+  { id: 'c50', starts: [3, 1, 10, 8],
+    nodes: [[0.307,0.784,4],[0.832,0.868],[0.232,0.388,2],[0.415,0.122],[0.834,0.579,3],[0.683,0.371,3],[0.528,0.836,1],[0.467,0.535,1],[0.844,0.115],[0.105,0.591,2],[0.107,0.868]],
+    edges: [[0,10],[0,6],[2,9],[4,5],[5,7],[2,7],[9,10],[1,4],[5,8],[2,3],[0,10],[0,6],[2,9],[4,5],[9,10],[1,4],[6,7],[1,6],[3,7],[3,8]] }
+];
+
+/* ============================================================
+   Level construction
+   ============================================================ */
+
+function nDist(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); }
+
+function buildLevel(raw) {
+  var nodes = raw.nodes.map(function (p) { return { x: p[0], y: p[1], claim: p[2] || 0 }; });
+  var edges = raw.edges.map(function (e, i) { return { i: i, a: e[0], b: e[1], bow: 0 }; });
+
+  var groups = {};
+  edges.forEach(function (e) {
+    var k = Math.min(e.a, e.b) + ':' + Math.max(e.a, e.b);
+    (groups[k] = groups[k] || []).push(e);
+  });
+  Object.keys(groups).forEach(function (k) {
+    var g = groups[k];
+    if (g.length < 2) return;
+    g.forEach(function (e, idx) { e.bow = (idx - (g.length - 1) / 2) * 0.075; });
+  });
+
+  var inc = nodes.map(function () { return []; });
+  edges.forEach(function (e) { inc[e.a].push(e.i); inc[e.b].push(e.i); });
+
+  var W = raw.starts.length;
+  var lv = {
+    id: raw.id, starts: raw.starts.slice(), W: W, hint: raw.hint || '',
+    euler: !!raw.euler, interlude: !!raw.interlude, act: raw.act || 0,
+    nodes: nodes, edges: edges, inc: inc
+  };
+  lv.claims = [];
+  for (var w = 0; w < W; w++) lv.claims.push([]);
+  nodes.forEach(function (n, i) { if (n.claim && n.claim <= W) lv.claims[n.claim - 1].push(i); });
+  lv.full = (1 << nodes.length) - 1;
+  lv.fullClaim = lv.claims.map(function (c) { return (1 << c.length) - 1; });
+  lv.claimBit = lv.claims.map(function (c) {
+    var m = {}; c.forEach(function (n, i) { m[n] = 1 << i; }); return m;
+  });
+  lv.total = edges.length;
+  return lv;
+}
+
+/* ============================================================
+   Solver
+
+   Travellers share one pool of bridges, so a position is (where each
+   one stands, which bridges are ash, which claims are settled).
+   Islands reached need no separate tracking: crossing a bridge means
+   standing on both its ends, so the visited set is always the starts
+   plus the endpoints of every burnt bridge.
+
+   Cost is the number of crossings, which makes the bound below exact
+   rather than estimated — that is what keeps the after-every-move
+   dead-position check instant.
+   ============================================================ */
+
+function popcount(x) { var c = 0; while (x) { x &= x - 1; c++; } return c; }
+
+function solveFrom(lv, pos, burnt, vis, met, cap) {
+  var N = lv.nodes.length, E = lv.edges.length, W = lv.W;
+  var best = Infinity, expansions = 0, capped = false;
+  var CAP = cap || 900000;
+  var memo = new Map();
+
+  // Travellers interact only through the shared pool of bridges, and bridges
+  // are only ever consumed — so any solution can be replayed with traveller 0
+  // walking its whole trail first, then traveller 1, and so on. Searching in
+  // that canonical order finds exactly the same solutions while skipping every
+  // equivalent interleaving, and it lets a finished traveller drop out of the
+  // state entirely: only the one currently walking needs a position.
+  var strideE = Math.pow(2, E);
+  var metStride = [], span = 1;
+  for (var w = 0; w < W; w++) { metStride.push(span); span *= (lv.fullClaim[w] + 1); }
+  var metSpan = span;
+
+  var M = met.slice();
+
+  function dfs(turn, here, burnt, cost, vis) {
+    var w, done = true;
+    if (vis === lv.full) {
+      for (w = 0; w < W; w++) if (M[w] !== lv.fullClaim[w]) { done = false; break; }
+      if (done) { if (cost < best) best = cost; return; }
+    }
+    if (turn >= W) return;
+    if (++expansions > CAP) { capped = true; return; }
+
+    // A traveller we have already walked past will never move again, so any
+    // claim of theirs still outstanding can never be settled.
+    for (w = 0; w < turn; w++) if (M[w] !== lv.fullClaim[w]) return;
+
+    // Every island still unreached needs a crossing to reach it, and every
+    // unsettled claim needs its own traveller to arrive. Both bound the
+    // number of bridges that must still burn.
+    var unvisited = N - popcount(vis), unclaimed = 0;
+    for (w = turn; w < W; w++) unclaimed += popcount(lv.fullClaim[w] & ~M[w]);
+    if (cost + Math.max(unvisited, unclaimed) >= best) return;
+
+    var mk = 0;
+    for (w = 0; w < W; w++) mk += M[w] * metStride[w];
+    var key = (((turn * N + here) * strideE) + burnt) * metSpan + mk;
+    var prev = memo.get(key);
+    if (prev !== undefined && prev <= cost) return;
+    memo.set(key, cost);
+
+    // Hand over to the next traveller...
+    dfs(turn + 1, turn + 1 < W ? pos[turn + 1] : 0, burnt, cost, vis);
+    if (capped) return;
+
+    // ...or walk this one further.
+    var list = lv.inc[here];
+    for (var ii = 0; ii < list.length; ii++) {
+      var ei = list[ii];
+      if ((burnt >> ei) & 1) continue;
+      var e = lv.edges[ei], nx = (e.a === here) ? e.b : e.a;
+      var bit = lv.claimBit[turn][nx], oldM = M[turn];
+      if (bit !== undefined) M[turn] = oldM | bit;
+      dfs(turn, nx, burnt | (1 << ei), cost + 1, vis | (1 << nx));
+      M[turn] = oldM;
+      if (capped) return;
+    }
+  }
+
+  dfs(0, pos[0], burnt, 0, vis);
+  return { ok: best < Infinity, par: best, capped: capped };
+}
+
+function initialState(lv) {
+  var vis = 0, met = [];
+  for (var w = 0; w < lv.W; w++) {
+    vis |= (1 << lv.starts[w]);
+    var bit = lv.claimBit[w][lv.starts[w]];
+    met.push(bit === undefined ? 0 : bit);
+  }
+  return { pos: lv.starts.slice(), burnt: 0, vis: vis, met: met };
+}
+
+function solveEuler(lv) {
+  var N = lv.nodes.length, deg = new Array(N).fill(0);
+  lv.edges.forEach(function (e) { deg[e.a]++; deg[e.b]++; });
+  var odd = [];
+  for (var u = 0; u < N; u++) if (deg[u] % 2 === 1) odd.push(u);
+  var ok = (odd.length === 0 && deg[lv.starts[0]] > 0) ||
+           (odd.length === 2 && odd.indexOf(lv.starts[0]) >= 0);
+  return { ok: ok, par: lv.total, odd: odd, deg: deg };
+}
+
+function solveLevel(lv, cap) {
+  if (lv.euler) return solveEuler(lv);
+  var s = initialState(lv);
+  return solveFrom(lv, s.pos, s.burnt, s.vis, s.met, cap || 2000000);
+}
+
+/* ============================================================
+   The obvious line — used to reject boards that solve themselves.
+   Each traveller steps toward whatever it still owes: its own
+   unclaimed island first, then any island nobody has reached.
+   ============================================================ */
+
+function greedyPlay(lv) {
+  var burnt = {}, pos = lv.starts.slice(), cost = 0, W = lv.W;
+  var vis = {}, met = [];
+  for (var w0 = 0; w0 < W; w0++) {
+    met.push({});
+    vis[pos[w0]] = 1;
+    if (lv.nodes[pos[w0]].claim === w0 + 1) met[w0][pos[w0]] = 1;
+  }
+  function done() {
+    for (var i = 0; i < lv.nodes.length; i++) if (!vis[i]) return false;
+    for (var w = 0; w < W; w++)
+      for (var k = 0; k < lv.claims[w].length; k++) if (!met[w][lv.claims[w][k]]) return false;
+    return true;
+  }
+  for (var step = 0; step < 120; step++) {
+    if (done()) return { won: true, cost: cost };
+    var bestMove = null;
+    for (var w = 0; w < W; w++) {
+      var here = pos[w];
+      for (var j = 0; j < lv.inc[here].length; j++) {
+        var ei = lv.inc[here][j];
+        if (burnt[ei]) continue;
+        var e = lv.edges[ei], nx = (e.a === here) ? e.b : e.a;
+        var rank = 2;
+        if (lv.nodes[nx].claim === w + 1 && !met[w][nx]) rank = 0;
+        else if (!vis[nx]) rank = 1;
+        if (!bestMove || rank < bestMove.rank) bestMove = { w: w, ei: ei, nx: nx, rank: rank };
+      }
+    }
+    if (!bestMove) return { won: false, cost: cost, stranded: true };
+    burnt[bestMove.ei] = 1; cost += 1;
+    pos[bestMove.w] = bestMove.nx;
+    vis[bestMove.nx] = 1;
+    if (lv.nodes[bestMove.nx].claim === bestMove.w + 1) met[bestMove.w][bestMove.nx] = 1;
+  }
+  return { won: false, cost: cost };
+}
+
+/* ============================================================
+   Drift — generated boards, certified before you see them
+   ============================================================ */
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function segCross(p1, p2, p3, p4) {
+  function o(a, b, c) {
+    var v = (b[1] - a[1]) * (c[0] - b[0]) - (b[0] - a[0]) * (c[1] - b[1]);
+    return v > 1e-9 ? 1 : (v < -1e-9 ? -1 : 0);
+  }
+  return o(p1, p2, p3) !== o(p1, p2, p4) && o(p3, p4, p1) !== o(p3, p4, p2);
+}
+
+// Lay out a planar board with no crossing spans, then hand each traveller a
+// start and claims on the far side of the board from where it stands — that
+// is what makes them compete for bridges instead of tidying their own corner.
+function buildBoard(rnd, n, extra, W, nClaim) {
+  var pts = [], guard = 0, sep = n > 9 ? 0.20 : 0.24;
+  while (pts.length < n && guard++ < 4000) {
+    var p = [0.10 + rnd() * 0.80, 0.10 + rnd() * 0.80], okp = true;
+    for (var i = 0; i < pts.length; i++) if (nDist(pts[i], p) < sep) { okp = false; break; }
+    if (okp) pts.push(p);
+  }
+  if (pts.length < n) return null;
+
+  var cand = [];
+  for (var a = 0; a < n; a++) for (var b = a + 1; b < n; b++) cand.push([a, b, nDist(pts[a], pts[b])]);
+  cand.sort(function (x, y) { return x[2] - y[2]; });
+
+  var edges = [], deg = new Array(n).fill(0);
+  var parent = pts.map(function (_, i) { return i; });
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function tryAdd(c) {
+    if (c[2] > 0.48 || deg[c[0]] >= 4 || deg[c[1]] >= 4) return false;
+    for (var e = 0; e < edges.length; e++) {
+      var f = edges[e];
+      if (f[0] === c[0] || f[0] === c[1] || f[1] === c[0] || f[1] === c[1]) continue;
+      if (segCross(pts[c[0]], pts[c[1]], pts[f[0]], pts[f[1]])) return false;
+    }
+    edges.push([c[0], c[1]]); deg[c[0]]++; deg[c[1]]++;
+    parent[find(c[0])] = find(c[1]);
+    return true;
+  }
+  cand.forEach(function (c) { if (find(c[0]) !== find(c[1])) tryAdd(c); });
+  for (var r = 1; r < n; r++) if (find(r) !== find(0)) return null;
+  var want = Math.min(n + extra, 22);
+  for (var ci = 0; ci < cand.length && edges.length < want; ci++) tryAdd(cand[ci]);
+  if (edges.length < n + 1) return null;
+
+  // A one-bridge island can only ever be where a trail ends, so a board with
+  // several of them is unsolvable no matter how it is walked. Give every such
+  // island a second span, and give up on the board if that is not possible.
+  for (var v = 0; v < n; v++) {
+    if (deg[v] !== 1) continue;
+    for (var ck = 0; ck < cand.length && deg[v] < 2; ck++) {
+      var c3 = cand[ck];
+      if (c3[0] !== v && c3[1] !== v) continue;
+      var dup = false;
+      for (var q3 = 0; q3 < edges.length; q3++)
+        if (edges[q3][0] === c3[0] && edges[q3][1] === c3[1]) { dup = true; break; }
+      if (!dup) tryAdd(c3);
+    }
+    if (deg[v] < 2) return null;
+  }
+
+  // Spread the starts: each new one as far as possible from those already placed.
+  var starts = [Math.floor(rnd() * n)];
+  while (starts.length < W) {
+    var bestN = -1, bestD = -1;
+    for (var k = 0; k < n; k++) {
+      if (starts.indexOf(k) >= 0) continue;
+      var d = Infinity;
+      starts.forEach(function (s) { d = Math.min(d, nDist(pts[k], pts[s])); });
+      if (d > bestD) { bestD = d; bestN = k; }
+    }
+    if (bestN < 0) return null;
+    starts.push(bestN);
+  }
+
+  var nodes = pts.map(function (p) { return [p[0], p[1], 0]; });
+  var pool = [];
+  for (var q = 0; q < n; q++) if (starts.indexOf(q) < 0) pool.push(q);
+  if (pool.length < W) return null;             // everyone needs at least one
+
+  // Each traveller claims islands far from its own start — that is what makes
+  // them cross the board and contend for the same spans. Handing them out one
+  // round at a time keeps the split even when islands run short, instead of
+  // starving whoever is served last.
+  for (var round = 0; round < nClaim; round++) {
+    for (var w = 0; w < W; w++) {
+      var mine = pool.filter(function (i) { return nodes[i][2] === 0; })
+        .sort(function (x, y) { return nDist(pts[y], pts[starts[w]]) - nDist(pts[x], pts[starts[w]]); });
+      if (!mine.length) break;
+      nodes[mine[0]][2] = w + 1;
+    }
+  }
+  for (var w2 = 0; w2 < W; w2++) {
+    var got = nodes.filter(function (nd) { return nd[2] === w2 + 1; }).length;
+    if (!got) return null;
+  }
+  return { nodes: nodes, edges: edges, starts: starts };
+}
+
+function generate(seed, depth) {
+  var rnd = mulberry32((seed * 2654435761) % 2147483647);
+  var W = depth < 8 ? 2 : (depth < 16 ? 3 : 4);
+  var n = clamp(5 + W + Math.floor(depth / 4), 6, 6 + W);
+  // More travellers need denser boards: with spans single-use, a sparse board
+  // usually has no valid set of trails at all, and generation stalls hunting
+  // for one. Claims are capped so every traveller can be given an island.
+  var nClaim = clamp(1 + Math.floor(depth / 6), 1, Math.max(1, Math.floor((n - W) / W)));
+  var board = buildBoard(rnd, n, W + 2 + Math.floor(depth / 8), W, nClaim);
+  if (!board) return null;
+
+  var lv = buildLevel({ id: 'drift', starts: board.starts, nodes: board.nodes, edges: board.edges });
+  var res = solveLevel(lv, 700000);
+  if (!res.ok || res.capped) return null;
+  var g = greedyPlay(lv);
+  if (g.won && g.cost === res.par) return null;   // solves itself
+  lv.par = res.par;
+  return lv;
+}
+
+function driftLevel(depth) {
+  for (var s = 1; s <= 1500; s++) {
+    var lv = generate(depth * 7919 + s, depth);
+    if (lv) { lv.id = 'drift' + depth; lv.depth = depth; return lv; }
+  }
+  return null;
+}
+
+/* ============================================================
+   Persistence
+   ============================================================ */
+
+var SAVE = { stars: {}, best: {}, drift: 0, seenHow: false };
+try {
+  var sv = localStorage.getItem('burnbridge.v3');
+  if (sv) { var pj = JSON.parse(sv); if (pj && typeof pj === 'object') SAVE = Object.assign(SAVE, pj); }
+} catch (err) {}
+function persist() {
+  try { localStorage.setItem('burnbridge.v3', JSON.stringify(SAVE)); } catch (err) {}
+}
+
+/* ============================================================
+   Game state
+   ============================================================ */
+
+var LV = RAW.map(buildLevel);
+(function () {   // crossings are numbered among themselves; the aside is not one
+  var no = 0;
+  LV.forEach(function (lv) { if (!lv.interlude) lv.no = ++no; });
+})();
+
+var G = {
+  screen: 'menu', mode: 'campaign', index: 0, lv: null,
+  par: 0, oddInfo: null,
+  pos: [], paths: [], used: [], burnt: null, met: [],
+  vis: 0, cost: 0, undos: 0, sel: 0,
+  deadAt: null, deadTime: 0, warnDismissed: -1,
+  overlay: null, revealOdd: false, parts: [], t: 0
+};
+
+function loadLevel(lv, idx, mode) {
+  G.lv = lv; G.index = idx; G.mode = mode || G.mode;
+  var res = (lv.par != null) ? { ok: true, par: lv.par } : solveLevel(lv);
+  G.par = res.par;
+  G.oddInfo = lv.euler ? res : null;
+  G.undos = 0; G.revealOdd = false;
+  resetLevel();
+  setOverlay(lv.interlude ? 'interludeIntro' : null);
+  showHint(lv.hint);
+  setScreen('play');
+}
+
+function resetLevel() {
+  var lv = G.lv, s = initialState(lv);
+  layout();
+  G.pos = s.pos.slice();
+  G.met = s.met.slice();
+  G.paths = s.pos.map(function (p) { return [p]; });
+  G.used = [];
+  G.burnt = new Uint8Array(lv.edges.length);
+  G.vis = s.vis;
+  G.cost = 0; G.sel = 0; G.parts.length = 0;
+  G.deadAt = null; G.deadTime = 0; G.warnDismissed = -1;
+  syncHud();
+}
+
+function availableFrom(n) {
+  return G.lv.inc[n].filter(function (ei) { return !G.burnt[ei]; });
+}
+function canMove(w) { return availableFrom(G.pos[w]).length > 0; }
+
+function isWon() {
+  var lv = G.lv;
+  if (lv.euler) return G.used.length === lv.edges.length;
+  if (G.vis !== lv.full) return false;
+  for (var w = 0; w < lv.W; w++) if (G.met[w] !== lv.fullClaim[w]) return false;
+  return true;
+}
+function anyMoveLeft() {
+  for (var w = 0; w < G.lv.W; w++) if (canMove(w)) return true;
+  return false;
+}
+
+function maskOfBurnt() {
+  var m = 0;
+  for (var i = 0; i < G.burnt.length; i++) if (G.burnt[i]) m |= (1 << i);
+  return m;
+}
+// Cheap enough to run every move.
+function isDead() {
+  if (G.lv.euler) return false;
+  var r = solveFrom(G.lv, G.pos, maskOfBurnt(), G.vis, G.met, 220000);
+  return !r.ok && !r.capped;
+}
+
+/* A board can become unwinnable several moves before it feels wrong, and
+   saying so the instant it happens takes the discovery away — you never get
+   to notice the shape of your own mistake. So the check runs every move but
+   keeps quiet: it remembers which crossing was fatal, and only speaks up once
+   you have had a couple of moves to spot it yourself. When it does, it is a
+   bar rather than a modal, and it offers to rewind exactly to the last
+   position that could still be won.                                        */
+var DEAD_GRACE_MOVES = 2, DEAD_GRACE_MS = 7000;
+
+function refreshDead() {
+  if (G.lv.euler) { G.deadAt = null; return; }
+  if (isDead()) {
+    if (G.deadAt === null) { G.deadAt = G.used.length; G.deadTime = G.t; }
+  } else {
+    G.deadAt = null;
+  }
+}
+function warnDue() {
+  if (G.deadAt === null || G.overlay || G.screen !== 'play') return false;
+  return (G.used.length - G.deadAt >= DEAD_GRACE_MOVES) || (G.t - G.deadTime >= DEAD_GRACE_MS);
+}
+function rewindToLastWinnable() {
+  var target = Math.max(0, G.deadAt - 1);
+  var guard = 0;
+  while (G.used.length > target && guard++ < 200) undo();
+  setOverlay(null);
+}
+
+function cross(w, ei) {
+  if (G.overlay || G.burnt[ei]) return false;
+  var lv = G.lv, e = lv.edges[ei], here = G.pos[w];
+  if (e.a !== here && e.b !== here) return false;
+  var nx = (e.a === here) ? e.b : e.a;
+
+  G.burnt[ei] = 1;
+  G.used.push({ w: w, ei: ei, from: here, to: nx });
+  G.cost += 1;
+  G.pos[w] = nx;
+  G.paths[w].push(nx);
+  G.vis |= (1 << nx);
+  var bit = lv.claimBit[w][nx];
+  if (bit !== undefined) G.met[w] |= bit;
+  G.sel = w;
+  spawnEmbers(ei, w);
+  syncHud();
+
+  if (isWon()) { G.deadAt = null; finishLevel(); return true; }
+  refreshDead();
+  if (!anyMoveLeft()) setOverlay('stranded');
+  else if (!canMove(w)) selectNextMovable();
+  return true;
+}
+
+function selectNextMovable() {
+  for (var k = 1; k <= G.lv.W; k++) {
+    var w = (G.sel + k) % G.lv.W;
+    if (canMove(w)) { G.sel = w; syncHud(); return; }
+  }
+}
+
+function undo() {
+  if (G.overlay === 'win' || !G.used.length) return;
+  var last = G.used.pop();
+  G.burnt[last.ei] = 0;
+  G.cost -= 1;
+  G.paths[last.w].pop();
+  G.pos[last.w] = G.paths[last.w][G.paths[last.w].length - 1];
+  recomputeMarks();
+  G.undos++;
+  G.sel = last.w;
+  refreshDead();
+  if (G.overlay === 'stranded') setOverlay(null);
+  syncHud();
+}
+
+function recomputeMarks() {
+  var lv = G.lv;
+  G.vis = 0;
+  for (var w = 0; w < lv.W; w++) {
+    G.met[w] = 0;
+    /* jshint loopfunc:true */
+    (function (w) {
+      G.paths[w].forEach(function (n) {
+        G.vis |= (1 << n);
+        var bit = lv.claimBit[w][n];
+        if (bit !== undefined) G.met[w] |= bit;
+      });
+    })(w);
+  }
+}
+
+function starsFor() {
+  if (G.lv.interlude) return 0;
+  if (G.lv.euler) return G.undos === 0 ? 3 : (G.undos <= 3 ? 2 : 1);
+  if (G.cost <= G.par) return 3;
+  if (G.cost <= G.par + 2) return 2;
+  return 1;
+}
+
+function finishLevel() {
+  var st = starsFor(), id = G.lv.id;
+  if (!G.lv.interlude) {
+    if (!(SAVE.stars[id] >= st)) SAVE.stars[id] = st;
+    if (!(SAVE.best[id] <= G.cost)) SAVE.best[id] = G.cost;
+  } else SAVE.stars[id] = 0;
+  if (G.mode === 'drift' && G.index > SAVE.drift) SAVE.drift = G.index;
+  persist();
+  setOverlay('win');
+}
+
+/* ============================================================
+   Canvas
+   ============================================================ */
+
+var cv = $('cv'), ctx = cv.getContext('2d');
+var VW = 0, VH = 0, DPR = 1, SX = 0, SY = 0, OX = 0, OY = 0, R = 14, SC = 1;
+var TEAM  = ['#ff8a4c', '#4ec9e8', '#b98cff', '#8fdc6a'];
+var TEAMD = [[255,138,76], [78,201,232], [185,140,255], [143,220,106]];
+var GLYPH = ['▲', '■', '◆', '⬟'];
+
+function rgba(w, alpha) {
+  var c = TEAMD[w];
+  return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
+}
+
+function resize() {
+  var r = cv.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  VW = r.width; VH = r.height;
+  cv.width = Math.round(VW * DPR);
+  cv.height = Math.round(VH * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  layout();
+}
+window.addEventListener('resize', resize);
+
+function layout() {
+  var PADX = 40, PADT = 36, PADB = 52;
+  var x0 = 0, y0 = 0, bw = 1, bh = 1;
+  if (G.lv) {
+    var xs = G.lv.nodes.map(function (n) { return n.x; });
+    var ys = G.lv.nodes.map(function (n) { return n.y; });
+    x0 = Math.min.apply(null, xs); y0 = Math.min.apply(null, ys);
+    bw = Math.max(0.12, Math.max.apply(null, xs) - x0);
+    bh = Math.max(0.12, Math.max.apply(null, ys) - y0);
+  }
+  var availW = Math.max(60, VW - PADX * 2), availH = Math.max(60, VH - PADT - PADB);
+  // Distance carries no meaning, so the board may stretch to fill the screen
+  // instead of sitting in a small square — capped so it still reads as a map.
+  var sx = availW / bw, sy = availH / bh, lo = Math.min(sx, sy);
+  SX = Math.min(sx, lo * 1.45); SY = Math.min(sy, lo * 1.45);
+  SC = lo;
+  R = clamp(lo * 0.033, 11, 24);
+  OX = PADX + (availW - bw * SX) / 2 - x0 * SX;
+  OY = PADT + (availH - bh * SY) / 2 - y0 * SY;
+}
+
+function PX(n) { return OX + n.x * SX; }
+function PY(n) { return OY + n.y * SY; }
+
+function ctrlOf(e) {
+  var A = G.lv.nodes[e.a], B = G.lv.nodes[e.b];
+  var ax = PX(A), ay = PY(A), bx = PX(B), by = PY(B);
+  if (!e.bow) return [(ax + bx) / 2, (ay + by) / 2];
+  var dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+  return [(ax + bx) / 2 - dy / L * e.bow * SC * 2, (ay + by) / 2 + dx / L * e.bow * SC * 2];
+}
+function bezAt(e, t) {
+  var A = G.lv.nodes[e.a], B = G.lv.nodes[e.b], C = ctrlOf(e), u = 1 - t;
+  return [u * u * PX(A) + 2 * u * t * C[0] + t * t * PX(B),
+          u * u * PY(A) + 2 * u * t * C[1] + t * t * PY(B)];
+}
+function edgePath(e) {
+  var A = G.lv.nodes[e.a], B = G.lv.nodes[e.b], C = ctrlOf(e);
+  ctx.beginPath();
+  ctx.moveTo(PX(A), PY(A));
+  ctx.quadraticCurveTo(C[0], C[1], PX(B), PY(B));
+}
+function segDist(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+  var t = L2 ? clamp(((px - x1) * dx + (py - y1) * dy) / L2, 0, 1) : 0;
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+function distToEdge(e, px, py) {
+  var best = Infinity, prev = bezAt(e, 0);
+  for (var i = 1; i <= 14; i++) {
+    var p = bezAt(e, i / 14);
+    var d = segDist(px, py, prev[0], prev[1], p[0], p[1]);
+    if (d < best) best = d;
+    prev = p;
+  }
+  return best;
+}
+
+function spawnEmbers(ei, w) {
+  var e = G.lv.edges[ei];
+  for (var i = 0; i < 14; i++) {
+    var p = bezAt(e, i / 13);
+    G.parts.push({
+      x: p[0], y: p[1], w: w,
+      vx: (Math.random() - 0.5) * 0.5, vy: -0.25 - Math.random() * 0.6,
+      life: 1, decay: 0.009 + Math.random() * 0.013, r: 1 + Math.random() * 1.8
+    });
+  }
+}
+
+function drawSea() {
+  var g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, '#08161f'); g.addColorStop(1, '#040d14');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  ctx.strokeStyle = 'rgba(90,150,175,0.05)'; ctx.lineWidth = 1;
+  for (var y = 18; y < VH; y += 28) {
+    ctx.beginPath();
+    for (var x = -10; x <= VW + 10; x += 16) {
+      var yy = y + Math.sin((x * 0.017) + G.t * 0.0006 + y * 0.05) * 2.2;
+      if (x <= 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+}
+
+/* ---------- bridges: three states, three unmistakable treatments ----------
+   standing  — thin, cool, low contrast. It recedes.
+   reachable — the selected traveller can cross it right now: thick, bright,
+               tinted with that traveller's colour.
+   burnt     — dashed in the colour of whoever burnt it, with an arrowhead
+               showing which way they went. Spent, by them, that way.        */
+
+function drawStanding(e) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(126,156,171,0.34)';
+  ctx.lineWidth = 2.4;
+  edgePath(e); ctx.stroke();
+  ctx.restore();
+}
+
+function drawReachable(e, w) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgba(w, 0.13);
+  ctx.lineWidth = 13;
+  edgePath(e); ctx.stroke();
+  ctx.strokeStyle = 'rgba(236,226,208,0.92)';
+  ctx.lineWidth = 4.4;
+  edgePath(e); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBurnt(mv) {
+  var e = G.lv.edges[mv.ei];
+  ctx.save();
+  ctx.lineCap = 'butt';
+  ctx.setLineDash([5, 5]);
+  ctx.strokeStyle = rgba(mv.w, 0.62);
+  ctx.lineWidth = 2.8;
+  edgePath(e); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Arrowhead at the midpoint, pointing the way the traveller walked.
+  var fwd = (e.a === mv.from);
+  var t = 0.5, p = bezAt(e, t), q = bezAt(e, t + (fwd ? 0.06 : -0.06));
+  var dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1;
+  dx /= L; dy /= L;
+  var s = clamp(R * 0.42, 5, 9);
+  ctx.beginPath();
+  ctx.moveTo(p[0] + dx * s, p[1] + dy * s);
+  ctx.lineTo(p[0] - dx * s * 0.55 - dy * s * 0.62, p[1] - dy * s * 0.55 + dx * s * 0.62);
+  ctx.lineTo(p[0] - dx * s * 0.55 + dy * s * 0.62, p[1] - dy * s * 0.55 - dx * s * 0.62);
+  ctx.closePath();
+  ctx.fillStyle = rgba(mv.w, 0.9);
+  ctx.fill();
+  ctx.restore();
+}
+
+// One visual channel each: a glyph means the island is claimed, a ring means
+// a traveller is standing on it. Never both for the same thing.
+function claimGlyph(x, y, claim, size, solid) {
+  var w = claim - 1;
+  ctx.beginPath();
+  if (w === 0) {                       // triangle
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size * 0.92, y + size * 0.72);
+    ctx.lineTo(x - size * 0.92, y + size * 0.72);
+    ctx.closePath();
+  } else if (w === 1) {                // square
+    ctx.rect(x - size * 0.82, y - size * 0.82, size * 1.64, size * 1.64);
+  } else if (w === 2) {                // diamond
+    ctx.moveTo(x, y - size * 1.05);
+    ctx.lineTo(x + size * 0.95, y);
+    ctx.lineTo(x, y + size * 1.05);
+    ctx.lineTo(x - size * 0.95, y);
+    ctx.closePath();
+  } else {                             // pentagon
+    for (var i = 0; i < 5; i++) {
+      var ang = -Math.PI / 2 + i * TAU / 5;
+      var px = x + Math.cos(ang) * size * 1.05, py = y + Math.sin(ang) * size * 1.05;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+  if (solid) { ctx.fillStyle = TEAM[w]; ctx.fill(); }
+  else { ctx.strokeStyle = TEAM[w]; ctx.lineWidth = 2.1; ctx.stroke(); }
+}
+
+function drawNode(i) {
+  var n = G.lv.nodes[i], x = PX(n), y = PY(n);
+  var visited = !!((G.vis >> i) & 1);
+  var claim = n.claim, settled = false;
+  if (claim && claim <= G.lv.W) {
+    var ci = G.lv.claims[claim - 1].indexOf(i);
+    settled = !!((G.met[claim - 1] >> ci) & 1);
+  }
+
+  ctx.beginPath(); ctx.arc(x, y, R, 0, TAU);
+  if (visited) { ctx.fillStyle = '#bfb49b'; ctx.fill(); }
+  else {
+    ctx.fillStyle = '#0d1e28'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(206,195,170,0.62)'; ctx.stroke();
+  }
+  if (claim) {
+    ctx.save();
+    ctx.globalAlpha = settled ? 1 : 0.52 + 0.38 * Math.sin(G.t * 0.004);
+    claimGlyph(x, y, claim, R * 0.5, settled);
+    ctx.restore();
+  }
+
+  if (G.revealOdd && G.oddInfo && G.oddInfo.deg) {
+    var d = G.oddInfo.deg[i], odd = d % 2 === 1;
+    ctx.beginPath(); ctx.arc(x, y, R + 9, 0, TAU);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = odd ? 'rgba(255,207,107,' + (0.55 + 0.35 * Math.sin(G.t * 0.006)).toFixed(3) + ')'
+                          : 'rgba(95,220,160,0.3)';
+    ctx.stroke();
+    ctx.font = '600 12px "Geist Mono", ui-monospace, monospace';
+    ctx.fillStyle = odd ? '#ffcf6b' : '#5fdca0';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(d), x, y - R - 18);
+  }
+}
+
+function drawWalker(w) {
+  var n = G.lv.nodes[G.pos[w]], x = PX(n), y = PY(n);
+  var isSel = (G.sel === w) && G.lv.W > 1;
+  var stuck = !canMove(w);
+  // Concentric rings so two travellers on one island stay distinguishable.
+  var rad = R + 4.5 + w * 4.2;
+  if (isSel) {
+    var pulse = 1 + Math.sin(G.t * 0.005) * 0.08;
+    ctx.beginPath(); ctx.arc(x, y, rad * 1.42 * pulse, 0, TAU);
+    ctx.fillStyle = rgba(w, 0.11); ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
+  ctx.lineWidth = isSel ? 3.4 : 1.8;
+  ctx.strokeStyle = TEAM[w];
+  ctx.globalAlpha = stuck ? 0.28 : (isSel ? 1 : 0.5);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawParts() {
+  for (var i = G.parts.length - 1; i >= 0; i--) {
+    var p = G.parts[i];
+    p.x += p.vx; p.y += p.vy; p.vy -= 0.008; p.life -= p.decay;
+    if (p.life <= 0) { G.parts.splice(i, 1); continue; }
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, TAU);
+    ctx.fillStyle = rgba(p.w, (p.life * 0.8).toFixed(3));
+    ctx.fill();
+  }
+}
+
+var warnOn = false, warnBack = -1;
+function updateWarn() {
+  var show = warnDue() && G.warnDismissed !== G.deadAt;
+  var back = show ? (G.used.length - G.deadAt + 1) : -1;
+  if (show === warnOn && back === warnBack) return;
+  warnOn = show; warnBack = back;
+  $('warn').classList.toggle('gone', !show);
+  if (show) {
+    hideHint();
+    $('warnText').innerHTML = 'This board <b>can no longer be finished</b> — the crossing that lost it was ' +
+      back + ' move' + (back === 1 ? '' : 's') + ' back.';
+    $('warnGo').textContent = 'Rewind ' + back;
+  }
+}
+
+function frame(ts) {
+  G.t = ts || 0;
+  updateWarn();
+  drawSea();
+  if (G.lv && G.screen === 'play') {
+    var reach = {};
+    if (!G.overlay) availableFrom(G.pos[G.sel]).forEach(function (ei) { reach[ei] = true; });
+
+    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && !reach[e.i]) drawStanding(e); });
+    G.used.forEach(drawBurnt);
+    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && reach[e.i]) drawReachable(e, G.sel); });
+    drawParts();
+    for (var i = 0; i < G.lv.nodes.length; i++) drawNode(i);
+    for (var k = G.lv.W - 1; k >= 0; k--) if (k !== G.sel) drawWalker(k);
+    drawWalker(G.sel);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   Input
+   ============================================================ */
+
+var press = null;
+
+function localPt(ev) {
+  var r = cv.getBoundingClientRect();
+  return [ev.clientX - r.left, ev.clientY - r.top];
+}
+function nodeHit(px, py) {
+  var bestI = -1, bestD = R * 2.2;
+  for (var i = 0; i < G.lv.nodes.length; i++) {
+    var n = G.lv.nodes[i], d = Math.hypot(px - PX(n), py - PY(n));
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return bestI;
+}
+function walkerHit(px, py) {
+  var best = -1, bd = R * 2.4;
+  for (var w = 0; w < G.lv.W; w++) {
+    var n = G.lv.nodes[G.pos[w]], d = Math.hypot(px - PX(n), py - PY(n));
+    // Prefer the selected traveller when several share an island.
+    if (d < bd - (w === G.sel ? 3 : 0)) { bd = d; best = w; }
+  }
+  return best;
+}
+function edgeFor(w, target, px, py) {
+  var opts = availableFrom(G.pos[w]).filter(function (ei) {
+    var e = G.lv.edges[ei];
+    return e.a === target || e.b === target;
+  });
+  if (!opts.length) return -1;
+  if (opts.length === 1) return opts[0];
+  var best = opts[0], bd = Infinity;
+  opts.forEach(function (ei) {
+    var d = distToEdge(G.lv.edges[ei], px, py);
+    if (d < bd) { bd = d; best = ei; }
+  });
+  return best;
+}
+function order(forceW) {
+  if (forceW !== undefined) return [forceW];
+  var o = [G.sel];
+  for (var w = 0; w < G.lv.W; w++) if (w !== G.sel) o.push(w);
+  return o;
+}
+function tryMove(px, py, forceW) {
+  var hit = nodeHit(px, py);
+  if (hit < 0) return false;
+  var o = order(forceW);
+  for (var k = 0; k < o.length; k++) {
+    if (hit === G.pos[o[k]]) continue;
+    var ei = edgeFor(o[k], hit, px, py);
+    if (ei >= 0) return cross(o[k], ei);
+  }
+  return false;
+}
+function trySpan(px, py) {
+  var o = order();
+  for (var k = 0; k < o.length; k++) {
+    var best = -1, bd = Math.max(16, R * 1.05);
+    /* jshint loopfunc:true */
+    availableFrom(G.pos[o[k]]).forEach(function (ei) {
+      var d = distToEdge(G.lv.edges[ei], px, py);
+      if (d < bd) { bd = d; best = ei; }
+    });
+    if (best >= 0) return cross(o[k], best);
+  }
+  return false;
+}
+
+cv.addEventListener('pointerdown', function (ev) {
+  if (G.screen !== 'play' || G.overlay) return;
+  var p = localPt(ev), w = walkerHit(p[0], p[1]);
+  if (w >= 0) { G.sel = w; syncHud(); }
+  press = { x: p[0], y: p[1], moved: 0, w: w >= 0 ? w : undefined };
+  cv.setPointerCapture(ev.pointerId);
+  hideHint();
+  ev.preventDefault();
+});
+cv.addEventListener('pointermove', function (ev) {
+  if (!press || G.screen !== 'play' || G.overlay) return;
+  var p = localPt(ev);
+  press.moved += Math.hypot(p[0] - press.x, p[1] - press.y);
+  press.x = p[0]; press.y = p[1];
+  // A drag that began on a traveller only ever moves that traveller.
+  if (press.moved > 8 && tryMove(p[0], p[1], press.w)) press.w = G.sel;
+  ev.preventDefault();
+});
+function endPress(ev) {
+  if (!press) return;
+  var p = localPt(ev);
+  if (press.moved <= 8 && G.screen === 'play' && !G.overlay) {
+    if (nodeHit(p[0], p[1]) !== G.pos[G.sel] || press.w === undefined) {
+      if (!tryMove(p[0], p[1])) trySpan(p[0], p[1]);
+    }
+  }
+  press = null;
+}
+cv.addEventListener('pointerup', endPress);
+cv.addEventListener('pointercancel', function () { press = null; });
+
+window.addEventListener('keydown', function (ev) {
+  if (ev.key === 'z' || ev.key === 'Z') undo();
+  if (ev.key === 'r' || ev.key === 'R') { G.undos = 0; resetLevel(); setOverlay(null); }
+  if (ev.key === ' ' && G.lv && G.lv.W > 1) {
+    G.sel = (G.sel + 1) % G.lv.W; syncHud(); ev.preventDefault();
+  }
+  if (G.lv && ev.key >= '1' && ev.key <= '4') {
+    var w = +ev.key - 1;
+    if (w < G.lv.W) { G.sel = w; syncHud(); }
+  }
+});
+
+/* ============================================================
+   HUD
+   ============================================================ */
+
+function syncHud() {
+  var lv = G.lv;
+  if (!lv) return;
+  $('lname').textContent = (G.mode === 'drift')
+    ? 'Drift ' + G.index
+    : (lv.interlude ? 'Königsberg, 1736' : String(lv.no).padStart(2, '0'));
+  $('cost').textContent = String(G.cost);
+  $('cost').className = 'mono' + (!lv.euler && G.cost > G.par ? ' over' : '');
+  $('par').textContent = lv.euler ? ('of ' + lv.edges.length) : ('par ' + G.par);
+  $('bUndo').disabled = G.used.length === 0;
+
+  var html = '';
+  if (!lv.euler) {
+    for (var w = 0; w < lv.W; w++) {
+      var owed = lv.claims[w].length - popcount(G.met[w]);
+      var cls = 'chip' + (w === G.sel ? ' on' : '') + (owed === 0 ? ' done' : '') +
+                (canMove(w) ? '' : ' stuck');
+      html += '<button class="' + cls + '" data-w="' + w + '" style="color:' +
+              (w === G.sel ? TEAM[w] : '') + '">' +
+              '<span class="gl" style="color:' + TEAM[w] + '">' + GLYPH[w] + '</span>' +
+              (lv.claims[w].length ? owed + ' left' : 'free') + '</button>';
+    }
+    var unseen = lv.nodes.length - popcount(G.vis);
+    html += '<span class="chip neutral' + (unseen ? '' : ' done') + '">○ ' + unseen + ' island' +
+            (unseen === 1 ? '' : 's') + '</span>';
+  } else {
+    html = '<span class="chip neutral">every bridge, exactly once</span>';
+  }
+  $('chips').innerHTML = html;
+  Array.prototype.forEach.call($('chips').querySelectorAll('.chip[data-w]'), function (c) {
+    c.addEventListener('click', function () {
+      G.sel = +c.getAttribute('data-w'); syncHud();
+    });
+  });
+}
+
+function setScreen(name) {
+  G.screen = name;
+  $('menu').classList.toggle('hidden', name !== 'menu');
+  $('levels').classList.toggle('hidden', name !== 'levels');
+  $('hud').style.visibility = (name === 'play') ? 'visible' : 'hidden';
+  if (name === 'levels') buildGrid();
+  if (name !== 'play') setOverlay(null);
+}
+
+var hintTimer = null;
+function showHint(txt) {
+  var h = $('hint');
+  if (!txt) { h.classList.add('gone'); return; }
+  h.innerHTML = txt;
+  h.classList.remove('gone');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(hideHint, Math.max(4500, txt.length * 52));
+}
+function hideHint() { $('hint').classList.add('gone'); }
+
+function starStr(n) {
+  var out = '';
+  for (var i = 0; i < 3; i++) out += (i < n ? '<b>★</b>' : '★');
+  return out;
+}
+function totalStars() {
+  return Object.keys(SAVE.stars).reduce(function (s, k) { return s + (SAVE.stars[k] || 0); }, 0);
+}
+function unlockedUpTo() {
+  var i = 0;
+  while (i < LV.length && SAVE.stars[LV[i].id] !== undefined) i++;
+  return Math.min(i, LV.length - 1);
+}
+
+var ACTS = ['Two travellers', 'Three travellers', 'Four travellers'];
+
+function buildGrid() {
+  var open = unlockedUpTo();
+  $('totStars').innerHTML = totalStars() + ' ★';
+  var html = '', act = -1;
+  LV.forEach(function (lv, i) {
+    var a = lv.interlude ? act : (lv.W - 2);
+    if (a !== act) {
+      if (act >= 0) html += '</div>';
+      html += '<div class="actlabel">' + (ACTS[a] || '') + '</div><div class="grid">';
+      act = a;
+    }
+    var st = SAVE.stars[lv.id], locked = i > open;
+    var label = lv.interlude ? '1736' : String(lv.no).padStart(2, '0');
+    var stEl = lv.interlude
+      ? '<div class="st ' + (st !== undefined ? 'done' : '') + '">' + (st !== undefined ? '✓' : '—') + '</div>'
+      : '<div class="st">' + starStr(st || 0) + '</div>';
+    html += '<button class="tile' + (locked ? ' locked' : '') + (lv.interlude ? ' mark' : '') +
+      '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
+      '<div class="n">' + label + '</div>' + stEl + '</button>';
+  });
+  html += '</div>';
+  $('acts').innerHTML = html;
+  Array.prototype.forEach.call($('acts').querySelectorAll('.tile'), function (t) {
+    t.addEventListener('click', function () {
+      var i = +t.getAttribute('data-i');
+      loadLevel(LV[i], i, 'campaign');
+    });
+  });
+}
+
+/* ---------- overlays ---------- */
+
+function setOverlay(kind) {
+  G.overlay = kind;
+  var ov = $('ov'), card = $('ovCard');
+  if (!kind) { ov.classList.add('hidden'); return; }
+  ov.classList.remove('hidden');
+  card.innerHTML = OVERLAYS[kind]();
+  Array.prototype.forEach.call(card.querySelectorAll('[data-act]'), function (b) {
+    b.addEventListener('click', function () { ACTIONS[b.getAttribute('data-act')](); });
+  });
+  if (kind === 'how') drawKey();
+}
+
+var OVERLAYS = {
+  win: function () {
+    var lv = G.lv, st = starsFor();
+    if (lv.interlude) return OVERLAYS.why();
+    var diff = G.cost - G.par;
+    var verdict = lv.euler
+      ? (G.undos === 0 ? 'One clean stroke.' : 'Crossed.')
+      : (diff <= 0 ? 'Par. Not one bridge wasted.'
+                   : diff + ' bridge' + (diff === 1 ? '' : 's') + ' more than needed.');
+    var nextTxt = (G.mode === 'drift') ? 'Drift on'
+                : (G.index + 1 < LV.length ? 'Next' : 'Back to crossings');
+    return '<h2>Crossed</h2><div class="stars">' + starStr(st) + '</div>' +
+      '<div class="scoreline">' +
+        '<div><div class="v mono">' + G.cost + '</div><div class="k">burnt</div></div>' +
+        '<div><div class="v mono">' + G.par + '</div><div class="k">par</div></div></div>' +
+      '<p class="tight">' + verdict + '</p>' +
+      '<button class="btn primary" data-act="next">' + nextTxt + '</button>' +
+      '<div class="row2"><button class="btn" data-act="replay">Again</button>' +
+      '<button class="btn" data-act="quit">Crossings</button></div>';
+  },
+  stranded: function () {
+    var why = G.lv.interlude ? '<button class="btn" data-act="why">Why can nobody do this?</button>' : '';
+    return '<h2>Stranded</h2>' +
+      '<p class="tight">Every bridge within reach is ash.</p>' +
+      '<button class="btn primary" data-act="undo">Step back</button>' +
+      '<button class="btn" data-act="replay">Restart</button>' + why +
+      '<button class="btn ghost" data-act="quit">Give up</button>';
+  },
+  interludeIntro: function () {
+    return '<h2>Königsberg, 1736</h2>' +
+      '<p>Seven bridges over the Pregel. The city argued for years over one question: <b>can you walk a route that crosses every bridge exactly once?</b></p>' +
+      '<p class="tight">One traveller this time. Try it.</p>' +
+      '<button class="btn primary" data-act="close">Try the walk</button>' +
+      '<button class="btn ghost" data-act="why">Just tell me</button>';
+  },
+  why: function () {
+    G.revealOdd = true;
+    return '<h2>It cannot be done</h2>' +
+      '<p class="tight">The number on each shore is how many bridges it has.</p>' +
+      '<p class="tight">Every shore you pass <b>through</b> spends bridges in pairs: one to arrive, one to leave. So a shore with an odd count can only be where you <b>start</b> or where you <b>finish</b>.</p>' +
+      '<p class="tight">All four of Königsberg\'s shores are odd. A walk has two ends. Four will not fit into two.</p>' +
+      '<p>Euler proved it by ignoring the map entirely and looking only at the counts. Graph theory starts here.</p>' +
+      '<button class="btn primary" data-act="passInterlude">Understood</button>';
+  },
+  how: function () {
+    return '<h2>How to play</h2>' +
+      '<div class="key">' +
+        '<div class="keyrow"><canvas id="k0" width="54" height="20"></canvas>A bridge still standing</div>' +
+        '<div class="keyrow"><canvas id="k1" width="54" height="20"></canvas>One the picked traveller can cross now</div>' +
+        '<div class="keyrow"><canvas id="k2" width="54" height="20"></canvas>Burnt — the arrow shows who went, and which way</div>' +
+      '</div>' +
+      '<ul class="howlist">' +
+      '<li>Tap a traveller (or its chip up top) to pick it up, then drag or tap to move.</li>' +
+      '<li>Every bridge <b>burns behind whoever crosses it</b>. One pool, shared by all of them.</li>' +
+      '<li><b>Every island must be reached.</b> An island marked with a traveller\'s shape only counts when <b>that</b> traveller stands on it.</li>' +
+      '<li><b>Par</b> is the fewest crossings that can settle the board. Match it for three stars.</li>' +
+      '<li><b>Undo</b> is unlimited. If a board becomes impossible the game waits a couple of moves before saying so — then offers to rewind to the last position that could still be won.</li>' +
+      '</ul><button class="btn primary" data-act="close">Got it</button>';
+  }
+};
+
+// Little swatches in the how-to, drawn with the same code paths as the board.
+function drawKey() {
+  var specs = [
+    ['k0', function (c) {
+      c.strokeStyle = 'rgba(126,156,171,0.34)'; c.lineWidth = 2.4;
+      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+    }],
+    ['k1', function (c) {
+      c.strokeStyle = rgba(0, 0.13); c.lineWidth = 13;
+      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+      c.strokeStyle = 'rgba(236,226,208,0.92)'; c.lineWidth = 4.4;
+      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+    }],
+    ['k2', function (c) {
+      c.setLineDash([5, 5]); c.strokeStyle = rgba(1, 0.62); c.lineWidth = 2.8;
+      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+      c.setLineDash([]);
+      c.fillStyle = rgba(1, 0.9);
+      c.beginPath(); c.moveTo(34, 10); c.lineTo(25, 5); c.lineTo(25, 15); c.closePath(); c.fill();
+    }]
+  ];
+  specs.forEach(function (s) {
+    var el = $(s[0]);
+    if (!el) return;
+    var c = el.getContext('2d');
+    var d = Math.min(window.devicePixelRatio || 1, 2.5);
+    el.width = 54 * d; el.height = 20 * d;
+    el.style.width = '54px'; el.style.height = '20px';
+    c.setTransform(d, 0, 0, d, 0, 0);
+    c.lineCap = 'round';
+    s[1](c);
+  });
+}
+
+var ACTIONS = {
+  close: function () { setOverlay(null); },
+  undo: function () { undo(); },
+  replay: function () { G.undos = 0; resetLevel(); setOverlay(null); },
+  quit: function () { setScreen(G.mode === 'drift' ? 'menu' : 'levels'); },
+  why: function () { setOverlay('why'); },
+  passInterlude: function () {
+    SAVE.stars[G.lv.id] = 0; persist(); setOverlay(null); ACTIONS.next();
+  },
+  next: function () {
+    if (G.mode === 'drift') {
+      var lv = driftLevel(G.index + 1);
+      if (!lv) { setScreen('menu'); return; }
+      loadLevel(lv, G.index + 1, 'drift');
+      return;
+    }
+    if (G.index + 1 < LV.length) loadLevel(LV[G.index + 1], G.index + 1, 'campaign');
+    else setScreen('levels');
+  }
+};
+
+$('bPlay').addEventListener('click', function () {
+  var i = unlockedUpTo();
+  loadLevel(LV[i], i, 'campaign');
+  if (!SAVE.seenHow) { SAVE.seenHow = true; persist(); setOverlay('how'); }
+});
+$('bLevels').addEventListener('click', function () { setScreen('levels'); });
+$('bHow').addEventListener('click', function () { setScreen('menu'); setOverlay('how'); });
+$('bDrift').addEventListener('click', function () {
+  var d = Math.max(1, SAVE.drift || 1), lv = driftLevel(d);
+  if (lv) loadLevel(lv, d, 'drift');
+});
+$('bBack').addEventListener('click', function () { setScreen(G.mode === 'drift' ? 'menu' : 'levels'); });
+$('warnGo').addEventListener('click', rewindToLastWinnable);
+$('warnX').addEventListener('click', function () { G.warnDismissed = G.deadAt; });
+$('bUndo').addEventListener('click', undo);
+$('bRestart').addEventListener('click', function () { G.undos = 0; resetLevel(); setOverlay(null); });
+
+resize();
+setScreen('menu');
+requestAnimationFrame(frame);
+
+/* Test hook: the harness drives the real game and reads real state. */
+window.__bb = {
+  load: function (i) { loadLevel(LV[i], i, 'campaign'); },
+  drift: function (d) { var lv = driftLevel(d); if (lv) loadLevel(lv, d, 'drift'); },
+  count: function () { return LV.length; },
+  state: function () {
+    return {
+      id: G.lv && G.lv.id, W: G.lv && G.lv.W, cost: G.cost, par: G.par,
+      overlay: G.overlay, pos: G.pos.slice(), sel: G.sel, used: G.used.length,
+      won: G.lv ? isWon() : false, screen: G.screen,
+      deadAt: G.deadAt, warnVisible: !$('warn').classList.contains('gone'),
+      nodes: G.lv ? G.lv.nodes.length : 0, edges: G.lv ? G.lv.edges.length : 0,
+      met: G.met.slice(), claims: G.lv ? G.lv.claims.map(function (c) { return c.length; }) : []
+    };
+  },
+  at: function (i) { var n = G.lv.nodes[i], r = cv.getBoundingClientRect(); return [r.left + PX(n), r.top + PY(n)]; },
+  sel: function (w) { G.sel = w; syncHud(); },
+  move: function (w, target) {
+    var ei = edgeFor(w, target, 0, 0);
+    return ei >= 0 ? cross(w, ei) : false;
+  }
+};
+
+})();
+</script>
+</body>
+</html>
