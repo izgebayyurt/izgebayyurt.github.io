@@ -13,15 +13,10 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   the baked-in image data (`portrait-data.js`, `img-data.js`).
 - `directions/asteroidz.jsx` — the playable Asteroids port embedded on the homepage.
 - `games/` — game write-up pages (`asteroids`, `marblz`, `soviet-scoot`) and assets.
-- `swerve/` — mobile-first arcade free kicks. One swipe is the whole game: direction
-  aims, length powers, and the hook in your swipe becomes the ball's curve. Every set
-  piece is verified solvable before you see it. Single self-contained `index.html`.
-- `worldie/` — arcade soccer score attack. 45 seconds on the clock, one striker
-  against a keeper and waves of defenders; every goal buys +4s and quick goals
-  chain a combo multiplier. Single self-contained `index.html`.
-- `gegenpress/` — turn-based soccer tactics on a 7×9 grid. Perfect information: the
-  opposition telegraphs every run, pass, shot and tackle before you commit, and
-  resolution is fully deterministic. Single self-contained `index.html`.
+- `carom/` — 1v1 slingshot duel. Drag to pull your circle back and release to fire
+  it; time crawls while you aim but the hold is on a leash, and every launch costs
+  a cooldown. Neither side may cross halfway, so nobody chases. Single
+  self-contained `index.html`.
 - `burnbridge/` — graph-theory puzzler for two to four travellers. They share one
   pool of bridges and every crossing burns the bridge behind it, so each span one
   spends is denied to the others forever. Formally: edge-disjoint trails, one per
