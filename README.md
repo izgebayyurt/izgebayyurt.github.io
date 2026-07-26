@@ -29,6 +29,25 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   same solver runs after every move, so a lost board says so immediately. 26 levels
   across three acts plus endless Drift, and Königsberg as an interlude that shows why
   it cannot be done. Single self-contained `index.html`.
+- `tapa/` — Tapa, the Turkish grid puzzle (the name is short for *Turkish art paint*):
+  fill one connected region of cells so every numbered cell describes the runs of
+  filled cells in the eight around it, with no 2×2 block ever filled entirely.
+  Four books by board size, 6×6 to 12×12, each numbered and endless — the number
+  seeds the generator, so №47 is the same board on every device, forever, with
+  nothing stored on a server. Boards are generated pattern-first and then stripped
+  clue by clue for exactly as long as a deduction-only solver can still finish, so
+  no puzzle here needs a guess; uniqueness comes free, since a guess-free complete
+  solve admits no alternative. That same solver rates the difficulty and would
+  drive hints. Filled cells merge into a single shape — convex corners rounded,
+  concave corners filleted — so a solved board reads as a painted form rather than
+  forty black squares, and on the last correct cell the clues fade and then the
+  grid itself dissolves, leaving the ink alone on the paper. Ink-on-paper palette
+  taken from the site's own dusk colours, with a night theme derived from it rather
+  than inverted. No check button and no visible clock: a clue whose neighbourhood is
+  fully decided falls quiet, and an outright rule break outlines in accent. State is
+  written on every move, so leaving mid-puzzle is not a decision anyone has to make.
+  Generation runs in a Web Worker, 4–35 ms a board. Single self-contained
+  `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 

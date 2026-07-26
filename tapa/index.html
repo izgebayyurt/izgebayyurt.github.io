@@ -1,0 +1,1507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#ece9e1" />
+<title>Tapa</title>
+<meta name="description" content="Tapa — a paint puzzle. Every board generated on your phone and proved solvable without guessing." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ece9e1'/%3E%3Cpath d='M7 9h7v5h5v5h-5v5H9v-5H7z' fill='%232a2730'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --pg:#ece9e1;            /* paper */
+    --pi:#2a2730;            /* ink — a purple-black, not a neutral one */
+    --pa:#7a5e9a;            /* the one accent; it means "you broke a rule" */
+    --pr:rgba(42,39,48,0.14);
+    --pd:rgba(42,39,48,0.55);
+    --pq:rgba(42,39,48,0.32);
+    --pfaint:rgba(42,39,48,0.20);
+    --shadow:rgba(42,39,48,0.16);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",ui-serif,Georgia,serif;
+    --sans:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  /* Night is derived from paper, not inverted: the ground keeps the purple
+     bias and the fill goes warm chalk, so it still reads as pigment. */
+  html[data-theme="night"] {
+    --pg:#191519;
+    --pi:#ded7c8;
+    --pa:#a888c8;
+    --pr:rgba(222,215,200,0.15);
+    --pd:rgba(222,215,200,0.56);
+    --pq:rgba(222,215,200,0.34);
+    --pfaint:rgba(222,215,200,0.22);
+    --shadow:rgba(0,0,0,0.5);
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--pg); color:var(--pi);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+  }
+  #app { position:fixed; inset:0; }
+
+  .screen {
+    position:absolute; inset:0; display:none;
+    flex-direction:column; background:var(--pg);
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .screen.on { display:flex; }
+
+  /* ---------- shared chrome ---------- */
+  .bar {
+    flex:0 0 auto; display:flex; align-items:center; gap:8px;
+    padding:14px 12px 8px; min-height:44px;
+  }
+  .icon {
+    width:30px; height:30px; display:grid; place-items:center;
+    color:var(--pd); font-size:19px; line-height:1; cursor:pointer;
+    background:none; border:0; padding:0; font-family:inherit; border-radius:8px;
+  }
+  .icon:active { background:var(--pr); }
+  .bartitle {
+    font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--pd); font-weight:500;
+  }
+  .grow { margin-left:auto; }
+  .scroll { flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; }
+  button { font-family:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--pa); outline-offset:2px; }
+
+  .pbtn {
+    display:block; width:100%; padding:14px; border-radius:12px; border:0;
+    background:var(--pi); color:var(--pg); font-size:14.5px; font-weight:600;
+    cursor:pointer; font-family:inherit;
+  }
+  .pbtn.ghost {
+    background:transparent; color:var(--pd); font-weight:500;
+    border:1px solid var(--pr);
+  }
+  .pbtn:active { opacity:0.85; }
+
+  /* ---------- home ---------- */
+  #home .inner { padding:14px 22px 22px; display:flex; flex-direction:column; min-height:100%; }
+  .wordmark { font-family:var(--serif); font-size:40px; line-height:1; font-weight:600; letter-spacing:-0.015em; }
+  .wordsub { font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--pd); margin-top:8px; }
+
+  .cont {
+    margin-top:22px; display:grid; grid-template-columns:50px minmax(0,1fr);
+    gap:13px; align-items:center; cursor:pointer;
+    border:1px solid var(--pr); border-radius:13px; padding:12px 14px 12px 12px;
+    background:none; text-align:left; width:100%;
+  }
+  .cont:active { background:var(--pr); }
+  .cont canvas { display:block; width:50px; height:50px; }
+  .cont .l { font-size:9.5px; letter-spacing:0.15em; text-transform:uppercase; color:var(--pd); font-weight:600; }
+  .cont .n { font-family:var(--serif); font-size:17px; font-weight:600; margin-top:3px; }
+  .cont .s { font-size:10.5px; color:var(--pd); margin-top:2px; }
+
+  .books { margin-top:20px; display:flex; flex-direction:column; }
+  .book {
+    display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:14px;
+    align-items:center; padding:13px 0; border-top:1px solid var(--pr);
+    background:none; border-left:0; border-right:0; border-bottom:0;
+    cursor:pointer; text-align:left; width:100%; color:inherit;
+  }
+  .books .book:last-child { border-bottom:1px solid var(--pr); }
+  .book:active { background:var(--pr); }
+  .book canvas { display:block; width:38px; height:38px; }
+  .book .n { font-family:var(--serif); font-size:17px; font-weight:600; line-height:1.15; }
+  .book .d { font-size:10.5px; color:var(--pd); margin-top:2px; }
+  .book .c { font-family:var(--serif); font-size:13.5px; color:var(--pq); font-variant-numeric:tabular-nums; }
+
+  .homefoot { margin-top:auto; padding-top:18px; display:flex; gap:20px; }
+  .homefoot button {
+    background:none; border:0; padding:6px 0; cursor:pointer;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd);
+  }
+
+  /* ---------- index ---------- */
+  #index .inner { padding:0 16px 28px; }
+  .idxh { display:flex; align-items:baseline; gap:10px; padding:2px 2px 12px; }
+  .idxh .t { font-family:var(--serif); font-size:23px; font-weight:600; }
+  .idxh .s { font-size:10.5px; color:var(--pd); margin-left:auto; font-variant-numeric:tabular-nums; }
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+  .cellw {
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:none; border:0; padding:0; cursor:pointer; font-family:inherit;
+  }
+  .cellw canvas { display:block; width:100%; aspect-ratio:1/1; }
+  .cellw .num {
+    font-family:var(--serif); font-size:11px; color:var(--pq);
+    font-variant-numeric:tabular-nums; line-height:1;
+  }
+  .cellw.done .num { color:var(--pd); }
+  .cellw.here .num { color:var(--pa); font-weight:700; }
+  .blank {
+    width:100%; aspect-ratio:1/1; display:grid; place-items:center;
+    border:1px solid var(--pr); border-radius:8px;
+    font-family:var(--serif); font-size:16px; color:var(--pq);
+    font-variant-numeric:tabular-nums;
+  }
+  .cellw.here .blank { border-color:var(--pa); }
+  .cellw:active .blank { background:var(--pr); }
+  .more { margin:18px auto 0; display:block; }
+
+  /* ---------- play ----------
+     No position rule here: .screen is already absolute with inset:0, and an
+     ID selector setting position:relative would beat it, collapsing the
+     screen to content height and stranding the board at the top. */
+  #boardwrap {
+    flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+    padding:0 12px 66px; min-height:0;
+  }
+  #board { display:block; width:100%; max-width:min(96vw, 62vh); aspect-ratio:1/1; touch-action:none; }
+  .thumb {
+    position:absolute; right:16px; bottom:calc(20px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:10px; align-items:center;
+  }
+  .tbtn {
+    width:52px; height:52px; border-radius:50%; display:grid; place-items:center;
+    border:1px solid var(--pr); background:var(--pg); cursor:pointer; padding:0;
+    box-shadow:0 2px 10px var(--shadow);
+  }
+  .tbtn:active { transform:scale(0.94); }
+  .tbtn .glyph { width:17px; height:17px; border-radius:5px; background:var(--pi); display:block; }
+  .tbtn.ink { background:var(--pi); border-color:var(--pi); }
+  .tbtn.ink .glyph { background:var(--pg); }
+  .tbtn.mark .glyph { width:9px; height:9px; border-radius:50%; background:var(--pq); }
+  .tbtn.undo { width:42px; height:42px; box-shadow:none; }
+  .tbtn.undo span { font-size:17px; color:var(--pi); line-height:1; }
+  .tbtn.undo[disabled] { opacity:0; pointer-events:none; }
+  .tbtn.undo:not([disabled]) { opacity:0.42; }
+
+  /* ---------- solved ---------- */
+  #solved .inner { padding:20px 22px 22px; display:flex; flex-direction:column; height:100%; }
+  #solvedBoard { display:block; width:100%; aspect-ratio:1/1; }
+  .smeta { margin-top:20px; display:flex; align-items:baseline; gap:11px; }
+  .stime { font-family:var(--serif); font-size:42px; line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
+  .stier { font-size:10.5px; letter-spacing:0.15em; text-transform:uppercase; color:var(--pd); }
+  .sline { margin-top:12px; font-size:12px; color:var(--pd); line-height:1.5; }
+  .sacts { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
+
+  /* ---------- sheets ---------- */
+  .sheet { padding:2px 22px 24px; }
+  .sheeth { font-family:var(--serif); font-size:25px; font-weight:600; line-height:1.1; }
+  .rules { margin-top:20px; display:flex; flex-direction:column; }
+  .rrow {
+    display:grid; grid-template-columns:52px minmax(0,1fr); gap:15px;
+    align-items:center; padding:15px 0; border-top:1px solid var(--pr);
+  }
+  .rules .rrow:last-child { border-bottom:1px solid var(--pr); }
+  .rrow canvas { display:block; width:52px; height:52px; }
+  .rrow .t { font-size:13px; font-weight:600; line-height:1.3; }
+  .rrow .d { font-size:11.5px; color:var(--pd); line-height:1.45; margin-top:3px; }
+
+  .setrows { margin-top:18px; display:flex; flex-direction:column; }
+  .setrow {
+    display:flex; align-items:center; gap:12px; padding:14px 0;
+    border-top:1px solid var(--pr); font-size:13px; cursor:pointer;
+    background:none; border-left:0; border-right:0; border-bottom:0;
+    width:100%; text-align:left; color:inherit; font-family:inherit;
+  }
+  .setrows .setrow:last-child { border-bottom:1px solid var(--pr); }
+  .setrow .lbl { display:flex; flex-direction:column; gap:3px; }
+  .setrow .sub { font-size:11px; color:var(--pd); }
+  .setrow .val { margin-left:auto; font-size:12px; color:var(--pd); }
+  .sw { margin-left:auto; width:38px; height:22px; border-radius:11px; background:var(--pr); position:relative; flex:0 0 auto; }
+  .sw i { position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--pg); box-shadow:0 1px 3px var(--shadow); transition:left .16s; }
+  .sw.on { background:var(--pi); }
+  .sw.on i { left:18px; }
+  .foot { margin-top:22px; font-size:11px; color:var(--pd); line-height:1.55; }
+
+  /* ---------- working overlay ---------- */
+  #working {
+    position:absolute; inset:0; z-index:20; display:none;
+    align-items:center; justify-content:center; flex-direction:column; gap:16px;
+    background:var(--pg);
+  }
+  #working.on { display:flex; }
+  #working .msg { font-size:11.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd); }
+  .pulse { width:26px; height:26px; border-radius:7px; background:var(--pi); animation:pulse 1.15s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ transform:scale(0.72); opacity:0.35 } 50%{ transform:scale(1); opacity:1 } }
+  @media (prefers-reduced-motion: reduce) {
+    .pulse { animation:none; opacity:0.8 }
+    .sw i { transition:none }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="home" class="screen">
+    <div class="scroll"><div class="inner">
+      <div>
+        <div class="wordmark">Tapa</div>
+        <div class="wordsub">Turkish art paint</div>
+      </div>
+      <button class="cont" id="contCard" style="display:none">
+        <canvas id="contCv"></canvas>
+        <div>
+          <div class="l">Continue</div>
+          <div class="n" id="contName"></div>
+          <div class="s" id="contWhen"></div>
+        </div>
+      </button>
+      <div class="books" id="books"></div>
+      <div class="homefoot">
+        <button id="toRules">Rules</button>
+        <button id="toSettings">Settings</button>
+      </div>
+    </div></div>
+  </section>
+
+  <section id="index" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="inner">
+      <div class="idxh"><span class="t" id="idxTitle"></span><span class="s" id="idxCount"></span></div>
+      <div class="grid4" id="idxGrid"></div>
+      <button class="pbtn ghost more" id="idxMore">Show more</button>
+    </div></div>
+  </section>
+
+  <section id="play" class="screen">
+    <div class="bar">
+      <button class="icon" id="playBack">&lsaquo;</button>
+      <div class="bartitle" id="playTitle"></div>
+      <div class="grow"></div>
+      <div class="bartitle" id="playClock"></div>
+    </div>
+    <div id="boardwrap"><canvas id="board"></canvas></div>
+    <div class="thumb">
+      <button class="tbtn undo" id="undoBtn" disabled aria-label="Undo"><span>&#8634;</span></button>
+      <button class="tbtn ink" id="verbBtn" aria-label="Switch between ink and mark"><span class="glyph"></span></button>
+    </div>
+  </section>
+
+  <section id="solved" class="screen">
+    <div class="inner">
+      <canvas id="solvedBoard"></canvas>
+      <div class="smeta"><span class="stime" id="sTime"></span><span class="stier" id="sName"></span></div>
+      <div class="sline" id="sLine"></div>
+      <div class="sacts">
+        <button class="pbtn" id="sNext">Another</button>
+        <button class="pbtn ghost" id="sHome">Home</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="rules" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="sheet">
+      <div class="sheeth">How Tapa works</div>
+      <div class="rules" id="ruleList"></div>
+      <div class="foot">
+        Drag across the board to paint. Starting on a cell you have already
+        painted rubs it out instead. The round button switches between ink and
+        the dots you use to mark a cell as definitely empty.
+      </div>
+    </div></div>
+  </section>
+
+  <section id="settings" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="sheet">
+      <div class="sheeth">Settings</div>
+      <div class="setrows" id="setRows"></div>
+      <div class="foot" id="setFoot"></div>
+    </div></div>
+  </section>
+
+  <div id="working"><div class="pulse"></div><div class="msg">Setting the puzzle</div></div>
+</div>
+
+<script>
+/* =====================================================================
+   CORE — pure puzzle logic. Written as one self-contained function so the
+   identical source can be stringified into a Web Worker; nothing in here
+   touches the DOM or any outer scope.
+   ===================================================================== */
+function TapaCore() {
+  "use strict";
+
+  var UNKNOWN = 0, INK = 1, EMPTY = 2;
+  var L_SINGLE = 1, L_PAIR = 2, L_CONNECT = 3;
+  var DIRS8 = [[-1,0],[-1,1],[0,1],[1,1],[1,0],[1,-1],[0,-1],[-1,-1]];
+  var DIRS4 = [[-1,0],[1,0],[0,-1],[0,1]];
+  var PAIR_CAP = 30000;
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /* A puzzle's identity is (size, number) and nothing else, so №47 in the
+     10x10 book is the same board on every device, forever. */
+  function seedFor(size, num) {
+    var h = 2166136261 >>> 0;
+    var s = size + ":" + num;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  /* ---------- clue signatures ---------- */
+  function sigOf(bits) {
+    var i, any = false, all = true;
+    for (i = 0; i < 8; i++) { if (bits[i]) any = true; else all = false; }
+    if (!any) return [0];
+    if (all) return [8];
+    var start = -1;
+    for (i = 0; i < 8; i++) {
+      if (!bits[i] && bits[(i + 1) % 8]) { start = (i + 1) % 8; break; }
+    }
+    var runs = [], cur = 0;
+    for (var k = 0; k < 8; k++) {
+      if (bits[(start + k) % 8]) cur++;
+      else if (cur) { runs.push(cur); cur = 0; }
+    }
+    if (cur) runs.push(cur);
+    runs.sort(function (a, b) { return b - a; });
+    return runs;
+  }
+  function sigKey(a) { return a.join(","); }
+
+  /* ---------- geometry ---------- */
+  function makeGeom(N) {
+    var inside = function (r, c) { return r >= 0 && r < N && c >= 0 && c < N; };
+    var ring = function (r, c) {
+      var out = [];
+      for (var i = 0; i < 8; i++) out.push([r + DIRS8[i][0], c + DIRS8[i][1]]);
+      return out;
+    };
+    return { N: N, inside: inside, ring: ring };
+  }
+
+  /* Patterns depend only on the clue value and which ring slots fall off the
+     grid. Clue cells being unpaintable is enforced by the solver state, so the
+     table can be built once and reused across every reduction trial. */
+  function patternTable(G, r, c, clue) {
+    var nb = G.ring(r, c), key = sigKey(clue), out = [];
+    for (var mask = 0; mask < 256; mask++) {
+      var bits = [], ok = true;
+      for (var i = 0; i < 8; i++) {
+        var b = (mask >> i & 1) === 1;
+        bits.push(b);
+        if (b && !G.inside(nb[i][0], nb[i][1])) { ok = false; break; }
+      }
+      if (ok && sigKey(sigOf(bits)) === key) out.push(bits);
+    }
+    return { nb: nb, pats: out };
+  }
+
+  function no2x2(G, isInk) {
+    for (var r = 0; r < G.N - 1; r++) {
+      for (var c = 0; c < G.N - 1; c++) {
+        if (isInk(r, c) && isInk(r + 1, c) && isInk(r, c + 1) && isInk(r + 1, c + 1)) return false;
+      }
+    }
+    return true;
+  }
+  function connectedSet(G, cells) {
+    if (!cells.size) return true;
+    var first = cells.values().next().value;
+    var seen = new Set([first]), stack = [first];
+    while (stack.length) {
+      var k = stack.pop(), r = (k / G.N) | 0, c = k % G.N;
+      for (var i = 0; i < 4; i++) {
+        var nr = r + DIRS4[i][0], nc = c + DIRS4[i][1];
+        if (!G.inside(nr, nc)) continue;
+        var nk = nr * G.N + nc;
+        if (cells.has(nk) && !seen.has(nk)) { seen.add(nk); stack.push(nk); }
+      }
+    }
+    return seen.size === cells.size;
+  }
+
+  /* ---------- the deduction solver ----------
+     Never guesses. Runs to a fixpoint and reports STUCK if it runs out of
+     technique, which is exactly the question "can a person finish this?". */
+  function solveLogic(G, clueList, tables, maxLevel) {
+    var N = G.N, i, r, c;
+    var state = new Uint8Array(N * N);
+    for (i = 0; i < clueList.length; i++) state[clueList[i].k] = EMPTY;
+    var level = 0, hard = 0;
+
+    function filt(t) {
+      var out = [];
+      for (var p = 0; p < t.pats.length; p++) {
+        var bits = t.pats[p], ok = true;
+        for (var j = 0; j < 8; j++) {
+          var n = t.nb[j];
+          if (!G.inside(n[0], n[1])) continue;
+          var s = state[n[0] * N + n[1]];
+          if ((s === INK && !bits[j]) || (s === EMPTY && bits[j])) { ok = false; break; }
+        }
+        if (ok) out.push(bits);
+      }
+      return out;
+    }
+
+    function single() {
+      var changed = false;
+      for (var q = 0; q < clueList.length; q++) {
+        var t = tables[clueList[q].k], surv = filt(t);
+        if (!surv.length) return -1;
+        for (var j = 0; j < 8; j++) {
+          var n = t.nb[j];
+          if (!G.inside(n[0], n[1])) continue;
+          var idx = n[0] * N + n[1];
+          if (state[idx] !== UNKNOWN) continue;
+          var v0 = surv[0][j], same = true;
+          for (var p = 1; p < surv.length; p++) if (surv[p][j] !== v0) { same = false; break; }
+          if (same) { state[idx] = v0 ? INK : EMPTY; changed = true; }
+        }
+      }
+      for (r = 0; r < N - 1; r++) {
+        for (c = 0; c < N - 1; c++) {
+          var q4 = [r * N + c, (r + 1) * N + c, r * N + c + 1, (r + 1) * N + c + 1];
+          var nInk = 0, nUnk = 0, unk = -1;
+          for (var z = 0; z < 4; z++) {
+            if (state[q4[z]] === INK) nInk++;
+            else if (state[q4[z]] === UNKNOWN) { nUnk++; unk = q4[z]; }
+          }
+          if (nInk === 4) return -1;
+          if (nInk === 3 && nUnk === 1) { state[unk] = EMPTY; changed = true; }
+        }
+      }
+      return changed ? 1 : 0;
+    }
+
+    function pair() {
+      for (var a = 0; a < clueList.length; a++) {
+        for (var b = a + 1; b < clueList.length; b++) {
+          var A = clueList[a], B = clueList[b];
+          if (Math.max(Math.abs(A.r - B.r), Math.abs(A.c - B.c)) > 2) continue;
+          var ta = tables[A.k], tb = tables[B.k];
+          var sa = filt(ta), sb = filt(tb);
+          if (!sa.length || !sb.length) return -1;
+          if (sa.length * sb.length > PAIR_CAP) continue;
+          var shared = [];
+          for (var x = 0; x < 8; x++) {
+            if (!G.inside(ta.nb[x][0], ta.nb[x][1])) continue;
+            for (var y = 0; y < 8; y++) {
+              if (ta.nb[x][0] === tb.nb[y][0] && ta.nb[x][1] === tb.nb[y][1]) shared.push([x, y]);
+            }
+          }
+          if (!shared.length) continue;
+          var poss = new Map(), found = false;
+          for (var pa = 0; pa < sa.length; pa++) {
+            for (var pb = 0; pb < sb.length; pb++) {
+              var okp = true;
+              for (var s2 = 0; s2 < shared.length; s2++) {
+                if (sa[pa][shared[s2][0]] !== sb[pb][shared[s2][1]]) { okp = false; break; }
+              }
+              if (!okp) continue;
+              found = true;
+              for (var j2 = 0; j2 < 8; j2++) {
+                var na = ta.nb[j2];
+                if (G.inside(na[0], na[1])) {
+                  var ka = na[0] * N + na[1];
+                  poss.set(ka, (poss.get(ka) || 0) | (sa[pa][j2] ? 1 : 2));
+                }
+                var nb2 = tb.nb[j2];
+                if (G.inside(nb2[0], nb2[1])) {
+                  var kb = nb2[0] * N + nb2[1];
+                  poss.set(kb, (poss.get(kb) || 0) | (sb[pb][j2] ? 1 : 2));
+                }
+              }
+            }
+          }
+          if (!found) return -1;
+          var ch = false;
+          poss.forEach(function (v, k) {
+            if (state[k] !== UNKNOWN) return;
+            if (v === 1) { state[k] = INK; ch = true; }
+            else if (v === 2) { state[k] = EMPTY; ch = true; }
+          });
+          if (ch) return 1;
+        }
+      }
+      return 0;
+    }
+
+    function comp(allowed, start) {
+      var seen = new Set([start]), stack = [start];
+      while (stack.length) {
+        var k = stack.pop(), r2 = (k / N) | 0, c2 = k % N;
+        for (var i2 = 0; i2 < 4; i2++) {
+          var nr = r2 + DIRS4[i2][0], nc = c2 + DIRS4[i2][1];
+          if (!G.inside(nr, nc)) continue;
+          var nk = nr * N + nc;
+          if (allowed.has(nk) && !seen.has(nk)) { seen.add(nk); stack.push(nk); }
+        }
+      }
+      return seen;
+    }
+
+    function connect() {
+      var ink = [], allowed = new Set(), k;
+      for (k = 0; k < N * N; k++) {
+        if (state[k] === INK) ink.push(k);
+        if (state[k] !== EMPTY) allowed.add(k);
+      }
+      if (!ink.length) return 0;
+      var reach = comp(allowed, ink[0]);
+      for (var z = 0; z < ink.length; z++) if (!reach.has(ink[z])) return -1;
+
+      /* A cell that cannot reach the existing ink could never join the single
+         region, so it can never be inked. */
+      var changed = false;
+      for (k = 0; k < N * N; k++) {
+        if (state[k] === UNKNOWN && !reach.has(k)) { state[k] = EMPTY; changed = true; }
+      }
+      if (changed) return 1;
+
+      /* A cell whose removal would strand some ink must itself be ink. */
+      for (k = 0; k < N * N; k++) {
+        if (state[k] !== UNKNOWN) continue;
+        allowed.delete(k);
+        var r2 = comp(allowed, ink[0]), bad = false;
+        for (var z2 = 0; z2 < ink.length; z2++) if (!r2.has(ink[z2])) { bad = true; break; }
+        allowed.add(k);
+        if (bad) { state[k] = INK; return 1; }
+      }
+      return 0;
+    }
+
+    for (;;) {
+      var res = single();
+      if (res < 0) return { solved:false, bad:true };
+      if (res) { level = Math.max(level, L_SINGLE); continue; }
+      if (maxLevel >= L_PAIR) {
+        res = pair();
+        if (res < 0) return { solved:false, bad:true };
+        if (res) { level = Math.max(level, L_PAIR); hard++; continue; }
+      }
+      if (maxLevel >= L_CONNECT) {
+        res = connect();
+        if (res < 0) return { solved:false, bad:true };
+        if (res) { level = Math.max(level, L_CONNECT); hard++; continue; }
+      }
+      break;
+    }
+
+    var unknown = 0, region = new Set();
+    for (var k2 = 0; k2 < N * N; k2++) {
+      if (state[k2] === UNKNOWN) unknown++;
+      else if (state[k2] === INK) region.add(k2);
+    }
+    var ok = unknown === 0 &&
+             no2x2(G, function (r3, c3) { return region.has(r3 * N + c3); }) &&
+             connectedSet(G, region);
+    return { solved:ok, bad:false, level:level, hard:hard, region:region, state:state };
+  }
+
+  /* ---------- region painting ---------- */
+  function randomRegion(G, rnd, target) {
+    var N = G.N, filled = new Set();
+    var start = ((rnd() * N) | 0) * N + ((rnd() * N) | 0);
+    filled.add(start);
+    var frontier = [start], guard = 0;
+    function ok2(k) {
+      var r = (k / N) | 0, c = k % N;
+      for (var dr = -1; dr <= 0; dr++) {
+        for (var dc = -1; dc <= 0; dc++) {
+          var a = r + dr, b = c + dc;
+          if (!G.inside(a, b) || !G.inside(a + 1, b + 1)) continue;
+          if (filled.has(a * N + b) && filled.has((a + 1) * N + b) &&
+              filled.has(a * N + b + 1) && filled.has((a + 1) * N + b + 1)) return false;
+        }
+      }
+      return true;
+    }
+    while (filled.size < target && frontier.length && guard++ < 40000) {
+      var pi = (rnd() * frontier.length) | 0, k = frontier[pi];
+      var r = (k / N) | 0, c = k % N, grew = false;
+      var order = [0, 1, 2, 3];
+      for (var i = 3; i > 0; i--) { var j = (rnd() * (i + 1)) | 0, t = order[i]; order[i] = order[j]; order[j] = t; }
+      for (var d = 0; d < 4; d++) {
+        var nr = r + DIRS4[order[d]][0], nc = c + DIRS4[order[d]][1];
+        if (!G.inside(nr, nc)) continue;
+        var nk = nr * N + nc;
+        if (filled.has(nk)) continue;
+        filled.add(nk);
+        if (ok2(nk)) { frontier.push(nk); grew = true; break; }
+        filled.delete(nk);
+      }
+      if (!grew) frontier.splice(pi, 1);
+    }
+    return filled;
+  }
+
+  /* ---------- the generator ----------
+     Pattern first, then strip clues while the deduction solver can still
+     finish. Uniqueness comes free: a guess-free complete solve admits no
+     alternative. `floor` stops the stripping early to make an easier board. */
+  function generate(size, num, opts) {
+    opts = opts || {};
+    var G = makeGeom(size), N = size;
+    var rnd = mulberry32(seedFor(size, num));
+    var maxLevel = opts.maxLevel || L_CONNECT;
+
+    for (var attempt = 0; attempt < 60; attempt++) {
+      var target = Math.round(N * N * 0.52);
+      var region = randomRegion(G, rnd, target);
+      if (region.size < target * 0.75) continue;
+      if (!connectedSet(G, region)) continue;
+
+      var clueKeys = [];
+      for (var k = 0; k < N * N; k++) if (!region.has(k)) clueKeys.push(k);
+      if (!clueKeys.length) continue;
+
+      var tables = {}, meta = {};
+      for (var i = 0; i < clueKeys.length; i++) {
+        var kk = clueKeys[i], r = (kk / N) | 0, c = kk % N;
+        var bits = [];
+        for (var d = 0; d < 8; d++) {
+          var nr = r + DIRS8[d][0], nc = c + DIRS8[d][1];
+          bits.push(G.inside(nr, nc) && region.has(nr * N + nc));
+        }
+        var clue = sigOf(bits);
+        meta[kk] = clue;
+        tables[kk] = patternTable(G, r, c, clue);
+      }
+
+      var list = clueKeys.map(function (kk) {
+        return { k: kk, r: (kk / N) | 0, c: kk % N };
+      });
+      var first = solveLogic(G, list, tables, maxLevel);
+      if (!first.solved) continue;
+
+      var order = clueKeys.slice();
+      for (var q = order.length - 1; q > 0; q--) {
+        var j2 = (rnd() * (q + 1)) | 0, tmp = order[q]; order[q] = order[j2]; order[j2] = tmp;
+      }
+      var keep = new Set(clueKeys);
+      var floor = opts.floor || 0;
+      for (var o = 0; o < order.length; o++) {
+        if (keep.size <= floor) break;
+        var cand = order[o];
+        keep.delete(cand);
+        var trial = [];
+        keep.forEach(function (kk2) { trial.push({ k: kk2, r: (kk2 / N) | 0, c: kk2 % N }); });
+        var rr = trial.length ? solveLogic(G, trial, tables, maxLevel) : { solved:false };
+        if (!rr.solved) keep.add(cand);
+      }
+
+      var finalList = [];
+      keep.forEach(function (kk2) { finalList.push({ k: kk2, r: (kk2 / N) | 0, c: kk2 % N }); });
+      var fin = solveLogic(G, finalList, tables, maxLevel);
+      if (!fin.solved) continue;
+
+      var clues = {};
+      keep.forEach(function (kk2) { clues[kk2] = meta[kk2]; });
+      return {
+        size: size, num: num,
+        region: Array.from(region),
+        clues: clues,
+        level: fin.level,
+        hard: fin.hard,
+        clueCount: keep.size
+      };
+    }
+    return null;
+  }
+
+  return {
+    UNKNOWN:UNKNOWN, INK:INK, EMPTY:EMPTY,
+    L_CONNECT:L_CONNECT,
+    mulberry32:mulberry32, seedFor:seedFor, sigOf:sigOf,
+    makeGeom:makeGeom, patternTable:patternTable,
+    solveLogic:solveLogic, generate:generate,
+    no2x2:no2x2, connectedSet:connectedSet
+  };
+}
+
+/* =====================================================================
+   APP
+   ===================================================================== */
+(function () {
+  "use strict";
+  var core = TapaCore();
+
+  /* ---------- persistence ---------- */
+  var KEY = "tapa.v1";
+  var save = { solved:{}, current:null, opts:{ theme:"auto", clock:false, flag:true } };
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      if (p && typeof p === "object") {
+        save.solved = p.solved || {};
+        save.current = p.current || null;
+        save.opts = Object.assign(save.opts, p.opts || {});
+      }
+    }
+  } catch (e) { /* storage unavailable — the game still plays, just forgets */ }
+  var persistTimer = null;
+  function persist() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(function () {
+      try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {}
+    }, 120);
+  }
+
+  var SIZES = [6, 8, 10, 12];
+  var BOOK_NOTE = {
+    6:  "A minute, maybe two",
+    8:  "The commute length",
+    10: "Classic Tapa",
+    12: "As large as a phone takes"
+  };
+  function solvedMap(size) { return save.solved[size] || (save.solved[size] = {}); }
+  function solvedCount(size) { return Object.keys(solvedMap(size)).length; }
+
+  /* Region bitmaps are stored as hex so a solved board keeps its shape in the
+     index without regenerating the puzzle. */
+  function packRegion(size, arr) {
+    var bytes = new Uint8Array(Math.ceil(size * size / 8));
+    arr.forEach(function (k) { bytes[k >> 3] |= 1 << (k & 7); });
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, "0");
+    return s;
+  }
+  function unpackRegion(size, hex) {
+    var out = [];
+    for (var k = 0; k < size * size; k++) {
+      var b = parseInt(hex.substr((k >> 3) * 2, 2), 16) || 0;
+      if (b & (1 << (k & 7))) out.push(k);
+    }
+    return out;
+  }
+
+  /* ---------- theme ---------- */
+  function applyTheme() {
+    var t = save.opts.theme;
+    var night = t === "night" ||
+      (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-theme", night ? "night" : "paper");
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", night ? "#191519" : "#ece9e1");
+    redrawAll();
+  }
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    if (save.opts.theme === "auto") applyTheme();
+  });
+
+  function css(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  /* ---------- renderer ----------
+     Filled cells merge into one region: convex corners round outward, and a
+     corner with both orthogonal neighbours filled but the diagonal empty gets
+     an inward fillet. Without the fillets the shape reads as glued tiles. */
+  var RADIUS = 0.17;
+
+  function drawRegion(ctx, isInk, N, x0, y0, cell, q) {
+    var e = 0.4;
+    for (var r = 0; r < N; r++) {
+      for (var c = 0; c < N; c++) {
+        if (!isInk(r, c)) continue;
+        var up = isInk(r - 1, c), dn = isInk(r + 1, c);
+        var lf = isInk(r, c - 1), rt = isInk(r, c + 1);
+        var x = x0 + c * cell, y = y0 + r * cell;
+        var xa = x - (lf ? e : 0), xb = x + cell + (rt ? e : 0);
+        var ya = y - (up ? e : 0), yb = y + cell + (dn ? e : 0);
+
+        ctx.beginPath();
+        if (!up && !lf) ctx.moveTo(xa + q, ya); else ctx.moveTo(xa, ya);
+        if (!up && !rt) { ctx.lineTo(xb - q, ya); ctx.arc(xb - q, ya + q, q, -Math.PI / 2, 0); }
+        else ctx.lineTo(xb, ya);
+        if (!dn && !rt) { ctx.lineTo(xb, yb - q); ctx.arc(xb - q, yb - q, q, 0, Math.PI / 2); }
+        else ctx.lineTo(xb, yb);
+        if (!dn && !lf) { ctx.lineTo(xa + q, yb); ctx.arc(xa + q, yb - q, q, Math.PI / 2, Math.PI); }
+        else ctx.lineTo(xa, yb);
+        if (!up && !lf) { ctx.lineTo(xa, ya + q); ctx.arc(xa + q, ya + q, q, Math.PI, Math.PI * 1.5); }
+        else ctx.lineTo(xa, ya);
+        ctx.closePath();
+        ctx.fill();
+
+        if (q > 0) {
+          var cn = [
+            [up, lf, isInk(r - 1, c - 1), x, y, 1, 1],
+            [up, rt, isInk(r - 1, c + 1), x + cell, y, -1, 1],
+            [dn, rt, isInk(r + 1, c + 1), x + cell, y + cell, -1, -1],
+            [dn, lf, isInk(r + 1, c - 1), x, y + cell, 1, -1]
+          ];
+          for (var i = 0; i < 4; i++) {
+            var o = cn[i];
+            if (!(o[0] && o[1] && !o[2])) continue;
+            var px = o[3], py = o[4], sx = o[5], sy = o[6];
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            ctx.lineTo(px, py - sy * q);
+            ctx.arc(px - sx * q, py - sy * q, q,
+                    sx === 1 ? 0 : Math.PI,
+                    sy === 1 ? Math.PI / 2 : -Math.PI / 2,
+                    sx * sy < 0);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+    }
+  }
+
+  function cluePositions(k) {
+    if (k === 1) return [[0.5, 0.5]];
+    if (k === 2) return [[0.29, 0.5], [0.71, 0.5]];
+    if (k === 3) return [[0.5, 0.27], [0.28, 0.7], [0.72, 0.7]];
+    return [[0.28, 0.28], [0.72, 0.28], [0.28, 0.72], [0.72, 0.72]];
+  }
+
+  /* opts: {N, isInk, isMark, clues, showGrid, showClues, quietClues,
+            breaks, gridAlpha, clueAlpha, bleed} */
+  function paint(cv, opts) {
+    var w = cv.clientWidth, N = opts.N;
+    if (!w || !N) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(w * dpr);
+    var ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var PG = css("--pg"), PI = css("--pi"), PA = css("--pa"),
+        PR = css("--pr"), PQ = css("--pq"), PD = css("--pd");
+
+    var pad = opts.bleed ? 0 : Math.max(2, w * 0.022);
+    var cell = (w - pad * 2) / N, x0 = pad, y0 = pad;
+
+    ctx.fillStyle = PG;
+    ctx.fillRect(0, 0, w, w);
+
+    var gA = opts.gridAlpha === undefined ? 1 : opts.gridAlpha;
+    if (opts.showGrid !== false && gA > 0) {
+      ctx.save();
+      ctx.globalAlpha = gA;
+      ctx.strokeStyle = PR;
+      ctx.lineWidth = 1;
+      for (var k = 0; k <= N; k++) {
+        var p = Math.round(x0 + k * cell) + 0.5;
+        ctx.beginPath(); ctx.moveTo(p, y0); ctx.lineTo(p, y0 + cell * N); ctx.stroke();
+        var pv = Math.round(y0 + k * cell) + 0.5;
+        ctx.beginPath(); ctx.moveTo(x0, pv); ctx.lineTo(x0 + cell * N, pv); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    ctx.fillStyle = PI;
+    drawRegion(ctx, opts.isInk, N, x0, y0, cell, cell * RADIUS);
+
+    if (opts.breaks && opts.breaks.length) {
+      ctx.strokeStyle = PA;
+      ctx.lineWidth = Math.max(1.4, cell * 0.055);
+      var ins = cell * 0.13;
+      for (var b = 0; b < opts.breaks.length; b++) {
+        var br = opts.breaks[b];
+        ctx.beginPath();
+        ctx.rect(x0 + br[1] * cell + ins, y0 + br[0] * cell + ins,
+                 cell * 2 - ins * 2, cell * 2 - ins * 2);
+        ctx.stroke();
+      }
+    }
+
+    if (opts.isMark) {
+      ctx.fillStyle = PQ;
+      for (var r2 = 0; r2 < N; r2++) {
+        for (var c2 = 0; c2 < N; c2++) {
+          if (!opts.isMark(r2, c2)) continue;
+          ctx.beginPath();
+          ctx.arc(x0 + c2 * cell + cell / 2, y0 + r2 * cell + cell / 2,
+                  Math.max(1.3, cell * 0.085), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    var cA = opts.clueAlpha === undefined ? 1 : opts.clueAlpha;
+    if (opts.clues && opts.showClues !== false && cA > 0) {
+      ctx.save();
+      ctx.globalAlpha = cA;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var serif = css("--serif");
+      for (var key in opts.clues) {
+        var kk = +key, rr = (kk / N) | 0, cc = kk % N;
+        var nums = opts.clues[key];
+        /* A clue whose neighbourhood is fully decided has nothing left to say,
+           so it falls quiet. The accent is reserved for rule breaks. */
+        ctx.fillStyle = (opts.quietClues && opts.quietClues(rr, cc)) ? PQ : PI;
+        var pos = cluePositions(nums.length);
+        var size = nums.length === 1 ? cell * 0.50
+                 : nums.length === 2 ? cell * 0.40 : cell * 0.335;
+        ctx.font = "600 " + size.toFixed(1) + "px " + serif;
+        for (var j = 0; j < nums.length; j++) {
+          ctx.fillText(String(nums[j]),
+            x0 + cc * cell + pos[j][0] * cell,
+            y0 + rr * cell + pos[j][1] * cell + size * 0.04);
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  function paintGlyph(cv, size, regionArr) {
+    var set = new Set(regionArr);
+    paint(cv, {
+      N: size, bleed: true, showGrid: false, showClues: false,
+      isInk: function (r, c) {
+        return r >= 0 && r < size && c >= 0 && c < size && set.has(r * size + c);
+      }
+    });
+  }
+
+  /* ---------- generation, off the main thread when possible ---------- */
+  var worker = null;
+  try {
+    var src = "(" + TapaCore.toString() + ")";
+    var blob = new Blob([
+      "var makeCore=" + src + ";var core=makeCore();" +
+      "onmessage=function(e){var d=e.data;var p=core.generate(d.size,d.num,d.opts);" +
+      "postMessage({id:d.id,puzzle:p});};"
+    ], { type: "text/javascript" });
+    worker = new Worker(URL.createObjectURL(blob));
+  } catch (e) { worker = null; }
+
+  var jobId = 0, jobs = {};
+  if (worker) {
+    worker.onmessage = function (e) {
+      var cb = jobs[e.data.id];
+      if (cb) { delete jobs[e.data.id]; cb(e.data.puzzle); }
+    };
+    worker.onerror = function () { worker = null; };
+  }
+
+  /* Difficulty ramps with the puzzle number by leaving more clues on early
+     boards. Stripping to the bone is what makes a board hard. */
+  function floorFor(size, num) {
+    var cells = size * size;
+    var t = Math.min(1, (num - 1) / 50);
+    var easy = Math.round(cells * 0.30);
+    return Math.round(easy * (1 - t));
+  }
+
+  function getPuzzle(size, num, done) {
+    var opts = { floor: floorFor(size, num), maxLevel: core.L_CONNECT };
+    if (worker) {
+      var id = ++jobId;
+      jobs[id] = done;
+      worker.postMessage({ id: id, size: size, num: num, opts: opts });
+    } else {
+      setTimeout(function () { done(core.generate(size, num, opts)); }, 16);
+    }
+  }
+
+  /* ---------- screens ---------- */
+  var screens = {};
+  ["home", "index", "play", "solved", "rules", "settings"].forEach(function (id) {
+    screens[id] = document.getElementById(id);
+  });
+  var currentScreen = "home";
+  function show(id) {
+    for (var k in screens) screens[k].classList.toggle("on", k === id);
+    currentScreen = id;
+    if (id === "home") renderHome();
+    if (id === "index") renderIndex();
+    if (id === "settings") renderSettings();
+    if (id === "rules") renderRules();
+  }
+  document.querySelectorAll("[data-back]").forEach(function (b) {
+    b.addEventListener("click", function () { show(b.getAttribute("data-back")); });
+  });
+
+  var working = document.getElementById("working");
+  function setWorking(on) { working.classList.toggle("on", on); }
+
+  /* ---------- home ---------- */
+  var booksEl = document.getElementById("books");
+  var contCard = document.getElementById("contCard");
+  function renderHome() {
+    var cur = save.current;
+    if (cur && cur.region) {
+      contCard.style.display = "grid";
+      document.getElementById("contName").textContent =
+        cur.size + " × " + cur.size + " · №" + cur.num;
+      var ink = (cur.cells || []).filter(function (v) { return v === 1; }).length;
+      document.getElementById("contWhen").textContent =
+        ink ? ink + " cells painted" : "Not started yet";
+      var arr = [];
+      (cur.cells || []).forEach(function (v, i) { if (v === 1) arr.push(i); });
+      paintGlyph(document.getElementById("contCv"), cur.size, arr);
+    } else {
+      contCard.style.display = "none";
+    }
+
+    booksEl.innerHTML = "";
+    SIZES.forEach(function (size) {
+      var b = document.createElement("button");
+      b.className = "book";
+      var cv = document.createElement("canvas");
+      var mid = document.createElement("div");
+      mid.innerHTML = '<div class="n"></div><div class="d"></div>';
+      mid.querySelector(".n").textContent = size + " × " + size;
+      mid.querySelector(".d").textContent = BOOK_NOTE[size];
+      var cnt = document.createElement("div");
+      cnt.className = "c";
+      cnt.textContent = solvedCount(size) || "";
+      b.appendChild(cv); b.appendChild(mid); b.appendChild(cnt);
+      b.addEventListener("click", function () { openBook(size); });
+      booksEl.appendChild(b);
+
+      /* the book's mark is a board you actually solved, if you have one */
+      var map = solvedMap(size), keys = Object.keys(map);
+      requestAnimationFrame(function () {
+        if (keys.length) paintGlyph(cv, size, unpackRegion(size, map[keys[keys.length - 1]].r));
+        else paint(cv, { N: size, bleed: true, showGrid: true, showClues: false,
+                         isInk: function () { return false; } });
+      });
+    });
+  }
+  contCard.addEventListener("click", function () {
+    if (save.current) resumeCurrent();
+  });
+  document.getElementById("toRules").addEventListener("click", function () { show("rules"); });
+  document.getElementById("toSettings").addEventListener("click", function () { show("settings"); });
+
+  /* ---------- index ---------- */
+  var bookSize = 10, pageMax = 24;
+  function openBook(size) { bookSize = size; pageMax = 24; show("index"); }
+  function renderIndex() {
+    document.getElementById("idxTitle").textContent = bookSize + " × " + bookSize;
+    var n = solvedCount(bookSize);
+    document.getElementById("idxCount").textContent = n ? n + " solved" : "";
+    var host = document.getElementById("idxGrid");
+    host.innerHTML = "";
+    var map = solvedMap(bookSize);
+    var cur = save.current;
+    for (var i = 1; i <= pageMax; i++) {
+      (function (num) {
+        var w = document.createElement("button");
+        var isDone = !!map[num];
+        var isHere = cur && cur.size === bookSize && cur.num === num;
+        w.className = "cellw" + (isDone ? " done" : "") + (isHere ? " here" : "");
+        if (isDone || isHere) {
+          var cv = document.createElement("canvas");
+          w.appendChild(cv);
+          var lab = document.createElement("div");
+          lab.className = "num"; lab.textContent = num;
+          w.appendChild(lab);
+          requestAnimationFrame(function () {
+            if (isDone) paintGlyph(cv, bookSize, unpackRegion(bookSize, map[num].r));
+            else {
+              var arr = [];
+              (cur.cells || []).forEach(function (v, i2) { if (v === 1) arr.push(i2); });
+              paintGlyph(cv, bookSize, arr);
+            }
+          });
+        } else {
+          var d = document.createElement("div");
+          d.className = "blank"; d.textContent = num;
+          w.appendChild(d);
+        }
+        w.addEventListener("click", function () { openPuzzle(bookSize, num); });
+        host.appendChild(w);
+      })(i);
+    }
+  }
+  document.getElementById("idxMore").addEventListener("click", function () {
+    pageMax += 24; renderIndex();
+  });
+
+  /* ---------- play ---------- */
+  var G = null;            /* {size, num, region:Set, clues:{}, level, hard} */
+  var cells = null;        /* Uint8Array: 0 unknown, 1 ink, 2 mark */
+  var undoStack = [];
+  var verb = 1;            /* 1 = ink, 2 = mark */
+  var startedAt = 0, elapsed = 0, tickTimer = null;
+  var boardEl = document.getElementById("board");
+
+  function keyOf(r, c) { return r * G.size + c; }
+  function isClue(r, c) { return G && G.clues.hasOwnProperty(keyOf(r, c)); }
+  function inGrid(r, c) { return G && r >= 0 && r < G.size && c >= 0 && c < G.size; }
+  function isInk(r, c) { return inGrid(r, c) && cells[keyOf(r, c)] === 1; }
+  function isMark(r, c) { return inGrid(r, c) && cells[keyOf(r, c)] === 2; }
+
+  function ruleBreaks() {
+    if (!save.opts.flag || !G) return [];
+    var out = [];
+    for (var r = 0; r < G.size - 1; r++) {
+      for (var c = 0; c < G.size - 1; c++) {
+        if (isInk(r, c) && isInk(r + 1, c) && isInk(r, c + 1) && isInk(r + 1, c + 1)) out.push([r, c]);
+      }
+    }
+    return out;
+  }
+  function clueQuiet(r, c) {
+    for (var i = 0; i < 8; i++) {
+      var nr = r + [-1,-1,0,1,1,1,0,-1][i], nc = c + [0,1,1,1,0,-1,-1,-1][i];
+      if (!inGrid(nr, nc)) continue;
+      if (cells[keyOf(nr, nc)] === 0) return false;
+    }
+    return true;
+  }
+
+  function drawBoard() {
+    if (!G) return;
+    paint(boardEl, {
+      N: G.size, isInk: isInk, isMark: isMark, clues: G.clues,
+      quietClues: clueQuiet, breaks: ruleBreaks()
+    });
+  }
+
+  function openPuzzle(size, num) {
+    setWorking(true);
+    show("play");
+    document.getElementById("playTitle").textContent = size + " × " + size + " · №" + num;
+    getPuzzle(size, num, function (p) {
+      setWorking(false);
+      if (!p) {
+        document.getElementById("playTitle").textContent = "Could not set that one";
+        return;
+      }
+      G = { size: size, num: num, region: new Set(p.region), clues: p.clues,
+            level: p.level, hard: p.hard, clueCount: p.clueCount };
+      cells = new Uint8Array(size * size);
+      undoStack = [];
+      elapsed = 0;
+      startClock();
+      save.current = { size: size, num: num, cells: Array.from(cells),
+                       region: p.region, clues: p.clues, elapsed: 0,
+                       level: p.level, hard: p.hard };
+      persist();
+      layoutBoard();
+      updateChrome();
+    });
+  }
+
+  function resumeCurrent() {
+    var c = save.current;
+    if (!c || !c.region) return;
+    G = { size: c.size, num: c.num, region: new Set(c.region), clues: c.clues,
+          level: c.level, hard: c.hard };
+    cells = Uint8Array.from(c.cells || new Array(c.size * c.size).fill(0));
+    undoStack = [];
+    elapsed = c.elapsed || 0;
+    document.getElementById("playTitle").textContent =
+      c.size + " × " + c.size + " · №" + c.num;
+    show("play");
+    startClock();
+    layoutBoard();
+    updateChrome();
+  }
+
+  function startClock() {
+    startedAt = Date.now();
+    clearInterval(tickTimer);
+    tickTimer = setInterval(function () {
+      if (currentScreen !== "play") return;
+      updateClock();
+    }, 1000);
+    updateClock();
+  }
+  function liveElapsed() {
+    return elapsed + (currentScreen === "play" ? (Date.now() - startedAt) / 1000 : 0);
+  }
+  function fmt(s) {
+    s = Math.max(0, Math.floor(s));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+  function updateClock() {
+    var el = document.getElementById("playClock");
+    el.textContent = save.opts.clock ? fmt(liveElapsed()) : "";
+  }
+
+  function layoutBoard() {
+    requestAnimationFrame(function () { drawBoard(); });
+  }
+  function updateChrome() {
+    document.getElementById("undoBtn").disabled = undoStack.length === 0;
+    var vb = document.getElementById("verbBtn");
+    vb.classList.toggle("ink", verb === 1);
+    vb.classList.toggle("mark", verb === 2);
+    updateClock();
+  }
+
+  /* input: the first cell you touch decides whether the stroke paints or rubs out */
+  var stroke = null;
+  function cellAt(ev) {
+    var rect = boardEl.getBoundingClientRect();
+    var w = rect.width, pad = Math.max(2, w * 0.022), cell = (w - pad * 2) / G.size;
+    var x = ev.clientX - rect.left - pad, y = ev.clientY - rect.top - pad;
+    var c = Math.floor(x / cell), r = Math.floor(y / cell);
+    if (!inGrid(r, c)) return null;
+    return { r: r, c: c };
+  }
+  boardEl.addEventListener("pointerdown", function (ev) {
+    if (!G) return;
+    var p = cellAt(ev);
+    if (!p || isClue(p.r, p.c)) return;
+    boardEl.setPointerCapture(ev.pointerId);
+    var cur = cells[keyOf(p.r, p.c)];
+    stroke = { target: cur === verb ? 0 : verb, changes: [] };
+    applyCell(p.r, p.c);
+    ev.preventDefault();
+  });
+  boardEl.addEventListener("pointermove", function (ev) {
+    if (!stroke || !G) return;
+    var p = cellAt(ev);
+    if (!p || isClue(p.r, p.c)) return;
+    applyCell(p.r, p.c);
+    ev.preventDefault();
+  });
+  function endStroke() {
+    if (!stroke) return;
+    if (stroke.changes.length) {
+      undoStack.push(stroke.changes);
+      if (undoStack.length > 400) undoStack.shift();
+      commit();
+    }
+    stroke = null;
+    updateChrome();
+  }
+  boardEl.addEventListener("pointerup", endStroke);
+  boardEl.addEventListener("pointercancel", endStroke);
+
+  function applyCell(r, c) {
+    var k = keyOf(r, c), before = cells[k];
+    if (before === stroke.target) return;
+    cells[k] = stroke.target;
+    stroke.changes.push([k, before, stroke.target]);
+    drawBoard();
+  }
+
+  function commit() {
+    if (!G) return;
+    if (save.current && save.current.size === G.size && save.current.num === G.num) {
+      save.current.cells = Array.from(cells);
+      save.current.elapsed = liveElapsed();
+    }
+    persist();
+    checkWin();
+  }
+
+  function checkWin() {
+    for (var k = 0; k < G.size * G.size; k++) {
+      if (G.clues.hasOwnProperty(k)) continue;
+      var wantInk = G.region.has(k);
+      if (wantInk && cells[k] !== 1) return;
+      if (!wantInk && cells[k] === 1) return;
+    }
+    win();
+  }
+
+  document.getElementById("undoBtn").addEventListener("click", function () {
+    var last = undoStack.pop();
+    if (!last) return;
+    for (var i = last.length - 1; i >= 0; i--) cells[last[i][0]] = last[i][1];
+    drawBoard();
+    commit();
+    updateChrome();
+  });
+  document.getElementById("verbBtn").addEventListener("click", function () {
+    verb = verb === 1 ? 2 : 1;
+    updateChrome();
+  });
+  document.getElementById("playBack").addEventListener("click", function () {
+    if (G) { elapsed = liveElapsed(); commit(); }
+    clearInterval(tickTimer);
+    show("home");
+  });
+
+  /* ---------- the solve moment ---------- */
+  var LEVEL_WORD = { 1: "one clue at a time", 2: "clues in pairs", 3: "the one-region rule" };
+  function win() {
+    clearInterval(tickTimer);
+    var secs = liveElapsed();
+    var map = solvedMap(G.size);
+    var prev = map[G.num];
+    if (!prev || secs < prev.t) {
+      map[G.num] = { t: Math.round(secs), r: packRegion(G.size, Array.from(G.region)) };
+    }
+    save.current = null;
+    persist();
+
+    document.getElementById("sTime").textContent = fmt(secs);
+    document.getElementById("sName").textContent = G.size + " × " + G.size + " · №" + G.num;
+    document.getElementById("sLine").textContent =
+      G.clueCount
+        ? "Solved from " + G.clueCount + " clues · needed " + (LEVEL_WORD[G.level] || "every rule")
+        : "Needed " + (LEVEL_WORD[G.level] || "every rule");
+    show("solved");
+    dissolve();
+  }
+
+  /* The clues fade, then the grid itself goes, leaving the ink alone on the
+     paper. It is the only moment in the game worth animating. */
+  function dissolve() {
+    var cv = document.getElementById("solvedBoard");
+    var size = G.size, region = G.region, clues = G.clues;
+    var opts = {
+      N: size, clues: clues,
+      isInk: function (r, c) { return r >= 0 && r < size && c >= 0 && c < size && region.has(r * size + c); },
+      quietClues: function () { return true; }
+    };
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      paint(cv, Object.assign({}, opts, { showGrid: false, showClues: false }));
+      return;
+    }
+    var start = null, dur = 1400;
+    function step(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      paint(cv, Object.assign({}, opts, {
+        clueAlpha: 1 - Math.min(1, t / 0.38),
+        gridAlpha: 1 - Math.max(0, Math.min(1, (t - 0.34) / 0.5))
+      }));
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  document.getElementById("sNext").addEventListener("click", function () {
+    var size = G.size, next = G.num + 1;
+    openPuzzle(size, next);
+  });
+  document.getElementById("sHome").addEventListener("click", function () { show("home"); });
+
+  /* ---------- rules ---------- */
+  var RULES = [
+    { t:"A clue counts the ink around it",
+      d:"3 and 1 means one run of three and one run of one, in any rotation.",
+      n:3, ink:[1,2,5,6], clue:{4:[3,1]} },
+    { t:"All the ink is one piece",
+      d:"Every filled cell connects to every other, edge to edge.",
+      n:4, ink:[1,2,4,5,8,11,12,13,14,15], clue:{} },
+    { t:"Never a filled 2×2",
+      d:"Four in a square is illegal no matter what the clues say.",
+      n:3, ink:[4,5,7,8], clue:{}, breaks:[[1,1]] },
+    { t:"Clue cells stay blank",
+      d:"A numbered cell is never part of the picture.",
+      n:3, ink:[0,1,2,3,5,6,7,8], clue:{4:[8]} }
+  ];
+  function renderRules() {
+    var host = document.getElementById("ruleList");
+    if (host.dataset.built) return;
+    host.dataset.built = "1";
+    RULES.forEach(function (R) {
+      var row = document.createElement("div");
+      row.className = "rrow";
+      var cv = document.createElement("canvas");
+      var txt = document.createElement("div");
+      txt.innerHTML = '<div class="t"></div><div class="d"></div>';
+      txt.querySelector(".t").textContent = R.t;
+      txt.querySelector(".d").textContent = R.d;
+      row.appendChild(cv); row.appendChild(txt);
+      host.appendChild(row);
+      var set = new Set(R.ink);
+      requestAnimationFrame(function () {
+        paint(cv, {
+          N: R.n, clues: R.clue, breaks: R.breaks,
+          isInk: function (r, c) { return r >= 0 && r < R.n && c >= 0 && c < R.n && set.has(r * R.n + c); },
+          quietClues: function () { return false; }
+        });
+      });
+    });
+  }
+
+  /* ---------- settings ---------- */
+  var THEMES = ["auto", "paper", "night"];
+  var THEME_LABEL = { auto: "Automatic", paper: "Paper", night: "Night" };
+  function renderSettings() {
+    var host = document.getElementById("setRows");
+    host.innerHTML = "";
+    function row(label, sub, right, onClick) {
+      var b = document.createElement("button");
+      b.className = "setrow";
+      var l = document.createElement("div");
+      l.className = "lbl";
+      l.innerHTML = "<span></span>" + (sub ? '<span class="sub"></span>' : "");
+      l.children[0].textContent = label;
+      if (sub) l.children[1].textContent = sub;
+      b.appendChild(l);
+      b.appendChild(right);
+      b.addEventListener("click", onClick);
+      host.appendChild(b);
+    }
+    function toggle(on) {
+      var d = document.createElement("div");
+      d.className = "sw" + (on ? " on" : "");
+      d.innerHTML = "<i></i>";
+      return d;
+    }
+    function value(text) {
+      var d = document.createElement("span");
+      d.className = "val"; d.textContent = text;
+      return d;
+    }
+
+    row("Theme", "Paper, night, or follow the system",
+        value(THEME_LABEL[save.opts.theme]), function () {
+      var i = THEMES.indexOf(save.opts.theme);
+      save.opts.theme = THEMES[(i + 1) % THEMES.length];
+      persist(); applyTheme(); renderSettings();
+    });
+    row("Show the clock", "While solving, not just at the end",
+        toggle(save.opts.clock), function () {
+      save.opts.clock = !save.opts.clock; persist(); renderSettings(); updateClock();
+    });
+    row("Flag broken rules", "Outline illegal squares as you make them",
+        toggle(save.opts.flag), function () {
+      save.opts.flag = !save.opts.flag; persist(); renderSettings(); drawBoard();
+    });
+
+    document.getElementById("setFoot").textContent =
+      "Every puzzle is generated on your device and proved solvable by pure " +
+      "deduction before you see it — no board here needs a guess. Puzzle " +
+      "number 47 in a book is the same board on every device, always.";
+  }
+
+  /* ---------- redraw on theme / resize ---------- */
+  function redrawAll() {
+    if (currentScreen === "play") drawBoard();
+    if (currentScreen === "home") renderHome();
+    if (currentScreen === "index") renderIndex();
+    if (currentScreen === "rules") {
+      document.getElementById("ruleList").dataset.built = "";
+      document.getElementById("ruleList").innerHTML = "";
+      renderRules();
+    }
+  }
+  var rt = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(rt);
+    rt = setTimeout(redrawAll, 140);
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && G && currentScreen === "play") {
+      elapsed = liveElapsed(); startedAt = Date.now(); commit();
+    }
+  });
+
+  /* ---------- go ---------- */
+  applyTheme();
+  show("home");
+})();
+</script>
+</body>
+</html>
