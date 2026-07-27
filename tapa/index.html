@@ -193,10 +193,30 @@
   .tbtn.ink { background:var(--pi); border-color:var(--pi); }
   .tbtn.ink .glyph { background:var(--pg); }
   .tbtn.mark .glyph { width:9px; height:9px; border-radius:50%; background:var(--pq); }
-  .tbtn.undo { width:42px; height:42px; box-shadow:none; }
-  .tbtn.undo span { font-size:17px; color:var(--pi); line-height:1; }
-  .tbtn.undo[disabled] { opacity:0; pointer-events:none; }
-  .tbtn.undo:not([disabled]) { opacity:0.42; }
+  .thumb-left { right:auto; left:16px; }
+  .tbtn.undo, .tbtn.reset { width:42px; height:42px; box-shadow:none; }
+  .tbtn.undo span, .tbtn.reset span { font-size:17px; color:var(--pi); line-height:1; }
+  .tbtn.reset span { font-size:15px; }
+  .tbtn.undo[disabled], .tbtn.reset[disabled] { opacity:0; pointer-events:none; }
+  .tbtn.undo:not([disabled]), .tbtn.reset:not([disabled]) { opacity:0.42; }
+
+  /* Clearing the board is the one destructive thing in the game, so it asks
+     first. Sits in the space under the board like the solve message, never
+     over it. */
+  .confirm {
+    display:none; flex-direction:column; gap:12px;
+    position:absolute; left:0; right:0;
+    bottom:calc(18px + env(safe-area-inset-bottom));
+    padding:0 22px;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .confirm.show { display:flex; }
+  .confirm.show.in { opacity:1; transform:none; }
+  .cmsg { font-family:var(--serif); font-size:19px; font-weight:600; text-align:center; }
+  .crow { display:flex; gap:10px; }
+  .crow .pbtn { flex:1 1 0; }
+  @media (prefers-reduced-motion: reduce) { .confirm { transition:none; } }
 
 
   /* ---------- sheets ---------- */
@@ -294,9 +314,19 @@
       <div class="fmsg" id="fmsg"></div>
       <button class="pbtn" id="fnext">Next puzzle</button>
     </div>
+    <div class="thumb thumb-left">
+      <button class="tbtn reset" id="resetBtn" disabled aria-label="Clear the board"><span>&#10005;</span></button>
+    </div>
     <div class="thumb">
       <button class="tbtn undo" id="undoBtn" disabled aria-label="Undo"><span>&#8634;</span></button>
       <button class="tbtn ink" id="verbBtn" aria-label="Switch between ink and mark"><span class="glyph"></span></button>
+    </div>
+    <div class="confirm" id="confirm">
+      <div class="cmsg">Clear the whole board?</div>
+      <div class="crow">
+        <button class="pbtn ghost" id="cCancel">Keep going</button>
+        <button class="pbtn" id="cClear">Clear it</button>
+      </div>
     </div>
   </section>
 
@@ -1409,6 +1439,7 @@ function TapaCore() {
      or the message and its button linger over the next puzzle. */
   function resetFinish() {
     lastTap = null;
+    showConfirm(false);
     document.querySelector(".thumb").classList.remove("gone");
     var el = document.getElementById("finish");
     el.classList.remove("in");
@@ -1532,6 +1563,9 @@ function TapaCore() {
   }
   function updateChrome() {
     document.getElementById("undoBtn").disabled = undoStack.length === 0;
+    var painted = false;
+    if (cells) for (var i = 0; i < cells.length; i++) if (cells[i]) { painted = true; break; }
+    document.getElementById("resetBtn").disabled = !painted;
     var vb = document.getElementById("verbBtn");
     vb.classList.toggle("ink", verb === 1);
     vb.classList.toggle("mark", verb === 2);
@@ -1638,6 +1672,43 @@ function TapaCore() {
     commit();
     updateChrome();
   });
+  /* Reset asks before wiping. The controls step aside while it does, so the
+     question is the only thing competing with the board. */
+  function showConfirm(on) {
+    var el = document.getElementById("confirm");
+    document.querySelectorAll(".thumb").forEach(function (t) {
+      t.classList.toggle("gone", on);
+    });
+    if (on) {
+      el.classList.add("show");
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { el.classList.add("in"); });
+      });
+    } else {
+      el.classList.remove("in");
+      el.classList.remove("show");
+    }
+  }
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    if (!G || finished) return;
+    showConfirm(true);
+  });
+  document.getElementById("cCancel").addEventListener("click", function () {
+    showConfirm(false);
+  });
+  document.getElementById("cClear").addEventListener("click", function () {
+    showConfirm(false);
+    if (!G) return;
+    cells = new Uint8Array(G.size * G.size);
+    undoStack = [];
+    lastTap = null;
+    elapsed = 0;
+    startClock();
+    drawBoard();
+    commit();
+    updateChrome();
+  });
+
   document.getElementById("verbBtn").addEventListener("click", function () {
     verb = verb === 1 ? 2 : 1;
     updateChrome();
