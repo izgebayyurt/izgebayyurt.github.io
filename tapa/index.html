@@ -917,12 +917,6 @@ function TapaCore() {
   }
 
   var SIZES = [6, 8, 10, 12];
-  var BOOK_NOTE = {
-    6:  "A minute, maybe two",
-    8:  "The commute length",
-    10: "Classic Tapa",
-    12: "As large as a phone takes"
-  };
   function solvedMap(size) { return save.solved[size] || (save.solved[size] = {}); }
   function solvedCount(size) { return Object.keys(solvedMap(size)).length; }
 
@@ -1188,8 +1182,11 @@ function TapaCore() {
         ctx.lineCap = "butt";
         for (var d = -bs; d < bs * 2; d += step) {
           ctx.beginPath();
-          ctx.moveTo(bx + d, by);
-          ctx.lineTo(bx + d + bs, by + bs);
+          /* run each stripe well past the block: a butt cap ends square to the
+             45-degree stroke, so a segment stopping on the edge leaves a
+             triangular nick at the top and bottom. The clip trims the excess. */
+          ctx.moveTo(bx + d - bs, by - bs);
+          ctx.lineTo(bx + d + bs * 2, by + bs * 2);
           ctx.stroke();
         }
         ctx.restore();
@@ -1330,9 +1327,8 @@ function TapaCore() {
       b.className = "book";
       var cv = document.createElement("canvas");
       var mid = document.createElement("div");
-      mid.innerHTML = '<div class="n"></div><div class="d"></div>';
+      mid.innerHTML = '<div class="n"></div>';
       mid.querySelector(".n").textContent = size + " × " + size;
-      mid.querySelector(".d").textContent = BOOK_NOTE[size];
       var cnt = document.createElement("div");
       cnt.className = "c";
       cnt.textContent = solvedCount(size) || "";
@@ -1742,9 +1738,11 @@ function TapaCore() {
       n:3, ink:[0,1,2,3,5,6,7,8], clue:{4:[8]} }
   ];
   function renderRules() {
+    /* Rebuild every time rather than caching. The canvases bake the palette
+       into their pixels, so a cached sheet keeps the old theme's paper after
+       the palette is changed from anywhere else. Four small boards; cheap. */
     var host = document.getElementById("ruleList");
-    if (host.dataset.built) return;
-    host.dataset.built = "1";
+    host.innerHTML = "";
     RULES.forEach(function (R) {
       var row = document.createElement("div");
       row.className = "rrow";
@@ -1823,11 +1821,7 @@ function TapaCore() {
     if (currentScreen === "play") drawBoard();
     if (currentScreen === "home") renderHome();
     if (currentScreen === "index") renderIndex();
-    if (currentScreen === "rules") {
-      document.getElementById("ruleList").dataset.built = "";
-      document.getElementById("ruleList").innerHTML = "";
-      renderRules();
-    }
+    if (currentScreen === "rules") renderRules();
   }
   var rt = null;
   window.addEventListener("resize", function () {
