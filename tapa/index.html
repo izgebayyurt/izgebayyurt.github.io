@@ -1217,6 +1217,17 @@ function TapaCore() {
        Done as a radial gradient across the single region path, so the sheen
        travels through the shape without breaking it into per-cell fills. */
     ctx.fillStyle = PI;
+    var fl = opts.flashCell;
+    if (fl && fl.amt > 0 && opts.isInk((fl.k / N) | 0, fl.k % N)) {
+      var lr = (fl.k / N) | 0, lc = fl.k % N;
+      var lx = x0 + (lc + 0.5) * cell, ly = y0 + (lr + 0.5) * cell;
+      var lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, cell * 0.95);
+      var hot = mixHex(PI, css("--pwave"), fl.amt);
+      lg.addColorStop(0, hot);
+      lg.addColorStop(0.62, hot);
+      lg.addColorStop(1, PI);
+      ctx.fillStyle = lg;
+    }
     if (opts.sheen !== undefined) {
       var sx = 0, sy = 0, sn = 0;
       for (var sr = 0; sr < N; sr++) {
@@ -1285,25 +1296,24 @@ function TapaCore() {
       }
     }
 
-    if (opts.flash !== undefined && opts.flash !== null) {
-      var fr = (opts.flash / N) | 0, fc = opts.flash % N;
-      ctx.strokeStyle = PA;
-      ctx.lineWidth = Math.max(2, cell * 0.09);
-      ctx.beginPath();
-      ctx.arc(x0 + fc * cell + cell / 2, y0 + fr * cell + cell / 2,
-              cell * 0.40, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
     if (opts.isMark) {
       ctx.fillStyle = PQ;
       for (var r2 = 0; r2 < N; r2++) {
         for (var c2 = 0; c2 < N; c2++) {
           if (!opts.isMark(r2, c2)) continue;
+          var mx = x0 + c2 * cell + cell / 2, my = y0 + r2 * cell + cell / 2;
           ctx.beginPath();
-          ctx.arc(x0 + c2 * cell + cell / 2, y0 + r2 * cell + cell / 2,
-                  Math.max(1.3, cell * 0.085), 0, Math.PI * 2);
+          ctx.arc(mx, my, Math.max(1.3, cell * 0.085), 0, Math.PI * 2);
           ctx.fill();
+          if (fl && fl.amt > 0 && fl.k === r2 * N + c2) {
+            ctx.save();
+            ctx.globalAlpha = fl.amt;
+            ctx.fillStyle = css("--pwave");
+            ctx.beginPath();
+            ctx.arc(mx, my, Math.max(2, cell * 0.13), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
         }
       }
     }
@@ -1612,7 +1622,7 @@ function TapaCore() {
     paint(boardEl, {
       N: G.size, isInk: isInk, isMark: isMark, clues: G.clues,
       quietClues: clueQuiet, breaks: ruleBreaks(),
-      flash: flash ? flash.k : null, view: view
+      flashCell: flash, view: view
     });
   }
 
@@ -1879,14 +1889,28 @@ function TapaCore() {
     return null;
   }
 
+  /* The revealed tile arrives orange, holds for a beat, then settles into its
+     own colour — so the eye is taken to it without anything being drawn around
+     it that has to be cleaned up afterwards. */
   function flashCell(k) {
-    flash = { k: k, until: Date.now() + 900 };
-    (function tick() {
-      if (!flash) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      flash = { k: k, amt: 1 };
       drawBoard();
-      if (Date.now() < flash.until) requestAnimationFrame(tick);
+      setTimeout(function () { flash = null; drawBoard(); }, 700);
+      return;
+    }
+    var start = null, dur = 950, hold = 0.18;
+    flash = { k: k, amt: 1 };
+    function step(ts) {
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      var amt = t < hold ? 1 : 1 - (t - hold) / (1 - hold);
+      flash = { k: k, amt: Math.max(0, amt) };
+      drawBoard();
+      if (t < 1) requestAnimationFrame(step);
       else { flash = null; drawBoard(); }
-    })();
+    }
+    requestAnimationFrame(step);
   }
 
   document.getElementById("hintBtn").addEventListener("click", function () {
