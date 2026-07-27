@@ -387,9 +387,9 @@
       <div class="sheeth">How Tapa works</div>
       <div class="rules" id="ruleList"></div>
       <div class="foot">
-        Drag across the board to paint. Starting on a cell you have already
-        painted rubs it out instead. The round button switches between ink and
-        the dots you use to mark a cell as definitely empty.
+        Tap a cell to cycle it: shaded, then a dot for definitely empty, then
+        blank again. Drag to fill a run in one go — the round button chooses
+        whether a drag lays shading or dots. Pinch to zoom, two fingers to pan.
       </div>
     </div></div>
   </section>
@@ -1570,7 +1570,6 @@ function TapaCore() {
   /* Every trace of the finished state has to be cleared before a new board,
      or the message and its button linger over the next puzzle. */
   function resetFinish() {
-    lastTap = null;
     view = { s: 1, tx: 0, ty: 0 };
     showConfirm(false);
     document.querySelector(".thumb").classList.remove("gone");
@@ -1725,13 +1724,6 @@ function TapaCore() {
     if (!inGrid(r, c)) return null;
     return { r: r, c: c };
   }
-  /* Double tap lays down the other verb, so the toggle is reachable without
-     leaving the board. The first tap has already painted by then, so undo it
-     and start again from what was there — otherwise the two taps stack and the
-     undo history grows a step nobody took. */
-  var lastTap = null;
-  var DOUBLE_MS = 320;
-
   /* Two fingers zoom and pan, one finger always paints — so panning can never
      be mistaken for a stroke, which is the usual failure of pinch-to-zoom on a
      drawing surface. */
@@ -1774,20 +1766,19 @@ function TapaCore() {
      painted at all. */
   var MOVE_SLOP = 8;
 
-  function commitPending() {
+  /* A tap cycles the cell: blank, ink, dot, blank. A drag is a different
+     intent — it lays down whichever verb the thumb button is set to, so a run
+     of cells comes out uniform instead of each one landing on a different
+     point in the cycle. */
+  function commitPending(isDrag) {
     var pd = stroke && stroke.pending;
     if (!pd) return;
     stroke.pending = null;
-    if (pd.dbl) {
-      var prev = undoStack.pop();
-      if (prev) {
-        for (var i = prev.length - 1; i >= 0; i--) cells[prev[i][0]] = prev[i][1];
-      }
-      lastTap = null;
-      var other = verb === 1 ? 2 : 1;
-      stroke.target = cells[pd.k] === other ? 0 : other;
-    } else {
+    if (isDrag) {
       stroke.target = cells[pd.k] === verb ? 0 : verb;
+    } else {
+      var cur = cells[pd.k];
+      stroke.target = cur === 0 ? 1 : (cur === 1 ? 2 : 0);
     }
     applyCell(pd.r, pd.c);
   }
@@ -1797,7 +1788,7 @@ function TapaCore() {
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (pointers.size >= 2) {
       /* a gesture that was still only a held cell paints nothing */
-      if (stroke && !stroke.changes.length) { stroke = null; lastTap = null; }
+      if (stroke && !stroke.changes.length) { stroke = null; }
       else endStroke();
       pinchStart();
       ev.preventDefault();
@@ -1809,11 +1800,7 @@ function TapaCore() {
     var k = keyOf(p.r, p.c);
     stroke = {
       target: null, changes: [],
-      pending: {
-        r: p.r, c: p.c, k: k,
-        dbl: !!(lastTap && lastTap.k === k && Date.now() - lastTap.t < DOUBLE_MS),
-        x: ev.clientX, y: ev.clientY
-      }
+      pending: { r: p.r, c: p.c, k: k, x: ev.clientX, y: ev.clientY }
     };
     ev.preventDefault();
   });
@@ -1827,7 +1814,7 @@ function TapaCore() {
       var pd = stroke.pending;
       if (Math.abs(ev.clientX - pd.x) < MOVE_SLOP &&
           Math.abs(ev.clientY - pd.y) < MOVE_SLOP) return;   /* still just a held finger */
-      commitPending();
+      commitPending(true);
     }
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
@@ -1836,17 +1823,13 @@ function TapaCore() {
   });
   function endStroke() {
     if (!stroke) return;
-    commitPending();          /* a release with no movement is a tap */
+    commitPending(false);     /* a release with no movement is a tap */
     if (stroke.changes.length) {
       undoStack.push(stroke.changes);
       if (undoStack.length > 400) undoStack.shift();
       redoStack = [];          /* a fresh move forks the history */
       commit();
     }
-    /* only a single-cell tap arms a double tap; a drag must not */
-    lastTap = stroke.changes.length === 1
-      ? { k: stroke.changes[0][0], t: Date.now() }
-      : null;
     stroke = null;
     updateChrome();
   }
@@ -2012,7 +1995,6 @@ function TapaCore() {
     askSheet("Clear the whole board?", "Keep going", "Clear it", function () {
       cells = new Uint8Array(G.size * G.size);
       undoStack = []; redoStack = [];
-      lastTap = null;
       elapsed = 0;
       startClock();
       drawBoard();
