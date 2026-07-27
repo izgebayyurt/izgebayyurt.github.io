@@ -387,9 +387,9 @@
       <div class="sheeth">How Tapa works</div>
       <div class="rules" id="ruleList"></div>
       <div class="foot">
-        Tap a cell to cycle it: shaded, then a dot for definitely empty, then
-        blank again. Drag to fill a run in one go — the round button chooses
-        whether a drag lays shading or dots. Pinch to zoom, two fingers to pan.
+        Tap a cell to cycle it: whatever the round button is set to first, then
+        the other, then blank again. Drag to fill a run in one go with the
+        button's choice. Pinch to zoom, two fingers to pan.
       </div>
     </div></div>
   </section>
@@ -1766,10 +1766,13 @@ function TapaCore() {
      painted at all. */
   var MOVE_SLOP = 8;
 
-  /* A tap cycles the cell: blank, ink, dot, blank. A drag is a different
-     intent — it lays down whichever verb the thumb button is set to, so a run
-     of cells comes out uniform instead of each one landing on a different
-     point in the cycle. */
+  /* A tap cycles the cell, starting with whatever the thumb button is set to:
+     in shading mode blank -> shaded -> dot -> blank, in dot mode blank -> dot
+     -> shaded -> blank. The first press always does what the button says, so
+     the button still means something once tapping can reach every state.
+     A drag is a different intent — it lays that verb down flat, so a run comes
+     out uniform instead of each cell landing on a different point in the
+     cycle. */
   function commitPending(isDrag) {
     var pd = stroke && stroke.pending;
     if (!pd) return;
@@ -1777,8 +1780,8 @@ function TapaCore() {
     if (isDrag) {
       stroke.target = cells[pd.k] === verb ? 0 : verb;
     } else {
-      var cur = cells[pd.k];
-      stroke.target = cur === 0 ? 1 : (cur === 1 ? 2 : 0);
+      var cur = cells[pd.k], other = verb === 1 ? 2 : 1;
+      stroke.target = cur === 0 ? verb : (cur === verb ? other : 0);
     }
     applyCell(pd.r, pd.c);
   }
