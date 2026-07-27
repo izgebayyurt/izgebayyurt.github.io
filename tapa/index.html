@@ -1078,12 +1078,18 @@ function TapaCore() {
        The line on a shared edge disappears with it, but the ink's own straight
        edge is already sitting on top of that line. */
     if (opts.showGrid !== false && gA > 0) {
+      /* Clear a margin the width of the corner radius, not just the cell. A
+         cell-sized clear still leaves lines in the neighbouring paper running
+         straight into the wall's curves — most visible around a clue with ink
+         painted round it, where three sides curve and the grid collides with
+         every one. At radius width, no line ever reaches a curve. */
+      var m = cell * RADIUS + 0.75;
       ctx.fillStyle = PG;
       for (var er = 0; er < N; er++) {
         for (var ec = 0; ec < N; ec++) {
           if (!opts.isInk(er, ec)) continue;
-          ctx.fillRect(x0 + ec * cell - 0.75, y0 + er * cell - 0.75,
-                       cell + 1.5, cell + 1.5);
+          ctx.fillRect(x0 + ec * cell - m, y0 + er * cell - m,
+                       cell + m * 2, cell + m * 2);
         }
       }
     }
