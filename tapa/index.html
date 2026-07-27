@@ -1766,11 +1766,39 @@ function TapaCore() {
     drawBoard();
   }
 
+  /* Nothing is painted on pointerdown. The first finger of a pinch lands
+     before the second, so painting immediately meant every zoom started by
+     inking whatever was under that finger. The first cell is held back until
+     the gesture declares itself: a release (tap) or real movement (drag). If a
+     second finger arrives first, the held cell is dropped and nothing is
+     painted at all. */
+  var MOVE_SLOP = 8;
+
+  function commitPending() {
+    var pd = stroke && stroke.pending;
+    if (!pd) return;
+    stroke.pending = null;
+    if (pd.dbl) {
+      var prev = undoStack.pop();
+      if (prev) {
+        for (var i = prev.length - 1; i >= 0; i--) cells[prev[i][0]] = prev[i][1];
+      }
+      lastTap = null;
+      var other = verb === 1 ? 2 : 1;
+      stroke.target = cells[pd.k] === other ? 0 : other;
+    } else {
+      stroke.target = cells[pd.k] === verb ? 0 : verb;
+    }
+    applyCell(pd.r, pd.c);
+  }
+
   boardEl.addEventListener("pointerdown", function (ev) {
     if (!G || finished) return;
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (pointers.size >= 2) {
-      endStroke();
+      /* a gesture that was still only a held cell paints nothing */
+      if (stroke && !stroke.changes.length) { stroke = null; lastTap = null; }
+      else endStroke();
       pinchStart();
       ev.preventDefault();
       return;
@@ -1779,20 +1807,14 @@ function TapaCore() {
     if (!p || isClue(p.r, p.c)) return;
     try { boardEl.setPointerCapture(ev.pointerId); } catch (e) { /* pointer already gone */ }
     var k = keyOf(p.r, p.c);
-
-    if (lastTap && lastTap.k === k && Date.now() - lastTap.t < DOUBLE_MS) {
-      var prev = undoStack.pop();
-      if (prev) {
-        for (var i = prev.length - 1; i >= 0; i--) cells[prev[i][0]] = prev[i][1];
+    stroke = {
+      target: null, changes: [],
+      pending: {
+        r: p.r, c: p.c, k: k,
+        dbl: !!(lastTap && lastTap.k === k && Date.now() - lastTap.t < DOUBLE_MS),
+        x: ev.clientX, y: ev.clientY
       }
-      lastTap = null;
-      var other = verb === 1 ? 2 : 1;
-      stroke = { target: cells[k] === other ? 0 : other, changes: [] };
-    } else {
-      var cur = cells[k];
-      stroke = { target: cur === verb ? 0 : verb, changes: [] };
-    }
-    applyCell(p.r, p.c);
+    };
     ev.preventDefault();
   });
   boardEl.addEventListener("pointermove", function (ev) {
@@ -1801,6 +1823,12 @@ function TapaCore() {
     }
     if (pointers.size >= 2) { pinchMove(); ev.preventDefault(); return; }
     if (!stroke || !G || finished) return;
+    if (stroke.pending) {
+      var pd = stroke.pending;
+      if (Math.abs(ev.clientX - pd.x) < MOVE_SLOP &&
+          Math.abs(ev.clientY - pd.y) < MOVE_SLOP) return;   /* still just a held finger */
+      commitPending();
+    }
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
     applyCell(p.r, p.c);
@@ -1808,6 +1836,7 @@ function TapaCore() {
   });
   function endStroke() {
     if (!stroke) return;
+    commitPending();          /* a release with no movement is a tap */
     if (stroke.changes.length) {
       undoStack.push(stroke.changes);
       if (undoStack.length > 400) undoStack.shift();
