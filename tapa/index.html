@@ -2014,9 +2014,7 @@ function TapaCore() {
     /* the controls have nothing left to do */
     document.querySelector(".thumb").classList.add("gone");
     document.getElementById("playClock").textContent = "";
-    document.getElementById("fmsg").textContent = aided
-      ? "Solved in " + fmt(secs) + ", with help"
-      : "Solved in " + fmt(secs) + "!";
+    document.getElementById("fmsg").textContent = "Solved in " + fmt(secs) + "!";
     dissolve(showFinish);
   }
 
@@ -2137,7 +2135,7 @@ function TapaCore() {
     var foot = document.createElement("div");
     foot.className = "foot";
     foot.textContent = any
-      ? "Puzzles finished with a hint or a reveal keep their shape in the book but are left out of these times."
+      ? "Puzzles solved with hints are excluded."
       : "Solve a puzzle without hints and its time appears here.";
     host.appendChild(foot);
   }
