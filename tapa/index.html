@@ -1071,6 +1071,23 @@ function TapaCore() {
       ctx.restore();
     }
 
+    /* Grid lines run under the ink, so anywhere a corner rounds, the square
+       grid corner stays visible in the wedge the curve leaves uncovered — a
+       hard right angle poking out of a soft one. Clear the grid back out of
+       every inked cell first, so the wall's curves always sit on bare paper.
+       The line on a shared edge disappears with it, but the ink's own straight
+       edge is already sitting on top of that line. */
+    if (opts.showGrid !== false && gA > 0) {
+      ctx.fillStyle = PG;
+      for (var er = 0; er < N; er++) {
+        for (var ec = 0; ec < N; ec++) {
+          if (!opts.isInk(er, ec)) continue;
+          ctx.fillRect(x0 + ec * cell - 0.75, y0 + er * cell - 0.75,
+                       cell + 1.5, cell + 1.5);
+        }
+      }
+    }
+
     /* A band of lighter pigment sweeping outward from the middle of the wall.
        Done as a radial gradient across the single region path, so the sheen
        travels through the shape without breaking it into per-cell fills. */
