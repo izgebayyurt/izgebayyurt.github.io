@@ -126,6 +126,30 @@
   .idxh { display:flex; align-items:baseline; gap:10px; padding:2px 2px 12px; }
   .idxh .t { font-family:var(--serif); font-size:23px; font-weight:600; }
   .idxh .s { font-size:10.5px; color:var(--pd); margin-left:auto; font-variant-numeric:tabular-nums; }
+  .jump {
+    background:none; border:1px solid var(--pr); border-radius:8px; cursor:pointer;
+    font-family:inherit; font-size:10.5px; letter-spacing:0.08em; color:var(--pd);
+    padding:5px 9px; margin-left:10px;
+  }
+  .jump:active { background:var(--pr); }
+  .statrow {
+    display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px;
+    padding:13px 0; border-top:1px solid var(--pr); align-items:baseline;
+  }
+  #statBody .statrow:last-child { border-bottom:1px solid var(--pr); }
+  .statrow .n { font-family:var(--serif); font-size:16.5px; font-weight:600; }
+  .statrow .d { font-size:10.5px; color:var(--pd); margin-top:3px;
+                font-variant-numeric:tabular-nums; }
+  .statrow .v { font-family:var(--serif); font-size:15px;
+                font-variant-numeric:tabular-nums; }
+  .stath { font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+           color:var(--pd); margin:22px 0 2px; }
+  .toplist { display:flex; flex-direction:column; }
+  .toprow { display:flex; gap:12px; padding:9px 0; border-top:1px solid var(--pr);
+            font-size:12.5px; font-variant-numeric:tabular-nums; }
+  .toprow .rank { color:var(--pq); width:22px; }
+  .toprow .who { color:var(--pd); }
+  .toprow .tm { margin-left:auto; font-family:var(--serif); font-size:14px; }
   .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
   .cellw {
     display:flex; flex-direction:column; align-items:center; gap:4px;
@@ -194,11 +218,15 @@
   .tbtn.ink .glyph { background:var(--pg); }
   .tbtn.mark .glyph { width:9px; height:9px; border-radius:50%; background:var(--pq); }
   .thumb-left { right:auto; left:16px; }
-  .tbtn.undo, .tbtn.reset { width:42px; height:42px; box-shadow:none; }
-  .tbtn.undo span, .tbtn.reset span { font-size:17px; color:var(--pi); line-height:1; }
+  .tbtn.undo, .tbtn.reset, .tbtn.redo, .tbtn.hint { width:42px; height:42px; box-shadow:none; }
+  .tbtn.undo span, .tbtn.reset span, .tbtn.redo span, .tbtn.hint span {
+    font-size:17px; color:var(--pi); line-height:1;
+  }
   .tbtn.reset span { font-size:15px; }
-  .tbtn.undo[disabled], .tbtn.reset[disabled] { opacity:0; pointer-events:none; }
-  .tbtn.undo:not([disabled]), .tbtn.reset:not([disabled]) { opacity:0.42; }
+  .tbtn.hint span { font-family:var(--serif); font-size:19px; font-weight:600; }
+  .tbtn.undo[disabled], .tbtn.reset[disabled], .tbtn.redo[disabled] { opacity:0; pointer-events:none; }
+  .tbtn.undo:not([disabled]), .tbtn.reset:not([disabled]),
+  .tbtn.redo:not([disabled]), .tbtn.hint { opacity:0.42; }
 
   /* Clearing the board is the one destructive thing in the game, so it asks
      first. Sits in the space under the board like the solve message, never
@@ -285,6 +313,7 @@
       <div class="books" id="books"></div>
       <div class="homefoot">
         <button id="toRules">Rules</button>
+        <button id="toStats">Stats</button>
         <button id="toSettings">Settings</button>
       </div>
     </div></div>
@@ -296,7 +325,11 @@
       <div class="bartitle">Back</div>
     </div>
     <div class="scroll"><div class="inner">
-      <div class="idxh"><span class="t" id="idxTitle"></span><span class="s" id="idxCount"></span></div>
+      <div class="idxh">
+        <span class="t" id="idxTitle"></span>
+        <span class="s" id="idxCount"></span>
+        <button class="jump" id="jumpBtn">Go to &#8470;</button>
+      </div>
       <div class="grid4" id="idxGrid"></div>
       <button class="pbtn ghost more" id="idxMore">Show more</button>
     </div></div>
@@ -308,6 +341,7 @@
       <div class="bartitle" id="playTitle"></div>
       <div class="grow"></div>
       <div class="bartitle" id="playClock"></div>
+      <button class="icon" id="moreBtn" aria-label="More">&hellip;</button>
     </div>
     <div id="boardwrap"><canvas id="board"></canvas></div>
     <div class="finish" id="finish">
@@ -315,21 +349,34 @@
       <button class="pbtn" id="fnext">Next puzzle</button>
     </div>
     <div class="thumb thumb-left">
+      <button class="tbtn hint" id="hintBtn" aria-label="Hint"><span>?</span></button>
       <button class="tbtn reset" id="resetBtn" disabled aria-label="Clear the board"><span>&#10005;</span></button>
     </div>
     <div class="thumb">
+      <button class="tbtn redo" id="redoBtn" disabled aria-label="Redo"><span>&#8635;</span></button>
       <button class="tbtn undo" id="undoBtn" disabled aria-label="Undo"><span>&#8634;</span></button>
       <button class="tbtn ink" id="verbBtn" aria-label="Switch between ink and mark"><span class="glyph"></span></button>
     </div>
     <div class="confirm" id="confirm">
-      <div class="cmsg">Clear the whole board?</div>
+      <div class="cmsg" id="cmsg"></div>
       <div class="crow">
-        <button class="pbtn ghost" id="cCancel">Keep going</button>
-        <button class="pbtn" id="cClear">Clear it</button>
+        <button class="pbtn ghost" id="cNo"></button>
+        <button class="pbtn" id="cYes"></button>
       </div>
     </div>
   </section>
 
+
+  <section id="stats" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="sheet">
+      <div class="sheeth">Times</div>
+      <div id="statBody"></div>
+    </div></div>
+  </section>
 
   <section id="rules" class="screen">
     <div class="bar">
@@ -625,17 +672,22 @@ function TapaCore() {
     /* Round accounting is what tells a real puzzle from a trivial one: how
        much of the board falls out in the very first sweep, and how long the
        chain runs afterwards. The generator selects on exactly this. */
-    function countKnown() {
-      var n = 0;
-      for (var k = 0; k < N * N; k++) if (state[k] !== UNKNOWN) n++;
-      return n;
-    }
-    var rounds = 0, firstGain = 0, prevKnown = countKnown();
+    /* `order` is the sequence in which cells become forced — the solve path.
+       Generation only needs the round counts, but a hint needs to know which
+       cell a person could legitimately work out next. */
+    var seen = new Uint8Array(state);
+    var rounds = 0, firstGain = 0, order = [];
     function noteRound() {
       rounds++;
-      var nk = countKnown();
-      if (rounds === 1) firstGain = nk - prevKnown;
-      prevKnown = nk;
+      var gained = 0;
+      for (var k = 0; k < N * N; k++) {
+        if (state[k] !== UNKNOWN && seen[k] === UNKNOWN) {
+          seen[k] = state[k];
+          order.push(k);
+          gained++;
+        }
+      }
+      if (rounds === 1) firstGain = gained;
     }
 
     for (;;) {
@@ -664,7 +716,7 @@ function TapaCore() {
              no2x2(G, function (r3, c3) { return region.has(r3 * N + c3); }) &&
              connectedSet(G, region);
     return { solved:ok, bad:false, level:level, hard:hard, region:region,
-             state:state, rounds:rounds, firstGain:firstGain };
+             state:state, rounds:rounds, firstGain:firstGain, order:order };
   }
 
   /* ---------- region painting ----------
@@ -827,7 +879,7 @@ function TapaCore() {
     return {
       score: 3.2 * multiF + 0.8 * threeF - 1.2 * clueF + 2.2 - 1.8 * runF
              - 5.2 * open + 2.0 * chain - 1.6 * clueF - 2.0 * nearF,
-      level: fin.level, hard: fin.hard,
+      level: fin.level, hard: fin.hard, order: fin.order,
       first: fin.firstGain, rounds: fin.rounds, clueCount: n
     };
   }
@@ -896,7 +948,8 @@ function TapaCore() {
           best = {
             size: size, num: num, region: regionArr, clues: clues,
             level: sc.level, hard: sc.hard, clueCount: sc.clueCount,
-            first: sc.first, rounds: sc.rounds, score: sc.score
+            first: sc.first, rounds: sc.rounds, score: sc.score,
+            order: sc.order
           };
         }
       }
@@ -1103,6 +1156,15 @@ function TapaCore() {
     ctx.fillStyle = PG;
     ctx.fillRect(0, 0, w, w);
 
+    /* Zoom transforms the board's contents only; the paper behind stays put so
+       there is never an unpainted edge when panning. */
+    var vw = opts.view;
+    if (vw && vw.s !== 1) {
+      ctx.save();
+      ctx.translate(vw.tx, vw.ty);
+      ctx.scale(vw.s, vw.s);
+    }
+
     var gA = opts.gridAlpha === undefined ? 1 : opts.gridAlpha;
     if (opts.showGrid !== false && gA > 0) {
       ctx.save();
@@ -1223,6 +1285,16 @@ function TapaCore() {
       }
     }
 
+    if (opts.flash !== undefined && opts.flash !== null) {
+      var fr = (opts.flash / N) | 0, fc = opts.flash % N;
+      ctx.strokeStyle = PA;
+      ctx.lineWidth = Math.max(2, cell * 0.09);
+      ctx.beginPath();
+      ctx.arc(x0 + fc * cell + cell / 2, y0 + fr * cell + cell / 2,
+              cell * 0.40, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     if (opts.isMark) {
       ctx.fillStyle = PQ;
       for (var r2 = 0; r2 < N; r2++) {
@@ -1261,6 +1333,8 @@ function TapaCore() {
       }
       ctx.restore();
     }
+
+    if (vw && vw.s !== 1) ctx.restore();
   }
 
   function paintGlyph(cv, size, regionArr) {
@@ -1300,7 +1374,29 @@ function TapaCore() {
      single-clue logic alone strips almost nothing and leaves bloated boards
      that collapse in three rounds. Board size is the difficulty axis, which is
      what the four books already are. */
+  /* Deterministic is not the same as precomputed: a board is searched from
+     scratch every time it is opened. Cache what has been built, and build the
+     next number in the background while the current one is being solved, so
+     moving on is instant. */
+  var puzzleCache = {};
+  function cacheKey(size, num) { return size + ":" + num; }
+
+  function prefetch(size, num) {
+    var key = cacheKey(size, num);
+    if (puzzleCache[key]) return;
+    buildPuzzle(size, num, function (p) { if (p) puzzleCache[key] = p; });
+  }
+
   function getPuzzle(size, num, done) {
+    var key = cacheKey(size, num);
+    if (puzzleCache[key]) { done(puzzleCache[key]); return; }
+    buildPuzzle(size, num, function (p) {
+      if (p) puzzleCache[key] = p;
+      done(p);
+    });
+  }
+
+  function buildPuzzle(size, num, done) {
     var opts = { maxLevel: core.L_CONNECT };
     if (worker) {
       var id = ++jobId;
@@ -1313,7 +1409,7 @@ function TapaCore() {
 
   /* ---------- screens ---------- */
   var screens = {};
-  ["home", "index", "play", "rules", "settings"].forEach(function (id) {
+  ["home", "index", "play", "stats", "rules", "settings"].forEach(function (id) {
     screens[id] = document.getElementById(id);
   });
   var currentScreen = "home";
@@ -1323,6 +1419,7 @@ function TapaCore() {
     if (id === "home") renderHome();
     if (id === "index") renderIndex();
     if (id === "settings") renderSettings();
+    if (id === "stats") renderStats();
     if (id === "rules") renderRules();
   }
   document.querySelectorAll("[data-back]").forEach(function (b) {
@@ -1379,6 +1476,7 @@ function TapaCore() {
     if (save.current) resumeCurrent();
   });
   document.getElementById("toRules").addEventListener("click", function () { show("rules"); });
+  document.getElementById("toStats").addEventListener("click", function () { show("stats"); });
   document.getElementById("toSettings").addEventListener("click", function () { show("settings"); });
 
   /* ---------- index ---------- */
@@ -1387,7 +1485,9 @@ function TapaCore() {
   function renderIndex() {
     document.getElementById("idxTitle").textContent = bookSize + " × " + bookSize;
     var n = solvedCount(bookSize);
-    document.getElementById("idxCount").textContent = n ? n + " solved" : "";
+    var stat = bookStat(bookSize);
+    document.getElementById("idxCount").textContent =
+      n ? n + " solved" + (stat ? " · avg " + fmt(stat.avg) : "") : "";
     var host = document.getElementById("idxGrid");
     host.innerHTML = "";
     var map = solvedMap(bookSize);
@@ -1425,6 +1525,13 @@ function TapaCore() {
   document.getElementById("idxMore").addEventListener("click", function () {
     pageMax += 24; renderIndex();
   });
+  document.getElementById("jumpBtn").addEventListener("click", function () {
+    var raw = window.prompt("Go to which puzzle in the " + bookSize + " × " + bookSize + " book?");
+    if (raw === null) return;
+    var num = parseInt(String(raw).replace(/[^0-9]/g, ""), 10);
+    if (!num || num < 1) return;
+    openPuzzle(bookSize, num);
+  });
 
   /* ---------- play ---------- */
   var G = null;            /* {size, num, region:Set, clues:{}, level, hard} */
@@ -1432,6 +1539,21 @@ function TapaCore() {
   var undoStack = [];
   var verb = 1;            /* 1 = ink, 2 = mark */
   var finished = false;    /* solved: the board becomes a picture, not a puzzle */
+  var redoStack = [];
+  var aided = false;       /* a hint or the solution was used: no time recorded */
+  var flash = null;        /* {k, until} — the cell a hint just pointed at */
+  var view = { s: 1, tx: 0, ty: 0 };
+
+  /* Keep the board covering the canvas: at scale 1 there is nowhere to go, and
+     zoomed in you can never drag paper into frame. */
+  function clampView() {
+    if (view.s <= 1.001) { view.s = 1; view.tx = 0; view.ty = 0; return; }
+    if (view.s > 4) view.s = 4;
+    var w = boardEl.clientWidth || 1;
+    var lo = w * (1 - view.s);
+    view.tx = Math.max(lo, Math.min(0, view.tx));
+    view.ty = Math.max(lo, Math.min(0, view.ty));
+  }
   var startedAt = 0, elapsed = 0, tickTimer = null;
   var boardEl = document.getElementById("board");
 
@@ -1439,6 +1561,7 @@ function TapaCore() {
      or the message and its button linger over the next puzzle. */
   function resetFinish() {
     lastTap = null;
+    view = { s: 1, tx: 0, ty: 0 };
     showConfirm(false);
     document.querySelector(".thumb").classList.remove("gone");
     var el = document.getElementById("finish");
@@ -1482,13 +1605,14 @@ function TapaCore() {
       /* solved: the grid and the marks go, the clues stay */
       paint(boardEl, {
         N: G.size, showGrid: false, isInk: isInk, clues: G.clues,
-        quietClues: function () { return false; }
+        quietClues: function () { return false; }, view: view
       });
       return;
     }
     paint(boardEl, {
       N: G.size, isInk: isInk, isMark: isMark, clues: G.clues,
-      quietClues: clueQuiet, breaks: ruleBreaks()
+      quietClues: clueQuiet, breaks: ruleBreaks(),
+      flash: flash ? flash.k : null, view: view
     });
   }
 
@@ -1503,17 +1627,22 @@ function TapaCore() {
         return;
       }
       G = { size: size, num: num, region: new Set(p.region), clues: p.clues,
-            level: p.level, hard: p.hard, clueCount: p.clueCount };
+            level: p.level, hard: p.hard, clueCount: p.clueCount,
+            order: p.order || [] };
       cells = new Uint8Array(size * size);
-      undoStack = [];
+      undoStack = []; redoStack = [];
       finished = false;
+      aided = false;
+      flash = null;
       resetFinish();
       elapsed = 0;
       startClock();
       save.current = { size: size, num: num, cells: Array.from(cells),
                        region: p.region, clues: p.clues, elapsed: 0,
-                       level: p.level, hard: p.hard };
+                       level: p.level, hard: p.hard, order: p.order || [],
+                       aided: false };
       persist();
+      prefetch(size, num + 1);
       layoutBoard();
       updateChrome();
     });
@@ -1523,10 +1652,12 @@ function TapaCore() {
     var c = save.current;
     if (!c || !c.region) return;
     G = { size: c.size, num: c.num, region: new Set(c.region), clues: c.clues,
-          level: c.level, hard: c.hard };
+          level: c.level, hard: c.hard, order: c.order || [] };
     cells = Uint8Array.from(c.cells || new Array(c.size * c.size).fill(0));
-    undoStack = [];
+    undoStack = []; redoStack = [];
     finished = false;
+    aided = !!c.aided;
+    flash = null;
     resetFinish();
     elapsed = c.elapsed || 0;
     document.getElementById("playTitle").textContent =
@@ -1566,6 +1697,7 @@ function TapaCore() {
     var painted = false;
     if (cells) for (var i = 0; i < cells.length; i++) if (cells[i]) { painted = true; break; }
     document.getElementById("resetBtn").disabled = !painted;
+    document.getElementById("redoBtn").disabled = redoStack.length === 0;
     var vb = document.getElementById("verbBtn");
     vb.classList.toggle("ink", verb === 1);
     vb.classList.toggle("mark", verb === 2);
@@ -1577,8 +1709,9 @@ function TapaCore() {
   function cellAt(ev) {
     var rect = boardEl.getBoundingClientRect();
     var w = rect.width, pad = Math.max(2, w * 0.022), cell = (w - pad * 2) / G.size;
-    var x = ev.clientX - rect.left - pad, y = ev.clientY - rect.top - pad;
-    var c = Math.floor(x / cell), r = Math.floor(y / cell);
+    var bx = (ev.clientX - rect.left - view.tx) / view.s;
+    var by = (ev.clientY - rect.top - view.ty) / view.s;
+    var c = Math.floor((bx - pad) / cell), r = Math.floor((by - pad) / cell);
     if (!inGrid(r, c)) return null;
     return { r: r, c: c };
   }
@@ -1589,11 +1722,52 @@ function TapaCore() {
   var lastTap = null;
   var DOUBLE_MS = 320;
 
+  /* Two fingers zoom and pan, one finger always paints — so panning can never
+     be mistaken for a stroke, which is the usual failure of pinch-to-zoom on a
+     drawing surface. */
+  var pointers = new Map();
+  var pinch = null;
+
+  function pinchStart() {
+    var pts = Array.from(pointers.values());
+    var dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+    pinch = {
+      d: Math.max(1, Math.hypot(dx, dy)),
+      mx: (pts[0].x + pts[1].x) / 2,
+      my: (pts[0].y + pts[1].y) / 2,
+      s: view.s, tx: view.tx, ty: view.ty
+    };
+  }
+  function pinchMove() {
+    if (!pinch || pointers.size < 2) return;
+    var pts = Array.from(pointers.values());
+    var dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+    var d = Math.max(1, Math.hypot(dx, dy));
+    var mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+    var ns = Math.max(1, Math.min(4, pinch.s * (d / pinch.d)));
+    var rect = boardEl.getBoundingClientRect();
+    /* keep the board point under the pinch centre under the pinch centre */
+    var ax = pinch.mx - rect.left, ay = pinch.my - rect.top;
+    var bx = (ax - pinch.tx) / pinch.s, by = (ay - pinch.ty) / pinch.s;
+    view.s = ns;
+    view.tx = (mx - rect.left) - bx * ns;
+    view.ty = (my - rect.top) - by * ns;
+    clampView();
+    drawBoard();
+  }
+
   boardEl.addEventListener("pointerdown", function (ev) {
     if (!G || finished) return;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size >= 2) {
+      endStroke();
+      pinchStart();
+      ev.preventDefault();
+      return;
+    }
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
-    boardEl.setPointerCapture(ev.pointerId);
+    try { boardEl.setPointerCapture(ev.pointerId); } catch (e) { /* pointer already gone */ }
     var k = keyOf(p.r, p.c);
 
     if (lastTap && lastTap.k === k && Date.now() - lastTap.t < DOUBLE_MS) {
@@ -1612,6 +1786,10 @@ function TapaCore() {
     ev.preventDefault();
   });
   boardEl.addEventListener("pointermove", function (ev) {
+    if (pointers.has(ev.pointerId)) {
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    }
+    if (pointers.size >= 2) { pinchMove(); ev.preventDefault(); return; }
     if (!stroke || !G || finished) return;
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
@@ -1623,6 +1801,7 @@ function TapaCore() {
     if (stroke.changes.length) {
       undoStack.push(stroke.changes);
       if (undoStack.length > 400) undoStack.shift();
+      redoStack = [];          /* a fresh move forks the history */
       commit();
     }
     /* only a single-cell tap arms a double tap; a drag must not */
@@ -1632,8 +1811,13 @@ function TapaCore() {
     stroke = null;
     updateChrome();
   }
-  boardEl.addEventListener("pointerup", endStroke);
-  boardEl.addEventListener("pointercancel", endStroke);
+  function liftPointer(ev) {
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinch = null;
+    endStroke();
+  }
+  boardEl.addEventListener("pointerup", liftPointer);
+  boardEl.addEventListener("pointercancel", liftPointer);
 
   function applyCell(r, c) {
     var k = keyOf(r, c), before = cells[k];
@@ -1648,6 +1832,7 @@ function TapaCore() {
     if (save.current && save.current.size === G.size && save.current.num === G.num) {
       save.current.cells = Array.from(cells);
       save.current.elapsed = liveElapsed();
+      save.current.aided = aided;
     }
     persist();
     checkWin();
@@ -1667,13 +1852,93 @@ function TapaCore() {
   document.getElementById("undoBtn").addEventListener("click", function () {
     var last = undoStack.pop();
     if (!last) return;
+    redoStack.push(last);
     for (var i = last.length - 1; i >= 0; i--) cells[last[i][0]] = last[i][1];
     drawBoard();
     commit();
     updateChrome();
   });
+  /* A hint follows the solver's own path. If the board already contradicts the
+     solution it points at the mistake instead — telling you the next deduction
+     is useless when what is on the board rules it out. */
+  function hintTarget() {
+    var n = G.size, k;
+    for (k = 0; k < n * n; k++) {
+      if (G.clues.hasOwnProperty(k)) continue;
+      var wantInk = G.region.has(k);
+      if (cells[k] === 1 && !wantInk) return { k: k, wrong: true };
+      if (cells[k] === 2 && wantInk) return { k: k, wrong: true };
+    }
+    var path = G.order || [];
+    for (var i = 0; i < path.length; i++) {
+      k = path[i];
+      if (G.clues.hasOwnProperty(k)) continue;
+      var want = G.region.has(k) ? 1 : 2;
+      if (cells[k] !== want) return { k: k, val: want };
+    }
+    return null;
+  }
+
+  function flashCell(k) {
+    flash = { k: k, until: Date.now() + 900 };
+    (function tick() {
+      if (!flash) return;
+      drawBoard();
+      if (Date.now() < flash.until) requestAnimationFrame(tick);
+      else { flash = null; drawBoard(); }
+    })();
+  }
+
+  document.getElementById("hintBtn").addEventListener("click", function () {
+    if (!G || finished) return;
+    var h = hintTarget();
+    if (!h) return;
+    aided = true;
+    if (h.wrong) { flashCell(h.k); return; }
+    var before = cells[h.k];
+    cells[h.k] = h.val;
+    undoStack.push([[h.k, before, h.val]]);
+    redoStack = [];
+    flashCell(h.k);
+    commit();
+    updateChrome();
+  });
+
+  document.getElementById("redoBtn").addEventListener("click", function () {
+    var step = redoStack.pop();
+    if (!step) return;
+    for (var i = 0; i < step.length; i++) cells[step[i][0]] = step[i][2];
+    undoStack.push(step);
+    drawBoard();
+    commit();
+    updateChrome();
+  });
+
+  document.getElementById("moreBtn").addEventListener("click", function () {
+    if (!G || finished) return;
+    askSheet("Show the finished wall?", "Not yet", "Show it", function () {
+      aided = true;
+      for (var k = 0; k < G.size * G.size; k++) {
+        if (G.clues.hasOwnProperty(k)) continue;
+        cells[k] = G.region.has(k) ? 1 : 2;
+      }
+      undoStack = []; redoStack = [];
+      drawBoard();
+      commit();
+      updateChrome();
+    });
+  });
+
   /* Reset asks before wiping. The controls step aside while it does, so the
      question is the only thing competing with the board. */
+  var sheetYes = null;
+  function askSheet(msg, no, yes, onYes) {
+    document.getElementById("cmsg").textContent = msg;
+    document.getElementById("cNo").textContent = no;
+    document.getElementById("cYes").textContent = yes;
+    sheetYes = onYes;
+    showConfirm(true);
+  }
   function showConfirm(on) {
     var el = document.getElementById("confirm");
     document.querySelectorAll(".thumb").forEach(function (t) {
@@ -1691,22 +1956,26 @@ function TapaCore() {
   }
   document.getElementById("resetBtn").addEventListener("click", function () {
     if (!G || finished) return;
-    showConfirm(true);
+    askSheet("Clear the whole board?", "Keep going", "Clear it", function () {
+      cells = new Uint8Array(G.size * G.size);
+      undoStack = []; redoStack = [];
+      lastTap = null;
+      elapsed = 0;
+      startClock();
+      drawBoard();
+      commit();
+      updateChrome();
+    });
   });
-  document.getElementById("cCancel").addEventListener("click", function () {
+  document.getElementById("cNo").addEventListener("click", function () {
+    sheetYes = null;
     showConfirm(false);
   });
-  document.getElementById("cClear").addEventListener("click", function () {
+  document.getElementById("cYes").addEventListener("click", function () {
+    var fn = sheetYes;
+    sheetYes = null;
     showConfirm(false);
-    if (!G) return;
-    cells = new Uint8Array(G.size * G.size);
-    undoStack = [];
-    lastTap = null;
-    elapsed = 0;
-    startClock();
-    drawBoard();
-    commit();
-    updateChrome();
+    if (fn) fn();
   });
 
   document.getElementById("verbBtn").addEventListener("click", function () {
@@ -1732,8 +2001,12 @@ function TapaCore() {
     var secs = liveElapsed();
     var map = solvedMap(G.size);
     var prev = map[G.num];
-    if (!prev || secs < prev.t) {
-      map[G.num] = { t: Math.round(secs), r: packRegion(G.size, Array.from(G.region)) };
+    var shape = packRegion(G.size, Array.from(G.region));
+    if (aided) {
+      /* a hint or a reveal still earns the picture, but not a time */
+      if (!prev) map[G.num] = { t: null, r: shape, aided: true };
+    } else if (!prev || prev.t === null || secs < prev.t) {
+      map[G.num] = { t: Math.round(secs), r: shape };
     }
     save.current = null;
     persist();
@@ -1741,7 +2014,9 @@ function TapaCore() {
     /* the controls have nothing left to do */
     document.querySelector(".thumb").classList.add("gone");
     document.getElementById("playClock").textContent = "";
-    document.getElementById("fmsg").textContent = "Solved in " + fmt(secs) + "!";
+    document.getElementById("fmsg").textContent = aided
+      ? "Solved in " + fmt(secs) + ", with help"
+      : "Solved in " + fmt(secs) + "!";
     dissolve(showFinish);
   }
 
@@ -1792,6 +2067,80 @@ function TapaCore() {
     if (!G) return;
     openPuzzle(G.size, G.num + 1);
   });
+
+  /* ---------- times ----------
+     Only unaided solves count. A puzzle finished with a hint keeps its shape in
+     the book but stays out of the averages, or the numbers mean nothing. */
+  function bookTimes(size) {
+    var map = solvedMap(size), out = [];
+    Object.keys(map).forEach(function (num) {
+      var e = map[num];
+      if (e && typeof e.t === "number") out.push({ num: +num, t: e.t });
+    });
+    out.sort(function (a, b) { return a.t - b.t; });
+    return out;
+  }
+  function bookStat(size) {
+    var t = bookTimes(size);
+    if (!t.length) return null;
+    var sum = 0;
+    for (var i = 0; i < t.length; i++) sum += t[i].t;
+    return { n: t.length, best: t[0], avg: sum / t.length, top: t.slice(0, 10) };
+  }
+
+  function renderStats() {
+    var host = document.getElementById("statBody");
+    host.innerHTML = "";
+    var any = false;
+    SIZES.forEach(function (size) {
+      var st = bookStat(size);
+      var row = document.createElement("div");
+      row.className = "statrow";
+      var left = document.createElement("div");
+      left.innerHTML = '<div class="n"></div><div class="d"></div>';
+      left.querySelector(".n").textContent = size + " × " + size;
+      left.querySelector(".d").textContent = st
+        ? st.n + " timed · best " + fmt(st.best.t) + " on \u2116" + st.best.num
+        : (solvedCount(size) ? solvedCount(size) + " solved, none timed" : "Not started");
+      var right = document.createElement("div");
+      right.className = "v";
+      right.textContent = st ? fmt(st.avg) : "—";
+      row.appendChild(left); row.appendChild(right);
+      host.appendChild(row);
+      if (st) any = true;
+    });
+
+    var best = [];
+    SIZES.forEach(function (size) {
+      bookTimes(size).forEach(function (e) {
+        best.push({ size: size, num: e.num, t: e.t });
+      });
+    });
+    best.sort(function (a, b) { return a.t - b.t; });
+    if (best.length) {
+      var h = document.createElement("div");
+      h.className = "stath"; h.textContent = "Ten fastest";
+      host.appendChild(h);
+      var list = document.createElement("div");
+      list.className = "toplist";
+      best.slice(0, 10).forEach(function (e, i) {
+        var r = document.createElement("div");
+        r.className = "toprow";
+        r.innerHTML = '<span class="rank"></span><span class="who"></span><span class="tm"></span>';
+        r.querySelector(".rank").textContent = (i + 1) + ".";
+        r.querySelector(".who").textContent = e.size + " × " + e.size + " · \u2116" + e.num;
+        r.querySelector(".tm").textContent = fmt(e.t);
+        list.appendChild(r);
+      });
+      host.appendChild(list);
+    }
+    var foot = document.createElement("div");
+    foot.className = "foot";
+    foot.textContent = any
+      ? "Puzzles finished with a hint or a reveal keep their shape in the book but are left out of these times."
+      : "Solve a puzzle without hints and its time appears here.";
+    host.appendChild(foot);
+  }
 
   /* ---------- rules ---------- */
   var RULES = [

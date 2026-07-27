@@ -47,6 +47,15 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   allow unaided rather than by the numbers printed in them. Board size is the
   difficulty axis; restricting the solver to weaker logic to make an easy book
   does not work, because a Tapa nearly always needs the one-region rule to close.
+  The same solver drives hints: it hands back the next cell a person could
+  legitimately work out, or points at the mistake already on the board if there
+  is one. Boards are deterministic but not precomputed — each is searched from
+  scratch on the device, so what you have opened is cached and the next number
+  is built in the background while you solve, which takes moving on from about a
+  second to instant. Pinch to zoom and two fingers to pan; one finger always
+  paints. Times are kept per puzzle, with per-book bests and averages and a ten
+  fastest list; a puzzle finished with a hint or a reveal keeps its picture but
+  is left out of the times.
   Filled cells merge into a single shape — convex corners rounded,
   concave corners filleted — so a solved board reads as a painted form rather than
   forty black squares, and on the last correct cell the clues fade and then the
