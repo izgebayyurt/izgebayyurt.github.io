@@ -983,15 +983,24 @@ function TapaCore() {
      wall is the only thing on screen. */
   function drawRegion(ctx, isInk, N, x0, y0, cell, q) {
     var e = 0.4;
+    /* The page crops the wall. Off-grid counts as solid when deciding corners,
+       so a cell on the border keeps a square corner and runs flush into the
+       board's edge; rounding there would curl the wall away from the border
+       and leave a gap the grid line runs into. Seam overlap still uses real
+       ink only, so nothing bleeds outside the board. */
+    function solid(r, c) {
+      if (r < 0 || r >= N || c < 0 || c >= N) return true;
+      return isInk(r, c);
+    }
     ctx.beginPath();
     for (var r = 0; r < N; r++) {
       for (var c = 0; c < N; c++) {
         if (!isInk(r, c)) continue;
-        var up = isInk(r - 1, c), dn = isInk(r + 1, c);
-        var lf = isInk(r, c - 1), rt = isInk(r, c + 1);
+        var up = solid(r - 1, c), dn = solid(r + 1, c);
+        var lf = solid(r, c - 1), rt = solid(r, c + 1);
         var x = x0 + c * cell, y = y0 + r * cell;
-        var xa = x - (lf ? e : 0), xb = x + cell + (rt ? e : 0);
-        var ya = y - (up ? e : 0), yb = y + cell + (dn ? e : 0);
+        var xa = x - (isInk(r, c - 1) ? e : 0), xb = x + cell + (isInk(r, c + 1) ? e : 0);
+        var ya = y - (isInk(r - 1, c) ? e : 0), yb = y + cell + (isInk(r + 1, c) ? e : 0);
 
         if (!up && !lf) ctx.moveTo(xa + q, ya); else ctx.moveTo(xa, ya);
         if (!up && !rt) { ctx.lineTo(xb - q, ya); ctx.arc(xb - q, ya + q, q, -Math.PI / 2, 0); }
@@ -1006,10 +1015,10 @@ function TapaCore() {
 
         if (q > 0) {
           var cn = [
-            [up, lf, isInk(r - 1, c - 1), x, y, 1, 1],
-            [up, rt, isInk(r - 1, c + 1), x + cell, y, -1, 1],
-            [dn, rt, isInk(r + 1, c + 1), x + cell, y + cell, -1, -1],
-            [dn, lf, isInk(r + 1, c - 1), x, y + cell, 1, -1]
+            [up, lf, solid(r - 1, c - 1), x, y, 1, 1],
+            [up, rt, solid(r - 1, c + 1), x + cell, y, -1, 1],
+            [dn, rt, solid(r + 1, c + 1), x + cell, y + cell, -1, -1],
+            [dn, lf, solid(r + 1, c - 1), x, y + cell, 1, -1]
           ];
           for (var i = 0; i < 4; i++) {
             var o = cn[i];
