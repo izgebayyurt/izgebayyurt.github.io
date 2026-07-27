@@ -14,6 +14,7 @@
     --pg:#ece9e1;            /* paper */
     --pi:#2a2730;            /* ink — a purple-black, not a neutral one */
     --pa:#7a5e9a;            /* the one accent; it means "you broke a rule" */
+    --pwave:#c85f18;         /* the solve wave, and nothing else */
     --pr:rgba(42,39,48,0.14);
     --pd:rgba(42,39,48,0.55);
     --pq:rgba(42,39,48,0.32);
@@ -28,6 +29,7 @@
     --pg:#191519;
     --pi:#ded7c8;
     --pa:#a888c8;
+    --pwave:#ff8a4c;
     --pr:rgba(222,215,200,0.15);
     --pd:rgba(222,215,200,0.56);
     --pq:rgba(222,215,200,0.34);
@@ -1140,7 +1142,7 @@ function TapaCore() {
         maxR = Math.max(maxR + cell, 1);
         var t = opts.sheen, band = 0.20;
         var g = ctx.createRadialGradient(gx, gy, 0, gx, gy, maxR);
-        var hi = mixHex(PI, css("--pa"), 0.55);
+        var hi = mixHex(PI, css("--pwave"), 0.62);
         var lo = Math.max(0.0001, Math.min(0.999, t - band));
         var mid = Math.max(lo + 0.0001, Math.min(0.9992, t));
         var up = Math.max(mid + 0.0001, Math.min(0.9995, t + band));
