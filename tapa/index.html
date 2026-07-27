@@ -155,6 +155,26 @@
     padding:0 12px 66px; min-height:0;
   }
   #board { display:block; width:100%; max-width:min(96vw, 62vh); aspect-ratio:1/1; touch-action:none; }
+  /* The message lives in the space the thumb controls vacated, positioned out
+     of flow so the board does not shift by a pixel when it appears — the whole
+     point is that you are looking at the board. */
+  .finish {
+    display:none; flex-direction:column; gap:12px;
+    position:absolute; left:0; right:0;
+    bottom:calc(18px + env(safe-area-inset-bottom));
+    padding:0 22px;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .55s ease, transform .55s ease;
+  }
+  .finish.show { display:flex; }
+  .finish.show.in { opacity:1; transform:none; }
+  .fmsg {
+    font-family:var(--serif); font-size:23px; font-weight:600; text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .finish { transition:none; }
+  }
   .thumb { transition:opacity .55s ease; }
   .thumb.gone { opacity:0; pointer-events:none; }
   .thumb {
@@ -268,6 +288,10 @@
       <div class="bartitle" id="playClock"></div>
     </div>
     <div id="boardwrap"><canvas id="board"></canvas></div>
+    <div class="finish" id="finish">
+      <div class="fmsg" id="fmsg"></div>
+      <button class="pbtn" id="fnext">Next puzzle</button>
+    </div>
     <div class="thumb">
       <button class="tbtn undo" id="undoBtn" disabled aria-label="Undo"><span>&#8634;</span></button>
       <button class="tbtn ink" id="verbBtn" aria-label="Switch between ink and mark"><span class="glyph"></span></button>
@@ -935,6 +959,17 @@ function TapaCore() {
   function css(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
+  function mixHex(a, b, t) {
+    function rgb(h) {
+      h = h.replace("#", "");
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    var A = rgb(a), B = rgb(b);
+    return "rgb(" + Math.round(A[0] + (B[0] - A[0]) * t) + "," +
+                    Math.round(A[1] + (B[1] - A[1]) * t) + "," +
+                    Math.round(A[2] + (B[2] - A[2]) * t) + ")";
+  }
 
   /* ---------- renderer ----------
      Filled cells merge into one region: convex corners round outward, and a
@@ -1036,7 +1071,43 @@ function TapaCore() {
       ctx.restore();
     }
 
+    /* A band of lighter pigment sweeping outward from the middle of the wall.
+       Done as a radial gradient across the single region path, so the sheen
+       travels through the shape without breaking it into per-cell fills. */
     ctx.fillStyle = PI;
+    if (opts.sheen !== undefined) {
+      var sx = 0, sy = 0, sn = 0;
+      for (var sr = 0; sr < N; sr++) {
+        for (var sc = 0; sc < N; sc++) {
+          if (opts.isInk(sr, sc)) { sx += sc + 0.5; sy += sr + 0.5; sn++; }
+        }
+      }
+      if (sn) {
+        var gx = x0 + (sx / sn) * cell, gy = y0 + (sy / sn) * cell;
+        var maxR = 0;
+        for (var mr = 0; mr < N; mr++) {
+          for (var mc = 0; mc < N; mc++) {
+            if (!opts.isInk(mr, mc)) continue;
+            var dx = x0 + (mc + 0.5) * cell - gx, dy = y0 + (mr + 0.5) * cell - gy;
+            var dd = Math.sqrt(dx * dx + dy * dy);
+            if (dd > maxR) maxR = dd;
+          }
+        }
+        maxR = Math.max(maxR + cell, 1);
+        var t = opts.sheen, band = 0.20;
+        var g = ctx.createRadialGradient(gx, gy, 0, gx, gy, maxR);
+        var hi = mixHex(PI, css("--pa"), 0.55);
+        var lo = Math.max(0.0001, Math.min(0.999, t - band));
+        var mid = Math.max(lo + 0.0001, Math.min(0.9992, t));
+        var up = Math.max(mid + 0.0001, Math.min(0.9995, t + band));
+        g.addColorStop(0, PI);
+        g.addColorStop(lo, PI);
+        g.addColorStop(mid, hi);
+        g.addColorStop(up, PI);
+        g.addColorStop(1, PI);
+        ctx.fillStyle = g;
+      }
+    }
     drawRegion(ctx, opts.isInk, N, x0, y0, cell, cell * RADIUS);
 
     if (opts.breaks && opts.breaks.length) {
@@ -1265,6 +1336,15 @@ function TapaCore() {
   var startedAt = 0, elapsed = 0, tickTimer = null;
   var boardEl = document.getElementById("board");
 
+  /* Every trace of the finished state has to be cleared before a new board,
+     or the message and its button linger over the next puzzle. */
+  function resetFinish() {
+    document.querySelector(".thumb").classList.remove("gone");
+    var el = document.getElementById("finish");
+    el.classList.remove("in");
+    el.classList.remove("show");
+  }
+
   function keyOf(r, c) { return r * G.size + c; }
   function isClue(r, c) { return G && G.clues.hasOwnProperty(keyOf(r, c)); }
   function inGrid(r, c) { return G && r >= 0 && r < G.size && c >= 0 && c < G.size; }
@@ -1321,7 +1401,7 @@ function TapaCore() {
       cells = new Uint8Array(size * size);
       undoStack = [];
       finished = false;
-      document.querySelector(".thumb").classList.remove("gone");
+      resetFinish();
       elapsed = 0;
       startClock();
       save.current = { size: size, num: num, cells: Array.from(cells),
@@ -1341,7 +1421,7 @@ function TapaCore() {
     cells = Uint8Array.from(c.cells || new Array(c.size * c.size).fill(0));
     undoStack = [];
     finished = false;
-    document.querySelector(".thumb").classList.remove("gone");
+    resetFinish();
     elapsed = c.elapsed || 0;
     document.getElementById("playTitle").textContent =
       c.size + " × " + c.size + " · №" + c.num;
@@ -1492,10 +1572,22 @@ function TapaCore() {
     /* the controls have nothing left to do */
     document.querySelector(".thumb").classList.add("gone");
     document.getElementById("playClock").textContent = "";
-    dissolve();
+    document.getElementById("fmsg").textContent = "Solved in " + fmt(secs) + "!";
+    dissolve(showFinish);
   }
 
-  function dissolve() {
+  function showFinish() {
+    var el = document.getElementById("finish");
+    el.classList.add("show");
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { el.classList.add("in"); });
+    });
+  }
+
+  /* Three beats: the clue numerals go, then the grid goes out from under the
+     wall, then a band of lighter pigment sweeps outward through the ink and
+     settles. Only then does anything appear underneath. */
+  function dissolve(done) {
     var size = G.size, region = G.region;
     var base = {
       N: size, clues: G.clues,
@@ -1507,21 +1599,32 @@ function TapaCore() {
     var bare = Object.assign({}, base, { showGrid: false, showClues: false });
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       paint(boardEl, bare);
+      done();
       return;
     }
-    var start = null, dur = 1400;
+    var start = null, dur = 2300;
     function step(ts) {
       if (start === null) start = ts;
       var t = Math.min(1, (ts - start) / dur);
-      paint(boardEl, Object.assign({}, base, {
-        clueAlpha: 1 - Math.min(1, t / 0.38),
-        gridAlpha: 1 - Math.max(0, Math.min(1, (t - 0.34) / 0.5))
-      }));
+      var o = {
+        clueAlpha: 1 - Math.min(1, t / 0.20),
+        gridAlpha: 1 - Math.max(0, Math.min(1, (t - 0.18) / 0.26))
+      };
+      if (t > 0.44) {
+        var s = (t - 0.44) / 0.52;          /* wavefront, 0 -> just past 1 */
+        if (s <= 1.08) o.sheen = s;
+      }
+      paint(boardEl, Object.assign({}, base, o));
       if (t < 1) requestAnimationFrame(step);
-      else paint(boardEl, bare);
+      else { paint(boardEl, bare); done(); }
     }
     requestAnimationFrame(step);
   }
+
+  document.getElementById("fnext").addEventListener("click", function () {
+    if (!G) return;
+    openPuzzle(G.size, G.num + 1);
+  });
 
   /* ---------- rules ---------- */
   var RULES = [
