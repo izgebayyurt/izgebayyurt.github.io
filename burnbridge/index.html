@@ -9,183 +9,196 @@
 <title>burnbridge</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23061119'/%3E%3Cpath d='M6 20 L16 11 L26 20' stroke='%23ff8a4c' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='21' r='3.4' fill='%23d8ccb1'/%3E%3Ccircle cx='26' cy='21' r='3.4' fill='%234ec9e8'/%3E%3C/svg%3E" />
 <style>
+  /* Ink on paper, borrowed wholesale from tapa: the same page, the same ink,
+     the same one-accent discipline. Travellers are the exception — a map with
+     four parties on it needs four pigments — so they are chosen as printing
+     inks of roughly equal weight rather than as screen colours. */
   :root {
-    --sea:    #061119;
-    --chrome: #0a1620;
-    --chrome2:#10222e;
-    --line:   #1b3441;
-    --ink:    #e9f2f5;
-    --dim:    #7c96a1;
-    --dimmer: #526874;
-    --t0:     #ff8a4c;
-    --t1:     #4ec9e8;
-    --t2:     #b98cff;
-    --t3:     #8fdc6a;
-    --gold:   #ffcf6b;
-    --good:   #5fdca0;
-    --burn:   #24343d;
+    --pg:#ece9e1;            /* paper */
+    --pi:#2a2730;            /* ink — a purple-black, not a neutral one */
+    --pr:rgba(42,39,48,0.14);
+    --pd:rgba(42,39,48,0.55);
+    --pq:rgba(42,39,48,0.32);
+    --pfaint:rgba(42,39,48,0.20);
+    --t0:#c85f18;            /* vermilion */
+    --t1:#2f6f8f;            /* steel */
+    --t2:#7a5e9a;            /* violet */
+    --t3:#5c7a3c;            /* olive */
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",ui-serif,Georgia,serif;
+    --sans:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* Night derived from paper rather than inverted: the ground keeps the purple
+     bias, the ink goes warm chalk, and the pigments lift instead of flipping. */
+  html[data-theme="night"] {
+    --pg:#191519;
+    --pi:#ded7c8;
+    --pr:rgba(222,215,200,0.15);
+    --pd:rgba(222,215,200,0.56);
+    --pq:rgba(222,215,200,0.34);
+    --pfaint:rgba(222,215,200,0.22);
+    --t0:#ff8a4c;
+    --t1:#5aa8c8;
+    --t2:#a888c8;
+    --t3:#8fb85e;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body {
-    margin: 0; padding: 0; height: 100%; overflow: hidden;
-    background: var(--sea); color: var(--ink);
-    font-family: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    user-select: none; -webkit-user-select: none;
-    overscroll-behavior: none;
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--pg); color:var(--pi);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    user-select:none; -webkit-user-select:none; overscroll-behavior:none;
   }
-  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
-  .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #app { position:fixed; inset:0; display:flex; flex-direction:column; }
+  button { font-family:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--t2); outline-offset:2px; }
+  .serif { font-family:var(--serif); font-variant-numeric:tabular-nums; }
+  .label { font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--pd); font-weight:500; }
 
   /* ---------- top bar ---------- */
   #hud {
-    flex: 0 0 auto; background: var(--chrome);
-    border-bottom: 1px solid var(--line);
-    padding: 8px 11px 0;
-    padding-top: max(8px, env(safe-area-inset-top));
+    flex:0 0 auto; padding:0 12px;
+    padding-top:max(6px, env(safe-area-inset-top));
+    border-bottom:1px solid var(--pr);
   }
-  #hudTop { display: flex; align-items: center; gap: 9px; }
-  .iconbtn {
-    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px;
-    background: var(--chrome2); border: 1px solid var(--line); color: var(--dim);
-    font-size: 14px; cursor: pointer; display: grid; place-items: center; padding: 0;
-    font-family: inherit; line-height: 1;
+  #hudTop { display:flex; align-items:center; gap:10px; min-height:44px; }
+  .icon {
+    width:30px; height:30px; display:grid; place-items:center;
+    color:var(--pd); font-size:19px; line-height:1; cursor:pointer;
+    background:none; border:0; padding:0; border-radius:8px; flex:0 0 auto;
   }
-  .iconbtn:active { background: #16303e; color: var(--ink); }
-  .iconbtn[disabled] { opacity: .34; }
-  #lname { flex: 1 1 auto; font-size: 14px; font-weight: 600; }
-  #tally { flex: 0 0 auto; text-align: right; }
-  #cost { font-size: 18px; font-weight: 500; letter-spacing: .04em; line-height: 1.1; }
-  #cost.over { color: var(--t0); }
-  #par { font-size: 9.5px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+  .icon:active { background:var(--pr); }
+  .icon[disabled] { opacity:0.3; }
+  #lname { flex:1 1 auto; font-family:var(--serif); font-size:19px; font-weight:600; letter-spacing:-0.01em; }
+  #tally { flex:0 0 auto; text-align:right; margin-right:2px; }
+  #cost { font-family:var(--serif); font-size:19px; font-weight:600; line-height:1.05; font-variant-numeric:tabular-nums; }
+  #cost.over { color:var(--t0); }
+  #par { font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pq); margin-top:1px; }
 
-  /* ---------- traveller chips: legend and selector in one ---------- */
-  #chips { display: flex; gap: 6px; padding: 7px 0 8px; overflow-x: auto; scrollbar-width: none; }
-  #chips::-webkit-scrollbar { display: none; }
+  /* traveller chips: legend and selector in one */
+  #chips { display:flex; gap:6px; padding:0 2px 9px; overflow-x:auto; scrollbar-width:none; }
+  #chips::after { content:''; flex:0 0 2px; }
+  #chips::-webkit-scrollbar { display:none; }
   .chip {
-    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 9px 4px 7px; border-radius: 8px; cursor: pointer;
-    background: transparent; border: 1px solid var(--line);
-    font-family: inherit; font-size: 11.5px; font-weight: 500; color: var(--dim);
-    line-height: 1;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    padding:5px 10px; border-radius:9px; cursor:pointer; line-height:1;
+    background:none; border:1px solid var(--pr); color:var(--pd);
+    font-size:11px; letter-spacing:0.04em;
   }
-  .chip .gl { font-size: 10px; }
-  .chip.on { background: var(--chrome2); color: var(--ink); }
-  .chip.done { opacity: .4; }
-  .chip.neutral { border-style: dashed; cursor: default; }
-  .chip.stuck { text-decoration: line-through; opacity: .45; }
+  .chip .ct { font-family:var(--serif); font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .chip.on { border-color:currentColor; }
+  .chip.done { opacity:0.42; }
+  .chip.stuck { opacity:0.3; }
+  .chip.neutral { border-style:dashed; cursor:default; }
+  .chip canvas { display:block; width:13px; height:13px; }
 
   /* ---------- board ---------- */
-  #board { flex: 1 1 auto; position: relative; min-height: 0; }
-  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #board { flex:1 1 auto; position:relative; min-height:0; }
+  #cv { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   #hint {
-    position: absolute; left: 14px; right: 14px; bottom: 10px;
-    text-align: center; font-size: 12px; color: var(--dim);
-    pointer-events: none; transition: opacity .4s; line-height: 1.5;
+    position:absolute; left:20px; right:20px; bottom:14px; text-align:center;
+    font-size:12px; line-height:1.55; color:var(--pd); pointer-events:none;
+    transition:opacity .4s;
   }
-  #hint.gone { opacity: 0; }
-  #hint b { color: var(--ink); font-weight: 500; }
+  #hint.gone { opacity:0; }
+  #hint b { color:var(--pi); font-weight:600; }
 
-  /* A bar, not a modal — the board stays playable while it is up. */
+  /* A card on the page, not a modal over it — the board stays playable. */
   #warn {
-    position: absolute; left: 10px; right: 10px;
-    bottom: max(10px, env(safe-area-inset-bottom));
-    display: flex; align-items: center; gap: 8px;
-    padding: 9px 9px 9px 12px; border-radius: 12px;
-    background: rgba(14,28,36,.94); border: 1px solid #4a3a22;
-    box-shadow: 0 6px 22px rgba(0,0,0,.4);
-    transition: opacity .3s, transform .3s;
+    position:absolute; left:12px; right:12px;
+    bottom:max(12px, env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:10px;
+    padding:11px 11px 11px 14px; border-radius:13px;
+    background:var(--pg); border:1px solid var(--pr);
+    box-shadow:0 8px 26px rgba(42,39,48,0.10);
+    transition:opacity .3s, transform .3s;
   }
-  #warn.gone { opacity: 0; transform: translateY(8px); pointer-events: none; }
-  #warnText { flex: 1 1 auto; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
-  #warnText b { color: var(--gold); font-weight: 500; }
-  #warn button {
-    flex: 0 0 auto; font-family: inherit; font-size: 11.5px; font-weight: 500;
-    border-radius: 8px; cursor: pointer; padding: 7px 11px;
-    background: var(--gold); border: 1px solid var(--gold); color: #241a06;
+  html[data-theme="night"] #warn { box-shadow:0 8px 26px rgba(0,0,0,0.45); }
+  #warn.gone { opacity:0; transform:translateY(8px); pointer-events:none; }
+  #warnText { flex:1 1 auto; font-size:11.5px; line-height:1.5; color:var(--pd); }
+  #warnText b { color:var(--pi); font-weight:600; }
+  #warnGo {
+    flex:0 0 auto; border:0; border-radius:9px; cursor:pointer;
+    padding:8px 13px; background:var(--pi); color:var(--pg);
+    font-size:11.5px; font-weight:600;
   }
-  #warn button:active { filter: brightness(1.1); }
-  #warn #warnX {
-    background: transparent; border-color: transparent; color: var(--dimmer);
-    padding: 7px 6px; font-size: 12px;
-  }
+  #warnGo:active { opacity:0.85; }
+  #warnX { flex:0 0 auto; background:none; border:0; color:var(--pq); font-size:13px; cursor:pointer; padding:8px 4px; }
 
-  /* ---------- screens & overlays ---------- */
+  /* ---------- screens ---------- */
   .screen {
-    position: absolute; inset: 0; z-index: 5; background: var(--sea);
-    display: flex; flex-direction: column;
-    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    position:absolute; inset:0; z-index:5; background:var(--pg);
+    display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding:max(16px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom));
   }
-  .ov {
-    position: absolute; inset: 0; z-index: 8; background: rgba(4,11,16,.82);
-    display: flex; align-items: center; justify-content: center; padding: 22px;
-    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
-  }
-  .hidden { display: none !important; }
-  .card {
-    width: 100%; max-width: 380px; background: var(--chrome);
-    border: 1px solid var(--line); border-radius: 16px; padding: 20px 18px; text-align: center;
-  }
-  .card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
-  .card p { margin: 0 0 14px; font-size: 13px; color: var(--dim); line-height: 1.6; }
-  .card p.tight { margin-bottom: 8px; }
-  .card p b { color: var(--ink); font-weight: 500; }
-  .btn {
-    display: block; width: 100%; margin-top: 9px; padding: 12px 14px;
-    border-radius: 11px; border: 1px solid var(--line); background: var(--chrome2);
-    color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
-  }
-  .btn:active { background: #17313f; }
-  .btn.primary { background: var(--t0); border-color: var(--t0); color: #1a0c05; font-weight: 600; }
-  .btn.ghost { background: transparent; color: var(--dim); }
-  .row2 { display: flex; gap: 9px; }
-  .row2 .btn { margin-top: 9px; }
+  .hidden { display:none !important; }
 
-  .stars { font-size: 24px; letter-spacing: 6px; margin: 4px 0 12px; color: var(--burn); }
-  .stars b { color: var(--gold); font-weight: 400; }
-  .scoreline { display: flex; justify-content: center; gap: 22px; margin: 2px 0 14px; }
-  .scoreline div { text-align: center; }
-  .scoreline .v { font-size: 22px; font-weight: 500; }
-  .scoreline .k { font-size: 9.5px; color: var(--dim); letter-spacing: .11em; text-transform: uppercase; margin-top: 2px; }
-
-  #menu { justify-content: center; align-items: center; text-align: center; }
-  #menu .wrap { width: 100%; max-width: 340px; }
-  .logo { font-size: 40px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 2px; }
-  .logo span { color: var(--t0); }
-  .logo em { color: var(--t1); font-style: normal; }
-  .tag { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin-bottom: 26px; }
-  .credit { margin-top: 24px; font-size: 10.5px; color: var(--dimmer); letter-spacing: .04em; }
-
-  #levels .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  #levels .head h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1 1 auto; }
-  #levels .head .tot { font-size: 12px; color: var(--gold); }
-  .actlabel {
-    font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--dimmer); margin: 16px 0 8px;
+  .pbtn {
+    display:block; width:100%; margin-top:9px; padding:14px; border-radius:12px; border:0;
+    background:var(--pi); color:var(--pg); font-size:14.5px; font-weight:600; cursor:pointer;
   }
-  .actlabel:first-of-type { margin-top: 0; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+  .pbtn.ghost { background:transparent; color:var(--pd); font-weight:500; border:1px solid var(--pr); }
+  .pbtn:active { opacity:0.85; }
+  .row2 { display:flex; gap:9px; }
+
+  /* ---------- menu ---------- */
+  #menu { justify-content:center; }
+  #menu .wrap { width:100%; max-width:360px; margin:0 auto; }
+  .wordmark { font-family:var(--serif); font-size:40px; line-height:1; font-weight:600; letter-spacing:-0.015em; }
+  .wordsub { margin-top:9px; margin-bottom:30px; }
+  .homefoot { margin-top:26px; display:flex; gap:22px; }
+  .homefoot button {
+    background:none; border:0; padding:6px 0; cursor:pointer;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd);
+  }
+
+  /* ---------- level index ---------- */
+  #levels .idxh { display:flex; align-items:baseline; gap:10px; padding:2px 2px 6px; }
+  #levels .idxh .t { font-family:var(--serif); font-size:23px; font-weight:600; }
+  #levels .idxh .s { margin-left:auto; font-family:var(--serif); font-size:13.5px; color:var(--pq); font-variant-numeric:tabular-nums; }
+  .actlabel { margin:20px 0 10px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:9px; }
   .tile {
-    background: var(--chrome); border: 1px solid var(--line); border-radius: 12px;
-    padding: 9px 8px; cursor: pointer; color: var(--ink); font-family: inherit;
-    min-height: 58px; display: flex; flex-direction: column; justify-content: space-between;
+    border:1px solid var(--pr); border-radius:12px; background:none; cursor:pointer;
+    padding:14px 6px 10px; display:flex; flex-direction:column; align-items:center; gap:7px;
   }
-  .tile:active { background: var(--chrome2); }
-  .tile .n { font-size: 14px; font-weight: 500; }
-  .tile .st { font-size: 9.5px; letter-spacing: 2px; color: var(--burn); margin-top: 5px; }
-  .tile .st b { color: var(--gold); font-weight: 400; }
-  .tile .st.done { color: var(--good); letter-spacing: 0; }
-  .tile.locked { opacity: .32; }
-  .tile.mark { border-color: #3a3320; }
-  .tile.mark .n { color: var(--gold); font-size: 12px; }
+  .tile:active { background:var(--pr); }
+  .tile .n { font-family:var(--serif); font-size:19px; font-weight:600; color:var(--pd); font-variant-numeric:tabular-nums; }
+  .tile.solved .n { color:var(--pi); }
+  .tile .st { display:flex; gap:3px; }
+  .tile .st i { width:4px; height:4px; border-radius:50%; background:var(--pr); }
+  .tile .st i.on { background:var(--pi); }
+  .tile.locked { opacity:0.32; }
+  .tile.mark .n { font-size:15px; color:var(--t2); }
 
-  .howlist { text-align: left; font-size: 13px; color: var(--dim); line-height: 1.65; margin: 0 0 14px; padding-left: 18px; }
-  .howlist li { margin-bottom: 7px; }
-  .howlist b { color: var(--ink); font-weight: 500; }
-  .key { display: flex; flex-direction: column; gap: 7px; margin: 0 0 15px; }
-  .keyrow { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); text-align: left; }
-  .keyrow canvas { flex: 0 0 auto; }
+  /* ---------- cards ---------- */
+  .ov {
+    position:absolute; inset:0; z-index:8; display:flex; align-items:center; justify-content:center;
+    padding:22px; background:color-mix(in srgb, var(--pg) 82%, transparent);
+    backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  }
+  .card {
+    width:100%; max-width:380px; background:var(--pg);
+    border:1px solid var(--pr); border-radius:16px; padding:22px 20px; text-align:center;
+    box-shadow:0 12px 40px rgba(42,39,48,0.12);
+  }
+  html[data-theme="night"] .card { box-shadow:0 12px 40px rgba(0,0,0,0.5); }
+  .card h2 { margin:0 0 10px; font-family:var(--serif); font-size:22px; font-weight:600; }
+  .card p { margin:0 0 14px; font-size:13px; color:var(--pd); line-height:1.65; }
+  .card p.tight { margin-bottom:9px; }
+  .card p b { color:var(--pi); font-weight:600; }
+  .scoreline { display:flex; justify-content:center; gap:26px; margin:14px 0 16px; }
+  .scoreline .v { font-family:var(--serif); font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .scoreline .k { font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pq); margin-top:3px; }
+  .marks { display:flex; justify-content:center; gap:7px; margin:2px 0 4px; }
+  .marks i { width:7px; height:7px; border-radius:50%; background:var(--pr); }
+  .marks i.on { background:var(--pi); }
+
+  .howlist { text-align:left; font-size:13px; color:var(--pd); line-height:1.7; margin:0 0 16px; padding-left:17px; }
+  .howlist li { margin-bottom:8px; }
+  .howlist b { color:var(--pi); font-weight:600; }
+  .key { display:flex; flex-direction:column; gap:9px; margin:0 0 16px; }
+  .keyrow { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--pd); text-align:left; }
+  .keyrow canvas { flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -193,11 +206,11 @@
 
   <div id="hud">
     <div id="hudTop">
-      <button class="iconbtn" id="bBack" aria-label="Back">‹</button>
+      <button class="icon" id="bBack" aria-label="Back">‹</button>
       <div id="lname">—</div>
-      <div id="tally"><div id="cost" class="mono">0</div><div id="par">par —</div></div>
-      <button class="iconbtn" id="bUndo" aria-label="Undo">↶</button>
-      <button class="iconbtn" id="bRestart" aria-label="Restart">↺</button>
+      <div id="tally"><div id="cost">0</div><div id="par">par —</div></div>
+      <button class="icon" id="bUndo" aria-label="Undo">↶</button>
+      <button class="icon" id="bRestart" aria-label="Restart">↺</button>
     </div>
     <div id="chips"></div>
   </div>
@@ -213,18 +226,20 @@
 
     <div class="screen" id="menu">
       <div class="wrap">
-        <div class="logo">burn<span>br</span><em>idge</em></div>
-        <div class="tag">Travellers who share one set of bridges.<br />Every crossing burns the bridge behind it.</div>
-        <button class="btn primary" id="bPlay">Play</button>
-        <button class="btn" id="bLevels">Crossings</button>
-        <button class="btn" id="bDrift">Drift · endless</button>
-        <button class="btn ghost" id="bHow">How to play</button>
-        <div class="credit">after Euler, Königsberg, 1736</div>
+        <div class="wordmark">Burnbridge</div>
+        <div class="wordsub label">Every crossing burns the bridge</div>
+        <button class="pbtn" id="bPlay">Play</button>
+        <button class="pbtn ghost" id="bLevels">Crossings</button>
+        <button class="pbtn ghost" id="bDrift">Drift · endless</button>
+        <div class="homefoot">
+          <button id="bHow">How to play</button>
+          <button id="bTheme">Theme</button>
+        </div>
       </div>
     </div>
 
     <div class="screen hidden" id="levels">
-      <div class="head"><h2>Crossings</h2><div class="tot" id="totStars">0 ★</div></div>
+      <div class="idxh"><div class="t">Crossings</div><div class="s" id="totStars">0</div></div>
       <div id="acts"></div>
     </div>
 
@@ -238,6 +253,7 @@
 
 var $ = function (id) { return document.getElementById(id); };
 var TAU = Math.PI * 2;
+var SERIF = '"Iowan Old Style","Palatino Linotype",Palatino,ui-serif,Georgia,serif';
 var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
 
 /* ============================================================
@@ -806,7 +822,7 @@ function driftLevel(depth) {
    Persistence
    ============================================================ */
 
-var SAVE = { stars: {}, best: {}, drift: 0, seenHow: false };
+var SAVE = { stars: {}, best: {}, drift: 0, seenHow: false, theme: 'auto' };
 try {
   var sv = localStorage.getItem('burnbridge.v3');
   if (sv) { var pj = JSON.parse(sv); if (pj && typeof pj === 'object') SAVE = Object.assign(SAVE, pj); }
@@ -830,8 +846,8 @@ var G = {
   par: 0, oddInfo: null,
   pos: [], paths: [], used: [], burnt: null, met: [],
   vis: 0, cost: 0, undos: 0, sel: 0,
-  deadAt: null, deadTime: 0, warnDismissed: -1,
-  overlay: null, revealOdd: false, parts: [], t: 0
+  deadAt: null, deadTime: 0, warnDismissed: -1, burnAt: {}, solvedAt: 0,
+  overlay: null, revealOdd: false, t: 0
 };
 
 function loadLevel(lv, idx, mode) {
@@ -855,7 +871,7 @@ function resetLevel() {
   G.used = [];
   G.burnt = new Uint8Array(lv.edges.length);
   G.vis = s.vis;
-  G.cost = 0; G.sel = 0; G.parts.length = 0;
+  G.cost = 0; G.sel = 0; G.burnAt = {}; G.solvedAt = 0;
   G.deadAt = null; G.deadTime = 0; G.warnDismissed = -1;
   syncHud();
 }
@@ -932,10 +948,10 @@ function cross(w, ei) {
   var bit = lv.claimBit[w][nx];
   if (bit !== undefined) G.met[w] |= bit;
   G.sel = w;
-  spawnEmbers(ei, w);
+  markBurn(ei);
   syncHud();
 
-  if (isWon()) { G.deadAt = null; finishLevel(); return true; }
+  if (isWon()) { G.deadAt = null; G.solvedAt = G.t; finishLevel(); return true; }
   refreshDead();
   if (!anyMoveLeft()) setOverlay('stranded');
   else if (!canMove(w)) selectNextMovable();
@@ -1005,14 +1021,45 @@ function finishLevel() {
 
 var cv = $('cv'), ctx = cv.getContext('2d');
 var VW = 0, VH = 0, DPR = 1, SX = 0, SY = 0, OX = 0, OY = 0, R = 14, SC = 1;
-var TEAM  = ['#ff8a4c', '#4ec9e8', '#b98cff', '#8fdc6a'];
-var TEAMD = [[255,138,76], [78,201,232], [185,140,255], [143,220,106]];
-var GLYPH = ['▲', '■', '◆', '⬟'];
 
+/* The canvas takes its colours from the stylesheet, so paper and night are one
+   source of truth. Read once per theme change rather than per frame. */
+var INK = {};
+function readTheme() {
+  var cs = getComputedStyle(document.documentElement);
+  function v(n) { return cs.getPropertyValue(n).trim(); }
+  INK.paper = v('--pg');
+  INK.ink = v('--pi');
+  INK.team = [v('--t0'), v('--t1'), v('--t2'), v('--t3')];
+  INK.inkRGB = hexRGB(INK.ink);
+  INK.teamRGB = INK.team.map(hexRGB);
+}
+function hexRGB(h) {
+  h = h.replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
 function rgba(w, alpha) {
-  var c = TEAMD[w];
+  var c = INK.teamRGB[w];
   return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
 }
+function inkA(alpha) {
+  var c = INK.inkRGB;
+  return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
+}
+
+function applyTheme() {
+  var t = SAVE.theme || 'auto';
+  var night = t === 'night' ||
+    (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', night ? 'night' : 'paper');
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', night ? '#191519' : '#ece9e1');
+  readTheme();
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+  if ((SAVE.theme || 'auto') === 'auto') { applyTheme(); syncHud(); }
+});
 
 function resize() {
   var r = cv.getBoundingClientRect();
@@ -1083,45 +1130,33 @@ function distToEdge(e, px, py) {
   return best;
 }
 
-function spawnEmbers(ei, w) {
-  var e = G.lv.edges[ei];
-  for (var i = 0; i < 14; i++) {
-    var p = bezAt(e, i / 13);
-    G.parts.push({
-      x: p[0], y: p[1], w: w,
-      vx: (Math.random() - 0.5) * 0.5, vy: -0.25 - Math.random() * 0.6,
-      life: 1, decay: 0.009 + Math.random() * 0.013, r: 1 + Math.random() * 1.8
-    });
-  }
+/* Burning a bridge is the only motion on the page: the span fades from live
+   pigment to spent over a moment, and its arrowhead grows in. No particles —
+   this is a map being drawn on, not a fire. */
+function markBurn(ei) { G.burnAt[ei] = G.t; }
+function burnPhase(ei) {
+  var t0 = G.burnAt[ei];
+  if (t0 === undefined) return 1;
+  return clamp((G.t - t0) / 300, 0, 1);
 }
 
-function drawSea() {
-  var g = ctx.createLinearGradient(0, 0, 0, VH);
-  g.addColorStop(0, '#08161f'); g.addColorStop(1, '#040d14');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
-  ctx.strokeStyle = 'rgba(90,150,175,0.05)'; ctx.lineWidth = 1;
-  for (var y = 18; y < VH; y += 28) {
-    ctx.beginPath();
-    for (var x = -10; x <= VW + 10; x += 16) {
-      var yy = y + Math.sin((x * 0.017) + G.t * 0.0006 + y * 0.05) * 2.2;
-      if (x <= 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
-    }
-    ctx.stroke();
-  }
+function drawPaper() {
+  ctx.fillStyle = INK.paper;
+  ctx.fillRect(0, 0, VW, VH);
 }
 
 /* ---------- bridges: three states, three unmistakable treatments ----------
-   standing  — thin, cool, low contrast. It recedes.
-   reachable — the selected traveller can cross it right now: thick, bright,
-               tinted with that traveller's colour.
-   burnt     — dashed in the colour of whoever burnt it, with an arrowhead
-               showing which way they went. Spent, by them, that way.        */
+   standing  — an ink hairline. Present, but it recedes into the page.
+   crossable — solid, in the pigment of the traveller you have picked up. The
+               only saturated lines on the board are the ones you may take now.
+   burnt     — the same pigment at a fraction of its strength, with a solid
+               arrowhead: spent, by them, that way.                          */
 
-function drawStanding(e) {
+function drawStanding(e, fade) {
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(126,156,171,0.34)';
-  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = inkA(0.30 * (fade === undefined ? 1 : fade));
+  ctx.lineWidth = 1.6;
   edgePath(e); ctx.stroke();
   ctx.restore();
 }
@@ -1129,71 +1164,66 @@ function drawStanding(e) {
 function drawReachable(e, w) {
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.strokeStyle = rgba(w, 0.13);
-  ctx.lineWidth = 13;
-  edgePath(e); ctx.stroke();
-  ctx.strokeStyle = 'rgba(236,226,208,0.92)';
-  ctx.lineWidth = 4.4;
+  ctx.strokeStyle = rgba(w, 0.95);
+  ctx.lineWidth = 3.4;
   edgePath(e); ctx.stroke();
   ctx.restore();
 }
 
 function drawBurnt(mv) {
-  var e = G.lv.edges[mv.ei];
+  var e = G.lv.edges[mv.ei], ph = burnPhase(mv.ei);
   ctx.save();
-  ctx.lineCap = 'butt';
-  ctx.setLineDash([5, 5]);
-  ctx.strokeStyle = rgba(mv.w, 0.62);
-  ctx.lineWidth = 2.8;
+  ctx.lineCap = 'round';
+  // Live pigment settling to spent.
+  ctx.strokeStyle = rgba(mv.w, 0.95 - 0.62 * ph);
+  ctx.lineWidth = 3.4 - 1.2 * ph;
   edgePath(e); ctx.stroke();
-  ctx.setLineDash([]);
 
-  // Arrowhead at the midpoint, pointing the way the traveller walked.
   var fwd = (e.a === mv.from);
-  var t = 0.5, p = bezAt(e, t), q = bezAt(e, t + (fwd ? 0.06 : -0.06));
+  var p = bezAt(e, 0.5), q = bezAt(e, 0.5 + (fwd ? 0.06 : -0.06));
   var dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1;
   dx /= L; dy /= L;
-  var s = clamp(R * 0.42, 5, 9);
+  var sz = clamp(R * 0.36, 4.5, 8) * (0.4 + 0.6 * ph);
   ctx.beginPath();
-  ctx.moveTo(p[0] + dx * s, p[1] + dy * s);
-  ctx.lineTo(p[0] - dx * s * 0.55 - dy * s * 0.62, p[1] - dy * s * 0.55 + dx * s * 0.62);
-  ctx.lineTo(p[0] - dx * s * 0.55 + dy * s * 0.62, p[1] - dy * s * 0.55 - dx * s * 0.62);
+  ctx.moveTo(p[0] + dx * sz, p[1] + dy * sz);
+  ctx.lineTo(p[0] - dx * sz * 0.5 - dy * sz * 0.66, p[1] - dy * sz * 0.5 + dx * sz * 0.66);
+  ctx.lineTo(p[0] - dx * sz * 0.5 + dy * sz * 0.66, p[1] - dy * sz * 0.5 - dx * sz * 0.66);
   ctx.closePath();
-  ctx.fillStyle = rgba(mv.w, 0.9);
+  ctx.fillStyle = rgba(mv.w, 0.85);
   ctx.fill();
   ctx.restore();
 }
 
-// One visual channel each: a glyph means the island is claimed, a ring means
-// a traveller is standing on it. Never both for the same thing.
-function claimGlyph(x, y, claim, size, solid) {
-  var w = claim - 1;
+/* A claimed island carries its owner's mark on a disc of bare paper, so it
+   stays legible whether the island is still blank or has been inked in. */
+function claimShape(x, y, w, size) {
   ctx.beginPath();
-  if (w === 0) {                       // triangle
+  if (w === 0) {
     ctx.moveTo(x, y - size);
     ctx.lineTo(x + size * 0.92, y + size * 0.72);
     ctx.lineTo(x - size * 0.92, y + size * 0.72);
     ctx.closePath();
-  } else if (w === 1) {                // square
+  } else if (w === 1) {
     ctx.rect(x - size * 0.82, y - size * 0.82, size * 1.64, size * 1.64);
-  } else if (w === 2) {                // diamond
-    ctx.moveTo(x, y - size * 1.05);
-    ctx.lineTo(x + size * 0.95, y);
-    ctx.lineTo(x, y + size * 1.05);
-    ctx.lineTo(x - size * 0.95, y);
+  } else if (w === 2) {
+    ctx.moveTo(x, y - size * 1.06);
+    ctx.lineTo(x + size * 0.96, y);
+    ctx.lineTo(x, y + size * 1.06);
+    ctx.lineTo(x - size * 0.96, y);
     ctx.closePath();
-  } else {                             // pentagon
+  } else {
     for (var i = 0; i < 5; i++) {
       var ang = -Math.PI / 2 + i * TAU / 5;
-      var px = x + Math.cos(ang) * size * 1.05, py = y + Math.sin(ang) * size * 1.05;
+      var px = x + Math.cos(ang) * size * 1.06, py = y + Math.sin(ang) * size * 1.06;
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.closePath();
   }
-  if (solid) { ctx.fillStyle = TEAM[w]; ctx.fill(); }
-  else { ctx.strokeStyle = TEAM[w]; ctx.lineWidth = 2.1; ctx.stroke(); }
 }
 
+/* An island is blank paper until someone stands on it, then it is inked in.
+   Reaching every island is the goal, so that is the loudest thing on the page:
+   the board fills with ink as it is solved. */
 function drawNode(i) {
   var n = G.lv.nodes[i], x = PX(n), y = PY(n);
   var visited = !!((G.vis >> i) & 1);
@@ -1204,60 +1234,55 @@ function drawNode(i) {
   }
 
   ctx.beginPath(); ctx.arc(x, y, R, 0, TAU);
-  if (visited) { ctx.fillStyle = '#bfb49b'; ctx.fill(); }
-  else {
-    ctx.fillStyle = '#0d1e28'; ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(206,195,170,0.62)'; ctx.stroke();
+  if (visited) {
+    ctx.fillStyle = INK.ink; ctx.fill();
+  } else {
+    ctx.fillStyle = INK.paper; ctx.fill();
+    ctx.lineWidth = 1.8; ctx.strokeStyle = inkA(0.5); ctx.stroke();
   }
+
   if (claim) {
-    ctx.save();
-    ctx.globalAlpha = settled ? 1 : 0.52 + 0.38 * Math.sin(G.t * 0.004);
-    claimGlyph(x, y, claim, R * 0.5, settled);
-    ctx.restore();
+    var w = claim - 1, r2 = R * 0.66;
+    ctx.beginPath(); ctx.arc(x, y, r2, 0, TAU);
+    ctx.fillStyle = INK.paper; ctx.fill();
+    if (settled) {
+      claimShape(x, y, w, r2 * 0.72);
+      ctx.fillStyle = INK.team[w]; ctx.fill();
+    } else {
+      claimShape(x, y, w, r2 * 0.7);
+      ctx.strokeStyle = INK.team[w]; ctx.lineWidth = 1.9; ctx.stroke();
+    }
   }
 
   if (G.revealOdd && G.oddInfo && G.oddInfo.deg) {
     var d = G.oddInfo.deg[i], odd = d % 2 === 1;
-    ctx.beginPath(); ctx.arc(x, y, R + 9, 0, TAU);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = odd ? 'rgba(255,207,107,' + (0.55 + 0.35 * Math.sin(G.t * 0.006)).toFixed(3) + ')'
-                          : 'rgba(95,220,160,0.3)';
-    ctx.stroke();
-    ctx.font = '600 12px "Geist Mono", ui-monospace, monospace';
-    ctx.fillStyle = odd ? '#ffcf6b' : '#5fdca0';
+    ctx.font = '600 13px ' + SERIF;
+    ctx.fillStyle = odd ? INK.team[0] : inkA(0.4);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(d), x, y - R - 18);
+    ctx.fillText(String(d), x, y - R - 15);
   }
 }
 
+/* The traveller is a ring outside the island — never an outline of the island
+   itself, which already means "not yet reached". Rings nest so several
+   travellers standing together stay countable. */
 function drawWalker(w) {
   var n = G.lv.nodes[G.pos[w]], x = PX(n), y = PY(n);
   var isSel = (G.sel === w) && G.lv.W > 1;
   var stuck = !canMove(w);
-  // Concentric rings so two travellers on one island stay distinguishable.
-  var rad = R + 4.5 + w * 4.2;
-  if (isSel) {
-    var pulse = 1 + Math.sin(G.t * 0.005) * 0.08;
-    ctx.beginPath(); ctx.arc(x, y, rad * 1.42 * pulse, 0, TAU);
-    ctx.fillStyle = rgba(w, 0.11); ctx.fill();
-  }
+  var rad = R + 5.5 + w * 4.4;
+  ctx.save();
+  // A hairline of bare paper first, so the ring never merges into an inked island.
   ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
-  ctx.lineWidth = isSel ? 3.4 : 1.8;
-  ctx.strokeStyle = TEAM[w];
-  ctx.globalAlpha = stuck ? 0.28 : (isSel ? 1 : 0.5);
+  ctx.lineWidth = (isSel ? 3.4 : 2.2) + 2.4;
+  ctx.strokeStyle = INK.paper;
   ctx.stroke();
-  ctx.globalAlpha = 1;
-}
-
-function drawParts() {
-  for (var i = G.parts.length - 1; i >= 0; i--) {
-    var p = G.parts[i];
-    p.x += p.vx; p.y += p.vy; p.vy -= 0.008; p.life -= p.decay;
-    if (p.life <= 0) { G.parts.splice(i, 1); continue; }
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, TAU);
-    ctx.fillStyle = rgba(p.w, (p.life * 0.8).toFixed(3));
-    ctx.fill();
-  }
+  ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
+  ctx.lineWidth = isSel ? 3.4 : 2.2;
+  ctx.strokeStyle = INK.team[w];
+  ctx.globalAlpha = stuck ? 0.3 : (isSel ? 1 : 0.8);
+  ctx.stroke();
+  ctx.restore();
 }
 
 var warnOn = false, warnBack = -1;
@@ -1278,18 +1303,25 @@ function updateWarn() {
 function frame(ts) {
   G.t = ts || 0;
   updateWarn();
-  drawSea();
+  drawPaper();
   if (G.lv && G.screen === 'play') {
     var reach = {};
     if (!G.overlay) availableFrom(G.pos[G.sel]).forEach(function (ei) { reach[ei] = true; });
 
-    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && !reach[e.i]) drawStanding(e); });
+    // On the solve, the spans nobody took fade off the page, leaving the routes
+    // and the inked islands behind — the map, finished.
+    var fade = G.solvedAt ? clamp(1 - (G.t - G.solvedAt) / 900, 0, 1) : 1;
+
+    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && !reach[e.i]) drawStanding(e, fade); });
     G.used.forEach(drawBurnt);
-    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && reach[e.i]) drawReachable(e, G.sel); });
-    drawParts();
+    G.lv.edges.forEach(function (e) {
+      if (!G.burnt[e.i] && reach[e.i]) {
+        if (fade < 1) drawStanding(e, fade); else drawReachable(e, G.sel);
+      }
+    });
     for (var i = 0; i < G.lv.nodes.length; i++) drawNode(i);
     for (var k = G.lv.W - 1; k >= 0; k--) if (k !== G.sel) drawWalker(k);
-    drawWalker(G.sel);
+    if (G.lv.W > 1) drawWalker(G.sel);
   }
   requestAnimationFrame(frame);
 }
@@ -1420,7 +1452,7 @@ function syncHud() {
     ? 'Drift ' + G.index
     : (lv.interlude ? 'Königsberg, 1736' : String(lv.no).padStart(2, '0'));
   $('cost').textContent = String(G.cost);
-  $('cost').className = 'mono' + (!lv.euler && G.cost > G.par ? ' over' : '');
+  $('cost').className = (!lv.euler && G.cost > G.par ? 'over' : '');
   $('par').textContent = lv.euler ? ('of ' + lv.edges.length) : ('par ' + G.par);
   $('bUndo').disabled = G.used.length === 0;
 
@@ -1430,23 +1462,44 @@ function syncHud() {
       var owed = lv.claims[w].length - popcount(G.met[w]);
       var cls = 'chip' + (w === G.sel ? ' on' : '') + (owed === 0 ? ' done' : '') +
                 (canMove(w) ? '' : ' stuck');
-      html += '<button class="' + cls + '" data-w="' + w + '" style="color:' +
-              (w === G.sel ? TEAM[w] : '') + '">' +
-              '<span class="gl" style="color:' + TEAM[w] + '">' + GLYPH[w] + '</span>' +
-              (lv.claims[w].length ? owed + ' left' : 'free') + '</button>';
+      html += '<button class="' + cls + '" data-w="' + w + '"' +
+              (w === G.sel ? ' style="color:' + INK.team[w] + '"' : '') + '>' +
+              '<canvas class="cg" data-g="' + w + '" width="13" height="13"></canvas>' +
+              (lv.claims[w].length ? '<span class="ct">' + owed + '</span> left' : 'free') +
+              '</button>';
     }
     var unseen = lv.nodes.length - popcount(G.vis);
-    html += '<span class="chip neutral' + (unseen ? '' : ' done') + '">○ ' + unseen + ' island' +
-            (unseen === 1 ? '' : 's') + '</span>';
+    html += '<span class="chip neutral' + (unseen ? '' : ' done') + '">' +
+            '<span class="ct">' + unseen + '</span> island' + (unseen === 1 ? '' : 's') + '</span>';
   } else {
     html = '<span class="chip neutral">every bridge, exactly once</span>';
   }
   $('chips').innerHTML = html;
+  // Draw each chip's mark with the same code the board uses, so the legend can
+  // never drift from the thing it is labelling.
+  Array.prototype.forEach.call($('chips').querySelectorAll('canvas.cg'), function (c) {
+    paintGlyph(c, +c.getAttribute('data-g'));
+  });
   Array.prototype.forEach.call($('chips').querySelectorAll('.chip[data-w]'), function (c) {
     c.addEventListener('click', function () {
       G.sel = +c.getAttribute('data-w'); syncHud();
     });
   });
+}
+
+function paintGlyph(el, w, solid) {
+  var d = Math.min(window.devicePixelRatio || 1, 2.5);
+  var size = el.width || 13;
+  el.width = size * d; el.height = size * d;
+  el.style.width = size + 'px'; el.style.height = size + 'px';
+  var c = el.getContext('2d');
+  c.setTransform(d, 0, 0, d, 0, 0);
+  var save = ctx;
+  ctx = c;                            // claimShape draws through the shared ctx
+  claimShape(size / 2, size / 2, w, size * 0.36);
+  ctx = save;
+  if (solid === false) { c.strokeStyle = INK.team[w]; c.lineWidth = 1.6; c.stroke(); }
+  else { c.fillStyle = INK.team[w]; c.fill(); }
 }
 
 function setScreen(name) {
@@ -1469,13 +1522,16 @@ function showHint(txt) {
 }
 function hideHint() { $('hint').classList.add('gone'); }
 
-function starStr(n) {
+// Three dots, filled as earned — quieter than stars and it sits on paper.
+function marks(n, cls) {
   var out = '';
-  for (var i = 0; i < 3; i++) out += (i < n ? '<b>★</b>' : '★');
-  return out;
+  for (var i = 0; i < 3; i++) out += '<i class="' + (i < n ? 'on' : '') + '"></i>';
+  return '<div class="' + (cls || 'st') + '">' + out + '</div>';
 }
+// Count only crossings that exist now — a save carried over from an older
+// build can hold ids this version no longer ships.
 function totalStars() {
-  return Object.keys(SAVE.stars).reduce(function (s, k) { return s + (SAVE.stars[k] || 0); }, 0);
+  return LV.reduce(function (n, lv) { return n + (SAVE.stars[lv.id] || 0); }, 0);
 }
 function unlockedUpTo() {
   var i = 0;
@@ -1487,22 +1543,20 @@ var ACTS = ['Two travellers', 'Three travellers', 'Four travellers'];
 
 function buildGrid() {
   var open = unlockedUpTo();
-  $('totStars').innerHTML = totalStars() + ' ★';
+  $('totStars').textContent = totalStars() + ' / ' + (LV.filter(function (l) { return !l.interlude; }).length * 3);
   var html = '', act = -1;
   LV.forEach(function (lv, i) {
     var a = lv.interlude ? act : (lv.W - 2);
     if (a !== act) {
       if (act >= 0) html += '</div>';
-      html += '<div class="actlabel">' + (ACTS[a] || '') + '</div><div class="grid">';
+      html += '<div class="actlabel label">' + (ACTS[a] || '') + '</div><div class="grid">';
       act = a;
     }
     var st = SAVE.stars[lv.id], locked = i > open;
     var label = lv.interlude ? '1736' : String(lv.no).padStart(2, '0');
-    var stEl = lv.interlude
-      ? '<div class="st ' + (st !== undefined ? 'done' : '') + '">' + (st !== undefined ? '✓' : '—') + '</div>'
-      : '<div class="st">' + starStr(st || 0) + '</div>';
+    var stEl = lv.interlude ? marks(st !== undefined ? 3 : 0) : marks(st || 0);
     html += '<button class="tile' + (locked ? ' locked' : '') + (lv.interlude ? ' mark' : '') +
-      '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
+      (st ? ' solved' : '') + '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
       '<div class="n">' + label + '</div>' + stEl + '</button>';
   });
   html += '</div>';
@@ -1540,87 +1594,93 @@ var OVERLAYS = {
                    : diff + ' bridge' + (diff === 1 ? '' : 's') + ' more than needed.');
     var nextTxt = (G.mode === 'drift') ? 'Drift on'
                 : (G.index + 1 < LV.length ? 'Next' : 'Back to crossings');
-    return '<h2>Crossed</h2><div class="stars">' + starStr(st) + '</div>' +
+    return '<h2>Crossed</h2>' + marks(st, 'marks') +
       '<div class="scoreline">' +
-        '<div><div class="v mono">' + G.cost + '</div><div class="k">burnt</div></div>' +
-        '<div><div class="v mono">' + G.par + '</div><div class="k">par</div></div></div>' +
+        '<div><div class="v">' + G.cost + '</div><div class="k">burnt</div></div>' +
+        '<div><div class="v">' + G.par + '</div><div class="k">par</div></div></div>' +
       '<p class="tight">' + verdict + '</p>' +
-      '<button class="btn primary" data-act="next">' + nextTxt + '</button>' +
-      '<div class="row2"><button class="btn" data-act="replay">Again</button>' +
-      '<button class="btn" data-act="quit">Crossings</button></div>';
+      '<button class="pbtn" data-act="next">' + nextTxt + '</button>' +
+      '<div class="row2"><button class="pbtn ghost" data-act="replay">Again</button>' +
+      '<button class="pbtn ghost" data-act="quit">Crossings</button></div>';
   },
   stranded: function () {
-    var why = G.lv.interlude ? '<button class="btn" data-act="why">Why can nobody do this?</button>' : '';
+    var why = G.lv.interlude ? '<button class="pbtn ghost" data-act="why">Why can nobody do this?</button>' : '';
     return '<h2>Stranded</h2>' +
       '<p class="tight">Every bridge within reach is ash.</p>' +
-      '<button class="btn primary" data-act="undo">Step back</button>' +
-      '<button class="btn" data-act="replay">Restart</button>' + why +
-      '<button class="btn ghost" data-act="quit">Give up</button>';
+      '<button class="pbtn" data-act="undo">Step back</button>' +
+      '<button class="pbtn ghost" data-act="replay">Restart</button>' + why +
+      '<button class="pbtn ghost" data-act="quit">Give up</button>';
   },
   interludeIntro: function () {
     return '<h2>Königsberg, 1736</h2>' +
       '<p>Seven bridges over the Pregel. The city argued for years over one question: <b>can you walk a route that crosses every bridge exactly once?</b></p>' +
       '<p class="tight">One traveller this time. Try it.</p>' +
-      '<button class="btn primary" data-act="close">Try the walk</button>' +
-      '<button class="btn ghost" data-act="why">Just tell me</button>';
+      '<button class="pbtn" data-act="close">Try the walk</button>' +
+      '<button class="pbtn ghost" data-act="why">Just tell me</button>';
   },
   why: function () {
     G.revealOdd = true;
     return '<h2>It cannot be done</h2>' +
-      '<p class="tight">The number on each shore is how many bridges it has.</p>' +
+      '<p class="tight">The number beside each shore is how many bridges it has.</p>' +
       '<p class="tight">Every shore you pass <b>through</b> spends bridges in pairs: one to arrive, one to leave. So a shore with an odd count can only be where you <b>start</b> or where you <b>finish</b>.</p>' +
       '<p class="tight">All four of Königsberg\'s shores are odd. A walk has two ends. Four will not fit into two.</p>' +
       '<p>Euler proved it by ignoring the map entirely and looking only at the counts. Graph theory starts here.</p>' +
-      '<button class="btn primary" data-act="passInterlude">Understood</button>';
+      '<button class="pbtn" data-act="passInterlude">Understood</button>';
   },
   how: function () {
     return '<h2>How to play</h2>' +
       '<div class="key">' +
-        '<div class="keyrow"><canvas id="k0" width="54" height="20"></canvas>A bridge still standing</div>' +
-        '<div class="keyrow"><canvas id="k1" width="54" height="20"></canvas>One the picked traveller can cross now</div>' +
-        '<div class="keyrow"><canvas id="k2" width="54" height="20"></canvas>Burnt — the arrow shows who went, and which way</div>' +
+        '<div class="keyrow"><canvas id="k0" width="56" height="18"></canvas>A bridge still standing</div>' +
+        '<div class="keyrow"><canvas id="k1" width="56" height="18"></canvas>One the traveller you have picked up can cross now</div>' +
+        '<div class="keyrow"><canvas id="k2" width="56" height="18"></canvas>Burnt — the arrow says who crossed, and which way</div>' +
+        '<div class="keyrow"><canvas id="k3" width="56" height="18"></canvas>An island, before and after someone reaches it</div>' +
       '</div>' +
       '<ul class="howlist">' +
-      '<li>Tap a traveller (or its chip up top) to pick it up, then drag or tap to move.</li>' +
+      '<li>Tap a traveller — or its chip up top — to pick it up, then drag or tap to move.</li>' +
       '<li>Every bridge <b>burns behind whoever crosses it</b>. One pool, shared by all of them.</li>' +
-      '<li><b>Every island must be reached.</b> An island marked with a traveller\'s shape only counts when <b>that</b> traveller stands on it.</li>' +
-      '<li><b>Par</b> is the fewest crossings that can settle the board. Match it for three stars.</li>' +
-      '<li><b>Undo</b> is unlimited. If a board becomes impossible the game waits a couple of moves before saying so — then offers to rewind to the last position that could still be won.</li>' +
-      '</ul><button class="btn primary" data-act="close">Got it</button>';
+      '<li><b>Every island must be reached</b>, and inks in when it is. An island carrying a traveller\'s mark only counts when <b>that</b> traveller stands on it.</li>' +
+      '<li><b>Par</b> is the fewest crossings that can settle the board.</li>' +
+      '<li><b>Undo</b> is unlimited. If a board becomes impossible the game waits a couple of moves before saying so, then offers to rewind to the last position that could still be won.</li>' +
+      '</ul><button class="pbtn" data-act="close">Got it</button>';
   }
 };
 
-// Little swatches in the how-to, drawn with the same code paths as the board.
+// Swatches for the how-to, drawn with the board's own colours.
 function drawKey() {
   var specs = [
     ['k0', function (c) {
-      c.strokeStyle = 'rgba(126,156,171,0.34)'; c.lineWidth = 2.4;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+      c.strokeStyle = inkA(0.30); c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(3, 9); c.lineTo(53, 9); c.stroke();
     }],
     ['k1', function (c) {
-      c.strokeStyle = rgba(0, 0.13); c.lineWidth = 13;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
-      c.strokeStyle = 'rgba(236,226,208,0.92)'; c.lineWidth = 4.4;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+      c.strokeStyle = rgba(0, 0.95); c.lineWidth = 3.4;
+      c.beginPath(); c.moveTo(3, 9); c.lineTo(53, 9); c.stroke();
     }],
     ['k2', function (c) {
-      c.setLineDash([5, 5]); c.strokeStyle = rgba(1, 0.62); c.lineWidth = 2.8;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
-      c.setLineDash([]);
-      c.fillStyle = rgba(1, 0.9);
-      c.beginPath(); c.moveTo(34, 10); c.lineTo(25, 5); c.lineTo(25, 15); c.closePath(); c.fill();
+      c.strokeStyle = rgba(1, 0.33); c.lineWidth = 2.2;
+      c.beginPath(); c.moveTo(3, 9); c.lineTo(53, 9); c.stroke();
+      c.fillStyle = rgba(1, 0.85);
+      c.beginPath(); c.moveTo(35, 9); c.lineTo(27, 4.6); c.lineTo(27, 13.4); c.closePath(); c.fill();
+    }],
+    ['k3', function (c) {
+      c.fillStyle = INK.paper; c.strokeStyle = inkA(0.5); c.lineWidth = 1.8;
+      c.beginPath(); c.arc(11, 9, 7.5, 0, TAU); c.fill(); c.stroke();
+      c.fillStyle = inkA(0.3);
+      c.beginPath(); c.moveTo(24, 9); c.lineTo(31, 9); c.stroke();
+      c.fillStyle = INK.ink;
+      c.beginPath(); c.arc(44, 9, 7.5, 0, TAU); c.fill();
     }]
   ];
-  specs.forEach(function (s) {
-    var el = $(s[0]);
+  specs.forEach(function (sp) {
+    var el = $(sp[0]);
     if (!el) return;
     var c = el.getContext('2d');
     var d = Math.min(window.devicePixelRatio || 1, 2.5);
-    el.width = 54 * d; el.height = 20 * d;
-    el.style.width = '54px'; el.style.height = '20px';
+    el.width = 56 * d; el.height = 18 * d;
+    el.style.width = '56px'; el.style.height = '18px';
     c.setTransform(d, 0, 0, d, 0, 0);
     c.lineCap = 'round';
-    s[1](c);
+    sp[1](c);
   });
 }
 
@@ -1652,6 +1712,13 @@ $('bPlay').addEventListener('click', function () {
 });
 $('bLevels').addEventListener('click', function () { setScreen('levels'); });
 $('bHow').addEventListener('click', function () { setScreen('menu'); setOverlay('how'); });
+var THEMES = ['auto', 'paper', 'night'];
+$('bTheme').addEventListener('click', function () {
+  SAVE.theme = THEMES[(THEMES.indexOf(SAVE.theme || 'auto') + 1) % 3];
+  persist(); applyTheme(); labelTheme();
+  if (G.lv) syncHud();
+});
+function labelTheme() { $('bTheme').textContent = 'Theme · ' + (SAVE.theme || 'auto'); }
 $('bDrift').addEventListener('click', function () {
   var d = Math.max(1, SAVE.drift || 1), lv = driftLevel(d);
   if (lv) loadLevel(lv, d, 'drift');
@@ -1662,6 +1729,8 @@ $('warnX').addEventListener('click', function () { G.warnDismissed = G.deadAt; }
 $('bUndo').addEventListener('click', undo);
 $('bRestart').addEventListener('click', function () { G.undos = 0; resetLevel(); setOverlay(null); });
 
+applyTheme();
+labelTheme();
 resize();
 setScreen('menu');
 requestAnimationFrame(frame);
