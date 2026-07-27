@@ -1373,10 +1373,10 @@ function TapaCore() {
   function drawBoard() {
     if (!G) return;
     if (finished) {
-      /* a solved board keeps no scaffolding: no grid, no clues, no marks */
+      /* solved: the grid and the marks go, the clues stay */
       paint(boardEl, {
-        N: G.size, showGrid: false, showClues: false,
-        isInk: isInk
+        N: G.size, showGrid: false, isInk: isInk, clues: G.clues,
+        quietClues: function () { return false; }
       });
       return;
     }
@@ -1584,9 +1584,10 @@ function TapaCore() {
     });
   }
 
-  /* Three beats: the clue numerals go, then the grid goes out from under the
-     wall, then a band of lighter pigment sweeps outward through the ink and
-     settles. Only then does anything appear underneath. */
+  /* Two beats: the grid goes out from under the wall, then a band of lighter
+     pigment sweeps outward through the ink and settles. The clue numerals stay
+     put at full strength throughout — they are part of the finished thing, not
+     scaffolding to be cleared away. */
   function dissolve(done) {
     var size = G.size, region = G.region;
     var base = {
@@ -1594,29 +1595,26 @@ function TapaCore() {
       isInk: function (r, c) {
         return r >= 0 && r < size && c >= 0 && c < size && region.has(r * size + c);
       },
-      quietClues: function () { return true; }
+      quietClues: function () { return false; }
     };
-    var bare = Object.assign({}, base, { showGrid: false, showClues: false });
+    var settled = Object.assign({}, base, { showGrid: false });
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      paint(boardEl, bare);
+      paint(boardEl, settled);
       done();
       return;
     }
-    var start = null, dur = 2300;
+    var start = null, dur = 2000;
     function step(ts) {
       if (start === null) start = ts;
       var t = Math.min(1, (ts - start) / dur);
-      var o = {
-        clueAlpha: 1 - Math.min(1, t / 0.20),
-        gridAlpha: 1 - Math.max(0, Math.min(1, (t - 0.18) / 0.26))
-      };
-      if (t > 0.44) {
-        var s = (t - 0.44) / 0.52;          /* wavefront, 0 -> just past 1 */
+      var o = { gridAlpha: 1 - Math.min(1, t / 0.28) };
+      if (t > 0.34) {
+        var s = (t - 0.34) / 0.60;          /* wavefront, 0 -> just past 1 */
         if (s <= 1.08) o.sheen = s;
       }
       paint(boardEl, Object.assign({}, base, o));
       if (t < 1) requestAnimationFrame(step);
-      else { paint(boardEl, bare); done(); }
+      else { paint(boardEl, settled); done(); }
     }
     requestAnimationFrame(step);
   }
