@@ -1015,12 +1015,23 @@ function TapaCore() {
             var o = cn[i];
             if (!(o[0] && o[1] && !o[2])) continue;
             var px = o[3], py = o[4], sx = o[5], sy = o[6];
+            var a0 = sx === 1 ? 0 : Math.PI;
+            var a1 = sy === 1 ? Math.PI / 2 : -Math.PI / 2;
+            var acw = sx * sy < 0;
+            /* Everything here is one path filled with the nonzero rule, so
+               every subpath must wind the same way as the cell rectangles.
+               Traversed naturally, the fillets at two of the four corners come
+               out counter-clockwise, and where the diagonal cell's seam overlap
+               laps onto them the windings cancel and punch a pinhole in the
+               ink. Walk those two backwards. */
             ctx.moveTo(px, py);
-            ctx.lineTo(px, py - sy * q);
-            ctx.arc(px - sx * q, py - sy * q, q,
-                    sx === 1 ? 0 : Math.PI,
-                    sy === 1 ? Math.PI / 2 : -Math.PI / 2,
-                    sx * sy < 0);
+            if (sx * sy > 0) {
+              ctx.lineTo(px - sx * q, py);
+              ctx.arc(px - sx * q, py - sy * q, q, a1, a0, !acw);
+            } else {
+              ctx.lineTo(px, py - sy * q);
+              ctx.arc(px - sx * q, py - sy * q, q, a0, a1, acw);
+            }
             ctx.closePath();
           }
         }
@@ -1077,19 +1088,29 @@ function TapaCore() {
        every inked cell first, so the wall's curves always sit on bare paper.
        The line on a shared edge disappears with it, but the ink's own straight
        edge is already sitting on top of that line. */
+    /* The grid should intersect normally everywhere; the only place it needs
+       clearing is where the wall's curve lands on an UNPAINTED tile. That is
+       exactly the concave fillet — the little wedge of ink that spills into the
+       empty diagonal cell at an inside corner. Leave a grid line running under
+       it and the line emerges from behind the curve as a stub. So clear just
+       that fillet's own corner square, and nothing else. */
     if (opts.showGrid !== false && gA > 0) {
-      /* Clear a margin the width of the corner radius, not just the cell. A
-         cell-sized clear still leaves lines in the neighbouring paper running
-         straight into the wall's curves — most visible around a clue with ink
-         painted round it, where three sides curve and the grid collides with
-         every one. At radius width, no line ever reaches a curve. */
-      var m = cell * RADIUS + 0.75;
+      var q = cell * RADIUS, pd = 1;
       ctx.fillStyle = PG;
       for (var er = 0; er < N; er++) {
         for (var ec = 0; ec < N; ec++) {
           if (!opts.isInk(er, ec)) continue;
-          ctx.fillRect(x0 + ec * cell - m, y0 + er * cell - m,
-                       cell + m * 2, cell + m * 2);
+          var eup = opts.isInk(er - 1, ec), edn = opts.isInk(er + 1, ec);
+          var elf = opts.isInk(er, ec - 1), ert = opts.isInk(er, ec + 1);
+          var ex = x0 + ec * cell, ey = y0 + er * cell;
+          if (eup && elf && !opts.isInk(er - 1, ec - 1))
+            ctx.fillRect(ex - q - pd, ey - q - pd, q + pd, q + pd);
+          if (eup && ert && !opts.isInk(er - 1, ec + 1))
+            ctx.fillRect(ex + cell, ey - q - pd, q + pd, q + pd);
+          if (edn && ert && !opts.isInk(er + 1, ec + 1))
+            ctx.fillRect(ex + cell, ey + cell, q + pd, q + pd);
+          if (edn && elf && !opts.isInk(er + 1, ec - 1))
+            ctx.fillRect(ex - q - pd, ey + cell, q + pd, q + pd);
         }
       }
     }
