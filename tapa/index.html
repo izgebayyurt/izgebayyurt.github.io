@@ -983,12 +983,18 @@ function TapaCore() {
      them separately leaves hairline antialiasing seams where the sub-shapes
      abut — invisible at thumbnail size, obvious on a solved board where the
      wall is the only thing on screen. */
-  function drawRegion(ctx, isInk, N, x0, y0, cell, q) {
+  /* Builds the path without filling, so the same geometry can be reused as a
+     clip — the hazard stripes need to follow the wall's real silhouette, not a
+     bounding box that would spill past its rounded corners. `only` restricts
+     which cells are included; neighbour tests still see the whole board, so
+     corners round exactly as they are drawn. */
+  function regionPath(ctx, isInk, N, x0, y0, cell, q, only) {
     var e = 0.4;
     ctx.beginPath();
     for (var r = 0; r < N; r++) {
       for (var c = 0; c < N; c++) {
         if (!isInk(r, c)) continue;
+        if (only && !only(r, c)) continue;
         var up = isInk(r - 1, c), dn = isInk(r + 1, c);
         var lf = isInk(r, c - 1), rt = isInk(r, c + 1);
         var x = x0 + c * cell, y = y0 + r * cell;
@@ -1039,6 +1045,10 @@ function TapaCore() {
         }
       }
     }
+  }
+
+  function drawRegion(ctx, isInk, N, x0, y0, cell, q) {
+    regionPath(ctx, isInk, N, x0, y0, cell, q, null);
     ctx.fill();
   }
 
@@ -1156,16 +1166,33 @@ function TapaCore() {
     }
     drawRegion(ctx, opts.isInk, N, x0, y0, cell, cell * RADIUS);
 
+    /* Hazard stripes over the offending square — the sign for "this is not
+       allowed" everywhere else in the world, and it does not read as another
+       piece of the puzzle the way an inscribed box does. */
     if (opts.breaks && opts.breaks.length) {
-      ctx.strokeStyle = PA;
-      ctx.lineWidth = Math.max(1.4, cell * 0.055);
-      var ins = cell * 0.13;
+      var bs = cell * 2;
+      var step = Math.max(6, cell * 0.34);
       for (var b = 0; b < opts.breaks.length; b++) {
         var br = opts.breaks[b];
-        ctx.beginPath();
-        ctx.rect(x0 + br[1] * cell + ins, y0 + br[0] * cell + ins,
-                 cell * 2 - ins * 2, cell * 2 - ins * 2);
-        ctx.stroke();
+        var bx = x0 + br[1] * cell, by = y0 + br[0] * cell;
+        ctx.save();
+        (function (b0, b1) {
+          regionPath(ctx, opts.isInk, N, x0, y0, cell, cell * RADIUS,
+                     function (rr, cc) {
+                       return rr >= b0 && rr <= b0 + 1 && cc >= b1 && cc <= b1 + 1;
+                     });
+        })(br[0], br[1]);
+        ctx.clip();
+        ctx.strokeStyle = PA;
+        ctx.lineWidth = Math.max(2, cell * 0.11);
+        ctx.lineCap = "butt";
+        for (var d = -bs; d < bs * 2; d += step) {
+          ctx.beginPath();
+          ctx.moveTo(bx + d, by);
+          ctx.lineTo(bx + d + bs, by + bs);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }
 
@@ -1385,6 +1412,7 @@ function TapaCore() {
   /* Every trace of the finished state has to be cleared before a new board,
      or the message and its button linger over the next puzzle. */
   function resetFinish() {
+    lastTap = null;
     document.querySelector(".thumb").classList.remove("gone");
     var el = document.getElementById("finish");
     el.classList.remove("in");
@@ -1411,6 +1439,11 @@ function TapaCore() {
     for (var i = 0; i < 8; i++) {
       var nr = r + [-1,-1,0,1,1,1,0,-1][i], nc = c + [0,1,1,1,0,-1,-1,-1][i];
       if (!inGrid(nr, nc)) continue;
+      /* A neighbouring clue is already decided — the rules say a numbered cell
+         is never shaded. It is never painted, so it sits at "unknown" forever,
+         which used to stop any clue beside another clue from ever falling
+         quiet. */
+      if (isClue(nr, nc)) continue;
       if (cells[keyOf(nr, nc)] === 0) return false;
     }
     return true;
@@ -1519,13 +1552,32 @@ function TapaCore() {
     if (!inGrid(r, c)) return null;
     return { r: r, c: c };
   }
+  /* Double tap lays down the other verb, so the toggle is reachable without
+     leaving the board. The first tap has already painted by then, so undo it
+     and start again from what was there — otherwise the two taps stack and the
+     undo history grows a step nobody took. */
+  var lastTap = null;
+  var DOUBLE_MS = 320;
+
   boardEl.addEventListener("pointerdown", function (ev) {
     if (!G || finished) return;
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
     boardEl.setPointerCapture(ev.pointerId);
-    var cur = cells[keyOf(p.r, p.c)];
-    stroke = { target: cur === verb ? 0 : verb, changes: [] };
+    var k = keyOf(p.r, p.c);
+
+    if (lastTap && lastTap.k === k && Date.now() - lastTap.t < DOUBLE_MS) {
+      var prev = undoStack.pop();
+      if (prev) {
+        for (var i = prev.length - 1; i >= 0; i--) cells[prev[i][0]] = prev[i][1];
+      }
+      lastTap = null;
+      var other = verb === 1 ? 2 : 1;
+      stroke = { target: cells[k] === other ? 0 : other, changes: [] };
+    } else {
+      var cur = cells[k];
+      stroke = { target: cur === verb ? 0 : verb, changes: [] };
+    }
     applyCell(p.r, p.c);
     ev.preventDefault();
   });
@@ -1543,6 +1595,10 @@ function TapaCore() {
       if (undoStack.length > 400) undoStack.shift();
       commit();
     }
+    /* only a single-cell tap arms a double tap; a drag must not */
+    lastTap = stroke.changes.length === 1
+      ? { k: stroke.changes[0][0], t: Date.now() }
+      : null;
     stroke = null;
     updateChrome();
   }
