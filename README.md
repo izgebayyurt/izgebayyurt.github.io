@@ -52,10 +52,15 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   is one. Boards are deterministic but not precomputed — each is searched from
   scratch on the device, so what you have opened is cached and the next number
   is built in the background while you solve, which takes moving on from about a
-  second to instant. Pinch to zoom and two fingers to pan; one finger always
-  paints. Times are kept per puzzle, with per-book bests and averages and a ten
-  fastest list; a puzzle finished with a hint or a reveal keeps its picture but
-  is left out of the times.
+  second to instant. The board is the screen: the canvas runs edge to edge and
+  every control floats over it on its own disc of paper, so nothing takes layout
+  space away from the puzzle. It opens at the largest size that still shows the
+  whole board — a square board cannot cover a 19.5:9 phone without cropping, and
+  cropping a Tapa crops the deduction — and from there pinch zooms to 4×, two
+  fingers pan, and a Fit pill appears while there is somewhere to come back
+  from; one finger always paints. Times are kept per puzzle, with per-book bests
+  and averages and a ten fastest list; a puzzle finished with a hint or a reveal
+  keeps its picture but is left out of the times.
   Filled cells merge into a single shape — convex corners rounded,
   concave corners filleted — so a solved board reads as a painted form rather than
   forty black squares, and on the last correct cell the clues fade and then the
@@ -64,8 +69,12 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   than inverted. No check button and no visible clock: a clue whose neighbourhood is
   fully decided falls quiet, and an outright rule break outlines in accent. State is
   written on every move, so leaving mid-puzzle is not a decision anyone has to make.
-  Generation runs in a Web Worker, 4–35 ms a board. Single self-contained
-  `index.html`.
+  Generation runs in a Web Worker, 4–35 ms a board. Installable, and playable with
+  the radio off: nothing is fetched while you play, so `sw.js` only has to keep the
+  one file it starts from. The game itself is still a single self-contained
+  `index.html`; `manifest.webmanifest`, `sw.js` and the launcher icons sit beside it
+  because a service worker cannot be registered from a blob and a launcher cannot
+  read an inline icon.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 

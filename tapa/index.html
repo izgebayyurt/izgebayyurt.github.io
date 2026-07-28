@@ -4,17 +4,22 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Tapa" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="theme-color" content="#ece9e1" />
 <title>Tapa</title>
 <meta name="description" content="Tapa — a paint puzzle. Every board generated on your phone and proved solvable without guessing." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ece9e1'/%3E%3Cpath d='M7 9h7v5h5v5h-5v5H9v-5H7z' fill='%232a2730'/%3E%3C/svg%3E" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
 <style>
   :root {
     --pg:#ece9e1;            /* paper */
     --pi:#2a2730;            /* ink — a purple-black, not a neutral one */
     --pa:#7a5e9a;            /* the one accent; it means "you broke a rule" */
     --pwave:#c85f18;         /* the solve wave, and nothing else */
+    --pg0:rgba(236,233,225,0);  /* paper at zero alpha, for fades off the board */
     --pr:rgba(42,39,48,0.14);
     --pd:rgba(42,39,48,0.55);
     --pq:rgba(42,39,48,0.32);
@@ -30,6 +35,7 @@
     --pi:#ded7c8;
     --pa:#a888c8;
     --pwave:#ff8a4c;
+    --pg0:rgba(25,21,25,0);
     --pr:rgba(222,215,200,0.15);
     --pd:rgba(222,215,200,0.56);
     --pq:rgba(222,215,200,0.34);
@@ -175,20 +181,49 @@
   /* ---------- play ----------
      No position rule here: .screen is already absolute with inset:0, and an
      ID selector setting position:relative would beat it, collapsing the
-     screen to content height and stranding the board at the top. */
-  #boardwrap {
-    flex:1 1 auto; display:flex; align-items:center; justify-content:center;
-    padding:0 12px 66px; min-height:0;
+     screen to content height and stranding the board at the top.
+
+     The canvas is the screen. Nothing is laid out beside the board and nothing
+     reserves space from it: the bar and the thumb controls float over the
+     paper, so the board is free to take the whole viewport and the only thing
+     deciding how big it looks is the zoom. The safe-area insets move to the
+     floating pieces, since the paper itself wants to reach the very edge. */
+  #play { padding:0; }
+  #board {
+    position:absolute; inset:0; display:block;
+    width:100%; height:100%; touch-action:none;
   }
-  #board { display:block; width:100%; max-width:min(96vw, 62vh); aspect-ratio:1/1; touch-action:none; }
+  .playbar {
+    position:absolute; left:0; right:0; top:0; z-index:3;
+    display:flex; align-items:center; gap:8px;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 0;
+    pointer-events:none;      /* the paper underneath is still the board */
+  }
+  .playbar > * { pointer-events:auto; }
+  .playbar .icon {
+    width:38px; height:38px; border-radius:50%;
+    background:var(--pg); border:1px solid var(--pr);
+    box-shadow:0 2px 10px var(--shadow);
+  }
+  /* same specificity as .icon:active and later, so it has to say it again */
+  .playbar .icon:active { background:var(--pr); }
+  /* Chrome that sits over the board carries its own paper, or a numeral lands
+     on ink and neither can be read. */
+  .plabel {
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--pd); font-weight:500; font-variant-numeric:tabular-nums;
+    background:var(--pg); border:1px solid var(--pr); border-radius:999px;
+    padding:7px 11px; box-shadow:0 2px 10px var(--shadow);
+  }
+  .plabel:empty { display:none; }   /* the clock, switched off */
   /* The message lives in the space the thumb controls vacated, positioned out
      of flow so the board does not shift by a pixel when it appears — the whole
      point is that you are looking at the board. */
   .finish {
     display:none; flex-direction:column; gap:12px;
-    position:absolute; left:0; right:0;
-    bottom:calc(18px + env(safe-area-inset-bottom));
-    padding:0 22px;
+    position:absolute; left:0; right:0; bottom:0; z-index:2;
+    padding:38px 22px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--pg) 64%, var(--pg0));
     opacity:0; transform:translateY(10px);
     transition:opacity .55s ease, transform .55s ease;
   }
@@ -205,8 +240,20 @@
   .thumb.gone { opacity:0; pointer-events:none; }
   .thumb {
     position:absolute; right:16px; bottom:calc(20px + env(safe-area-inset-bottom));
-    display:flex; flex-direction:column; gap:10px; align-items:center;
+    display:flex; flex-direction:column; gap:10px; align-items:center; z-index:2;
   }
+  /* Zoom has no button, only a gesture, so the way back to the whole board
+     needs one — but only while there is somewhere to come back from. */
+  .thumb-mid { left:50%; right:auto; transform:translateX(-50%); }
+  .fitbtn {
+    border:1px solid var(--pr); background:var(--pg); color:var(--pd);
+    border-radius:999px; padding:8px 14px; cursor:pointer; font-family:inherit;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    box-shadow:0 2px 10px var(--shadow);
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  .fitbtn.on { opacity:1; pointer-events:auto; }
+  .fitbtn:active { background:var(--pr); }
   .tbtn {
     width:52px; height:52px; border-radius:50%; display:grid; place-items:center;
     border:1px solid var(--pr); background:var(--pg); cursor:pointer; padding:0;
@@ -233,9 +280,9 @@
      over it. */
   .confirm {
     display:none; flex-direction:column; gap:12px;
-    position:absolute; left:0; right:0;
-    bottom:calc(18px + env(safe-area-inset-bottom));
-    padding:0 22px;
+    position:absolute; left:0; right:0; bottom:0; z-index:2;
+    padding:38px 22px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--pg) 64%, var(--pg0));
     opacity:0; transform:translateY(10px);
     transition:opacity .3s ease, transform .3s ease;
   }
@@ -336,14 +383,17 @@
   </section>
 
   <section id="play" class="screen">
-    <div class="bar">
+    <canvas id="board"></canvas>
+    <div class="playbar">
       <button class="icon" id="playBack">&lsaquo;</button>
-      <div class="bartitle" id="playTitle"></div>
+      <div class="plabel" id="playTitle"></div>
       <div class="grow"></div>
-      <div class="bartitle" id="playClock"></div>
+      <div class="plabel" id="playClock"></div>
       <button class="icon" id="moreBtn" aria-label="More">&hellip;</button>
     </div>
-    <div id="boardwrap"><canvas id="board"></canvas></div>
+    <div class="thumb thumb-mid">
+      <button class="fitbtn" id="fitBtn">Fit</button>
+    </div>
     <div class="finish" id="finish">
       <div class="fmsg" id="fmsg"></div>
       <button class="pbtn" id="fnext">Next puzzle</button>
@@ -389,7 +439,8 @@
       <div class="foot">
         Tap a cell to lay down whatever the round button is set to, and tap
         again to clear it. Double tap for the other one. Drag to fill a run in
-        one go. Pinch to zoom, two fingers to pan.
+        one go. Pinch to zoom and two fingers to pan; Fit puts the whole board
+        back on the screen.
       </div>
     </div></div>
   </section>
@@ -1139,27 +1190,35 @@ function TapaCore() {
   /* opts: {N, isInk, isMark, clues, showGrid, showClues, quietClues,
             breaks, gridAlpha, clueAlpha, bleed} */
   function paint(cv, opts) {
-    var w = cv.clientWidth, N = opts.N;
-    if (!w || !N) return;
+    var cw = cv.clientWidth, chh = cv.clientHeight || cw, N = opts.N;
+    if (!cw || !N) return;
     var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.width = Math.round(w * dpr);
-    cv.height = Math.round(w * dpr);
+    var pw = Math.round(cw * dpr), ph = Math.round(chh * dpr);
+    /* Assigning width or height reallocates the backing store even when the
+       value is unchanged. On a thumbnail nobody notices; on a canvas the size
+       of the screen, doing it every frame is what makes a pinch stutter. */
+    if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
     var ctx = cv.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     var PG = css("--pg"), PI = css("--pi"), PA = css("--pa"),
         PR = css("--pr"), PQ = css("--pq"), PD = css("--pd");
 
+    /* Everything below is drawn in board space: a square of side w with its
+       origin at 0,0. Where that square lands on the canvas — centred, zoomed,
+       panned — is entirely the view transform's business, which is why the
+       canvas itself no longer has to be square. */
+    var w = opts.side || Math.min(cw, chh);
     var pad = opts.bleed ? 0 : Math.max(2, w * 0.022);
     var cell = (w - pad * 2) / N, x0 = pad, y0 = pad;
 
     ctx.fillStyle = PG;
-    ctx.fillRect(0, 0, w, w);
+    ctx.fillRect(0, 0, cw, chh);
 
     /* Zoom transforms the board's contents only; the paper behind stays put so
        there is never an unpainted edge when panning. */
     var vw = opts.view;
-    if (vw && vw.s !== 1) {
+    if (vw) {
       ctx.save();
       ctx.translate(vw.tx, vw.ty);
       ctx.scale(vw.s, vw.s);
@@ -1344,7 +1403,7 @@ function TapaCore() {
       ctx.restore();
     }
 
-    if (vw && vw.s !== 1) ctx.restore();
+    if (vw) ctx.restore();
   }
 
   function paintGlyph(cv, size, regionArr) {
@@ -1553,27 +1612,55 @@ function TapaCore() {
   var aided = false;       /* a hint or the solution was used: no time recorded */
   var flash = null;        /* {k, until} — the cell a hint just pointed at */
   var view = { s: 1, tx: 0, ty: 0 };
-
-  /* Keep the board covering the canvas: at scale 1 there is nowhere to go, and
-     zoomed in you can never drag paper into frame. */
-  function clampView() {
-    if (view.s <= 1.001) { view.s = 1; view.tx = 0; view.ty = 0; return; }
-    if (view.s > 4) view.s = 4;
-    var w = boardEl.clientWidth || 1;
-    var lo = w * (1 - view.s);
-    view.tx = Math.max(lo, Math.min(0, view.tx));
-    view.ty = Math.max(lo, Math.min(0, view.ty));
-  }
   var startedAt = 0, elapsed = 0, tickTimer = null;
   var boardEl = document.getElementById("board");
+
+  /* The board's own side at scale 1: as much of the screen as a square can
+     take. Everything else about where it sits is in view.tx/ty. */
+  function boardSide() {
+    return Math.max(1, Math.min(boardEl.clientWidth || 1, boardEl.clientHeight || 1));
+  }
+  /* An axis is either too small to pan — in which case the board is centred on
+     it, which is what "fit" means — or large enough that panning is allowed
+     but never far enough to drag blank paper into frame. */
+  function clampAxis(t, avail, size) {
+    if (size <= avail) return (avail - size) / 2;
+    return Math.max(avail - size, Math.min(0, t));
+  }
+  function clampView() {
+    if (!(view.s >= 1)) view.s = 1;
+    if (view.s > 4) view.s = 4;
+    var size = boardSide() * view.s;
+    view.tx = clampAxis(view.tx, boardEl.clientWidth || 1, size);
+    view.ty = clampAxis(view.ty, boardEl.clientHeight || 1, size);
+  }
+  function fitView() { view.s = 1; clampView(); }
+  function updateFit() {
+    document.getElementById("fitBtn").classList.toggle("on", view.s > 1.01);
+  }
+  /* One redraw per frame however many events arrive. A pinch on a phone can
+     deliver a dozen moves between frames, and each one used to repaint the
+     whole board. */
+  var drawQueued = false, animating = false;
+  function requestDraw() {
+    if (drawQueued) return;
+    drawQueued = true;
+    requestAnimationFrame(function () {
+      drawQueued = false;
+      if (!animating) drawBoard();
+    });
+  }
 
   /* Every trace of the finished state has to be cleared before a new board,
      or the message and its button linger over the next puzzle. */
   function resetFinish() {
     lastTap = null;
-    view = { s: 1, tx: 0, ty: 0 };
+    fitView();
+    updateFit();
     showConfirm(false);
-    document.querySelector(".thumb").classList.remove("gone");
+    document.querySelectorAll(".thumb").forEach(function (t) {
+      t.classList.remove("gone");
+    });
     var el = document.getElementById("finish");
     el.classList.remove("in");
     el.classList.remove("show");
@@ -1694,13 +1781,21 @@ function TapaCore() {
     s = Math.max(0, Math.floor(s));
     return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
   }
+  /* Empty means gone — the pill is display:none when it has nothing in it.
+     A solved board has no clock: the time is in the message underneath, and
+     updateChrome runs once more after the win, so clearing it in win() alone
+     put it straight back. */
   function updateClock() {
     var el = document.getElementById("playClock");
-    el.textContent = save.opts.clock ? fmt(liveElapsed()) : "";
+    el.textContent = (save.opts.clock && !finished) ? fmt(liveElapsed()) : "";
   }
 
   function layoutBoard() {
-    requestAnimationFrame(function () { drawBoard(); });
+    requestAnimationFrame(function () {
+      clampView();      /* the canvas has its real size only now */
+      updateFit();
+      drawBoard();
+    });
   }
   function updateChrome() {
     document.getElementById("undoBtn").disabled = undoStack.length === 0;
@@ -1718,7 +1813,7 @@ function TapaCore() {
   var stroke = null;
   function cellAt(ev) {
     var rect = boardEl.getBoundingClientRect();
-    var w = rect.width, pad = Math.max(2, w * 0.022), cell = (w - pad * 2) / G.size;
+    var w = boardSide(), pad = Math.max(2, w * 0.022), cell = (w - pad * 2) / G.size;
     var bx = (ev.clientX - rect.left - view.tx) / view.s;
     var by = (ev.clientY - rect.top - view.ty) / view.s;
     var c = Math.floor((bx - pad) / cell), r = Math.floor((by - pad) / cell);
@@ -1731,22 +1826,38 @@ function TapaCore() {
   var pointers = new Map();
   var pinch = null;
 
+  /* The two fingers driving the gesture, named rather than counted. Reading
+     "the first two in the map" fresh on every move looked equivalent, but a
+     third finger landing or the leading one lifting silently swapped the pair
+     mid-gesture and the board jumped. */
+  function pinchPair() {
+    var ids = [];
+    pointers.forEach(function (_, id) { if (ids.length < 2) ids.push(id); });
+    return ids.length === 2 ? ids : null;
+  }
   function pinchStart() {
-    var pts = Array.from(pointers.values());
-    var dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+    var ids = pinchPair();
+    if (!ids) { pinch = null; return; }
+    var a = pointers.get(ids[0]), b = pointers.get(ids[1]);
+    var dx = a.x - b.x, dy = a.y - b.y;
     pinch = {
+      ids: ids,
       d: Math.max(1, Math.hypot(dx, dy)),
-      mx: (pts[0].x + pts[1].x) / 2,
-      my: (pts[0].y + pts[1].y) / 2,
+      mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2,
       s: view.s, tx: view.tx, ty: view.ty
     };
   }
   function pinchMove() {
-    if (!pinch || pointers.size < 2) return;
-    var pts = Array.from(pointers.values());
-    var dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+    var ids = pinchPair();
+    if (!ids) { pinch = null; return; }
+    if (!pinch || pinch.ids[0] !== ids[0] || pinch.ids[1] !== ids[1]) {
+      pinchStart();          /* the pair changed: re-anchor, do not jump */
+      return;
+    }
+    var a = pointers.get(ids[0]), b = pointers.get(ids[1]);
+    var dx = a.x - b.x, dy = a.y - b.y;
     var d = Math.max(1, Math.hypot(dx, dy));
-    var mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
     var ns = Math.max(1, Math.min(4, pinch.s * (d / pinch.d)));
     var rect = boardEl.getBoundingClientRect();
     /* keep the board point under the pinch centre under the pinch centre */
@@ -1756,7 +1867,8 @@ function TapaCore() {
     view.tx = (mx - rect.left) - bx * ns;
     view.ty = (my - rect.top) - by * ns;
     clampView();
-    drawBoard();
+    updateFit();
+    requestDraw();
   }
 
   /* Nothing is painted on pointerdown. The first finger of a pinch lands
@@ -1793,6 +1905,13 @@ function TapaCore() {
     applyCell(pd.r, pd.c);
   }
 
+  var captured = null;
+  function dropCapture() {
+    if (captured === null) return;
+    try { boardEl.releasePointerCapture(captured); } catch (e) { /* already gone */ }
+    captured = null;
+  }
+
   boardEl.addEventListener("pointerdown", function (ev) {
     if (!G || finished) return;
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
@@ -1800,13 +1919,22 @@ function TapaCore() {
       /* a gesture that was still only a held cell paints nothing */
       if (stroke && !stroke.changes.length) { stroke = null; lastTap = null; }
       else endStroke();
+      /* The capture taken for the first finger has served its purpose and is
+         now a liability: some engines route the second finger's moves oddly
+         while another pointer is captured, and the window listeners below
+         already guarantee we see every move and every release. */
+      dropCapture();
       pinchStart();
       ev.preventDefault();
       return;
     }
+    ev.preventDefault();      /* even on a clue, or the page takes the gesture */
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
-    try { boardEl.setPointerCapture(ev.pointerId); } catch (e) { /* pointer already gone */ }
+    try {
+      boardEl.setPointerCapture(ev.pointerId);
+      captured = ev.pointerId;
+    } catch (e) { /* pointer already gone */ }
     var k = keyOf(p.r, p.c);
     stroke = {
       target: null, changes: [],
@@ -1816,13 +1944,16 @@ function TapaCore() {
         x: ev.clientX, y: ev.clientY
       }
     };
-    ev.preventDefault();
   });
-  boardEl.addEventListener("pointermove", function (ev) {
-    if (pointers.has(ev.pointerId)) {
-      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-    }
-    if (pointers.size >= 2) { pinchMove(); ev.preventDefault(); return; }
+  /* Moves and releases are watched on the window, not the canvas. A finger
+     that strays over a floating button, or a release the engine forgets to
+     deliver to the captured element, would otherwise leave a pointer stuck in
+     the map — and a stuck pointer means every later touch is read as the
+     second finger of a pinch that is not happening. */
+  window.addEventListener("pointermove", function (ev) {
+    if (!pointers.has(ev.pointerId)) return;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size >= 2) { pinchMove(); if (ev.cancelable) ev.preventDefault(); return; }
     if (!stroke || !G || finished) return;
     if (stroke.pending) {
       var pd = stroke.pending;
@@ -1833,8 +1964,8 @@ function TapaCore() {
     var p = cellAt(ev);
     if (!p || isClue(p.r, p.c)) return;
     applyCell(p.r, p.c);
-    ev.preventDefault();
-  });
+    if (ev.cancelable) ev.preventDefault();
+  }, { passive: false });
   function endStroke() {
     if (!stroke) return;
     commitPending();          /* a release with no movement is a tap */
@@ -1852,19 +1983,53 @@ function TapaCore() {
     updateChrome();
   }
   function liftPointer(ev) {
-    pointers.delete(ev.pointerId);
+    var had = pointers.delete(ev.pointerId);
     if (pointers.size < 2) pinch = null;
-    endStroke();
+    if (ev.pointerId === captured) captured = null;
+    if (had) endStroke();
   }
-  boardEl.addEventListener("pointerup", liftPointer);
-  boardEl.addEventListener("pointercancel", liftPointer);
+  window.addEventListener("pointerup", liftPointer);
+  window.addEventListener("pointercancel", liftPointer);
+
+  /* touch-action already tells the browser to keep its hands off the board.
+     Firefox for Android honours the accessibility setting that forces
+     pinch-zoom on for every site regardless of the viewport meta, and there
+     the page can still zoom out from under the puzzle mid-gesture — which is
+     what "zoom is buggy" looks like from the outside. Refusing the default on
+     the touch events themselves is what actually stops it. */
+  ["touchstart", "touchmove"].forEach(function (t) {
+    boardEl.addEventListener(t, function (ev) {
+      if (ev.cancelable) ev.preventDefault();
+    }, { passive: false });
+  });
+
+  /* Trackpad pinch and ctrl-wheel, so zoom is reachable without a touchscreen. */
+  boardEl.addEventListener("wheel", function (ev) {
+    if (!G || finished) return;
+    ev.preventDefault();
+    var rect = boardEl.getBoundingClientRect();
+    var ax = ev.clientX - rect.left, ay = ev.clientY - rect.top;
+    var bx = (ax - view.tx) / view.s, by = (ay - view.ty) / view.s;
+    view.s = Math.max(1, Math.min(4, view.s * Math.exp(-ev.deltaY * 0.006)));
+    view.tx = ax - bx * view.s;
+    view.ty = ay - by * view.s;
+    clampView();
+    updateFit();
+    requestDraw();
+  }, { passive: false });
+
+  document.getElementById("fitBtn").addEventListener("click", function () {
+    fitView();
+    updateFit();
+    requestDraw();
+  });
 
   function applyCell(r, c) {
     var k = keyOf(r, c), before = cells[k];
     if (before === stroke.target) return;
     cells[k] = stroke.target;
     stroke.changes.push([k, before, stroke.target]);
-    drawBoard();
+    requestDraw();
   }
 
   function commit() {
@@ -2066,7 +2231,9 @@ function TapaCore() {
     persist();
 
     /* the controls have nothing left to do */
-    document.querySelector(".thumb").classList.add("gone");
+    document.querySelectorAll(".thumb").forEach(function (t) {
+      t.classList.add("gone");
+    });
     document.getElementById("playClock").textContent = "";
     document.getElementById("fmsg").textContent = "Solved in " + fmt(secs) + "!";
     dissolve(showFinish);
@@ -2093,12 +2260,16 @@ function TapaCore() {
       },
       quietClues: function () { return false; }
     };
+    base.view = view;
     var settled = Object.assign({}, base, { showGrid: false });
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       paint(boardEl, settled);
       done();
       return;
     }
+    /* The dissolve owns the canvas while it runs: a redraw queued by the last
+       stroke would land in the middle of it and repaint the grid. */
+    animating = true;
     var start = null, dur = 2000;
     function step(ts) {
       if (start === null) start = ts;
@@ -2110,7 +2281,7 @@ function TapaCore() {
       }
       paint(boardEl, Object.assign({}, base, o));
       if (t < 1) requestAnimationFrame(step);
-      else { paint(boardEl, settled); done(); }
+      else { paint(boardEl, settled); animating = false; done(); }
     }
     requestAnimationFrame(step);
   }
@@ -2298,13 +2469,30 @@ function TapaCore() {
   var rt = null;
   window.addEventListener("resize", function () {
     clearTimeout(rt);
-    rt = setTimeout(redrawAll, 140);
+    rt = setTimeout(function () {
+      /* the board's side is now something else, so where it sits is too */
+      clampView();
+      updateFit();
+      redrawAll();
+    }, 140);
   });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden && G && currentScreen === "play") {
       elapsed = liveElapsed(); startedAt = Date.now(); commit();
     }
   });
+
+  /* ---------- installable, and playable with the radio off ----------
+     Nothing here is fetched from anywhere while you play — the boards are
+     computed on the device and the whole game is one file — so offline is a
+     matter of keeping that file, not of syncing anything. */
+  if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {
+        /* a private window, an unsupported engine: the game still runs */
+      });
+    });
+  }
 
   /* ---------- go ---------- */
   applyTheme();
