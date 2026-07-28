@@ -7,7 +7,12 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="Tapa" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="theme-color" content="#ece9e1" />
+<!-- The status bar and the gesture bar are painted from theme-color, so a pair
+     of them keyed to the system scheme gets the very first frame right; once a
+     theme is actually chosen the script sets both to the same value, or the
+     media query would keep answering for the one nobody picked. -->
+<meta name="theme-color" content="#ece9e1" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#191519" media="(prefers-color-scheme: dark)" />
 <title>Tapa</title>
 <meta name="description" content="Tapa — a paint puzzle. Every board generated on your phone and proved solvable without guessing." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ece9e1'/%3E%3Cpath d='M7 9h7v5h5v5h-5v5H9v-5H7z' fill='%232a2730'/%3E%3C/svg%3E" />
@@ -27,7 +32,15 @@
     --shadow:rgba(42,39,48,0.16);
     --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",ui-serif,Georgia,serif;
     --sans:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color-scheme:light;
   }
+  /* The bands the page does not itself paint — the status bar, the gesture
+     bar, the overscroll gutter — are the browser's, and it decides their
+     colour from color-scheme, not from anything in the stylesheet. Without
+     this they stay light while the board is dark. */
+  @media (prefers-color-scheme: dark) { :root { color-scheme:dark; } }
+  html[data-theme="paper"] { color-scheme:light; }
+  html[data-theme="night"] { color-scheme:dark; }
   /* Night is derived from paper, not inverted: the ground keeps the purple
      bias and the fill goes warm chalk, so it still reads as pigment. */
   html[data-theme="night"] {
@@ -1078,8 +1091,13 @@ function TapaCore() {
     var night = t === "night" ||
       (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.setAttribute("data-theme", night ? "night" : "paper");
-    var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute("content", night ? "#191519" : "#ece9e1");
+    /* Every one of them, not just the first. The tags are a media-keyed pair so
+       the first paint matches the system; from the moment a theme is resolved
+       they both have to say the same thing, or the browser answers the media
+       query and paints the bars for the theme nobody is looking at. */
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+      m.setAttribute("content", night ? "#191519" : "#ece9e1");
+    });
     redrawAll();
   }
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
