@@ -69,9 +69,15 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   than inverted. No check button and no visible clock: a clue whose neighbourhood is
   fully decided falls quiet, and an outright rule break outlines in accent. State is
   written on every move, so leaving mid-puzzle is not a decision anyone has to make.
-  Generation runs in a Web Worker, 4–35 ms a board. Installable, and playable with
-  the radio off: nothing is fetched while you play, so `sw.js` only has to keep the
-  one file it starts from. The game itself is still a single self-contained
+  Generation runs in a Web Worker, 4–35 ms a board. The mark is a Tapa rather than
+  a letter: a three-step wall drawn by the same code that draws a solved board,
+  with the two clues that are actually true of it. The staircase is not styling —
+  the ban on a filled 2×2 is what forces a wall to step — and the position is
+  legal, connected and 2×2-free, checked rather than eyeballed. Installable, and
+  playable with the radio off: nothing is fetched while you play, so `sw.js` only
+  has to keep the one file it starts from — network-first for the page so a deploy
+  is never a launch late, cache-first for the icons, which never change.
+  The game itself is still a single self-contained
   `index.html`; `manifest.webmanifest`, `sw.js` and the launcher icons sit beside it
   because a service worker cannot be registered from a blob and a launcher cannot
   read an inline icon.

@@ -2,13 +2,16 @@
  *
  * The game is one HTML file that loads nothing at run time — every board is
  * computed on the device — so "works offline" only ever meant "keep the file".
- * That makes the strategy short: precache the shell, serve it from the cache
- * so a cold start never waits on the network, and quietly refetch in the
- * background so the next launch has whatever was deployed since.
+ *
+ * The page goes to the network first and falls back to the cache; the icons,
+ * which never change, come from the cache first. Serving the page cache-first
+ * too was tidier and wrong: a deploy then arrived a launch late, and a fix
+ * nobody could see is indistinguishable from a fix that does not work. Offline
+ * still plays, because the fallback is the whole point of keeping the file.
  *
  * Bump CACHE when the shell changes; the old one is deleted on activate.
  */
-var CACHE = "tapa-v1";
+var CACHE = "tapa-v2";
 var SHELL = [
   "./",
   "./index.html",
@@ -46,20 +49,41 @@ self.addEventListener("fetch", function (ev) {
   var url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
+  var shell = req.mode === "navigate" ||
+              url.pathname.endsWith("/") ||
+              url.pathname.endsWith("/index.html");
+
+  if (shell) {
+    ev.respondWith(
+      fetch(req).then(function (res) {
+        if (res && res.ok) {
+          /* under both keys: the request may be the directory, and the
+             precache and the offline fallback both name index.html */
+          var a = res.clone(), b = res.clone();
+          caches.open(CACHE).then(function (c) {
+            c.put(req, a);
+            c.put("./index.html", b);
+          });
+        }
+        return res;
+      }).catch(function () {
+        return caches.match(req, { ignoreSearch: true }).then(function (hit) {
+          return hit || caches.match("./index.html");
+        });
+      })
+    );
+    return;
+  }
+
   ev.respondWith(
     caches.match(req, { ignoreSearch: true }).then(function (hit) {
-      var live = fetch(req).then(function (res) {
+      return hit || fetch(req).then(function (res) {
         if (res && res.ok && res.type === "basic") {
           var copy = res.clone();
           caches.open(CACHE).then(function (c) { c.put(req, copy); });
         }
         return res;
-      }).catch(function () {
-        /* offline: the cached copy is the answer, and for a navigation with
-           nothing cached under this exact URL, the shell still is */
-        return hit || caches.match("./index.html");
       });
-      return hit || live;
     })
   );
 });
