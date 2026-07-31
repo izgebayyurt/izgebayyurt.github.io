@@ -117,6 +117,39 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   single self-contained `index.html`, with `manifest.webmanifest`, `sw.js`
   and the launcher icons beside it because a service worker cannot be
   registered from a blob and a launcher cannot read an inline icon.
+- `delve/` — Delve, an original puzzle genre and the second of the underground
+  pair (Dowse finds the water; Delve digs). Dig tunnels from a door on the
+  edge: all tunnels connect to the door and never loop — between any two
+  tunnel cells there is exactly one way through — every number sits in a
+  tunnel and is the exact number of steps from the door walking the tunnels,
+  and every dead end is numbered, so a passage only ever stops at a chamber.
+  Where Dowse is metric geometry (a reading dries a diamond of open ground),
+  Delve is path topology: distances live inside the thing being drawn, so a
+  number three cells from the door promising nine steps is promising a
+  six-step detour. The dead-end rule is the quiet load-bearing one — any
+  digging beyond the true burrow must create a new dead end, and an
+  unnumbered dead end is illegal, so a deduction closure that produces a
+  valid burrow has produced THE burrow: uniqueness comes free. The solver
+  works in three registers — lacing (a cell that would close a ring is rock,
+  a corridor down to its last two openings digs both), spanning (ground that
+  cannot reach the door or whose pocket holds no chamber is rock, choke
+  points every walk squeezes through are dug, a chamber at its shortest
+  possible walk pins every step), and probing (suppose one cell, run the
+  cheap rules, keep whichever answer does not collapse — one step deep,
+  never nested). Burrows are grown to prefer long galleries over stubs,
+  numbers are seeded everywhere and stripped in two passes (cheap rules
+  first, the probing solver only asked about the survivors), and boards were
+  additionally brute-force verified unique during development. It is a
+  denser genre than Dowse — mid-corridor numbers survive stripping exactly
+  when removing them would let the tunnel reroute, so every number on the
+  board is load-bearing. Tapa's app shell wearing peat and lantern-gold:
+  same floating chrome, pinch zoom, times with hint-exclusion, dissolve-
+  and-sheen solve moment; tapping a number lights the walk it has so far,
+  gold along the dug cells from the door. Four books, 6×6 to 12×12.
+  Installable and offline like its siblings; the launcher mark is a legal
+  five-wide burrow — connected, ring-free, its one chamber's walk verified
+  rather than eyeballed. Single self-contained `index.html` with
+  `manifest.webmanifest`, `sw.js` and the icons beside it.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
