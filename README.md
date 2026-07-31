@@ -101,8 +101,22 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   reading that has come exactly true falls quiet, a drowned one turns accent, a
   pooled 2×2 gets hazard stripes, and when the only thing left wrong is water in
   two pieces it says so in words, since no single cell can show it. Tap a number
-  to see how far its reading reaches. Three books, 7×7 to 11×11; single
-  self-contained `index.html`.
+  to see how far its reading reaches — the diamond it dries and the rim where
+  its water must lie. The app is Tapa's shell wearing Dowse's colours: the
+  board is the screen with every control floating over it, pinch zooms to 4×
+  and two fingers pan while one finger always paints, hints follow the
+  solver's own path (and point at a mistake first if there is one), a reveal
+  sits behind the ⋯, and the solve moment withdraws the scaffolding — grid,
+  marks, tones — leaving the vein alone in the sand with its readings. Times
+  are kept per puzzle with per-book bests, averages and a ten fastest list;
+  a puzzle finished with a hint or a reveal keeps its picture but is left out
+  of the times. Four books, 7×7 to 13×13. The launcher mark is a Dowse rather
+  than a letter: a five-wide vein with the one reading that is actually true
+  of it — connected, pool-free, distance checked rather than eyeballed.
+  Installable and playable with the radio off; the game itself is still a
+  single self-contained `index.html`, with `manifest.webmanifest`, `sw.js`
+  and the launcher icons beside it because a service worker cannot be
+  registered from a blob and a launcher cannot read an inline icon.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
