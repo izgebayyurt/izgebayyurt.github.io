@@ -1,0 +1,1945 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Dowse" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<!-- The status bar and the gesture bar are painted from theme-color, so a pair
+     of them keyed to the system scheme gets the very first frame right; once a
+     theme is actually chosen the script sets both to the same value. -->
+<meta name="theme-color" content="#eae6da" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#131a1d" media="(prefers-color-scheme: dark)" />
+<title>Dowse</title>
+<meta name="description" content="Dowse — a water-divining puzzle. Every number reads the exact distance to the nearest water. Every board generated on your phone and proved solvable without guessing." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23eae6da'/%3E%3Cpath d='M32 10 L54 32 L32 54 L10 32 Z' fill='none' stroke='%2324424e' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%2324424e'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --pg:#eae6da;            /* sand */
+    --pi:#24424e;            /* well water — a slate teal, not a neutral ink */
+    --pa:#a84b32;            /* the one accent; it means "the reading is wrong" */
+    --pwave:#2b93a8;         /* the solve wave, and nothing else */
+    --pg0:rgba(234,230,218,0);  /* sand at zero alpha, for fades off the board */
+    --pr:rgba(36,66,78,0.14);
+    --pd:rgba(36,66,78,0.55);
+    --pq:rgba(36,66,78,0.32);
+    --pfaint:rgba(36,66,78,0.20);
+    --shadow:rgba(36,66,78,0.16);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",ui-serif,Georgia,serif;
+    --sans:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color-scheme:light;
+  }
+  /* The bands the page does not itself paint — the status bar, the gesture
+     bar, the overscroll gutter — are the browser's, and it decides their
+     colour from color-scheme, not from anything in the stylesheet. */
+  @media (prefers-color-scheme: dark) { :root { color-scheme:dark; } }
+  html[data-theme="sand"] { color-scheme:light; }
+  html[data-theme="night"] { color-scheme:dark; }
+  /* Night is derived from sand, not inverted: the ground goes river-bottom
+     dark and the water goes pale glass, so it still reads as water in earth. */
+  html[data-theme="night"] {
+    --pg:#131a1d;
+    --pi:#c2d6d4;
+    --pa:#d07a5c;
+    --pwave:#5ec6d8;
+    --pg0:rgba(19,26,29,0);
+    --pr:rgba(194,214,212,0.15);
+    --pd:rgba(194,214,212,0.56);
+    --pq:rgba(194,214,212,0.34);
+    --pfaint:rgba(194,214,212,0.22);
+    --shadow:rgba(0,0,0,0.5);
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--pg); color:var(--pi);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+  }
+  #app { position:fixed; inset:0; }
+
+  .screen {
+    position:absolute; inset:0; display:none;
+    flex-direction:column; background:var(--pg);
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .screen.on { display:flex; }
+
+  /* ---------- shared chrome ---------- */
+  .bar {
+    flex:0 0 auto; display:flex; align-items:center; gap:8px;
+    padding:14px 12px 8px; min-height:44px;
+  }
+  .icon {
+    width:30px; height:30px; display:grid; place-items:center;
+    color:var(--pd); font-size:19px; line-height:1; cursor:pointer;
+    background:none; border:0; padding:0; font-family:inherit; border-radius:8px;
+  }
+  .icon:active { background:var(--pr); }
+  .bartitle {
+    font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--pd); font-weight:500;
+  }
+  .grow { margin-left:auto; }
+  .scroll { flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; }
+  button { font-family:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--pa); outline-offset:2px; }
+
+  .pbtn {
+    display:block; width:100%; padding:14px; border-radius:12px; border:0;
+    background:var(--pi); color:var(--pg); font-size:14.5px; font-weight:600;
+    cursor:pointer; font-family:inherit;
+  }
+  .pbtn.ghost {
+    background:transparent; color:var(--pd); font-weight:500;
+    border:1px solid var(--pr);
+  }
+  .pbtn:active { opacity:0.85; }
+
+  /* ---------- home ---------- */
+  #home .inner { padding:14px 22px 22px; display:flex; flex-direction:column; min-height:100%; }
+  .wordmark { font-family:var(--serif); font-size:40px; line-height:1; font-weight:600; letter-spacing:-0.015em; }
+  .wordsub { font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--pd); margin-top:8px; }
+
+  .cont {
+    margin-top:22px; display:grid; grid-template-columns:50px minmax(0,1fr);
+    gap:13px; align-items:center; cursor:pointer;
+    border:1px solid var(--pr); border-radius:13px; padding:12px 14px 12px 12px;
+    background:none; text-align:left; width:100%;
+  }
+  .cont:active { background:var(--pr); }
+  .cont canvas { display:block; width:50px; height:50px; }
+  .cont .l { font-size:9.5px; letter-spacing:0.15em; text-transform:uppercase; color:var(--pd); font-weight:600; }
+  .cont .n { font-family:var(--serif); font-size:17px; font-weight:600; margin-top:3px; }
+  .cont .s { font-size:10.5px; color:var(--pd); margin-top:2px; }
+
+  .books { margin-top:20px; display:flex; flex-direction:column; }
+  .book {
+    display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:14px;
+    align-items:center; padding:13px 0; border-top:1px solid var(--pr);
+    background:none; border-left:0; border-right:0; border-bottom:0;
+    cursor:pointer; text-align:left; width:100%; color:inherit;
+  }
+  .books .book:last-child { border-bottom:1px solid var(--pr); }
+  .book:active { background:var(--pr); }
+  .book canvas { display:block; width:38px; height:38px; }
+  .book .n { font-family:var(--serif); font-size:17px; font-weight:600; line-height:1.15; }
+  .book .d { font-size:10.5px; color:var(--pd); margin-top:2px; }
+  .book .c { font-family:var(--serif); font-size:13.5px; color:var(--pq); font-variant-numeric:tabular-nums; }
+
+  .homefoot { margin-top:auto; padding-top:18px; display:flex; gap:20px; }
+  .homefoot button {
+    background:none; border:0; padding:6px 0; cursor:pointer;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd);
+  }
+
+  /* ---------- index ---------- */
+  #index .inner { padding:0 16px 28px; }
+  .idxh { display:flex; align-items:baseline; gap:10px; padding:2px 2px 12px; }
+  .idxh .t { font-family:var(--serif); font-size:23px; font-weight:600; }
+  .idxh .s { font-size:10.5px; color:var(--pd); margin-left:auto; font-variant-numeric:tabular-nums; }
+  .jump {
+    background:none; border:1px solid var(--pr); border-radius:8px; cursor:pointer;
+    font-family:inherit; font-size:10.5px; letter-spacing:0.08em; color:var(--pd);
+    padding:5px 9px; margin-left:10px;
+  }
+  .jump:active { background:var(--pr); }
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+  .cellw {
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:none; border:0; padding:0; cursor:pointer; font-family:inherit;
+  }
+  .cellw canvas { display:block; width:100%; aspect-ratio:1/1; }
+  .cellw .num {
+    font-family:var(--serif); font-size:11px; color:var(--pq);
+    font-variant-numeric:tabular-nums; line-height:1;
+  }
+  .cellw.done .num { color:var(--pd); }
+  .cellw.here .num { color:var(--pa); font-weight:700; }
+  .blank {
+    width:100%; aspect-ratio:1/1; display:grid; place-items:center;
+    border:1px solid var(--pr); border-radius:8px;
+    font-family:var(--serif); font-size:16px; color:var(--pq);
+    font-variant-numeric:tabular-nums;
+  }
+  .cellw.here .blank { border-color:var(--pa); }
+  .cellw:active .blank { background:var(--pr); }
+  .more { margin:18px auto 0; display:block; }
+
+  /* ---------- play ----------
+     The canvas is the screen. Nothing is laid out beside the board and
+     nothing reserves space from it: the bar and the thumb controls float
+     over the sand. The safe-area insets move to the floating pieces, since
+     the ground itself wants to reach the very edge. */
+  #play { padding:0; }
+  #board {
+    position:absolute; inset:0; display:block;
+    width:100%; height:100%; touch-action:none;
+  }
+  .playbar {
+    position:absolute; left:0; right:0; top:0; z-index:3;
+    display:flex; align-items:center; gap:8px;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 0;
+    pointer-events:none;      /* the ground underneath is still the board */
+  }
+  .playbar > * { pointer-events:auto; }
+  .playbar .icon {
+    width:38px; height:38px; border-radius:50%;
+    background:var(--pg); border:1px solid var(--pr);
+    box-shadow:0 2px 10px var(--shadow);
+  }
+  .playbar .icon:active { background:var(--pr); }
+  .plabel {
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--pd); font-weight:500; font-variant-numeric:tabular-nums;
+    background:var(--pg); border:1px solid var(--pr); border-radius:999px;
+    padding:7px 11px; box-shadow:0 2px 10px var(--shadow);
+  }
+  .plabel:empty { display:none; }
+  /* When the only thing wrong is that the water is in pieces, the board
+     cannot show it on any one cell, so it gets said in words — floating
+     over the sand, never moving the board. */
+  .notice {
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(88px + env(safe-area-inset-bottom)); z-index:2;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--pd); background:var(--pg); border:1px solid var(--pr);
+    border-radius:999px; padding:7px 12px; box-shadow:0 2px 10px var(--shadow);
+    opacity:0; transition:opacity .35s ease; pointer-events:none; white-space:nowrap;
+  }
+  .notice.on { opacity:1; }
+  .finish {
+    display:none; flex-direction:column; gap:12px;
+    position:absolute; left:0; right:0; bottom:0; z-index:2;
+    padding:38px 22px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--pg) 64%, var(--pg0));
+    opacity:0; transform:translateY(10px);
+    transition:opacity .55s ease, transform .55s ease;
+  }
+  .finish.show { display:flex; }
+  .finish.show.in { opacity:1; transform:none; }
+  .fmsg {
+    font-family:var(--serif); font-size:23px; font-weight:600; text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .finish { transition:none; }
+    .notice { transition:none; }
+  }
+  .thumb { transition:opacity .55s ease; }
+  .thumb.gone { opacity:0; pointer-events:none; }
+  .thumb {
+    position:absolute; right:16px; bottom:calc(20px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:10px; align-items:center; z-index:2;
+  }
+  .tbtn {
+    width:52px; height:52px; border-radius:50%; display:grid; place-items:center;
+    border:1px solid var(--pr); background:var(--pg); cursor:pointer; padding:0;
+    box-shadow:0 2px 10px var(--shadow);
+  }
+  .tbtn:active { transform:scale(0.94); }
+  .tbtn .glyph { width:17px; height:17px; border-radius:5px; background:var(--pi); display:block; }
+  .tbtn.ink { background:var(--pi); border-color:var(--pi); }
+  .tbtn.ink .glyph { background:var(--pg); }
+  .tbtn.mark .glyph { width:9px; height:9px; border-radius:50%; background:var(--pq); }
+  .thumb-left { right:auto; left:16px; }
+  .tbtn.undo, .tbtn.reset, .tbtn.redo, .tbtn.hint { width:42px; height:42px; box-shadow:none; }
+  .tbtn.undo span, .tbtn.reset span, .tbtn.redo span, .tbtn.hint span {
+    font-size:17px; color:var(--pi); line-height:1;
+  }
+  .tbtn.reset span { font-size:15px; }
+  .tbtn.hint span { font-family:var(--serif); font-size:19px; font-weight:600; }
+  .tbtn.undo[disabled], .tbtn.reset[disabled], .tbtn.redo[disabled] { opacity:0; pointer-events:none; }
+  .tbtn.undo:not([disabled]), .tbtn.reset:not([disabled]),
+  .tbtn.redo:not([disabled]), .tbtn.hint { opacity:0.42; }
+
+  /* Clearing the board is the one destructive thing in the game, so it
+     asks first. Sits in the space under the board, never over it. */
+  .confirm {
+    display:none; flex-direction:column; gap:12px;
+    position:absolute; left:0; right:0; bottom:0; z-index:2;
+    padding:38px 22px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--pg) 64%, var(--pg0));
+    opacity:0; transform:translateY(10px);
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .confirm.show { display:flex; }
+  .confirm.show.in { opacity:1; transform:none; }
+  .cmsg { font-family:var(--serif); font-size:19px; font-weight:600; text-align:center; }
+  .crow { display:flex; gap:10px; }
+  .crow .pbtn { flex:1 1 0; }
+  @media (prefers-reduced-motion: reduce) { .confirm { transition:none; } }
+
+  /* ---------- sheets ---------- */
+  .sheet { padding:2px 22px 24px; }
+  .sheeth { font-family:var(--serif); font-size:25px; font-weight:600; line-height:1.1; }
+  .rules { margin-top:20px; display:flex; flex-direction:column; }
+  .rrow {
+    display:grid; grid-template-columns:52px minmax(0,1fr); gap:15px;
+    align-items:center; padding:15px 0; border-top:1px solid var(--pr);
+  }
+  .rules .rrow:last-child { border-bottom:1px solid var(--pr); }
+  .rrow canvas { display:block; width:52px; height:52px; }
+  .rrow .t { font-size:13px; font-weight:600; line-height:1.3; }
+  .rrow .d { font-size:11.5px; color:var(--pd); line-height:1.45; margin-top:3px; }
+
+  .setrows { margin-top:18px; display:flex; flex-direction:column; }
+  .setrow {
+    display:flex; align-items:center; gap:12px; padding:14px 0;
+    border-top:1px solid var(--pr); font-size:13px; cursor:pointer;
+    background:none; border-left:0; border-right:0; border-bottom:0;
+    width:100%; text-align:left; color:inherit; font-family:inherit;
+  }
+  .setrows .setrow:last-child { border-bottom:1px solid var(--pr); }
+  .setrow .lbl { display:flex; flex-direction:column; gap:3px; }
+  .setrow .sub { font-size:11px; color:var(--pd); }
+  .setrow .val { margin-left:auto; font-size:12px; color:var(--pd); }
+  .sw { margin-left:auto; width:38px; height:22px; border-radius:11px; background:var(--pr); position:relative; flex:0 0 auto; }
+  .sw i { position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--pg); box-shadow:0 1px 3px var(--shadow); transition:left .16s; }
+  .sw.on { background:var(--pi); }
+  .sw.on i { left:18px; }
+  .foot { margin-top:22px; font-size:11px; color:var(--pd); line-height:1.55; }
+
+  /* ---------- working overlay ---------- */
+  #working {
+    position:absolute; inset:0; z-index:20; display:none;
+    align-items:center; justify-content:center; flex-direction:column; gap:16px;
+    background:var(--pg);
+  }
+  #working.on { display:flex; }
+  #working .msg { font-size:11.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd); }
+  .pulse { width:26px; height:26px; border-radius:7px; background:var(--pi);
+           transform:rotate(45deg); animation:pulse 1.15s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ transform:rotate(45deg) scale(0.72); opacity:0.35 } 50%{ transform:rotate(45deg) scale(1); opacity:1 } }
+  @media (prefers-reduced-motion: reduce) {
+    .pulse { animation:none; opacity:0.8 }
+    .sw i { transition:none }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="home" class="screen">
+    <div class="scroll"><div class="inner">
+      <div>
+        <div class="wordmark">Dowse</div>
+        <div class="wordsub">A water-divining puzzle</div>
+      </div>
+      <button class="cont" id="contCard" style="display:none">
+        <canvas id="contCv"></canvas>
+        <div>
+          <div class="l">Continue</div>
+          <div class="n" id="contName"></div>
+          <div class="s" id="contWhen"></div>
+        </div>
+      </button>
+      <div class="books" id="books"></div>
+      <div class="homefoot">
+        <button id="toRules">Rules</button>
+        <button id="toSettings">Settings</button>
+      </div>
+    </div></div>
+  </section>
+
+  <section id="index" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="inner">
+      <div class="idxh">
+        <span class="t" id="idxTitle"></span>
+        <button class="jump" id="jumpBtn">Go to &#8470;</button>
+        <span class="s" id="idxCount"></span>
+      </div>
+      <div class="grid4" id="idxGrid"></div>
+      <button class="pbtn ghost more" id="idxMore">Show more</button>
+    </div></div>
+  </section>
+
+  <section id="play" class="screen">
+    <canvas id="board"></canvas>
+    <div class="playbar">
+      <button class="icon" id="playBack">&lsaquo;</button>
+      <div class="plabel" id="playTitle"></div>
+      <div class="grow"></div>
+      <div class="plabel" id="playClock"></div>
+    </div>
+    <div class="notice" id="notice"></div>
+    <div class="finish" id="finish">
+      <div class="fmsg" id="fmsg"></div>
+      <button class="pbtn" id="fnext">Next puzzle</button>
+    </div>
+    <div class="thumb thumb-left">
+      <button class="tbtn hint" id="hintBtn" aria-label="Hint"><span>?</span></button>
+      <button class="tbtn reset" id="resetBtn" disabled aria-label="Clear the board"><span>&#10005;</span></button>
+    </div>
+    <div class="thumb">
+      <button class="tbtn redo" id="redoBtn" disabled aria-label="Redo"><span>&#8635;</span></button>
+      <button class="tbtn undo" id="undoBtn" disabled aria-label="Undo"><span>&#8634;</span></button>
+      <button class="tbtn ink" id="verbBtn" aria-label="Switch between water and dry mark"><span class="glyph"></span></button>
+    </div>
+    <div class="confirm" id="confirm">
+      <div class="cmsg" id="cmsg"></div>
+      <div class="crow">
+        <button class="pbtn ghost" id="cNo"></button>
+        <button class="pbtn" id="cYes"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="rules" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="sheet">
+      <div class="sheeth">How Dowse works</div>
+      <div class="rules" id="ruleList"></div>
+      <div class="foot">
+        Tap a cell to lay down whatever the round button is set to, and tap
+        again to clear it. Double tap for the other one. Drag to fill a run
+        in one go. Tap a number to see how far its reading reaches.
+      </div>
+    </div></div>
+  </section>
+
+  <section id="settings" class="screen">
+    <div class="bar">
+      <button class="icon" data-back="home">&lsaquo;</button>
+      <div class="bartitle">Back</div>
+    </div>
+    <div class="scroll"><div class="sheet">
+      <div class="sheeth">Settings</div>
+      <div class="setrows" id="setRows"></div>
+      <div class="foot">
+        Dowse is an original puzzle. Every board is generated on your device
+        from its number alone and proved solvable by deduction — no guessing
+        is ever needed, and the answer is unique.
+      </div>
+    </div></div>
+  </section>
+
+  <div id="working"><div class="pulse"></div><div class="msg">Divining the water</div></div>
+</div>
+
+<script>
+/* =====================================================================
+   CORE — pure puzzle logic. Written as one self-contained function so the
+   identical source can be stringified into a Web Worker; nothing in here
+   touches the DOM or any outer scope.
+
+   The puzzle: shade underground water. A number is a dowser's reading —
+   the nearest water lies EXACTLY that many rook-steps away (taxicab
+   distance, through anything). All water is one connected vein, water
+   never pools into a 2x2, and numbered ground is dry.
+   ===================================================================== */
+function DowseCore() {
+  "use strict";
+
+  var UNKNOWN = 0, WATER = 1, DRY = 2;
+  var L_RIPPLE = 1, L_FLOW = 2;
+  var DIRS4 = [[-1,0],[1,0],[0,-1],[0,1]];
+  var DIRS8 = [[-1,0],[-1,1],[0,1],[1,1],[1,0],[1,-1],[0,-1],[-1,-1]];
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /* A puzzle's identity is (size, number) and nothing else, so №12 in the
+     9x9 book is the same board on every device, forever. */
+  function seedFor(size, num) {
+    var h = 2166136261 >>> 0;
+    var s = "d" + size + ":" + num;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  function makeGeom(N) {
+    var inside = function (r, c) { return r >= 0 && r < N && c >= 0 && c < N; };
+    return { N: N, inside: inside };
+  }
+
+  function no2x2(G, isWater) {
+    for (var r = 0; r < G.N - 1; r++) {
+      for (var c = 0; c < G.N - 1; c++) {
+        if (isWater(r, c) && isWater(r + 1, c) && isWater(r, c + 1) && isWater(r + 1, c + 1)) return false;
+      }
+    }
+    return true;
+  }
+
+  function connectedSet(G, cells) {
+    if (!cells.size) return true;
+    var first = cells.values().next().value;
+    var seen = new Set([first]), stack = [first];
+    while (stack.length) {
+      var k = stack.pop(), r = (k / G.N) | 0, c = k % G.N;
+      for (var i = 0; i < 4; i++) {
+        var nr = r + DIRS4[i][0], nc = c + DIRS4[i][1];
+        if (!G.inside(nr, nc)) continue;
+        var nk = nr * G.N + nc;
+        if (cells.has(nk) && !seen.has(nk)) { seen.add(nk); stack.push(nk); }
+      }
+    }
+    return seen.size === cells.size;
+  }
+
+  /* Taxicab distance from every cell to the nearest cell of `sources`,
+     by multi-source BFS. The metric goes through anything — a reading is
+     a divination, not a walk. */
+  function distField(G, sources) {
+    var N = G.N, dist = new Int16Array(N * N).fill(-1), queue = [], head = 0;
+    sources.forEach(function (k) { dist[k] = 0; queue.push(k); });
+    while (head < queue.length) {
+      var k = queue[head++], r = (k / N) | 0, c = k % N;
+      for (var i = 0; i < 4; i++) {
+        var nr = r + DIRS4[i][0], nc = c + DIRS4[i][1];
+        if (!G.inside(nr, nc)) continue;
+        var nk = nr * N + nc;
+        if (dist[nk] === -1) { dist[nk] = dist[k] + 1; queue.push(nk); }
+      }
+    }
+    return dist;
+  }
+
+  /* Every cell at taxicab distance < val is dry, every cell at exactly
+     val is a candidate for the reading's water. Both depend only on the
+     clue's position and value, so they are built once and reused across
+     every reduction trial. */
+  function clueTable(G, k, val) {
+    var N = G.N, r = (k / N) | 0, c = k % N;
+    var diamond = [], ring = [];
+    var lo = Math.max(0, r - val), hi = Math.min(N - 1, r + val);
+    for (var rr = lo; rr <= hi; rr++) {
+      var rem = val - Math.abs(rr - r);
+      for (var cc = Math.max(0, c - rem); cc <= Math.min(N - 1, c + rem); cc++) {
+        var d = Math.abs(rr - r) + Math.abs(cc - c);
+        var kk = rr * N + cc;
+        if (kk === k) continue;
+        if (d < val) diamond.push(kk);
+        else ring.push(kk);
+      }
+    }
+    return { k: k, val: val, diamond: diamond, ring: ring };
+  }
+
+  /* ---------- the deduction solver ----------
+     Never guesses. Runs to a fixpoint and reports STUCK if it runs out of
+     technique, which is exactly the question "can a person finish this?". */
+  function solveLogic(G, clueList, tables, maxLevel) {
+    var N = G.N, i, j;
+    var state = new Uint8Array(N * N);
+    for (i = 0; i < clueList.length; i++) state[clueList[i].k] = DRY;
+    var level = 0, hard = 0;
+
+    /* Readings. The diamond dries out; an unsatisfied ring down to its
+       last possible cell forces water there; a drowned diamond or an
+       exhausted ring is a contradiction. Plus the pool rule: three
+       waters in a square dry the fourth corner. */
+    function ripple() {
+      var changed = false, q, t;
+      for (q = 0; q < clueList.length; q++) {
+        t = tables[clueList[q].k];
+        for (j = 0; j < t.diamond.length; j++) {
+          var dk = t.diamond[j];
+          if (state[dk] === WATER) return -1;
+          if (state[dk] === UNKNOWN) { state[dk] = DRY; changed = true; }
+        }
+        var sat = false, unk = 0, last = -1;
+        for (j = 0; j < t.ring.length; j++) {
+          var rk = t.ring[j];
+          if (state[rk] === WATER) { sat = true; break; }
+          if (state[rk] === UNKNOWN) { unk++; last = rk; }
+        }
+        if (!sat) {
+          if (unk === 0) return -1;
+          if (unk === 1) { state[last] = WATER; changed = true; }
+        }
+      }
+      for (var r = 0; r < N - 1; r++) {
+        for (var c = 0; c < N - 1; c++) {
+          var q4 = [r * N + c, (r + 1) * N + c, r * N + c + 1, (r + 1) * N + c + 1];
+          var nW = 0, nU = 0, u = -1;
+          for (var z = 0; z < 4; z++) {
+            if (state[q4[z]] === WATER) nW++;
+            else if (state[q4[z]] === UNKNOWN) { nU++; u = q4[z]; }
+          }
+          if (nW === 4) return -1;
+          if (nW === 3 && nU === 1) { state[u] = DRY; changed = true; }
+        }
+      }
+      return changed ? 1 : 0;
+    }
+
+    function comp(allowed, start) {
+      var seen = new Set([start]), stack = [start];
+      while (stack.length) {
+        var k = stack.pop(), r = (k / N) | 0, c = k % N;
+        for (var i2 = 0; i2 < 4; i2++) {
+          var nr = r + DIRS4[i2][0], nc = c + DIRS4[i2][1];
+          if (!G.inside(nr, nc)) continue;
+          var nk = nr * N + nc;
+          if (allowed.has(nk) && !seen.has(nk)) { seen.add(nk); stack.push(nk); }
+        }
+      }
+      return seen;
+    }
+
+    /* The vein is one body. Ground that cannot reach it will never be
+       water; a cell whose removal would strand some water must itself
+       be water. */
+    function flow() {
+      var water = [], allowed = new Set(), k;
+      for (k = 0; k < N * N; k++) {
+        if (state[k] === WATER) water.push(k);
+        if (state[k] !== DRY) allowed.add(k);
+      }
+      if (!water.length) return 0;
+      var reach = comp(allowed, water[0]);
+      for (var z = 0; z < water.length; z++) if (!reach.has(water[z])) return -1;
+
+      var changed = false;
+      for (k = 0; k < N * N; k++) {
+        if (state[k] === UNKNOWN && !reach.has(k)) { state[k] = DRY; changed = true; }
+      }
+      if (changed) return 1;
+
+      for (k = 0; k < N * N; k++) {
+        if (state[k] !== UNKNOWN) continue;
+        allowed.delete(k);
+        var r2 = comp(allowed, water[0]), bad = false;
+        for (var z2 = 0; z2 < water.length; z2++) if (!r2.has(water[z2])) { bad = true; break; }
+        allowed.add(k);
+        if (bad) { state[k] = WATER; return 1; }
+      }
+      return 0;
+    }
+
+    /* `order` is the sequence in which cells become forced — the solve
+       path. Generation only needs the round counts, but a hint needs to
+       know which cell a person could legitimately work out next. */
+    var seen = new Uint8Array(state);
+    var rounds = 0, firstGain = 0, order = [];
+    function noteRound() {
+      rounds++;
+      var gained = 0;
+      for (var k = 0; k < N * N; k++) {
+        if (state[k] !== UNKNOWN && seen[k] === UNKNOWN) {
+          seen[k] = state[k];
+          order.push(k);
+          gained++;
+        }
+      }
+      if (rounds === 1) firstGain = gained;
+    }
+
+    for (;;) {
+      var res = ripple();
+      if (res < 0) return { solved:false, bad:true };
+      if (res) { level = Math.max(level, L_RIPPLE); noteRound(); continue; }
+      if (maxLevel >= L_FLOW) {
+        res = flow();
+        if (res < 0) return { solved:false, bad:true };
+        if (res) { level = Math.max(level, L_FLOW); hard++; noteRound(); continue; }
+      }
+      break;
+    }
+
+    var unknown = 0, region = new Set();
+    for (var k2 = 0; k2 < N * N; k2++) {
+      if (state[k2] === UNKNOWN) unknown++;
+      else if (state[k2] === WATER) region.add(k2);
+    }
+    var ok = unknown === 0 &&
+             no2x2(G, function (r3, c3) { return region.has(r3 * N + c3); }) &&
+             connectedSet(G, region);
+    if (ok) {
+      /* The closure said every cell; the readings must still be EXACT —
+         verify outright rather than trust the chain. */
+      var df = distField(G, region);
+      for (var q2 = 0; q2 < clueList.length; q2++) {
+        if (df[clueList[q2].k] !== tables[clueList[q2].k].val) { ok = false; break; }
+      }
+    }
+    return { solved:ok, bad:false, level:level, hard:hard, region:region,
+             state:state, rounds:rounds, firstGain:firstGain, order:order };
+  }
+
+  /* ---------- growing the vein ----------
+     The shaded cells are underground water, and the water is the whole
+     puzzle: fill it too densely and the no-pool rule leaves it no
+     freedom. So grow it THIN — prefer the candidate with the fewest
+     filled neighbours — while steering toward rows and columns the vein
+     has not reached, so a sparse vein still spans the grid instead of
+     curling up in one corner. */
+  function veinRegion(G, rnd, target) {
+    var N = G.N, filled = new Set();
+    filled.add(((rnd() * N) | 0) * N + ((rnd() * N) | 0));
+
+    function ok2(k) {
+      var r = (k / N) | 0, c = k % N;
+      for (var dr = -1; dr <= 0; dr++) {
+        for (var dc = -1; dc <= 0; dc++) {
+          var a = r + dr, b = c + dc;
+          if (!G.inside(a, b) || !G.inside(a + 1, b + 1)) continue;
+          if (filled.has(a * N + b) && filled.has((a + 1) * N + b) &&
+              filled.has(a * N + b + 1) && filled.has((a + 1) * N + b + 1)) return false;
+        }
+      }
+      return true;
+    }
+    function around8(k) {
+      var r = (k / N) | 0, c = k % N, n = 0;
+      for (var i = 0; i < 8; i++) {
+        var a = r + DIRS8[i][0], b = c + DIRS8[i][1];
+        if (G.inside(a, b) && filled.has(a * N + b)) n++;
+      }
+      return n;
+    }
+
+    var guard = 0;
+    while (filled.size < target && guard++ < 60000) {
+      var seen = new Set(), cands = [];
+      filled.forEach(function (k) {
+        var r = (k / N) | 0, c = k % N;
+        for (var i = 0; i < 4; i++) {
+          var a = r + DIRS4[i][0], b = c + DIRS4[i][1];
+          if (!G.inside(a, b)) continue;
+          var nk = a * N + b;
+          if (filled.has(nk) || seen.has(nk)) continue;
+          seen.add(nk); cands.push(nk);
+        }
+      });
+      if (!cands.length) break;
+
+      var rowN = new Array(N).fill(0), colN = new Array(N).fill(0);
+      filled.forEach(function (k) { rowN[(k / N) | 0]++; colN[k % N]++; });
+
+      var valid = [], scored = [], bestScore = 1e9;
+      for (var i2 = 0; i2 < cands.length; i2++) {
+        var k2 = cands[i2];
+        filled.add(k2);
+        var good = ok2(k2);
+        filled.delete(k2);
+        if (!good) continue;
+        var s = around8(k2) * 2 + (rowN[(k2 / N) | 0] + colN[k2 % N]) * 0.42;
+        valid.push(k2); scored.push(s);
+        if (s < bestScore) bestScore = s;
+      }
+      if (!valid.length) break;
+      var near = [];
+      for (var v = 0; v < valid.length; v++) if (scored[v] <= bestScore + 1.2) near.push(valid[v]);
+      var pool = (rnd() < 0.25) ? valid : near;
+      filled.add(pool[(rnd() * pool.length) | 0]);
+    }
+    return filled;
+  }
+
+  /* How many search candidates each size can afford. */
+  var BUDGET = {
+    7:  { regions: 14, orders: 4 },
+    9:  { regions: 10, orders: 3 },
+    11: { regions: 8,  orders: 3 }
+  };
+
+  function listOf(set, N) {
+    var out = [];
+    set.forEach(function (kk) { out.push({ k: kk, r: (kk / N) | 0, c: kk % N }); });
+    return out;
+  }
+
+  /* ---------- reduction ----------
+     Greedy stripping keeps whatever it cannot remove, so the order clues
+     are OFFERED UP decides which survive. A reading whose ring barely
+     fits the grid hands over its water the instant you read it; offer the
+     most self-forcing up first, and the clues that must be worked out are
+     what remain. */
+  function reduceClues(G, tables, clueKeys, rnd, maxLevel) {
+    var N = G.N;
+    var order = clueKeys.slice(), rank = {};
+    for (var z = 0; z < clueKeys.length; z++) {
+      rank[clueKeys[z]] = tables[clueKeys[z]].ring.length + rnd() * 1.5;
+    }
+    order.sort(function (a, b) { return rank[a] - rank[b]; });
+
+    var keep = new Set(clueKeys);
+    for (var o = 0; o < order.length; o++) {
+      var cand = order[o];
+      keep.delete(cand);
+      var rr = keep.size ? solveLogic(G, listOf(keep, N), tables, maxLevel)
+                         : { solved:false };
+      if (!rr.solved) keep.add(cand);
+    }
+    return keep;
+  }
+
+  /* ---------- candidate scoring ----------
+     Score the SOLVE, not the clue statistics: how little falls out in
+     round one, how long the chain runs, whether the readings vary. A
+     board carrying a reading that gives itself away is rejected outright. */
+  function scoreCandidate(G, size, regionArr, keep, tables, maxLevel) {
+    var N = size, cells = size * size;
+    var list = listOf(keep, N);
+    var fin = solveLogic(G, list, tables, maxLevel);
+    if (!fin.solved) return null;
+
+    var deep = 0, shallow = 0;
+    for (var i = 0; i < list.length; i++) {
+      var t = tables[list[i].k];
+      if (t.ring.length <= 1) return null;     /* a pure giveaway: reject */
+      if (t.val >= 3) deep++;
+      if (t.val === 1) shallow++;
+    }
+    var n = list.length;
+    var clueF = n / cells;
+    var open = fin.firstGain / cells;
+    var chain = Math.min(1, fin.rounds / 25);
+    var deepF = deep / n, shallowF = shallow / n;
+
+    /* long straight runs are the striped failure mode */
+    var set = new Set(regionArr), longRuns = 0;
+    for (var a = 0; a < size; a++) {
+      var hr = 0, vr = 0;
+      for (var b = 0; b < size; b++) {
+        hr = set.has(a * size + b) ? hr + 1 : 0;
+        if (hr === 5) longRuns++;
+        vr = set.has(b * size + a) ? vr + 1 : 0;
+        if (vr === 5) longRuns++;
+      }
+    }
+    var runF = Math.min(1, longRuns / (size * 0.6));
+
+    return {
+      score: 2.4 * deepF - 1.4 * shallowF - 2.6 * clueF - 1.8 * runF
+             - 5.2 * open + 2.2 * chain + 2.0,
+      level: fin.level, hard: fin.hard, order: fin.order,
+      first: fin.firstGain, rounds: fin.rounds, clueCount: n
+    };
+  }
+
+  /* ---------- the generator ----------
+     Vein first, every dry cell seeded as a reading, then stripped for as
+     long as the deduction solver can still finish. Uniqueness comes free:
+     a guess-free complete solve admits no alternative. Several candidates
+     are built and the best kept, because the first correct board is
+     rarely a good one. */
+  function generate(size, num, opts) {
+    opts = opts || {};
+    var G = makeGeom(size), N = size;
+    var rnd = mulberry32(seedFor(size, num));
+    var maxLevel = opts.maxLevel || L_FLOW;
+    var budget = BUDGET[size] || { regions: 8, orders: 3 };
+    var regions = opts.regions || budget.regions;
+    var orders = opts.orders || budget.orders;
+    var best = null;
+
+    /* Puzzle numbers are permanent, so a number that fails to generate is
+       a hole in the book forever. If the normal budget finds nothing, keep
+       searching rather than handing back an error — the PRNG stream
+       carries on, so the result stays deterministic. */
+    var pass = 0;
+    for (;;) {
+    for (var t = 0; t < regions; t++) {
+      var density = 0.24 + rnd() * 0.09;
+      var target = Math.round(N * N * density);
+      var region = veinRegion(G, rnd, target);
+      if (region.size < target * 0.8) continue;
+      if (!connectedSet(G, region)) continue;
+
+      /* The vein must touch every row and column, or the board reads as
+         a mistake however good its solve path is. */
+      var rw = new Array(N).fill(0), cw = new Array(N).fill(0);
+      region.forEach(function (k) { rw[(k / N) | 0]++; cw[k % N]++; });
+      var starved = false;
+      for (var q = 0; q < N; q++) if (rw[q] === 0 || cw[q] === 0) { starved = true; break; }
+      if (starved) continue;
+
+      var dist = distField(G, region);
+      var clueKeys = [], tables = {};
+      for (var k = 0; k < N * N; k++) {
+        if (region.has(k)) continue;
+        clueKeys.push(k);
+        tables[k] = clueTable(G, k, dist[k]);
+      }
+      if (!clueKeys.length) continue;
+      if (!solveLogic(G, listOf(new Set(clueKeys), N), tables, maxLevel).solved) continue;
+
+      var regionArr = Array.from(region);
+      for (var o = 0; o < orders; o++) {
+        var keep = reduceClues(G, tables, clueKeys, rnd, maxLevel);
+        var sc = scoreCandidate(G, size, regionArr, keep, tables, maxLevel);
+        if (!sc) continue;
+        if (!best || sc.score > best.score) {
+          var clues = {};
+          keep.forEach(function (kk2) { clues[kk2] = tables[kk2].val; });
+          best = {
+            size: size, num: num, region: regionArr, clues: clues,
+            level: sc.level, hard: sc.hard, clueCount: sc.clueCount,
+            first: sc.first, rounds: sc.rounds, score: sc.score,
+            order: sc.order
+          };
+        }
+      }
+    }
+      if (best || ++pass >= 4) break;
+      regions = regions * 3;
+    }
+    return best;
+  }
+
+  return {
+    UNKNOWN:UNKNOWN, WATER:WATER, DRY:DRY,
+    L_FLOW:L_FLOW,
+    mulberry32:mulberry32, seedFor:seedFor,
+    makeGeom:makeGeom, clueTable:clueTable, distField:distField,
+    solveLogic:solveLogic, generate:generate,
+    no2x2:no2x2, connectedSet:connectedSet
+  };
+}
+
+/* =====================================================================
+   APP
+   ===================================================================== */
+(function () {
+  "use strict";
+  var core = DowseCore();
+
+  /* ---------- persistence ---------- */
+  var KEY = "dowse.v1";
+  var save = { solved:{}, current:null, opts:{ theme:"auto", clock:false } };
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      if (p && typeof p === "object") {
+        save.solved = p.solved || {};
+        save.current = p.current || null;
+        save.opts = Object.assign(save.opts, p.opts || {});
+      }
+    }
+  } catch (e) { /* storage unavailable — the game still plays, just forgets */ }
+  var persistTimer = null;
+  function persist() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(function () {
+      try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {}
+    }, 120);
+  }
+
+  var SIZES = [7, 9, 11];
+  function solvedMap(size) { return save.solved[size] || (save.solved[size] = {}); }
+  function solvedCount(size) { return Object.keys(solvedMap(size)).length; }
+
+  /* Region bitmaps are stored as hex so a solved board keeps its shape in
+     the index without regenerating the puzzle. */
+  function packRegion(size, arr) {
+    var bytes = new Uint8Array(Math.ceil(size * size / 8));
+    arr.forEach(function (k) { bytes[k >> 3] |= 1 << (k & 7); });
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, "0");
+    return s;
+  }
+  function unpackRegion(size, hex) {
+    var out = [];
+    for (var k = 0; k < size * size; k++) {
+      var b = parseInt(hex.substr((k >> 3) * 2, 2), 16) || 0;
+      if (b & (1 << (k & 7))) out.push(k);
+    }
+    return out;
+  }
+
+  /* ---------- theme ---------- */
+  function applyTheme() {
+    var t = save.opts.theme;
+    var night = t === "night" ||
+      (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-theme", night ? "night" : "sand");
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+      m.setAttribute("content", night ? "#131a1d" : "#eae6da");
+    });
+    redrawAll();
+  }
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    if (save.opts.theme === "auto") applyTheme();
+  });
+
+  function css(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function mixHex(a, b, t) {
+    function rgb(h) {
+      h = h.replace("#", "");
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    var A = rgb(a), B = rgb(b);
+    return "rgb(" + Math.round(A[0] + (B[0] - A[0]) * t) + "," +
+                    Math.round(A[1] + (B[1] - A[1]) * t) + "," +
+                    Math.round(A[2] + (B[2] - A[2]) * t) + ")";
+  }
+
+  /* ---------- renderer ----------
+     Water cells merge into one region: convex corners round outward, and
+     a corner with both orthogonal neighbours filled but the diagonal
+     empty gets an inward fillet. Without the fillets the vein reads as
+     glued tiles instead of a body of water. */
+  var RADIUS = 0.17;
+
+  function regionPath(ctx, isWater, N, x0, y0, cell, q, only) {
+    var e = 0.4;
+    ctx.beginPath();
+    for (var r = 0; r < N; r++) {
+      for (var c = 0; c < N; c++) {
+        if (!isWater(r, c)) continue;
+        if (only && !only(r, c)) continue;
+        var up = isWater(r - 1, c), dn = isWater(r + 1, c);
+        var lf = isWater(r, c - 1), rt = isWater(r, c + 1);
+        var x = x0 + c * cell, y = y0 + r * cell;
+        var xa = x - (lf ? e : 0), xb = x + cell + (rt ? e : 0);
+        var ya = y - (up ? e : 0), yb = y + cell + (dn ? e : 0);
+
+        if (!up && !lf) ctx.moveTo(xa + q, ya); else ctx.moveTo(xa, ya);
+        if (!up && !rt) { ctx.lineTo(xb - q, ya); ctx.arc(xb - q, ya + q, q, -Math.PI / 2, 0); }
+        else ctx.lineTo(xb, ya);
+        if (!dn && !rt) { ctx.lineTo(xb, yb - q); ctx.arc(xb - q, yb - q, q, 0, Math.PI / 2); }
+        else ctx.lineTo(xb, yb);
+        if (!dn && !lf) { ctx.lineTo(xa + q, yb); ctx.arc(xa + q, yb - q, q, Math.PI / 2, Math.PI); }
+        else ctx.lineTo(xa, yb);
+        if (!up && !lf) { ctx.lineTo(xa, ya + q); ctx.arc(xa + q, ya + q, q, Math.PI, Math.PI * 1.5); }
+        else ctx.lineTo(xa, ya);
+        ctx.closePath();
+
+        if (q > 0) {
+          var cn = [
+            [up, lf, isWater(r - 1, c - 1), x, y, 1, 1],
+            [up, rt, isWater(r - 1, c + 1), x + cell, y, -1, 1],
+            [dn, rt, isWater(r + 1, c + 1), x + cell, y + cell, -1, -1],
+            [dn, lf, isWater(r + 1, c - 1), x, y + cell, 1, -1]
+          ];
+          for (var i = 0; i < 4; i++) {
+            var o = cn[i];
+            if (!(o[0] && o[1] && !o[2])) continue;
+            var px = o[3], py = o[4], sx = o[5], sy = o[6];
+            var a0 = sx === 1 ? 0 : Math.PI;
+            var a1 = sy === 1 ? Math.PI / 2 : -Math.PI / 2;
+            var acw = sx * sy < 0;
+            /* Everything here is one path filled with the nonzero rule, so
+               every subpath must wind the same way as the cell rectangles.
+               Two of the four fillets come out counter-clockwise traversed
+               naturally; walk those two backwards or the windings cancel
+               and punch a pinhole. */
+            ctx.moveTo(px, py);
+            if (sx * sy > 0) {
+              ctx.lineTo(px - sx * q, py);
+              ctx.arc(px - sx * q, py - sy * q, q, a1, a0, !acw);
+            } else {
+              ctx.lineTo(px, py - sy * q);
+              ctx.arc(px - sx * q, py - sy * q, q, a0, a1, acw);
+            }
+            ctx.closePath();
+          }
+        }
+      }
+    }
+  }
+
+  function drawRegion(ctx, isWater, N, x0, y0, cell, q) {
+    regionPath(ctx, isWater, N, x0, y0, cell, q, null);
+    ctx.fill();
+  }
+
+  /* opts: {N, isWater, isMark, clues, clueTone, breaks, showGrid, bleed,
+            side, top, flashCell, sheen, aid, gridAlpha, clueAlpha} */
+  function paint(cv, opts) {
+    var cw = cv.clientWidth, chh = cv.clientHeight || cw, N = opts.N;
+    if (!cw || !N) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var pw = Math.round(cw * dpr), ph = Math.round(chh * dpr);
+    /* Assigning width or height reallocates the backing store even when
+       the value is unchanged — never do it every frame. */
+    if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+    var ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var PG = css("--pg"), PI = css("--pi"), PA = css("--pa"),
+        PR = css("--pr"), PQ = css("--pq");
+
+    var w = opts.side || Math.min(cw, chh);
+    var pad = opts.bleed ? 0 : Math.max(2, w * 0.022);
+    var cell = (w - pad * 2) / N;
+    var x0 = (cw - w) / 2 + pad;
+    var y0 = (opts.top !== undefined ? opts.top : (chh - w) / 2) + pad;
+
+    ctx.fillStyle = PG;
+    ctx.fillRect(0, 0, cw, chh);
+
+    var gA = opts.gridAlpha === undefined ? 1 : opts.gridAlpha;
+    if (opts.showGrid !== false && gA > 0) {
+      ctx.save();
+      ctx.globalAlpha = gA;
+      ctx.strokeStyle = PR;
+      ctx.lineWidth = 1;
+      for (var k = 0; k <= N; k++) {
+        var p = Math.round(x0 + k * cell) + 0.5;
+        ctx.beginPath(); ctx.moveTo(p, y0); ctx.lineTo(p, y0 + cell * N); ctx.stroke();
+        var pv = Math.round(y0 + k * cell) + 0.5;
+        ctx.beginPath(); ctx.moveTo(x0, pv); ctx.lineTo(x0 + cell * N, pv); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /* The reading's reach, shown while a number is held: the diamond that
+       must stay dry as a wash, the ring where its water must lie as a
+       second, warmer wash. Drawn under the water so a mistaken flood is
+       still visible through it. */
+    if (opts.aid && opts.aid.amt > 0) {
+      var ad = opts.aid, t2 = core.clueTable(core.makeGeom(N), ad.k, ad.val);
+      ctx.save();
+      ctx.globalAlpha = 0.16 * ad.amt;
+      ctx.fillStyle = PI;
+      t2.diamond.forEach(function (dk) {
+        ctx.fillRect(x0 + (dk % N) * cell, y0 + ((dk / N) | 0) * cell, cell, cell);
+      });
+      ctx.globalAlpha = 0.34 * ad.amt;
+      ctx.fillStyle = css("--pwave");
+      t2.ring.forEach(function (rk) {
+        ctx.fillRect(x0 + (rk % N) * cell, y0 + ((rk / N) | 0) * cell, cell, cell);
+      });
+      ctx.restore();
+    }
+
+    /* Clear the grid back out of the little wedge the concave fillet
+       spills into the empty diagonal cell, so the vein's curves always
+       sit on bare sand. */
+    if (opts.showGrid !== false && gA > 0 && opts.isWater) {
+      var q = cell * RADIUS, pd2 = 1;
+      ctx.fillStyle = PG;
+      for (var er = 0; er < N; er++) {
+        for (var ec = 0; ec < N; ec++) {
+          if (!opts.isWater(er, ec)) continue;
+          var eup = opts.isWater(er - 1, ec), edn = opts.isWater(er + 1, ec);
+          var elf = opts.isWater(er, ec - 1), ert = opts.isWater(er, ec + 1);
+          var ex = x0 + ec * cell, ey = y0 + er * cell;
+          if (eup && elf && !opts.isWater(er - 1, ec - 1))
+            ctx.fillRect(ex - q - pd2, ey - q - pd2, q + pd2, q + pd2);
+          if (eup && ert && !opts.isWater(er - 1, ec + 1))
+            ctx.fillRect(ex + cell, ey - q - pd2, q + pd2, q + pd2);
+          if (edn && ert && !opts.isWater(er + 1, ec + 1))
+            ctx.fillRect(ex + cell, ey + cell, q + pd2, q + pd2);
+          if (edn && elf && !opts.isWater(er + 1, ec - 1))
+            ctx.fillRect(ex - q - pd2, ey + cell, q + pd2, q + pd2);
+        }
+      }
+    }
+
+    ctx.fillStyle = PI;
+    var fl = opts.flashCell;
+    if (fl && fl.amt > 0 && opts.isWater && opts.isWater((fl.k / N) | 0, fl.k % N)) {
+      var lr = (fl.k / N) | 0, lc = fl.k % N;
+      var lx = x0 + (lc + 0.5) * cell, ly = y0 + (lr + 0.5) * cell;
+      var lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, cell * 0.95);
+      var hot = mixHex(PI, css("--pwave"), fl.amt);
+      lg.addColorStop(0, hot);
+      lg.addColorStop(0.62, hot);
+      lg.addColorStop(1, PI);
+      ctx.fillStyle = lg;
+    }
+    /* A band of lighter water sweeping outward from the vein's middle on
+       a solve — the sheen travels through the shape without breaking it
+       into per-cell fills. */
+    if (opts.sheen !== undefined && opts.isWater) {
+      var sx = 0, sy = 0, sn = 0;
+      for (var sr = 0; sr < N; sr++) {
+        for (var sc = 0; sc < N; sc++) {
+          if (opts.isWater(sr, sc)) { sx += sc + 0.5; sy += sr + 0.5; sn++; }
+        }
+      }
+      if (sn) {
+        var gx = x0 + (sx / sn) * cell, gy = y0 + (sy / sn) * cell;
+        var maxR = 0;
+        for (var mr = 0; mr < N; mr++) {
+          for (var mc = 0; mc < N; mc++) {
+            if (!opts.isWater(mr, mc)) continue;
+            var dx = x0 + (mc + 0.5) * cell - gx, dy = y0 + (mr + 0.5) * cell - gy;
+            var dd = Math.sqrt(dx * dx + dy * dy);
+            if (dd > maxR) maxR = dd;
+          }
+        }
+        maxR = Math.max(maxR + cell, 1);
+        var t = opts.sheen, band = 0.20;
+        var g = ctx.createRadialGradient(gx, gy, 0, gx, gy, maxR);
+        var hi = mixHex(PI, css("--pwave"), 0.62);
+        var lo = Math.max(0.0001, Math.min(0.999, t - band));
+        var mid = Math.max(lo + 0.0001, Math.min(0.9992, t));
+        var up2 = Math.max(mid + 0.0001, Math.min(0.9995, t + band));
+        g.addColorStop(0, PI);
+        g.addColorStop(lo, PI);
+        g.addColorStop(mid, hi);
+        g.addColorStop(up2, PI);
+        g.addColorStop(1, PI);
+        ctx.fillStyle = g;
+      }
+    }
+    if (opts.isWater) drawRegion(ctx, opts.isWater, N, x0, y0, cell, cell * RADIUS);
+
+    /* Hazard stripes over a pooled square — the sign for "this is not
+       allowed" everywhere else in the world. */
+    if (opts.breaks && opts.breaks.length && opts.isWater) {
+      var bs = cell * 2;
+      var step = Math.max(6, cell * 0.34);
+      for (var b = 0; b < opts.breaks.length; b++) {
+        var br = opts.breaks[b];
+        var bx = x0 + br[1] * cell, by = y0 + br[0] * cell;
+        ctx.save();
+        (function (b0, b1) {
+          regionPath(ctx, opts.isWater, N, x0, y0, cell, cell * RADIUS,
+                     function (rr, cc) {
+                       return rr >= b0 && rr <= b0 + 1 && cc >= b1 && cc <= b1 + 1;
+                     });
+        })(br[0], br[1]);
+        ctx.clip();
+        ctx.strokeStyle = PA;
+        ctx.lineWidth = Math.max(2, cell * 0.11);
+        ctx.lineCap = "butt";
+        for (var d = -bs; d < bs * 2; d += step) {
+          ctx.beginPath();
+          ctx.moveTo(bx + d - bs, by - bs);
+          ctx.lineTo(bx + d + bs * 2, by + bs * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    if (opts.isMark) {
+      ctx.fillStyle = PQ;
+      for (var r2 = 0; r2 < N; r2++) {
+        for (var c2 = 0; c2 < N; c2++) {
+          if (!opts.isMark(r2, c2)) continue;
+          var mx = x0 + c2 * cell + cell / 2, my = y0 + r2 * cell + cell / 2;
+          ctx.beginPath();
+          ctx.arc(mx, my, Math.max(1.3, cell * 0.085), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    var cA = opts.clueAlpha === undefined ? 1 : opts.clueAlpha;
+    if (opts.clues && cA > 0) {
+      ctx.save();
+      ctx.globalAlpha = cA;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var serif = css("--serif");
+      for (var key in opts.clues) {
+        var kk = +key, rr2 = (kk / N) | 0, cc2 = kk % N;
+        /* A reading that has come exactly true has nothing left to say,
+           so it falls quiet. The accent means it reads wrong. */
+        var tone = opts.clueTone ? opts.clueTone(kk) : "ink";
+        ctx.fillStyle = tone === "bad" ? PA : tone === "quiet" ? PQ : PI;
+        var fsize = cell * 0.52;
+        ctx.font = "600 " + fsize.toFixed(1) + "px " + serif;
+        ctx.fillText(String(opts.clues[key]),
+          x0 + cc2 * cell + cell / 2,
+          y0 + rr2 * cell + cell / 2 + fsize * 0.04);
+        if (fl && fl.amt > 0 && fl.k === kk) {
+          ctx.save();
+          ctx.globalAlpha = fl.amt * 0.5;
+          ctx.strokeStyle = css("--pwave");
+          ctx.lineWidth = Math.max(2, cell * 0.09);
+          ctx.strokeRect(x0 + cc2 * cell + 1, y0 + rr2 * cell + 1, cell - 2, cell - 2);
+          ctx.restore();
+        }
+      }
+      ctx.restore();
+    }
+
+    /* The hint flash on a cell that is not yet water: a ring of wave
+       colour, "look here". */
+    if (fl && fl.amt > 0 && (!opts.isWater || !opts.isWater((fl.k / N) | 0, fl.k % N)) &&
+        !(opts.clues && opts.clues[fl.k] !== undefined)) {
+      var hr2 = (fl.k / N) | 0, hc2 = fl.k % N;
+      ctx.save();
+      ctx.globalAlpha = fl.amt;
+      ctx.strokeStyle = css("--pwave");
+      ctx.lineWidth = Math.max(2, cell * 0.09);
+      ctx.strokeRect(x0 + hc2 * cell + 1, y0 + hr2 * cell + 1, cell - 2, cell - 2);
+      ctx.restore();
+    }
+
+    return { x0: x0 - pad, y0: y0 - pad, cell: cell, pad: pad };
+  }
+
+  function paintGlyph(cv, size, regionArr) {
+    var set = new Set(regionArr);
+    paint(cv, {
+      N: size, bleed: true, showGrid: false,
+      isWater: function (r, c) {
+        return r >= 0 && r < size && c >= 0 && c < size && set.has(r * size + c);
+      }
+    });
+  }
+
+  /* ---------- generation, off the main thread when possible ---------- */
+  var worker = null;
+  try {
+    var src = "(" + DowseCore.toString() + ")";
+    var blob = new Blob([
+      "var makeCore=" + src + ";var core=makeCore();" +
+      "onmessage=function(e){var d=e.data;var p=core.generate(d.size,d.num,d.opts);" +
+      "postMessage({id:d.id,puzzle:p});};"
+    ], { type: "text/javascript" });
+    worker = new Worker(URL.createObjectURL(blob));
+  } catch (e) { worker = null; }
+
+  var jobId = 0, jobs = {};
+  if (worker) {
+    worker.onmessage = function (e) {
+      var cb = jobs[e.data.id];
+      if (cb) { delete jobs[e.data.id]; cb(e.data.puzzle); }
+    };
+    worker.onerror = function () { worker = null; };
+  }
+
+  /* Deterministic is not the same as precomputed: a board is searched from
+     scratch every time it is opened. Cache what has been built, and build
+     the next number in the background while the current one is being
+     solved, so moving on is instant. */
+  var puzzleCache = {};
+  function cacheKey(size, num) { return size + ":" + num; }
+
+  function prefetch(size, num) {
+    var key = cacheKey(size, num);
+    if (puzzleCache[key]) return;
+    buildPuzzle(size, num, function (p) { if (p) puzzleCache[key] = p; });
+  }
+
+  function getPuzzle(size, num, done) {
+    var key = cacheKey(size, num);
+    if (puzzleCache[key]) { done(puzzleCache[key]); return; }
+    buildPuzzle(size, num, function (p) {
+      if (p) puzzleCache[key] = p;
+      done(p);
+    });
+  }
+
+  function buildPuzzle(size, num, done) {
+    var opts = { maxLevel: core.L_FLOW };
+    if (worker) {
+      var id = ++jobId;
+      jobs[id] = done;
+      worker.postMessage({ id: id, size: size, num: num, opts: opts });
+    } else {
+      setTimeout(function () { done(core.generate(size, num, opts)); }, 16);
+    }
+  }
+
+  /* ---------- screens ---------- */
+  var screens = {};
+  ["home", "index", "play", "rules", "settings"].forEach(function (id) {
+    screens[id] = document.getElementById(id);
+  });
+  var currentScreen = "home";
+  function show(id) {
+    for (var k in screens) screens[k].classList.toggle("on", k === id);
+    currentScreen = id;
+    if (id === "home") renderHome();
+    if (id === "index") renderIndex();
+    if (id === "settings") renderSettings();
+    if (id === "rules") renderRules();
+  }
+  document.querySelectorAll("[data-back]").forEach(function (b) {
+    b.addEventListener("click", function () { show(b.getAttribute("data-back")); });
+  });
+
+  var working = document.getElementById("working");
+  function setWorking(on) { working.classList.toggle("on", on); }
+
+  /* ---------- home ---------- */
+  var booksEl = document.getElementById("books");
+  var contCard = document.getElementById("contCard");
+  function renderHome() {
+    var cur = save.current;
+    if (cur && cur.cells) {
+      contCard.style.display = "grid";
+      document.getElementById("contName").textContent =
+        cur.size + " × " + cur.size + " · №" + cur.num;
+      var water = cur.cells.filter(function (v) { return v === 1; }).length;
+      document.getElementById("contWhen").textContent =
+        water ? water + " cells of water" : "Not started yet";
+      var arr = [];
+      cur.cells.forEach(function (v, i) { if (v === 1) arr.push(i); });
+      paintGlyph(document.getElementById("contCv"), cur.size, arr);
+    } else {
+      contCard.style.display = "none";
+    }
+
+    booksEl.innerHTML = "";
+    SIZES.forEach(function (size) {
+      var b = document.createElement("button");
+      b.className = "book";
+      var cv = document.createElement("canvas");
+      var mid = document.createElement("div");
+      mid.innerHTML = '<div class="n"></div>';
+      mid.querySelector(".n").textContent = size + " × " + size;
+      var cnt = document.createElement("div");
+      cnt.className = "c";
+      cnt.textContent = solvedCount(size) || "";
+      b.appendChild(cv); b.appendChild(mid); b.appendChild(cnt);
+      b.addEventListener("click", function () { openBook(size); });
+      booksEl.appendChild(b);
+
+      /* the book's mark is a board you actually solved, if you have one */
+      var map = solvedMap(size), keys = Object.keys(map);
+      requestAnimationFrame(function () {
+        if (keys.length) paintGlyph(cv, size, unpackRegion(size, map[keys[keys.length - 1]].r));
+        else paint(cv, { N: size, bleed: true, showGrid: true,
+                         isWater: function () { return false; } });
+      });
+    });
+  }
+  contCard.addEventListener("click", function () {
+    if (save.current) openPuzzle(save.current.size, save.current.num, true);
+  });
+  document.getElementById("toRules").addEventListener("click", function () { show("rules"); });
+  document.getElementById("toSettings").addEventListener("click", function () { show("settings"); });
+
+  /* ---------- index ---------- */
+  var idxSize = 9, idxShown = 40;
+  function openBook(size) {
+    idxSize = size;
+    idxShown = 40;
+    /* land the reader on the first unsolved page of the book */
+    var map = solvedMap(size), n = 1;
+    while (map[n]) n++;
+    idxShown = Math.max(40, Math.ceil(n / 40) * 40);
+    show("index");
+  }
+  function nextUnsolved(size) {
+    var map = solvedMap(size), n = 1;
+    while (map[n]) n++;
+    return n;
+  }
+  function renderIndex() {
+    document.getElementById("idxTitle").textContent = idxSize + " × " + idxSize;
+    document.getElementById("idxCount").textContent = solvedCount(idxSize) + " solved";
+    var grid = document.getElementById("idxGrid");
+    grid.innerHTML = "";
+    var map = solvedMap(idxSize);
+    var here = nextUnsolved(idxSize);
+    for (var num = 1; num <= idxShown; num++) {
+      var w = document.createElement("button");
+      w.className = "cellw" + (map[num] ? " done" : "") + (num === here ? " here" : "");
+      if (map[num]) {
+        var cv = document.createElement("canvas");
+        w.appendChild(cv);
+        (function (cv2, size2, hex) {
+          requestAnimationFrame(function () { paintGlyph(cv2, size2, unpackRegion(size2, hex)); });
+        })(cv, idxSize, map[num].r);
+      } else {
+        var bl = document.createElement("div");
+        bl.className = "blank";
+        bl.textContent = num;
+        w.appendChild(bl);
+      }
+      var lab = document.createElement("div");
+      lab.className = "num";
+      lab.textContent = "№" + num;
+      w.appendChild(lab);
+      (function (n2) {
+        w.addEventListener("click", function () { openPuzzle(idxSize, n2, false); });
+      })(num);
+      grid.appendChild(w);
+    }
+  }
+  document.getElementById("idxMore").addEventListener("click", function () {
+    idxShown += 40;
+    renderIndex();
+  });
+  document.getElementById("jumpBtn").addEventListener("click", function () {
+    var v = parseInt(prompt("Go to puzzle №", ""), 10);
+    if (!isFinite(v) || v < 1 || v > 9999) return;
+    openPuzzle(idxSize, v, false);
+  });
+
+  /* ---------- play ---------- */
+  var boardCv = document.getElementById("board");
+  var G = null, puzzle = null, cells = null, verb = 1; /* 1 water, 2 mark */
+  var undoStack = [], redoStack = [];
+  var layout = null, solvedNow = false, seconds = 0, clockTimer = null;
+  var flash = null, aid = null, sheenT = -1, animReq = 0;
+
+  var noticeEl = document.getElementById("notice");
+  var finishEl = document.getElementById("finish");
+  var confirmEl = document.getElementById("confirm");
+
+  function openPuzzle(size, num, resume) {
+    setWorking(true);
+    getPuzzle(size, num, function (p) {
+      setWorking(false);
+      if (!p) { show("home"); return; }
+      puzzle = p;
+      G = core.makeGeom(size);
+      cells = new Uint8Array(size * size);
+      seconds = 0;
+      if (resume && save.current && save.current.size === size && save.current.num === num) {
+        (save.current.cells || []).forEach(function (v, i) { cells[i] = v; });
+        seconds = save.current.sec || 0;
+      }
+      /* clue cells can never hold a mark, whatever an old save says */
+      for (var kk in p.clues) cells[+kk] = 0;
+      undoStack = []; redoStack = [];
+      solvedNow = false; flash = null; aid = null; sheenT = -1;
+      finishEl.classList.remove("show", "in");
+      noticeEl.classList.remove("on");
+      document.querySelectorAll("#play .thumb").forEach(function (t) { t.classList.remove("gone"); });
+      document.getElementById("playTitle").textContent = size + "×" + size + " · №" + num;
+      save.current = { size: size, num: num, cells: Array.from(cells), sec: seconds };
+      persist();
+      show("play");
+      syncButtons();
+      requestAnimationFrame(repaint);
+      startClock();
+      prefetch(size, num + 1);
+    });
+  }
+
+  function startClock() {
+    clearInterval(clockTimer);
+    var el = document.getElementById("playClock");
+    function tick() {
+      if (currentScreen !== "play" || solvedNow) return;
+      seconds++;
+      if (save.current) { save.current.sec = seconds; persist(); }
+      el.textContent = save.opts.clock ? fmtTime(seconds) : "";
+    }
+    el.textContent = save.opts.clock ? fmtTime(seconds) : "";
+    clockTimer = setInterval(tick, 1000);
+  }
+  function fmtTime(s) {
+    var m = (s / 60) | 0, ss = s % 60;
+    return m + ":" + (ss < 10 ? "0" : "") + ss;
+  }
+
+  /* ---------- judging the board ----------
+     Everything the player sees about rightness comes from here: which
+     readings are wrong (accent), which have come true (quiet), where the
+     water pools (stripes), and whether the one-vein rule is all that is
+     left (said in words, since no single cell can show it). */
+  function judge() {
+    var N = puzzle.size, waterSet = new Set();
+    for (var k = 0; k < N * N; k++) if (cells[k] === 1) waterSet.add(k);
+    var df = waterSet.size ? core.distField(G, waterSet) : null;
+
+    var tones = {}, anyBad = false, allQuiet = true;
+    for (var kk in puzzle.clues) {
+      var key = +kk, val = puzzle.clues[kk];
+      var d = df ? df[key] : -1;
+      var tone = "ink";
+      if (df && d >= 0 && d < val) { tone = "bad"; anyBad = true; }
+      else if (df && d === val) tone = "quiet";
+      if (tone !== "quiet") allQuiet = false;
+      tones[key] = tone;
+    }
+
+    var breaks = [];
+    for (var r = 0; r < N - 1; r++) {
+      for (var c = 0; c < N - 1; c++) {
+        if (waterSet.has(r * N + c) && waterSet.has((r + 1) * N + c) &&
+            waterSet.has(r * N + c + 1) && waterSet.has((r + 1) * N + c + 1)) breaks.push([r, c]);
+      }
+    }
+
+    var connected = core.connectedSet(G, waterSet);
+    var done = waterSet.size > 0 && allQuiet && !anyBad && !breaks.length && connected;
+    return { tones: tones, breaks: breaks, connected: connected,
+             allQuiet: allQuiet, anyBad: anyBad, done: done, waterSet: waterSet };
+  }
+
+  function repaint() {
+    if (!puzzle || currentScreen !== "play") return;
+    var N = puzzle.size;
+    var cw = boardCv.clientWidth, ch = boardCv.clientHeight;
+    /* the floating chrome: room for the bar above and the thumbs below */
+    var topRes = 74, botRes = 96;
+    var side = Math.min(cw - 8, ch - topRes - botRes);
+    var j = judge();
+    var l = paint(boardCv, {
+      N: N,
+      side: side,
+      top: topRes + Math.max(0, (ch - topRes - botRes - side) / 2),
+      isWater: function (r, c) { return r >= 0 && r < N && c >= 0 && c < N && cells[r * N + c] === 1; },
+      isMark: function (r, c) { return cells[r * N + c] === 2; },
+      clues: puzzle.clues,
+      clueTone: solvedNow ? function () { return "quiet"; } : function (k) { return j.tones[k]; },
+      breaks: j.breaks,
+      flashCell: flash,
+      aid: aid,
+      sheen: sheenT >= 0 ? sheenT : undefined,
+      clueAlpha: solvedNow ? 0.35 : 1
+    });
+    if (l) layout = { x0: l.x0 + l.pad, y0: l.y0 + l.pad, cell: l.cell };
+
+    /* the one-vein rule, in words, exactly when it is the last thing wrong */
+    var showNotice = !solvedNow && j.allQuiet && !j.anyBad && !j.breaks.length &&
+                     !j.connected && j.waterSet.size > 0;
+    noticeEl.textContent = "the waters are apart";
+    noticeEl.classList.toggle("on", showNotice);
+  }
+  function redrawAll() {
+    if (currentScreen === "play") requestAnimationFrame(repaint);
+    if (currentScreen === "home") renderHome();
+    if (currentScreen === "index") renderIndex();
+    if (currentScreen === "rules") renderRules();
+  }
+  window.addEventListener("resize", redrawAll);
+
+  /* ---------- animation ---------- */
+  function animate() {
+    cancelAnimationFrame(animReq);
+    var t0 = performance.now();
+    /* The first frame's timestamp can land BEFORE the performance.now()
+       captured when the animation was started; an unclamped age comes out
+       negative and a ramp-up animation nulls itself before it ever draws. */
+    function step(t) {
+      var busy = false;
+      if (flash) {
+        flash.amt = Math.max(0, 1 - Math.max(0, t - flash.t0) / 900);
+        if (flash.amt > 0) busy = true; else flash = null;
+      }
+      if (aid) {
+        var age = Math.max(0, t - aid.t0);
+        aid.amt = age < 1400 ? Math.min(1, age / 120) : Math.max(0, 1 - (age - 1400) / 350);
+        if (age < 1400 || aid.amt > 0) busy = true; else aid = null;
+      }
+      if (sheenT >= 0) {
+        sheenT = Math.min(1, Math.max(0, t - sheen0) / 1400);
+        if (sheenT < 1) busy = true; else sheenT = -1;
+      }
+      repaint();
+      if (busy) animReq = requestAnimationFrame(step);
+    }
+    animReq = requestAnimationFrame(step);
+  }
+  var sheen0 = 0;
+
+  /* ---------- input ----------
+     Tap lays the active verb, tap again clears, double tap lays the other
+     verb, drag paints a run of the first-touched value. Tapping a reading
+     shows its reach instead. */
+  var stroke = null, lastTap = { k: -1, t: 0 };
+
+  function cellAt(ev) {
+    if (!layout || !puzzle) return -1;
+    var rect = boardCv.getBoundingClientRect();
+    var x = ev.clientX - rect.left - layout.x0, y = ev.clientY - rect.top - layout.y0;
+    var c = Math.floor(x / layout.cell), r = Math.floor(y / layout.cell);
+    if (r < 0 || c < 0 || r >= puzzle.size || c >= puzzle.size) return -1;
+    return r * puzzle.size + c;
+  }
+
+  function applyCell(k, v, changes) {
+    if (puzzle.clues[k] !== undefined) return;
+    if (cells[k] === v) return;
+    changes.push({ k: k, from: cells[k], to: v });
+    cells[k] = v;
+  }
+
+  boardCv.addEventListener("pointerdown", function (ev) {
+    if (solvedNow || confirmEl.classList.contains("show")) return;
+    boardCv.setPointerCapture(ev.pointerId);
+    var k = cellAt(ev);
+    if (k < 0) return;
+    if (puzzle.clues[k] !== undefined) {
+      /* a reading: show its reach */
+      aid = { k: k, val: puzzle.clues[k], amt: 0, t0: performance.now() };
+      animate();
+      return;
+    }
+    var now = performance.now();
+    var dbl = (lastTap.k === k && now - lastTap.t < 320);
+    var v;
+    if (dbl && stroke === null) {
+      /* second tap: swap what the first tap laid for the other verb */
+      var other = verb === 1 ? 2 : 1;
+      v = other;
+      /* the first tap's change is on the undo stack; fold this into it */
+      var last = undoStack[undoStack.length - 1];
+      if (last && last.length === 1 && last[0].k === k) {
+        cells[k] = last[0].from;
+        undoStack.pop();
+      }
+    } else {
+      v = (cells[k] === verb) ? 0 : verb;
+    }
+    lastTap = { k: k, t: now };
+    var changes = [];
+    applyCell(k, v, changes);
+    stroke = { v: v, changes: changes, last: k };
+    afterChange(false);
+  });
+
+  boardCv.addEventListener("pointermove", function (ev) {
+    if (!stroke) return;
+    var k = cellAt(ev);
+    if (k < 0 || k === stroke.last) return;
+    stroke.last = k;
+    /* dragging clears nothing by accident: a clearing stroke only clears
+       cells that held the active verb */
+    if (stroke.v === 0) {
+      if (cells[k] === verb) applyCell(k, 0, stroke.changes);
+    } else {
+      applyCell(k, stroke.v, stroke.changes);
+    }
+    afterChange(false);
+  });
+
+  function endStroke() {
+    if (!stroke) return;
+    if (stroke.changes.length) {
+      undoStack.push(stroke.changes);
+      if (undoStack.length > 600) undoStack.shift();
+      redoStack = [];
+    }
+    stroke = null;
+    afterChange(true);
+  }
+  boardCv.addEventListener("pointerup", endStroke);
+  boardCv.addEventListener("pointercancel", endStroke);
+
+  function afterChange(settled) {
+    if (save.current) {
+      save.current.cells = Array.from(cells);
+      persist();
+    }
+    syncButtons();
+    requestAnimationFrame(repaint);
+    if (settled) maybeFinish();
+  }
+
+  function syncButtons() {
+    document.getElementById("undoBtn").disabled = !undoStack.length;
+    document.getElementById("redoBtn").disabled = !redoStack.length;
+    var any = false;
+    if (cells) for (var i = 0; i < cells.length; i++) if (cells[i]) { any = true; break; }
+    document.getElementById("resetBtn").disabled = !any;
+  }
+
+  document.getElementById("undoBtn").addEventListener("click", function () {
+    var grp = undoStack.pop();
+    if (!grp) return;
+    for (var i = grp.length - 1; i >= 0; i--) cells[grp[i].k] = grp[i].from;
+    redoStack.push(grp);
+    afterChange(true);
+  });
+  document.getElementById("redoBtn").addEventListener("click", function () {
+    var grp = redoStack.pop();
+    if (!grp) return;
+    for (var i = 0; i < grp.length; i++) cells[grp[i].k] = grp[i].to;
+    undoStack.push(grp);
+    afterChange(true);
+  });
+
+  var verbBtn = document.getElementById("verbBtn");
+  verbBtn.addEventListener("click", function () {
+    verb = verb === 1 ? 2 : 1;
+    verbBtn.classList.toggle("ink", verb === 1);
+    verbBtn.classList.toggle("mark", verb === 2);
+  });
+
+  /* ---------- reset, with a question first ---------- */
+  function askConfirm(msg, yes, no, cb) {
+    document.getElementById("cmsg").textContent = msg;
+    document.getElementById("cYes").textContent = yes;
+    document.getElementById("cNo").textContent = no;
+    confirmEl.classList.add("show");
+    requestAnimationFrame(function () { confirmEl.classList.add("in"); });
+    confirmCb = cb;
+  }
+  var confirmCb = null;
+  function closeConfirm() {
+    confirmEl.classList.remove("in");
+    setTimeout(function () { confirmEl.classList.remove("show"); }, 300);
+  }
+  document.getElementById("cYes").addEventListener("click", function () {
+    closeConfirm();
+    if (confirmCb) confirmCb();
+    confirmCb = null;
+  });
+  document.getElementById("cNo").addEventListener("click", function () {
+    closeConfirm();
+    confirmCb = null;
+  });
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    askConfirm("Clear the whole board?", "Clear it", "Keep going", function () {
+      var changes = [];
+      for (var k = 0; k < cells.length; k++) {
+        if (cells[k]) { changes.push({ k: k, from: cells[k], to: 0 }); cells[k] = 0; }
+      }
+      if (changes.length) { undoStack.push(changes); redoStack = []; }
+      afterChange(true);
+    });
+  });
+
+  /* ---------- hint ----------
+     A wrongly laid water cell is pointed out first; otherwise the flash
+     lands on the next cell of the generator's own solve path that the
+     player has not found, which is by construction workable without
+     guessing from what is already on the board. */
+  document.getElementById("hintBtn").addEventListener("click", function () {
+    if (!puzzle || solvedNow) return;
+    var N = puzzle.size, sol = new Set(puzzle.region), target = -1;
+    for (var k = 0; k < N * N; k++) {
+      if (cells[k] === 1 && !sol.has(k)) { target = k; break; }
+      if (cells[k] === 2 && sol.has(k)) { target = k; break; }
+    }
+    if (target < 0) {
+      for (var i = 0; i < puzzle.order.length; i++) {
+        var kk = puzzle.order[i];
+        if (sol.has(kk) && cells[kk] !== 1) { target = kk; break; }
+      }
+    }
+    if (target < 0) return;
+    flash = { k: target, amt: 1, t0: performance.now() };
+    animate();
+  });
+
+  /* ---------- finishing ---------- */
+  function maybeFinish() {
+    if (solvedNow || !puzzle) return;
+    var j = judge();
+    if (!j.done) return;
+    solvedNow = true;
+    clearInterval(clockTimer);
+
+    var size = puzzle.size, num = puzzle.num;
+    solvedMap(size)[num] = { t: seconds, r: packRegion(size, puzzle.region) };
+    save.current = null;
+    persist();
+
+    sheen0 = performance.now();
+    sheenT = 0;
+    animate();
+
+    document.querySelectorAll("#play .thumb").forEach(function (t) { t.classList.add("gone"); });
+    var msg = "Solved";
+    if (save.opts.clock) msg += " in " + fmtTime(seconds);
+    document.getElementById("fmsg").textContent = msg;
+    setTimeout(function () {
+      finishEl.classList.add("show");
+      requestAnimationFrame(function () { finishEl.classList.add("in"); });
+    }, 900);
+  }
+  document.getElementById("fnext").addEventListener("click", function () {
+    openPuzzle(puzzle.size, puzzle.num + 1, false);
+  });
+  document.getElementById("playBack").addEventListener("click", function () { show("home"); });
+
+  /* ---------- rules ---------- */
+  function renderRules() {
+    var list = document.getElementById("ruleList");
+    list.innerHTML = "";
+    function row(title, desc, draw) {
+      var d = document.createElement("div");
+      d.className = "rrow";
+      var cv = document.createElement("canvas");
+      var tx = document.createElement("div");
+      tx.innerHTML = '<div class="t"></div><div class="d"></div>';
+      tx.querySelector(".t").textContent = title;
+      tx.querySelector(".d").textContent = desc;
+      d.appendChild(cv); d.appendChild(tx);
+      list.appendChild(d);
+      requestAnimationFrame(function () { draw(cv); });
+    }
+
+    row("The number is a reading",
+        "The nearest water lies exactly that many steps away — counting only across and down, straight through anything.",
+        function (cv) {
+          /* the example water sits exactly on the reading's ring */
+          var set = new Set([2]);
+          paint(cv, { N: 5, bleed: true, showGrid: true,
+            isWater: function (r, c) { return set.has(r * 5 + c); },
+            clues: { 17: 3 },
+            aid: { k: 17, val: 3, amt: 0.9 } });
+        });
+    row("All water is one vein",
+        "Every water cell joins every other, side by side. Water in two pieces is not an answer.",
+        function (cv) {
+          var set = new Set([0, 5, 10, 11, 12, 17, 22, 23, 24]);
+          paint(cv, { N: 5, bleed: true, showGrid: true,
+            isWater: function (r, c) { return set.has(r * 5 + c); } });
+        });
+    row("Water never pools",
+        "No 2 × 2 square is ever all water — a vein, not a lake.",
+        function (cv) {
+          var set = new Set([6, 7, 11, 12]);
+          paint(cv, { N: 5, bleed: true, showGrid: true,
+            isWater: function (r, c) { return set.has(r * 5 + c); },
+            breaks: [[1, 1]] });
+        });
+    row("Numbered ground is dry",
+        "A reading is taken standing on dry ground. Ground without a number may be either — only the numbers are promises.",
+        function (cv) {
+          var set = new Set([3, 8, 13, 18, 23]);
+          paint(cv, { N: 5, bleed: true, showGrid: true,
+            isWater: function (r, c) { return set.has(r * 5 + c); },
+            clues: { 11: 2, 20: 3 } });
+        });
+  }
+
+  /* ---------- settings ---------- */
+  function renderSettings() {
+    var rows = document.getElementById("setRows");
+    rows.innerHTML = "";
+
+    var themes = { auto: "Match the system", sand: "Sand", night: "Night" };
+    var tr = document.createElement("button");
+    tr.className = "setrow";
+    tr.innerHTML = '<div class="lbl">Theme<span class="sub">Sand by day, night by night</span></div><span class="val"></span>';
+    tr.querySelector(".val").textContent = themes[save.opts.theme];
+    tr.addEventListener("click", function () {
+      var order = ["auto", "sand", "night"];
+      save.opts.theme = order[(order.indexOf(save.opts.theme) + 1) % order.length];
+      tr.querySelector(".val").textContent = themes[save.opts.theme];
+      persist();
+      applyTheme();
+    });
+    rows.appendChild(tr);
+
+    var cr = document.createElement("button");
+    cr.className = "setrow";
+    cr.innerHTML = '<div class="lbl">Clock<span class="sub">Show the time while you solve</span></div><div class="sw"><i></i></div>';
+    var sw = cr.querySelector(".sw");
+    sw.classList.toggle("on", !!save.opts.clock);
+    cr.addEventListener("click", function () {
+      save.opts.clock = !save.opts.clock;
+      sw.classList.toggle("on", !!save.opts.clock);
+      persist();
+      document.getElementById("playClock").textContent =
+        save.opts.clock && puzzle ? fmtTime(seconds) : "";
+    });
+    rows.appendChild(cr);
+  }
+
+  /* ---------- boot ---------- */
+  applyTheme();
+  show("home");
+  /* warm the cache toward where the player will land */
+  SIZES.forEach(function (s) { prefetch(s, nextUnsolved(s)); });
+})();
+</script>
+</body>
+</html>

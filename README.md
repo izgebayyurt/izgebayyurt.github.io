@@ -81,6 +81,28 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   `index.html`; `manifest.webmanifest`, `sw.js` and the launcher icons sit beside it
   because a service worker cannot be registered from a blob and a launcher cannot
   read an inline icon.
+- `dowse/` — Dowse, an original puzzle genre designed as a sibling to Tapa. Shade
+  underground water: every number is a dowser standing on dry ground, and the
+  reading is the exact taxicab distance to the nearest water cell — not a count
+  of neighbours (Minesweeper, Tapa) and not a line of sight (Kuromasu), but a
+  nearest-distance promise, which no established genre clues. Each reading
+  therefore does two things at once: it dries out the whole diamond of cells
+  nearer than its number, and it demands water somewhere on the diamond's rim.
+  All water is one connected vein, no 2×2 is ever all water, and that is the
+  entire rule set — the depth comes from rims colliding with the one-vein rule,
+  which has to thread water through the dry diamonds. Generation mirrors Tapa's:
+  vein first, every dry cell seeded as a reading, then stripped for as long as a
+  deduction-only solver (diamond dryness, last-candidate rims, the pool rule,
+  reachability and cut cells) can still finish, so no board needs a guess and
+  uniqueness comes free; candidates are scored on the shape of the solve and a
+  reading that gives itself away is rejected outright. Puzzle number seeds the
+  generator, so №12 is the same board everywhere, built in a Web Worker with the
+  next number prefetched while you solve. The board answers as you work: a
+  reading that has come exactly true falls quiet, a drowned one turns accent, a
+  pooled 2×2 gets hazard stripes, and when the only thing left wrong is water in
+  two pieces it says so in words, since no single cell can show it. Tap a number
+  to see how far its reading reaches. Three books, 7×7 to 11×11; single
+  self-contained `index.html`.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
