@@ -1,4 +1,4 @@
-/* Dowse's service worker.
+/* Rill's service worker.
  *
  * The game is one HTML file that loads nothing at run time — every board is
  * computed on the device — so "works offline" only ever meant "keep the file".
@@ -11,7 +11,7 @@
  *
  * Bump CACHE when the shell changes; the old one is deleted on activate.
  */
-var CACHE = "dowse-v1";
+var CACHE = "rill-v1";
 var SHELL = [
   "./",
   "./index.html",
