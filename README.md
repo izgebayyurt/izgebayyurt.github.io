@@ -88,16 +88,20 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   board, the verbs and the exactness, and changes what the number hears.
   Shade the rill — one connected vein that never loops, so between any two
   water cells there is exactly one way along it — and wherever the rill
-  stops, a spring wells up. A rill is never a bare snake: boards are grown
-  with three or more springs spread wide, tributaries joining one flow, so
-  the readings triangulate between springheads instead of asking which of
-  two ends is nearer. Every number is the exact taxicab distance to
+  stops, a spring wells up. Every number is the exact taxicab distance to
   the nearest SPRING. So a number no longer empties anything: water may run
   right past it — it just cannot stop nearby. The reading's reach flips
   from "forced empty" to "forced flowing": inside it every water cell must
-  keep two arms in the water, and only on the rim may a spring rise. The
-  opening sweep, which under Dowse handed over a third of the board,
-  measures 2–4% under Rill on every book size. The solver reasons with
+  keep two arms in the water, and only on the rim may a spring rise. Any
+  nearest-distance reading still decomposes into a thin existential and a
+  universal stencil whose area grows with the square of the number, so the
+  boards are grown SPRING-RICH — tributaries everywhere, roughly a spring
+  per two board rows — which keeps every reading naturally small: almost
+  all are 1, 2 or 3, a "1" has no stencil at all, and the generator strips
+  fat readings first and scores directly against stencil coverage. A clue
+  alone tells almost nothing; the game is interlocking many weak readings,
+  and the opening sweep, which under Dowse handed over a third of the
+  board, measures 4–5%. The solver reasons with
   through-forcing (a corridor down to its last two openings takes both),
   proven springs (a rim down to one candidate makes it a spring, whose
   other sides then dry), loop-rock, the one-vein rule, and one-step

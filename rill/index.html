@@ -903,7 +903,7 @@ function RillCore() {
     var N = G.N;
     var order = clueKeys.slice(), rank = {};
     for (var z = 0; z < clueKeys.length; z++) {
-      rank[clueKeys[z]] = tables[clueKeys[z]].val + rnd() * 2.5;
+      rank[clueKeys[z]] = -tables[clueKeys[z]].val + rnd() * 2.5;
     }
     order.sort(function (a, b) { return rank[a] - rank[b]; });
 
@@ -944,25 +944,22 @@ function RillCore() {
     var fin = solveLogic(G, list, tables, maxLevel);
     if (!fin.solved) return null;
 
-    var deep = 0, n = list.length;
-    for (var i = 0; i < n; i++) if (list[i].val >= 4) deep++;
+    var n = list.length, fat = 0;
+    var stencil = new Set();
+    for (var i = 0; i < n; i++) {
+      if (list[i].val >= 7) return null;       /* a fortune-teller: reject */
+      if (list[i].val >= 5) fat++;
+      var inn = tables[list[i].k].inner;
+      for (var z2 = 0; z2 < inn.length; z2++) stencil.add(inn[z2]);
+    }
+    var stencilF = stencil.size / cells;
     var clueF = n / cells;
     var open = fin.firstGain / cells;
     var chain = Math.min(1, fin.rounds / 22);
 
-    var springs = veinInfo(G, new Set(regionArr)).springs, minPair = 1e9;
-    for (var a = 0; a < springs.length; a++) {
-      for (var b = a + 1; b < springs.length; b++) {
-        var d = Math.abs(((springs[a] / N) | 0) - ((springs[b] / N) | 0)) +
-                Math.abs((springs[a] % N) - (springs[b] % N));
-        if (d < minPair) minPair = d;
-      }
-    }
-    var spreadF = Math.min(1, minPair / N);
-
     return {
-      score: -5.2 * open + 2.2 * chain - 2.6 * clueF + 0.9 * (deep / n)
-             + 1.2 * spreadF + 2.0,
+      score: -5.2 * open + 2.2 * chain - 1.6 * clueF - 3.2 * stencilF
+             - 1.2 * (fat / n) + 2.0,
       level: fin.level, hard: fin.hard, order: fin.order,
       first: fin.firstGain, rounds: fin.rounds, clueCount: n
     };
@@ -982,16 +979,17 @@ function RillCore() {
     var pass = 0;
     for (;;) {
     for (var t = 0; t < veins; t++) {
-      var density = 0.24 + rnd() * 0.08;
+      var density = 0.28 + rnd() * 0.09;
       var target = Math.round(N * N * density);
-      var targetSprings = 3 + ((rnd() * (N / 3.5)) | 0);
+      var targetSprings = Math.round(N * 0.55) + ((rnd() * N * 0.3) | 0);
       var region = growVein(G, rnd, target, targetSprings);
       if (region.size < Math.max(4, target * 0.75)) continue;
 
       var info = veinInfo(G, region);
-      /* a two-spring tree is a bare path; the rill wants tributaries */
-      if (!info.ok || info.springs.length < 3) continue;
-      if (info.springs.length > Math.max(4, Math.round(region.size * 0.34))) continue;
+      /* springs everywhere: no cell of the board should sit far from one,
+         or its reading grows a stencil worth a fortune */
+      if (!info.ok || info.springs.length < Math.max(3, Math.round(N * 0.45))) continue;
+      if (info.springs.length > Math.round(region.size * 0.45)) continue;
 
       /* the rill must touch every row and column */
       var rw = new Array(N).fill(0), cw = new Array(N).fill(0);
