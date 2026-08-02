@@ -88,7 +88,10 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   board, the verbs and the exactness, and changes what the number hears.
   Shade the rill — one connected vein that never loops, so between any two
   water cells there is exactly one way along it — and wherever the rill
-  stops, a spring wells up. Every number is the exact taxicab distance to
+  stops, a spring wells up. A rill is never a bare snake: boards are grown
+  with three or more springs spread wide, tributaries joining one flow, so
+  the readings triangulate between springheads instead of asking which of
+  two ends is nearer. Every number is the exact taxicab distance to
   the nearest SPRING. So a number no longer empties anything: water may run
   right past it — it just cannot stop nearby. The reading's reach flips
   from "forced empty" to "forced flowing": inside it every water cell must
