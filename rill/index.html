@@ -591,7 +591,7 @@ function RillCore() {
      "suppose, propagate, contradict". Completion means every cell is
      decided and the water reads true — and a guess-free complete closure
      admits no alternative, so uniqueness comes free. */
-  function solveLogic(G, clueList, tables, maxLevel) {
+  function solveLogic(G, clueList, tables, maxLevel, roundCap) {
     var N = G.N, i, j;
     var state = new Uint8Array(N * N);
     for (i = 0; i < clueList.length; i++) {
@@ -748,6 +748,27 @@ function RillCore() {
     }
 
     /* Probe: one supposition deep, cheap rules only. */
+    /* One cheap stroke of the one-vein rule for suppositions: water cut
+       into pieces that can never rejoin is a contradiction. This is what
+       corners a silent spring — "if this cell were dry, that stream is
+       stranded" — without the price of the full flow pass. */
+    function reachBad() {
+      var water = [], k;
+      for (k = 0; k < N * N; k++) if (state[k] === WATER) water.push(k);
+      if (water.length < 2) return false;
+      var seen = new Set([water[0]]), stack = [water[0]];
+      while (stack.length) {
+        var kk = stack.pop();
+        var nb = neighbors(G, kk);
+        for (var z = 0; z < nb.length; z++) {
+          var n = nb[z];
+          if (state[n] !== DRY && !seen.has(n)) { seen.add(n); stack.push(n); }
+        }
+      }
+      for (k = 0; k < water.length; k++) if (!seen.has(water[k])) return true;
+      return false;
+    }
+
     function closureQuiet(st, tips) {
       var savedS = state, savedT = mustTip;
       state = st; mustTip = tips;
@@ -756,15 +777,17 @@ function RillCore() {
         var res = ripple();
         if (res < 0) { bad = true; break; }
         if (res) { if (++guard > 60) break; continue; }
+        if (reachBad()) { bad = true; }
         break;
       }
       state = savedS; mustTip = savedT;
       return bad;
     }
-    function probe() {
+    function probeSweep(scope) {
       var found = [];
       for (var k = 0; k < N * N; k++) {
         if (state[k] !== UNKNOWN) continue;
+        if (scope && !scope.has(k)) continue;
         var nb = neighbors(G, k), near = false;
         for (var j2 = 0; j2 < nb.length; j2++) {
           if (state[nb[j2]] !== UNKNOWN) { near = true; break; }
@@ -778,10 +801,30 @@ function RillCore() {
       for (var f = 0; f < found.length; f++) state[found[f][0]] = found[f][1];
       return found.length ? 1 : 0;
     }
+    /* Most probe forcings happen where the board just moved, so probe
+       there first; the expensive whole-board sweep runs only to prove
+       there is truly nothing left. */
+    function probe() {
+      if (recent.size) {
+        var scope = new Set();
+        recent.forEach(function (k) {
+          var r = (k / N) | 0, c = k % N;
+          for (var dr = -2; dr <= 2; dr++) {
+            for (var dc = -2; dc <= 2; dc++) {
+              var rr = r + dr, cc = c + dc;
+              if (G.inside(rr, cc)) scope.add(rr * N + cc);
+            }
+          }
+        });
+        recent = new Set();
+        if (probeSweep(scope)) return 1;
+      }
+      return probeSweep(null);
+    }
 
     /* the solve path, for hints and for grading */
     var seen = new Uint8Array(state);
-    var rounds = 0, firstGain = 0, order = [];
+    var rounds = 0, firstGain = 0, order = [], recent = new Set();
     function noteRound() {
       rounds++;
       var gained = 0;
@@ -789,6 +832,7 @@ function RillCore() {
         if (state[k] !== UNKNOWN && seen[k] === UNKNOWN) {
           seen[k] = state[k];
           order.push(k);
+          recent.add(k);
           gained++;
         }
       }
@@ -817,6 +861,7 @@ function RillCore() {
     }
 
     for (;;) {
+      if (roundCap && rounds > roundCap) return { solved:false, bad:false };
       var res = ripple();
       if (res < 0) return { solved:false, bad:true };
       if (res) { level = Math.max(level, L_RIPPLE); noteRound(); continue; }
@@ -895,10 +940,10 @@ function RillCore() {
   }
 
   var BUDGET = {
-    7:  { veins: 14, orders: 3 },
-    9:  { veins: 8,  orders: 2 },
-    11: { veins: 5,  orders: 1 },
-    13: { veins: 4,  orders: 1 }
+    7:  { veins: 6, orders: 2 },
+    9:  { veins: 4, orders: 1 },
+    11: { veins: 3, orders: 1 },
+    13: { veins: 3, orders: 1 }
   };
 
   /* ---------- reduction ----------
@@ -931,23 +976,28 @@ function RillCore() {
       });
       return list;
     }
-    var o;
+    /* Windows are stripped by bisection: a window that can all go costs
+       one solve, and a stubborn one narrows to its needed numbers in a
+       logarithmic handful rather than one solve per number. */
+    var o, big = G.N >= 13;
+    function stripSet(win) {
+      if (!win.length) return;
+      win.forEach(function (kk) { keep.delete(kk); });
+      if (keep.size && solveLogic(G, listFrom(), tables, L_FLOW, 60).solved) return;
+      win.forEach(function (kk) { keep.add(kk); });
+      if (win.length === 1) return;
+      var mid = win.length >> 1;
+      stripSet(win.slice(0, mid));
+      stripSet(win.slice(mid));
+    }
     if (maxLevel > L_FLOW) {
-      var W = 5;
+      var W = big ? 10 : 6;
       for (var w = 0; w < order.length; w += W) {
-        var win = order.slice(w, w + W).filter(function (kk) { return keep.has(kk); });
-        if (!win.length) continue;
-        win.forEach(function (kk) { keep.delete(kk); });
-        if (keep.size && solveLogic(G, listFrom(), tables, L_FLOW).solved) continue;
-        win.forEach(function (kk) { keep.add(kk); });
-        for (o = 0; o < win.length; o++) {
-          keep.delete(win[o]);
-          if (!keep.size || !solveLogic(G, listFrom(), tables, L_FLOW).solved) keep.add(win[o]);
-        }
+        stripSet(order.slice(w, w + W).filter(function (kk) { return keep.has(kk); }));
       }
     }
     var survivors = order.filter(function (kk) { return keep.has(kk); });
-    var dear = G.N <= 9 ? survivors.length : Math.min(survivors.length, 16);
+    var dear = Math.min(survivors.length, G.N <= 9 ? 12 : (big ? 6 : 8));
     for (o = 0; o < dear; o++) {
       keep.delete(survivors[o]);
       if (!keep.size || !solveLogic(G, listFrom(), tables, maxLevel).solved) keep.add(survivors[o]);
@@ -955,7 +1005,7 @@ function RillCore() {
     return keep;
   }
 
-  function scoreCandidate(G, size, regionArr, keep, tables, maxLevel) {
+  function scoreCandidate(G, size, regionArr, keep, tables, maxLevel, relaxed) {
     var N = size, cells = size * size;
     var regionSet = new Set(regionArr);
     var list = [];
@@ -964,6 +1014,47 @@ function RillCore() {
     });
     var fin = solveLogic(G, list, tables, maxLevel);
     if (!fin.solved) return null;
+
+    /* Counting the numbers must never be enough: the kept readings must
+       admit at least TWO distinct minimal spring-layouts, so a solver who
+       intersects rims and assumes the fewest springs still has to let
+       the flow decide between decoys. */
+    var inner2 = new Uint8Array(cells), rims2 = [];
+    for (var q3 = 0; q3 < list.length; q3++) {
+      var t3 = tables[list[q3].k];
+      for (var z3 = 0; z3 < t3.inner.length; z3++) inner2[t3.inner[z3]] = 1;
+    }
+    for (var q4 = 0; q4 < list.length; q4++) {
+      rims2.push(tables[list[q4].k].ring.filter(function (rk) { return !inner2[rk]; }));
+    }
+    var covers = 0, coverSeen = {};
+    (function dfsCover(idx, chosen) {
+      if (covers >= 2) return;
+      if (idx === rims2.length) {
+        var minimal = chosen.every(function (cc) {
+          return rims2.some(function (rr) {
+            return rr.indexOf(cc) >= 0 &&
+                   rr.every(function (x) { return x === cc || chosen.indexOf(x) < 0; });
+          });
+        });
+        if (minimal) {
+          var key = chosen.slice().sort(function (a, b) { return a - b; }).join(",");
+          if (!coverSeen[key]) { coverSeen[key] = 1; covers++; }
+        }
+        return;
+      }
+      var rr2 = rims2[idx];
+      for (var i3 = 0; i3 < rr2.length; i3++) {
+        if (chosen.indexOf(rr2[i3]) >= 0) { dfsCover(idx + 1, chosen); return; }
+      }
+      for (var i4 = 0; i4 < rr2.length; i4++) {
+        chosen.push(rr2[i4]);
+        dfsCover(idx + 1, chosen);
+        chosen.pop();
+        if (covers >= 2) return;
+      }
+    })(0, []);
+    if (covers < 2 && !relaxed) return null;
 
     var n = list.length;
     var stencil = new Set(), seenVals = {};
@@ -1043,7 +1134,6 @@ function RillCore() {
          since a spring's own reading would be zero */
       var springs = info.springs, springSet = new Set(springs);
       var clueKeys = [], tables = {};
-      var okBoard = true;
       for (var k = 0; k < N * N; k++) {
         if (springSet.has(k)) continue;
         var r = (k / N) | 0, c = k % N, bestD = 1e9;
@@ -1058,7 +1148,7 @@ function RillCore() {
         clueKeys.push(k);
         tables[k] = clueTable(G, k, bestD);
       }
-      if (!okBoard || !clueKeys.length) continue;
+      if (!clueKeys.length) continue;
       var entry = function (kk) {
         return { k: kk, val: tables[kk].val, wet: region.has(kk) };
       };
@@ -1067,7 +1157,7 @@ function RillCore() {
       var regionArr = Array.from(region);
       for (var o = 0; o < orders; o++) {
         var keep = reduceClues(G, tables, clueKeys, region, rnd, maxLevel);
-        var sc = scoreCandidate(G, size, regionArr, keep, tables, maxLevel);
+        var sc = scoreCandidate(G, size, regionArr, keep, tables, maxLevel, pass >= 3);
         if (!sc) continue;
         if (!best || sc.score > best.score) {
           var clues = {};
@@ -1126,7 +1216,7 @@ function RillCore() {
     }, 120);
   }
 
-  var SIZES = [7, 9, 11, 13];
+  var SIZES = [7, 9, 11];
   function solvedMap(size) { return save.solved[size] || (save.solved[size] = {}); }
   function solvedCount(size) { return Object.keys(solvedMap(size)).length; }
 

@@ -112,7 +112,15 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   on a bank). A clue alone tells almost nothing; the game is
   triangulating a handful of far-apart readings against the one-vein
   rule, and the opening sweep, which under Dowse handed over a third of
-  the board, measures well under a tenth. The solver reasons with
+  the board, measures well under a tenth. Triangulation itself is kept
+  honest by construction: measuring showed that on most boards the true
+  springs were the unique minimal way to satisfy the numbers — intersect
+  the rims, assume the fewest springs, done — so every board is now
+  REQUIRED to admit at least two distinct minimal spring-layouts, and
+  only the flow decides between the decoys. (A stronger idea, springs no
+  number hears at all, turned out to be structurally impossible: the
+  readings near a spring are exactly what pin its region, and silencing
+  them all makes the board non-unique.) The solver reasons with
   through-forcing (a corridor down to its last two openings takes both),
   proven springs (a rim down to one candidate makes it a spring, whose
   other sides then dry), loop-rock, the one-vein rule, and one-step
@@ -120,9 +128,11 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   hear is a thing you can see, and tapping a number washes its reach —
   pass-through inside, spring-rim outside. Boards were brute-force
   verified unique in development (30 of 30 on the small book). Same sand
-  and well-water shell as before: four books 7×7 to 13×13, times with
+  and well-water shell as before, times with
   hint-exclusion, pinch zoom, the dissolve-and-sheen solve moment,
-  installable and playable offline; the launcher mark is a legal rill —
+  installable and playable offline. Three books, 7×7 to 11×11 — a 13×13
+  cannot yet be generated inside the budget a phone deserves — and the
+  launcher mark is a legal rill —
   loop-free, two springs ringed, its one reading verified rather than
   eyeballed. Single self-contained `index.html` with
   `manifest.webmanifest`, `sw.js` and the icons beside it.
