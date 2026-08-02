@@ -81,49 +81,58 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   `index.html`; `manifest.webmanifest`, `sw.js` and the launcher icons sit beside it
   because a service worker cannot be registered from a blob and a launcher cannot
   read an inline icon.
-- `dowse/` — Dowse, an original puzzle genre designed as a sibling to Tapa. Shade
-  underground water: every number is a dowser standing on dry ground, and the
-  reading is the exact taxicab distance to the nearest water cell — not a count
-  of neighbours (Minesweeper, Tapa) and not a line of sight (Kuromasu), but a
-  nearest-distance promise, which no established genre clues. Each reading
-  therefore does two things at once: it dries out the whole diamond of cells
-  nearer than its number, and it demands water somewhere on the diamond's rim.
-  All water is one connected vein, no 2×2 is ever all water, and that is the
-  entire rule set — the depth comes from rims colliding with the one-vein rule,
-  which has to thread water through the dry diamonds. Generation mirrors Tapa's:
-  vein first, every dry cell seeded as a reading, then stripped for as long as a
-  deduction-only solver (diamond dryness, last-candidate rims, the pool rule,
-  reachability and cut cells) can still finish, so no board needs a guess and
-  uniqueness comes free; candidates are scored on the shape of the solve and a
-  reading that gives itself away is rejected outright. Puzzle number seeds the
-  generator, so №12 is the same board everywhere, built in a Web Worker with the
-  next number prefetched while you solve. The board answers as you work: a
-  reading that has come exactly true falls quiet, a drowned one turns accent, a
-  pooled 2×2 gets hazard stripes, and when the only thing left wrong is water in
-  two pieces it says so in words, since no single cell can show it. Tap a number
-  to see how far its reading reaches — the diamond it dries and the rim where
-  its water must lie. The app is Tapa's shell wearing Dowse's colours: the
-  board is the screen with every control floating over it, pinch zooms to 4×
-  and two fingers pan while one finger always paints, hints follow the
-  solver's own path (and point at a mistake first if there is one), a reveal
-  sits behind the ⋯, and the solve moment withdraws the scaffolding — grid,
-  marks, tones — leaving the vein alone in the sand with its readings. Times
-  are kept per puzzle with per-book bests, averages and a ten fastest list;
-  a puzzle finished with a hint or a reveal keeps its picture but is left out
-  of the times. Four books, 7×7 to 13×13. The launcher mark is a Dowse rather
-  than a letter: a five-wide vein with the one reading that is actually true
-  of it — connected, pool-free, distance checked rather than eyeballed.
-  Installable and playable with the radio off; the game itself is still a
-  single self-contained `index.html`, with `manifest.webmanifest`, `sw.js`
-  and the launcher icons beside it because a service worker cannot be
-  registered from a blob and a launcher cannot read an inline icon.
+- `rill/` — Rill, an original puzzle genre, reborn from an earlier design
+  called Dowse. Dowse read the exact distance to the nearest water, and that
+  clue is too generous: an 8 empties the whole diamond of radius seven
+  around it mechanically, before any real deduction happens. Rill keeps the
+  board, the verbs and the exactness, and changes what the number hears.
+  Shade the rill — one connected vein that never loops, so between any two
+  water cells there is exactly one way along it — and wherever the rill
+  stops, a spring wells up. Every number is the exact taxicab distance to
+  the nearest SPRING — and numbers sit wet or dry, AS SHOWN: some readings
+  are taken from mid-flow, the rill running straight over them, some from
+  dry ground. The wet-or-dry rule earns its keep twice. Readings alone
+  cannot pin the water's course — two rills with the same springs read
+  identically — so the numbers' own cells carry the pins, and when every
+  number was forced dry the surviving ones inevitably lined the banks and
+  traced the river in negative space; wet numbers pin corridors from
+  WITHIN the flow instead, so the numbers scatter and the carving
+  disappears. A number is never a spring — its reading would have to be
+  zero — which is also why a flooded number must keep flowing. The
+  reading's reach means "no stopping here", never "nothing here": inside
+  it every water cell keeps two arms in the water, and only on the rim may
+  a spring rise. Any nearest-distance reading still decomposes into a thin
+  existential and a universal stencil whose area grows with the square of
+  the number, so springs are grown to cover the board — enough that no
+  reading ever exceeds 6 — and the numbers are kept FEW and FAR: about
+  ten on the small book, thirty on the large, stripped crowded-first so
+  what survives is spread, scored against clue count and stencil
+  coverage, with readings ranging 2 to 6 on dry ground (only a wet
+  number may read 1 — it sits in the water beside its own wellhead, not
+  on a bank). A clue alone tells almost nothing; the game is
+  triangulating a handful of far-apart readings against the one-vein
+  rule, and the opening sweep, which under Dowse handed over a third of
+  the board, measures well under a tenth. The solver reasons with
+  through-forcing (a corridor down to its last two openings takes both),
+  proven springs (a rim down to one candidate makes it a spring, whose
+  other sides then dry), loop-rock, the one-vein rule, and one-step
+  probes; springs are drawn as wellhead rings so the thing the readings
+  hear is a thing you can see, and tapping a number washes its reach —
+  pass-through inside, spring-rim outside. Boards were brute-force
+  verified unique in development (30 of 30 on the small book). Same sand
+  and well-water shell as before: four books 7×7 to 13×13, times with
+  hint-exclusion, pinch zoom, the dissolve-and-sheen solve moment,
+  installable and playable offline; the launcher mark is a legal rill —
+  loop-free, two springs ringed, its one reading verified rather than
+  eyeballed. Single self-contained `index.html` with
+  `manifest.webmanifest`, `sw.js` and the icons beside it.
 - `delve/` — Delve, an original puzzle genre and the second of the underground
-  pair (Dowse finds the water; Delve digs). Dig tunnels from a door on the
+  pair (Rill traces the water to its springs; Delve digs). Dig tunnels from a door on the
   edge: all tunnels connect to the door and never loop — between any two
   tunnel cells there is exactly one way through — every number sits in a
   tunnel and is the exact number of steps from the door walking the tunnels,
   and every dead end is numbered, so a passage only ever stops at a chamber.
-  Where Dowse is metric geometry (a reading dries a diamond of open ground),
+  Where Rill is metric geometry (readings heard across open ground),
   Delve is path topology: distances live inside the thing being drawn, so a
   number three cells from the door promising nine steps is promising a
   six-step detour. The dead-end rule is the quiet load-bearing one — any
