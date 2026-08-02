@@ -89,19 +89,28 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   Shade the rill — one connected vein that never loops, so between any two
   water cells there is exactly one way along it — and wherever the rill
   stops, a spring wells up. Every number is the exact taxicab distance to
-  the nearest SPRING. So a number no longer empties anything: water may run
-  right past it — it just cannot stop nearby. The reading's reach flips
-  from "forced empty" to "forced flowing": inside it every water cell must
-  keep two arms in the water, and only on the rim may a spring rise. Any
-  nearest-distance reading still decomposes into a thin existential and a
-  universal stencil whose area grows with the square of the number, so the
-  boards are grown SPRING-RICH — tributaries everywhere, roughly a spring
-  per two board rows — which keeps every reading naturally small: almost
-  all are 1, 2 or 3, a "1" has no stencil at all, and the generator strips
-  fat readings first and scores directly against stencil coverage. A clue
-  alone tells almost nothing; the game is interlocking many weak readings,
-  and the opening sweep, which under Dowse handed over a third of the
-  board, measures 4–5%. The solver reasons with
+  the nearest SPRING — and numbers sit wet or dry, AS SHOWN: some readings
+  are taken from mid-flow, the rill running straight over them, some from
+  dry ground. The wet-or-dry rule earns its keep twice. Readings alone
+  cannot pin the water's course — two rills with the same springs read
+  identically — so the numbers' own cells carry the pins, and when every
+  number was forced dry the surviving ones inevitably lined the banks and
+  traced the river in negative space; wet numbers pin corridors from
+  WITHIN the flow instead, so the numbers scatter and the carving
+  disappears. A number is never a spring — its reading would have to be
+  zero — which is also why a flooded number must keep flowing. The
+  reading's reach means "no stopping here", never "nothing here": inside
+  it every water cell keeps two arms in the water, and only on the rim may
+  a spring rise. Any nearest-distance reading still decomposes into a thin
+  existential and a universal stencil whose area grows with the square of
+  the number, so boards are grown SPRING-RICH — tributaries everywhere,
+  roughly a spring per two board rows — which keeps every reading
+  naturally small: almost all are 1, 2 or 3, a 1's stencil is its own cell
+  alone, and the generator strips fat readings first, scores directly
+  against stencil coverage and clue count, and rewards numbers scattered
+  wide. A clue alone tells almost nothing; the game is interlocking many
+  weak readings, and the opening sweep, which under Dowse handed over a
+  third of the board, measures well under a tenth. The solver reasons with
   through-forcing (a corridor down to its last two openings takes both),
   proven springs (a rim down to one candidate makes it a spring, whose
   other sides then dry), loop-rock, the one-vein rule, and one-step
