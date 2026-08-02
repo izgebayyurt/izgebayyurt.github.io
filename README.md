@@ -95,11 +95,20 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   wherever the rill stops, a spring wells up. Every number counts the
   springs within EARSHOT, the diamond of cells within two steps: how
   many, never where. A count is a wide question — a "1" owns an earshot
-  of a dozen cells and will not say which of them holds the spring, a
-  "0" hushes its whole neighbourhood without drying a single cell —
+  of a dozen cells and will not say which of them holds the spring —
   so a clue alone pins nothing, and the game is overlapping earshots
   against the one-vein rule, minesweeper's arithmetic bent around
-  running water. Numbers sit wet or dry AS SHOWN (readings alone cannot
+  running water. Counts run 1 to 4, and never 0: a zero turned out to
+  say too much — twelve cells of certified silence for free, Dowse's
+  disease in negative — so silence is never printed, a cell that
+  counts nothing is never offered as a clue, every number on the board
+  vouches for at least one spring, and all the emptiness has to be
+  earned by deduction. Banning zeros exposed how load-bearing they had
+  quietly been: a branch grown out of mid-corridor raises a new spring,
+  and if no number hears it the board stops being unique — it was the
+  zeros that pinned those flanks dry — so springs are now grown dense
+  enough that every flank of the vein sits inside some positive
+  earshot, which is also what keeps the counts small and various. Numbers sit wet or dry AS SHOWN (readings alone cannot
   pin the course — two rills with the same springs count identically —
   so the numbers' own cells carry the pins), and a number is never a
   spring: it does the counting, it cannot be counted, which is also why

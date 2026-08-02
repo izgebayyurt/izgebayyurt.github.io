@@ -988,7 +988,7 @@ function RillCore() {
         var d2 = Math.abs(((k2 / N2) | 0) - rz) + Math.abs((k2 % N2) - cz);
         if (d2 < nn) nn = d2;
       }
-      rank[kz] = nn * 2.2 + (tables[kz].val === 0 ? -4.0 : 0) + rnd() * 2.0;
+      rank[kz] = nn * 2.2 + rnd() * 2.0;
     }
     order.sort(function (a, b) { return rank[a] - rank[b]; });
 
@@ -1094,11 +1094,9 @@ function RillCore() {
 
     var n = list.length;
     var earUnion = new Set(), seenVals = {};
-    var adjPairs = 0, zeros = 0;
+    var adjPairs = 0;
     for (var i = 0; i < n; i++) {
-      var vv = list[i].val;
-      seenVals[vv] = 1;
-      if (vv === 0) zeros++;
+      seenVals[list[i].val] = 1;
       var earI = tables[list[i].k].ear;
       for (var z2 = 0; z2 < earI.length; z2++) earUnion.add(earI[z2]);
       for (var i2 = i + 1; i2 < n; i2++) {
@@ -1107,8 +1105,6 @@ function RillCore() {
         if (dA === 1) adjPairs++;
       }
     }
-    /* a board of hushes: zeros may season the count, not carry it */
-    if (!relaxed && zeros > Math.max(1, Math.round(n * 0.34))) return null;
     if (N <= 7 && adjPairs > Math.max(2, Math.round(n * 0.3))) return null;   /* a heap of numbers: reject */
     var earF = earUnion.size / cells;
     var clueF = n / cells;
@@ -1155,13 +1151,13 @@ function RillCore() {
     for (var t = 0; t < veins; t++) {
       var density = 0.26 + rnd() * 0.08;
       var target = Math.round(N * N * density);
-      var targetSprings = Math.max(3, Math.round(N * N * 0.085)) + ((rnd() * 2) | 0);
+      var targetSprings = Math.max(4, Math.round(N * N * 0.125)) + ((rnd() * 2) | 0);
       var region = growVein(G, rnd, target, targetSprings);
       if (region.size < Math.max(4, target * 0.75)) continue;
 
       var info = veinInfo(G, region);
       if (!info.ok || info.springs.length < 3) continue;
-      if (info.springs.length > Math.round(region.size * 0.38)) continue;
+      if (info.springs.length > Math.round(region.size * 0.52)) continue;
 
       /* the rill must touch every row and column */
       var rw = new Array(N).fill(0), cw = new Array(N).fill(0);
@@ -1171,8 +1167,11 @@ function RillCore() {
       if (missed > Math.floor(N / 6)) continue;
 
       /* a count for every cell, wet or dry — springs alone excepted,
-         since a spring would have to count itself. A cell that hears
-         a crowd is a megaphone and is never offered as a clue. */
+         since a spring would have to count itself. A cell that hears a
+         crowd is a megaphone, and a cell that hears nothing says too
+         much the other way — a 0 is twelve cells of silence for free —
+         so neither is ever offered: every printed number vouches for a
+         spring, and all the emptiness has to be earned by deduction. */
       var springs = info.springs, springSet = new Set(springs);
       var clueKeys = [], tables = {};
       for (var k = 0; k < N * N; k++) {
@@ -1182,7 +1181,7 @@ function RillCore() {
         for (var e = 0; e < tab.ear.length; e++) {
           if (springSet.has(tab.ear[e])) cnt++;
         }
-        if (cnt > 4) continue;
+        if (cnt < 1 || cnt > 4) continue;
         tab.val = cnt;
         clueKeys.push(k);
         tables[k] = tab;
@@ -1234,10 +1233,11 @@ function RillCore() {
   var core = RillCore();
 
   /* ---------- persistence ---------- */
-  /* v2: the counting redesign renumbered every book — a board a v1 save
-     calls solved is not the board that number opens now, so old saves
-     are left where they lie rather than misread. */
-  var KEY = "rill.v2";
+  /* v3: redesigns renumber every book — a board an old save calls
+     solved is not the board that number opens now, so old saves are
+     left where they lie rather than misread. (v2 printed zero-counts;
+     v3 never does.) */
+  var KEY = "rill.v3";
   var save = { solved:{}, current:null, opts:{ theme:"auto", clock:false, flag:true } };
   try {
     var raw = localStorage.getItem(KEY);
