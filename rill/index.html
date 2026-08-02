@@ -732,15 +732,19 @@ function RillCore() {
       }
       if (changed) return 1;
 
+      /* all choke points judged against the same board, landed at once */
+      var cuts = [];
       for (k = 0; k < N * N; k++) {
         if (state[k] !== UNKNOWN) continue;
         allowed.delete(k);
-        var r2 = comp(allowed, water[0]), bad = false;
-        for (var z2 = 0; z2 < water.length; z2++) if (!r2.has(water[z2])) { bad = true; break; }
+        var r2 = comp(allowed, water[0]);
+        for (var z2 = 0; z2 < water.length; z2++) {
+          if (!r2.has(water[z2])) { cuts.push(k); break; }
+        }
         allowed.add(k);
-        if (bad) { state[k] = WATER; return 1; }
       }
-      return 0;
+      for (k = 0; k < cuts.length; k++) { state[cuts[k]] = WATER; changed = true; }
+      return changed ? 1 : 0;
     }
 
     /* Probe: one supposition deep, cheap rules only. */
@@ -891,9 +895,9 @@ function RillCore() {
   }
 
   var BUDGET = {
-    7:  { veins: 10, orders: 2 },
+    7:  { veins: 14, orders: 3 },
     9:  { veins: 8,  orders: 2 },
-    11: { veins: 6,  orders: 1 },
+    11: { veins: 5,  orders: 1 },
     13: { veins: 4,  orders: 1 }
   };
 
@@ -905,9 +909,17 @@ function RillCore() {
      that have to be worked out. */
   function reduceClues(G, tables, clueKeys, wetSet, rnd, maxLevel) {
     var N = G.N;
+    var N2 = G.N;
     var order = clueKeys.slice(), rank = {};
     for (var z = 0; z < clueKeys.length; z++) {
-      rank[clueKeys[z]] = -tables[clueKeys[z]].val + rnd() * 2.5;
+      var kz = clueKeys[z], rz = (kz / N2) | 0, cz = kz % N2, nn = 1e9;
+      for (var z2 = 0; z2 < clueKeys.length; z2++) {
+        if (z2 === z) continue;
+        var k2 = clueKeys[z2];
+        var d2 = Math.abs(((k2 / N2) | 0) - rz) + Math.abs((k2 % N2) - cz);
+        if (d2 < nn) nn = d2;
+      }
+      rank[kz] = -nn * 2.2 + rnd() * 2.0;   /* crowded first, spread last */
     }
     order.sort(function (a, b) { return rank[a] - rank[b]; });
 
@@ -953,18 +965,26 @@ function RillCore() {
     var fin = solveLogic(G, list, tables, maxLevel);
     if (!fin.solved) return null;
 
-    var n = list.length, fat = 0;
-    var stencil = new Set();
+    var n = list.length;
+    var stencil = new Set(), seenVals = {};
+    var adjPairs = 0;
     for (var i = 0; i < n; i++) {
       if (list[i].val >= 7) return null;       /* a fortune-teller: reject */
-      if (list[i].val >= 5) fat++;
+      seenVals[list[i].val] = 1;
       var inn = tables[list[i].k].inner;
       for (var z2 = 0; z2 < inn.length; z2++) stencil.add(inn[z2]);
+      for (var i2 = i + 1; i2 < n; i2++) {
+        var dA = Math.abs(((list[i].k / N) | 0) - ((list[i2].k / N) | 0)) +
+                 Math.abs((list[i].k % N) - (list[i2].k % N));
+        if (dA === 1) adjPairs++;
+      }
     }
+    if (N <= 7 && adjPairs > Math.max(2, Math.round(n * 0.3))) return null;   /* a heap of numbers: reject */
     var stencilF = stencil.size / cells;
     var clueF = n / cells;
     var open = fin.firstGain / cells;
     var chain = Math.min(1, fin.rounds / 22);
+    var variety = Object.keys(seenVals).length / 5;
 
     /* scatter: how far each kept number sits from its nearest fellow */
     var nnSum = 0;
@@ -976,13 +996,13 @@ function RillCore() {
         var d2 = Math.abs(((kb / N) | 0) - ra) + Math.abs((kb % N) - ca);
         if (d2 < nn) nn = d2;
       }
-      nnSum += Math.min(nn, 4);
+      nnSum += Math.min(nn, 5);
     }
-    var scatterF = n > 1 ? (nnSum / n) / 4 : 1;
+    var scatterF = n > 1 ? (nnSum / n) / 5 : 1;
 
     return {
-      score: -5.2 * open + 2.2 * chain - 2.4 * clueF - 3.2 * stencilF
-             - 1.2 * (fat / n) + 1.4 * scatterF + 2.0,
+      score: -4.0 * open + 2.0 * chain - 6.0 * clueF - 1.5 * stencilF
+             + 3.0 * scatterF + 0.8 * variety - 0.5 * adjPairs + 2.0,
       level: fin.level, hard: fin.hard, order: fin.order,
       first: fin.firstGain, rounds: fin.rounds, clueCount: n
     };
@@ -1002,24 +1022,22 @@ function RillCore() {
     var pass = 0;
     for (;;) {
     for (var t = 0; t < veins; t++) {
-      var density = 0.28 + rnd() * 0.09;
+      var density = 0.26 + rnd() * 0.08;
       var target = Math.round(N * N * density);
-      var targetSprings = Math.round(N * 0.55) + ((rnd() * N * 0.3) | 0);
+      var targetSprings = Math.max(3, Math.round(N * N * 0.055)) + ((rnd() * 2) | 0);
       var region = growVein(G, rnd, target, targetSprings);
       if (region.size < Math.max(4, target * 0.75)) continue;
 
       var info = veinInfo(G, region);
-      /* springs everywhere: no cell of the board should sit far from one,
-         or its reading grows a stencil worth a fortune */
-      if (!info.ok || info.springs.length < Math.max(3, Math.round(N * 0.45))) continue;
-      if (info.springs.length > Math.round(region.size * 0.45)) continue;
+      if (!info.ok || info.springs.length < 3) continue;
+      if (info.springs.length > Math.round(region.size * 0.38)) continue;
 
       /* the rill must touch every row and column */
       var rw = new Array(N).fill(0), cw = new Array(N).fill(0);
       region.forEach(function (k) { rw[(k / N) | 0]++; cw[k % N]++; });
-      var starved = false;
-      for (var q = 0; q < N; q++) if (rw[q] === 0 || cw[q] === 0) { starved = true; break; }
-      if (starved) continue;
+      var missed = 0;
+      for (var q = 0; q < N; q++) { if (rw[q] === 0) missed++; if (cw[q] === 0) missed++; }
+      if (missed > Math.floor(N / 6)) continue;
 
       /* readings for every cell, wet or dry — springs alone excepted,
          since a spring's own reading would be zero */
@@ -1033,6 +1051,10 @@ function RillCore() {
           var d = Math.abs(((springs[s] / N) | 0) - r) + Math.abs((springs[s] % N) - c);
           if (d < bestD) bestD = d;
         }
+        /* dry numbers keep off the springs' doorsteps — a dry 1 lines
+           the banks — but a wet 1 rides the water beside its wellhead */
+        var wetHere = region.has(k);
+        if (bestD < (wetHere ? 1 : 2) || bestD > 6) continue;
         clueKeys.push(k);
         tables[k] = clueTable(G, k, bestD);
       }
@@ -1535,7 +1557,7 @@ function RillCore() {
   }
 
   function buildPuzzle(size, num, done) {
-    var opts = { maxLevel: core.L_FLOW };
+    var opts = { maxLevel: core.L_PROBE };
     if (worker) {
       var id = ++jobId;
       jobs[id] = done;

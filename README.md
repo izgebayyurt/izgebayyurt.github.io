@@ -103,14 +103,16 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   it every water cell keeps two arms in the water, and only on the rim may
   a spring rise. Any nearest-distance reading still decomposes into a thin
   existential and a universal stencil whose area grows with the square of
-  the number, so boards are grown SPRING-RICH — tributaries everywhere,
-  roughly a spring per two board rows — which keeps every reading
-  naturally small: almost all are 1, 2 or 3, a 1's stencil is its own cell
-  alone, and the generator strips fat readings first, scores directly
-  against stencil coverage and clue count, and rewards numbers scattered
-  wide. A clue alone tells almost nothing; the game is interlocking many
-  weak readings, and the opening sweep, which under Dowse handed over a
-  third of the board, measures well under a tenth. The solver reasons with
+  the number, so springs are grown to cover the board — enough that no
+  reading ever exceeds 6 — and the numbers are kept FEW and FAR: about
+  ten on the small book, thirty on the large, stripped crowded-first so
+  what survives is spread, scored against clue count and stencil
+  coverage, with readings ranging 2 to 6 on dry ground (only a wet
+  number may read 1 — it sits in the water beside its own wellhead, not
+  on a bank). A clue alone tells almost nothing; the game is
+  triangulating a handful of far-apart readings against the one-vein
+  rule, and the opening sweep, which under Dowse handed over a third of
+  the board, measures well under a tenth. The solver reasons with
   through-forcing (a corridor down to its last two openings takes both),
   proven springs (a rim down to one candidate makes it a spring, whose
   other sides then dry), loop-rock, the one-vein rule, and one-step
