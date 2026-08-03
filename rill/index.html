@@ -1071,9 +1071,9 @@ function RillCore() {
   }
 
   var BUDGET = {
-    7:  { veins: 6, orders: 2 },
-    9:  { veins: 4, orders: 1 },
-    11: { veins: 3, orders: 1 },
+    7:  { veins: 6, orders: 3 },
+    9:  { veins: 4, orders: 2 },
+    11: { veins: 3, orders: 2 },
     13: { veins: 3, orders: 1 }
   };
 
@@ -1147,9 +1147,12 @@ function RillCore() {
         stripSet(order.slice(w, w + W).filter(kept));
       }
     }
+    /* every survivor is offered to the full solver exactly once. A clue
+       that cannot go against set S cannot go against any subset of S
+       either, so one greedy pass leaves an IRREDUNDANT set: nothing
+       printed on the board can be crossed out. */
     var survivors = order.filter(kept);
-    var dear = Math.min(survivors.length, G.N <= 9 ? 14 : (big ? 8 : 10));
-    for (o = 0; o < dear; o++) {
+    for (o = 0; o < survivors.length; o++) {
       var it2 = items[survivors[o]];
       drop(it2);
       if ((!keepC.size && !keepG.size) ||
@@ -1268,9 +1271,9 @@ function RillCore() {
     var scatterF = n > 1 ? (nnSum / n) / 5 : 1;
 
     return {
-      score: -5.5 * open + 2.0 * chain - 9.0 * clueF - 2.0 * bankF
-             - 1.0 * gaugeF
-             + 3.0 * scatterF + 0.8 * variety - 0.5 * adjPairs
+      score: -5.5 * open + 2.0 * chain - 14.0 * clueF - 2.0 * bankF
+             - 2.2 * gaugeF
+             + 2.0 * scatterF + 0.6 * variety - 0.5 * adjPairs
              + 0.25 * Math.min(amb, 8) + 2.0,
       level: fin.level, hard: fin.hard, order: fin.order,
       first: fin.firstGain, rounds: fin.rounds, clueCount: n,
@@ -1383,11 +1386,11 @@ function RillCore() {
   var core = RillCore();
 
   /* ---------- persistence ---------- */
-  /* v4: redesigns renumber every book — a board an old save calls
+  /* v5: redesigns renumber every book — a board an old save calls
      solved is not the board that number opens now, so old saves are
-     left where they lie rather than misread. (v4 moved the course
-     onto bank gauges and the snake rule.) */
-  var KEY = "rill.v4";
+     left where they lie rather than misread. (v5 made every printed
+     set irredundant: nothing on the board can be crossed out.) */
+  var KEY = "rill.v5";
   var save = { solved:{}, current:null, opts:{ theme:"auto", clock:false, flag:true } };
   try {
     var raw = localStorage.getItem(KEY);
