@@ -81,63 +81,55 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   `index.html`; `manifest.webmanifest`, `sw.js` and the launcher icons sit beside it
   because a service worker cannot be registered from a blob and a launcher cannot
   read an inline icon.
-- `rill/` — Rill, an original puzzle genre, twice reborn. It began as
-  Dowse, whose numbers read the exact distance to the nearest water — too
-  generous, since an 8 empties the whole diamond of radius seven around it
-  before any deduction happens. The first redesign kept exactness but
-  pointed it at springs; play showed exactness itself was the flaw. An
-  exact reading is a thin question — a circle the spring must sit on —
-  and two or three circles intersect to a point, so the dead ends could
-  be triangulated arithmetically and a decoy-layout gate only masked the
-  disease. The cure is the current genre: the number stops measuring and
-  starts COUNTING. Shade the rill — one connected vein that never loops,
-  so between any two water cells there is exactly one way along it — and
-  wherever the rill stops, a spring wells up. Every number counts the
-  springs within EARSHOT, the diamond of cells within two steps: how
-  many, never where. A count is a wide question — a "1" owns an earshot
-  of a dozen cells and will not say which of them holds the spring —
-  so a clue alone pins nothing, and the game is overlapping earshots
-  against the one-vein rule, minesweeper's arithmetic bent around
-  running water. Counts run 1 to 4, and never 0: a zero turned out to
-  say too much — twelve cells of certified silence for free, Dowse's
-  disease in negative — so silence is never printed, a cell that
-  counts nothing is never offered as a clue, every number on the board
-  vouches for at least one spring, and all the emptiness has to be
-  earned by deduction. Banning zeros exposed how load-bearing they had
-  quietly been: a branch grown out of mid-corridor raises a new spring,
-  and if no number hears it the board stops being unique — it was the
-  zeros that pinned those flanks dry — so springs are now grown dense
-  enough that every flank of the vein sits inside some positive
-  earshot, which is also what keeps the counts small and various. Numbers sit wet or dry AS SHOWN (readings alone cannot
-  pin the course — two rills with the same springs count identically —
-  so the numbers' own cells carry the pins), and a number is never a
-  spring: it does the counting, it cannot be counted, which is also why
-  a flooded number must keep flowing. Ambiguity is not assumed but
-  ENFORCED: every board must admit at least two distinct spring-layouts
-  that satisfy all the counts by themselves, so counting alone never
-  triangulates and only the flow decides — and the audit that used to
-  merely measure this now gates it (generated boards run 4 to 50+
-  count-consistent layouts, where the exact-distance design kept
-  collapsing to 1). The solver carries a spring-status beside wet/dry —
-  proven springs and proven never-springs — and each count squeezes its
-  earshot from both sides: proven springs reaching the number turns
-  everyone else in earshot into a through-flow, possible springs
-  shrinking to the number raises them all; loop-rock, degree forcing,
-  the one-vein rule and one-step probes do the rest. Counting turned
-  out cheaper than measuring — generation dropped from seconds to a
-  few hundred milliseconds — which bought back the 13×13 book the
-  exact-distance design had to drop: FOUR books now, 7×7 to 13×13,
-  numbers kept few and spread (about eleven on the small board, forty
-  on the large), opening sweep under 5% of the board, 7×7 boards
-  brute-force verified unique 15 of 15 in development. Springs are
-  drawn as wellhead rings so the thing the counts hear is a thing you
-  can see; tapping a number washes its earshot. Same sand and
-  well-water shell, times with hint-exclusion, pinch zoom, the
-  dissolve-and-sheen solve moment, installable and playable offline.
-  The launcher mark is a legal rill — loop-free, springs ringed, its
-  one count verified rather than eyeballed. Single self-contained
-  `index.html` with `manifest.webmanifest`, `sw.js` and the icons
-  beside it.
+- `rill/` — Rill, an original puzzle genre that earned its rules the hard
+  way, through four designs, each killed by measurement. It began as Dowse:
+  numbers reading the exact distance to the nearest water — too generous, an
+  8 empties a whole diamond mechanically. Pointing exactness at springs
+  instead didn't save it: an exact reading is a thin question, a circle the
+  spring must sit on, and circles intersect to a point, so the dead ends
+  could be triangulated arithmetically. So the number stopped measuring and
+  started COUNTING — springs within earshot, how many, never where — and
+  when zeros turned out to say too much (twelve cells of certified silence
+  for free), silence was banned from print. That ban exposed the real
+  disease: a counting number must stand within two cells of a spring to
+  have anything to say, springs sit on the water, and counting says nothing
+  about the corridors' routes — so the only way the generator could pin the
+  course was to keep MORE numbers. Measured: 22% of cells carried numbers
+  and two-thirds of the dry ones were pressed against the water, tracing
+  the river in negative space. A blanket of clues that forces the line, and
+  no tuning of that clue system escapes it — the geometry is intrinsic.
+  The cure was structural, two rules that carry what the blanket used to:
+  the rill never runs ALONGSIDE itself (two diagonally touching water
+  cells must share an orthogonally wet corner — an honest bend, never a
+  bare squeeze), which tidies the routes and makes the veins read as
+  actual meanders; and GAUGES ON THE BANKS — numbers outside the grid,
+  each counting the water cells in its row or column, the trees-and-tents
+  device turned into river gauges. A gauge cannot trace the line, because
+  it does not stand on the board; yet it pins the course globally, exactly
+  the work no earshot count could do, and any branch grown anywhere
+  disturbs some tally, which is what makes sparse boards unique again.
+  Gauges keep the same vow of silence: a tally of zero is never printed.
+  What remains in the field is the springs game, distilled: a HANDFUL of
+  counts — 4–6% of cells at every size, two numbers on a 7×7 — almost all
+  of them WET, riding the stream as part of the picture rather than
+  outlining it (dry numbers are offered up for removal first, so what
+  survives floats). Counting alone is still provably insufficient by
+  construction: every board must admit at least two spring-layouts
+  consistent with its counts, and shipped boards run 11 to 50+. The board
+  keeps a one-cell gutter for the gauges; tapping a number washes its
+  earshot, tapping a gauge lights its line; a bare diagonal squeeze is
+  striped like a loop — the two shapes the rill may never make. Springs
+  wear wellhead rings, numbers sit wet or dry as shown, a number is never
+  a spring. All four books, 7×7 to 13×13, generate in well under a second
+  a board; 7×7 was brute-force verified unique 15 of 15 in development,
+  with the solver-vs-intended match checked at every size. Same sand and
+  well-water shell: times with hint-exclusion, pinch zoom, the
+  dissolve-and-sheen solve moment (the gauges stay through it — they are
+  part of the finished thing), installable and playable offline. The
+  launcher mark is a legal rill under every rule — loop-free, never
+  alongside itself, springs ringed, its one count verified rather than
+  eyeballed. Single self-contained `index.html` with
+  `manifest.webmanifest`, `sw.js` and the icons beside it.
 - `delve/` — Delve, an original puzzle genre and the second of the underground
   pair (Rill traces the water to its springs; Delve digs). Dig tunnels from a door on the
   edge: all tunnels connect to the door and never loop — between any two
