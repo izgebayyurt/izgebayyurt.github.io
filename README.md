@@ -129,10 +129,17 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   descent found on the mid and large boards and within a clue or two on
   the small — about eleven printed things on a 7×7, twenty-six on a
   13×13, most of them tallies in the margin. All four books, 7×7 to
-  13×13, generate in about a third of a second to two; the opening
-  levels are certified, not sampled — №1–30 of the 7×7 book and №1–6 of
-  the 9×9 brute-force verified unique by an independent counter, №1–12
-  of the 11×11 and 13×13 books verified valid and solver-matched. Same sand and
+  13×13, generate in about a third of a second to two. The generator
+  also reads the solve's CHARACTER before keeping a board: the solver
+  keeps a ledger of which rule family placed every deduced cell, a
+  board that falls mostly to gauge row-arithmetic is rejected as
+  battleship in disguise, and springs-game work earns score — on the
+  shipped tuning roughly a quarter to two-fifths of a solve is
+  one-step supposition work and row arithmetic stays under two-fifths.
+  The opening levels are certified, not sampled — the 7×7 book's first
+  fifteen and the 9×9's opening boards brute-force verified unique by
+  an independent counter, №1–12 of the 9×9, 11×11 and 13×13 books
+  verified valid and solver-matched. Same sand and
   well-water shell: times with hint-exclusion, pinch zoom, the
   dissolve-and-sheen solve moment (the gauges stay through it — they are
   part of the finished thing), installable and playable offline. The
