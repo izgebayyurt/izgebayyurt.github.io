@@ -517,7 +517,7 @@ function RillCore() {
   var EAR = 2;                 /* every number hears this far */
   var SNAKE = true;            /* the rill never runs alongside itself */
   var HEARD = false;           /* retired: gauges hear the tentacles */
-  var SPRING_D = 0.065;        /* springs per cell, roughly */
+  var SPRING_D = 0.085;        /* springs per cell, roughly */
   var DIRS4 = [[-1,0],[1,0],[0,-1],[0,1]];
   var DIAG = [[-1,-1],[-1,1],[1,-1],[1,1]];
 
@@ -647,6 +647,10 @@ function RillCore() {
       for (i = 0; i < N * N; i++) if (!heardCell[i]) noTip[i] = 1;
     }
     var level = 0, hard = 0;
+    var fired = { ring: 0, snake: 0, spring: 0, through: 0, banks: 0,
+                  count: 0, gauge: 0, flow: 0, probe: 0 };
+    var sim = false;
+    function note(f, n) { if (!sim) fired[f] += (n === undefined ? 1 : n); }
 
     function waterNbrs(k) {
       var nb = neighbors(G, k), w = 0, u = 0, uCell = -1, wCell = -1;
@@ -689,7 +693,7 @@ function RillCore() {
             if (roots[x] === roots[y]) { dup = true; break; }
           }
         }
-        if (dup) { state[k] = DRY; changed = true; }
+        if (dup) { state[k] = DRY; changed = true; note("ring"); }
       }
 
       /* snake: a diagonal touch must share an honest corner */
@@ -707,11 +711,11 @@ function RillCore() {
               if (!o1 && !o2) return -1;
               if (o1 !== o2) {
                 var cf = o1 ? c1 : c2;
-                state[cf] = WATER; changed = true;
+                state[cf] = WATER; changed = true; note("snake");
               }
             } else if (state[dk] === UNKNOWN &&
                        state[c1] === DRY && state[c2] === DRY) {
-              state[dk] = DRY; changed = true;
+              state[dk] = DRY; changed = true; note("snake");
             }
           }
         }
@@ -726,18 +730,18 @@ function RillCore() {
           if (d.w === 1 && d.u > 0) {
             /* the spring has its one arm; the rest of its sides are dry */
             for (var z2 = 0; z2 < d.nb.length; z2++) {
-              if (state[d.nb[z2]] === UNKNOWN) { state[d.nb[z2]] = DRY; changed = true; }
+              if (state[d.nb[z2]] === UNKNOWN) { state[d.nb[z2]] = DRY; changed = true; note("spring"); }
             }
           }
           if (d.w === 0) {
             if (d.u === 0) return -1;          /* a spring with no rill */
-            if (d.u === 1) { state[d.uCell] = WATER; changed = true; }
+            if (d.u === 1) { state[d.uCell] = WATER; changed = true; note("spring"); }
           }
         } else if (noTip[k]) {
           if (d.w + d.u < 2) return -1;
           if (d.w < 2 && d.w + d.u === 2) {
             for (var z3 = 0; z3 < d.nb.length; z3++) {
-              if (state[d.nb[z3]] === UNKNOWN) { state[d.nb[z3]] = WATER; changed = true; }
+              if (state[d.nb[z3]] === UNKNOWN) { state[d.nb[z3]] = WATER; changed = true; note("through"); }
             }
           }
         } else {
@@ -745,7 +749,7 @@ function RillCore() {
              with one opening it takes that opening */
           if (d.u === 0 && d.w <= 1) { mustTip[k] = 1; changed = true; }
           else if (d.w === 0 && d.u === 1 && waterTotal >= 2) {
-            state[d.uCell] = WATER; changed = true;
+            state[d.uCell] = WATER; changed = true; note("spring");
           }
         }
       }
@@ -755,8 +759,8 @@ function RillCore() {
         if (state[k] !== UNKNOWN) continue;
         var nb3 = neighbors(G, k), open = 0;
         for (j = 0; j < nb3.length; j++) if (state[nb3[j]] !== DRY) open++;
-        if (noTip[k] && open < 2) { state[k] = DRY; changed = true; }
-        else if (open === 0 && waterTotal >= 1) { state[k] = DRY; changed = true; }
+        if (noTip[k] && open < 2) { state[k] = DRY; changed = true; note("banks"); }
+        else if (open === 0 && waterTotal >= 1) { state[k] = DRY; changed = true; note("banks"); }
       }
 
       /* counts: each earshot squeezed between its proven springs and
@@ -784,7 +788,7 @@ function RillCore() {
           }
         } else if (def + pot.length === v) {
           for (j = 0; j < pot.length; j++) {
-            if (state[pot[j]] === UNKNOWN) { state[pot[j]] = WATER; }
+            if (state[pot[j]] === UNKNOWN) { state[pot[j]] = WATER; note("count"); }
             mustTip[pot[j]] = 1; changed = true;
           }
         }
@@ -804,7 +808,7 @@ function RillCore() {
             var fill = gw === gg.v ? DRY : WATER;
             for (gz = 0; gz < N; gz++) {
               var gk2 = gg.a === 0 ? gg.i * N + gz : gz * N + gg.i;
-              if (state[gk2] === UNKNOWN) { state[gk2] = fill; changed = true; }
+              if (state[gk2] === UNKNOWN) { state[gk2] = fill; changed = true; note("gauge"); }
             }
           }
         }
@@ -838,7 +842,7 @@ function RillCore() {
 
       var changed = false;
       for (k = 0; k < N * N; k++) {
-        if (state[k] === UNKNOWN && !reach.has(k)) { state[k] = DRY; changed = true; }
+        if (state[k] === UNKNOWN && !reach.has(k)) { state[k] = DRY; changed = true; note("flow"); }
       }
       if (changed) return 1;
 
@@ -853,7 +857,7 @@ function RillCore() {
         }
         allowed.add(k);
       }
-      for (k = 0; k < cuts.length; k++) { state[cuts[k]] = WATER; changed = true; }
+      for (k = 0; k < cuts.length; k++) { state[cuts[k]] = WATER; changed = true; note("flow"); }
       return changed ? 1 : 0;
     }
 
@@ -879,6 +883,8 @@ function RillCore() {
     /* Probe: one supposition deep, cheap rules only. */
     function closureQuiet(st, tips, nots) {
       var savedS = state, savedT = mustTip, savedN = noTip;
+      var savedSim = sim;
+      sim = true;
       state = st; mustTip = tips; noTip = nots;
       var guard = 0, bad = false;
       for (;;) {
@@ -889,6 +895,7 @@ function RillCore() {
         break;
       }
       state = savedS; mustTip = savedT; noTip = savedN;
+      sim = savedSim;
       return bad;
     }
     function probeSweep(scope) {
@@ -907,6 +914,7 @@ function RillCore() {
         if (closureQuiet((st[k] = DRY, st), Uint8Array.from(mustTip), Uint8Array.from(noTip))) { found.push([k, WATER]); }
       }
       for (var f = 0; f < found.length; f++) state[found[f][0]] = found[f][1];
+      note("probe", found.length);
       return found.length ? 1 : 0;
     }
     /* Most probe forcings happen where the board just moved, so probe
@@ -1006,7 +1014,8 @@ function RillCore() {
     var done = verify();
     if (done) {
       return { solved:true, bad:false, level:level, hard:hard, region:done,
-               state:state, rounds:rounds, firstGain:firstGain, order:order };
+               state:state, rounds:rounds, firstGain:firstGain, order:order,
+               mix:fired };
     }
     return { solved:false, bad:false };
   }
@@ -1097,11 +1106,11 @@ function RillCore() {
         if (d2 < nn) nn = d2;
       }
       items.push({ t: 0, k: kz });
-      rank.push(nn * 2.2 + (wetSet.has(kz) ? 3.0 : 0) + rnd() * 2.0);
+      rank.push(nn * 2.2 + (wetSet.has(kz) ? 1.5 : 0) + rnd() * 2.0);
     }
     for (var g = 0; g < gaugesAll.length; g++) {
       items.push({ t: 1, g: g });
-      rank.push(30 + rnd() * 4.0);
+      rank.push(9 + rnd() * 8.0);
     }
     var order = items.map(function (_, i) { return i; });
     order.sort(function (a, b) { return rank[a] - rank[b]; });
@@ -1256,6 +1265,16 @@ function RillCore() {
     var chain = Math.min(1, fin.rounds / 22);
     var variety = Object.keys(seenVals).length / 4;
 
+    /* the solve's character: how much of the board fell to plain row
+       arithmetic, and how much to the springs game proper */
+    var mixTot = 0, mx = fin.mix || {};
+    Object.keys(mx).forEach(function (f) { mixTot += mx[f]; });
+    var gaugeShare = mixTot ? (mx.gauge || 0) / mixTot : 0;
+    var gameShare = mixTot
+      ? ((mx.count || 0) + (mx.spring || 0) + (mx.probe || 0) +
+         (mx.snake || 0) + (mx.ring || 0)) / mixTot : 0;
+    if (!relaxed && gaugeShare > 0.62) return null;   /* battleship: reject */
+
     /* scatter: how far each kept number sits from its nearest fellow */
     var nnSum = 0;
     for (var a2 = 0; a2 < n; a2++) {
@@ -1271,9 +1290,10 @@ function RillCore() {
     var scatterF = n > 1 ? (nnSum / n) / 5 : 1;
 
     return {
-      score: -5.5 * open + 2.0 * chain - 14.0 * clueF - 2.0 * bankF
-             - 2.2 * gaugeF
-             + 2.0 * scatterF + 0.6 * variety - 0.5 * adjPairs
+      score: -7.0 * open + 3.0 * chain - 11.0 * clueF - 2.0 * bankF
+             - 2.6 * gaugeF - 5.0 * Math.max(0, gaugeShare - 0.35)
+             + 2.5 * gameShare
+             + 2.0 * scatterF + 1.2 * variety - 0.5 * adjPairs
              + 0.25 * Math.min(amb, 8) + 2.0,
       level: fin.level, hard: fin.hard, order: fin.order,
       first: fin.firstGain, rounds: fin.rounds, clueCount: n,
@@ -1390,7 +1410,7 @@ function RillCore() {
      solved is not the board that number opens now, so old saves are
      left where they lie rather than misread. (v5 made every printed
      set irredundant: nothing on the board can be crossed out.) */
-  var KEY = "rill.v5";
+  var KEY = "rill.v6";
   var save = { solved:{}, current:null, opts:{ theme:"auto", clock:false, flag:true } };
   try {
     var raw = localStorage.getItem(KEY);
