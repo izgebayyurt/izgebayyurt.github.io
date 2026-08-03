@@ -115,14 +115,24 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   outlining it (dry numbers are offered up for removal first, so what
   survives floats). Counting alone is still provably insufficient by
   construction: every board must admit at least two spring-layouts
-  consistent with its counts, and shipped boards run 11 to 50+. The board
+  consistent with its counts, and shipped boards run 8 to 50+. The board
   keeps a one-cell gutter for the gauges; tapping a number washes its
   earshot, tapping a gauge lights its line; a bare diagonal squeeze is
   striped like a loop — the two shapes the rill may never make. Springs
   wear wellhead rings, numbers sit wet or dry as shown, a number is never
-  a spring. All four books, 7×7 to 13×13, generate in well under a second
-  a board; 7×7 was brute-force verified unique 15 of 15 in development,
-  with the solver-vs-intended match checked at every size. Same sand and
+  a spring. What is printed is also provably IRREDUNDANT: reduction
+  offers every survivor — field number and gauge alike — to the full
+  solver once, and since removability is monotone that one pass proves
+  no single printed thing can be crossed out. Against a randomized-
+  search estimate of the true minimum (independent greedy descents from
+  the full candidate set), shipped counts sit at or below the best
+  descent found on the mid and large boards and within a clue or two on
+  the small — about eleven printed things on a 7×7, twenty-six on a
+  13×13, most of them tallies in the margin. All four books, 7×7 to
+  13×13, generate in about a third of a second to two; the opening
+  levels are certified, not sampled — №1–30 of the 7×7 book and №1–6 of
+  the 9×9 brute-force verified unique by an independent counter, №1–12
+  of the 11×11 and 13×13 books verified valid and solver-matched. Same sand and
   well-water shell: times with hint-exclusion, pinch zoom, the
   dissolve-and-sheen solve moment (the gauges stay through it — they are
   part of the finished thing), installable and playable offline. The
