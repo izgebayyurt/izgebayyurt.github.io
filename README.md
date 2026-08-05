@@ -87,12 +87,13 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   ends exactly there — one connected vein, never looping (water joins,
   it never circles), never running alongside itself (two diagonally
   touching water cells share a wet corner: an honest bend, never a bare
-  squeeze), whose dead ends are precisely the printed springs. Numbers,
-  wet or dry AS SHOWN, count their own four sides: a dry number is a
-  stone on the bank feeling the stream; a wet number is the river
-  describing itself — a 2 flows through, a 3 is a fork. A river with L
-  springs forks exactly L−2 times, so every fork found is one off the
-  ledger. A zero is never printed, anywhere. The road here: exact
+  squeeze), whose dead ends are precisely the printed springs. Numbers
+  are STONES the river must flow around — water never touches a
+  numbered cell — and each counts the water in the EIGHT squares
+  around it, minesweeper's own question asked about a stream. The
+  stone's cell being forbidden is itself a clue: a rock parts the
+  current. A river with L springs forks exactly L−2 times, so every
+  fork found is one off the ledger. A zero is never printed, anywhere. The road here: exact
   distance readings fell to triangulation (thin questions — circles
   intersect to a point); earshot counts fixed ambiguity but measured
   22% of cells clued with the dry numbers tracing the river in negative
@@ -105,27 +106,29 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   springs given, the dead-end rule (Delve's load-bearing idea,
   transplanted) does the global pinning — any stray branch is illegal
   the moment it strands a tip — and reduction then stripped EVERY bank
-  gauge on EVERY board as dead weight, so gauges retired and the
-  ruleset shrank to four teachable lines. The solver's ledger says the
+  gauge on EVERY board as dead weight, so gauges retired, wet numbers
+  followed (numbers riding the water handed their cells away free),
+  and the ruleset shrank to four teachable lines. The solver's ledger says the
   solve is finally made of nameable moves: walking a spring out of its
   pocket, a corridor with two dry sides dying, minesweeper arithmetic
   on a stone, fork budgeting, one-way-out flow arguments — probing
   (the unfair, invisible kind of progress) is capped at 30% by a hard
-  generation gate and measures 14–21%. Boards stay sparse: 4–14
-  numbers (8–10% of cells, roughly two-thirds wet), springs 4–9 by
-  book. Every printed set is IRREDUNDANT — each survivor is offered to
+  generation gate and measures 19–24%. Boards stay sparse: 3–11
+  stones (6–7% of cells), springs 4–8 by book, counts spread across
+  the whole 1–6 range. Every printed set is IRREDUNDANT — each survivor is offered to
   the full solver once, and monotonicity makes that a proof that
   nothing on the board can be crossed out. Certified, not sampled:
   №1–30 of the 7×7 book and №1–4 of the 9×9 brute-force verified
   unique by an independent counter, №1–12 of every book valid and
-  solver-matched; generation 0.3–1.6 s. Tapping a number lights the
-  four sides it counts; a loop, a bare squeeze, or a buried wellhead
-  is striped; a stream ending where no spring rises is said in words.
+  solver-matched; generation 0.3–2.4 s. Tapping a number lights the
+  eight squares it counts; a loop, a bare squeeze, or a buried
+  wellhead is striped; a stream ending where no spring rises is said
+  in words.
   Same sand and well-water shell: times with hint-exclusion, pinch
   zoom, the dissolve-and-sheen solve moment, installable and playable
   offline. The launcher mark is a legal rill under every rule — its
-  three springs ringed, its one number a wet 2 verified rather than
-  eyeballed. Single self-contained `index.html` with
+  three springs ringed, its one stone counting three wet squares,
+  verified rather than eyeballed. Single self-contained `index.html` with
   `manifest.webmanifest`, `sw.js` and the icons beside it.
 - `delve/` — Delve, an original puzzle genre and the second of the underground
   pair (Rill traces the water to its springs; Delve digs). Dig tunnels from a door on the
