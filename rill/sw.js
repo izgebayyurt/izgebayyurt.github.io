@@ -11,7 +11,7 @@
  *
  * Bump CACHE when the shell changes; the old one is deleted on activate.
  */
-var CACHE = "rill-v12";
+var CACHE = "rill-v13";
 var SHELL = [
   "./",
   "./index.html",
