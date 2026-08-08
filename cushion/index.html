@@ -25,7 +25,13 @@
     --bed2:#dbd5c5;            /* the bed's far edge, for the one soft gradient */
     --pi:#2a2730;              /* ink — a purple-black, never a neutral one */
     --rail:#2a2730;            /* the cushions are ink; they are the drawing */
-    --pocket:#211e27;
+    /* The mouths are leather, not more ink. A near-black hole in a near-black
+       rail is a hole nobody can see, so the pockets are the one warm thing on
+       the table — and warm is the right direction, because the only other
+       warm colour here is the one that means a ball is going in. */
+    --pocket:#7a5433;          /* the lip of the liner, where the light gets in */
+    --pocket-deep:#20120a;     /* down the throat */
+    --pocket-lip:#f2e4d0;      /* the rim that says "opening", not "smudge" */
     --pa:#7a5e9a;              /* the one accent: aim, and the ball that is on */
     --pw:#c85f18;             /* the clear moment, and nothing else */
     --sight:#ece9e1;           /* the rail diamonds, which must read on the rail */
@@ -60,7 +66,9 @@
     --bed2:#251f2b;
     --pi:#ded7c8;
     --rail:#0c0a0f;
-    --pocket:#040305;
+    --pocket:#7d5836;
+    --pocket-deep:#160d06;
+    --pocket-lip:#c9a074;
     --sight:#7c7186;
     --pa:#a888c8;
     --pw:#ff8a4c;
@@ -1118,21 +1126,26 @@ function predict(bs, shot, opts) {
   strike(w, shot);
   const ev = newEvents();
   const cue = [{ x:w[0].x, y:w[0].y }];
-  let hitAt = -1, hitNum = -1, obj = null, ticks = 0;
-  const cap = opts.ticks || 300;
+  let hitAt = -1, hitNum = -1, obj = null, hitBall = null, ticks = 0;
+  const cap = opts.ticks || 900;
+  const tail = opts.tail === undefined ? 110 : opts.tail;
   while (ticks < cap) {
     ticks++;
     advance(w, ev, null);
     if (w[0].live) cue.push({ x:w[0].x, y:w[0].y });
     if (hitAt < 0 && ev.firstHit >= 0) {
       hitAt = ticks; hitNum = ev.firstHit;
-      for (let i = 0; i < w.length; i++) if (w[i].num === hitNum) obj = [{ x:w[i].x, y:w[i].y }];
+      for (let i = 0; i < w.length; i++) if (w[i].num === hitNum) { hitBall = w[i]; obj = [{ x:w[i].x, y:w[i].y }]; }
     } else if (hitAt > 0) {
-      for (let i = 0; i < w.length; i++) if (w[i].num === hitNum && w[i].live) obj.push({ x:w[i].x, y:w[i].y });
-      if (ticks > hitAt + 150) break;
+      if (hitBall.live) obj.push({ x:hitBall.x, y:hitBall.y });
+      /* Once the struck ball has either dropped or run out of legs, the
+         question this line was asked has been answered; the cue ball's
+         remaining travel is drawn faintly and does not need watching to the
+         end. Running on would cost several milliseconds a frame mid-drag. */
+      const settled = !hitBall.live || (hitBall.vx === 0 && hitBall.vy === 0);
+      if (settled && ticks > hitAt + tail) break;
     }
     if (!moving(w)) break;
-    if (hitAt < 0 && ticks > cap - 1) break;
   }
   return { cue, obj, hit:hitNum, hitAt, potted:ev.potted.slice(), pottedAt:ev.pottedAt.slice(), scratch:ev.cueScratch };
 }
@@ -1170,7 +1183,8 @@ let C = {};
 function readTheme() {
   C = {
     pg:css('--pg'), bed:css('--bed'), bed2:css('--bed2'), ink:css('--pi'), rail:css('--rail'),
-    pocket:css('--pocket'), pa:css('--pa'), pw:css('--pw'), line:css('--ballline'),
+    pocket:css('--pocket'), pdeep:css('--pocket-deep'), plip:css('--pocket-lip'),
+    pa:css('--pa'), pw:css('--pw'), line:css('--ballline'),
     rim:css('--ballrim'), cue:css('--cue'), faint:css('--pfaint'), quiet:css('--pq'), dim:css('--pd'),
     sight:css('--sight'),
   };
@@ -1217,6 +1231,12 @@ function toTable(px, py) {
   return V.rot ? { x:TW - (py - V.oy) / V.s, y:(px - V.ox) / V.s } : { x:(px - V.ox) / V.s, y:(py - V.oy) / V.s };
 }
 const PX = px => px / V.s;                          /* a width in real screen pixels */
+/* the tokens are hex; a gradient needs to fade one of them to nothing */
+function withA(hex, a) {
+  const h = (hex || '#000').replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16) || 0;
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
 
 /* --------------------------------------------------------------- static table */
 
@@ -1263,14 +1283,18 @@ function drawTable(g) {
   for (let y = 4; y < TH; y += 9) for (let x = ((y / 9) & 1) ? 8.5 : 4; x < TW; x += 9) g.fillRect(x, y, 0.9, 0.9);
   g.restore();
 
-  /* the mouths, cut through both cloth and frame */
-  g.fillStyle = C.pocket;
+  /* The mouths, cut through both cloth and frame. A hole is not a dark disc: it
+     is lighter where the light reaches its near edge and black down the throat,
+     and it has a lip. Without the lip it disappears into a rail this dark. */
   for (let i = 0; i < 6; i++) {
-    const p = POCKETS[i];
-    g.beginPath();
     const q = pocketCentre(i);
-    g.arc(q.x, q.y, q.r, 0, TAU);
-    g.fill();
+    const gr = g.createRadialGradient(q.x, q.y - q.r * 0.18, q.r * 0.1, q.x, q.y, q.r);
+    gr.addColorStop(0, C.pdeep); gr.addColorStop(0.62, C.pdeep); gr.addColorStop(1, C.pocket);
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill();
+    g.strokeStyle = C.plip; g.globalAlpha = 0.5; g.lineWidth = PX(1.3);
+    g.beginPath(); g.arc(q.x, q.y, q.r - PX(0.7), 0, TAU); g.stroke();
+    g.globalAlpha = 1;
   }
 
   /* the cushion noses: capsules whose surface is exactly where a ball stops,
@@ -1552,9 +1576,18 @@ function say(text, bad) {
 
 function pushFx(kind, x, y, extra) { G.fx.push(Object.assign({ kind, x, y, t:0 }, extra || {})); }
 
-/* A hint fades itself after a few seconds. That timer belongs to the table it
-   was asked about, so any new table — or any stroke — has to cancel it, or it
-   comes back later and wipes the advice for a board it never saw. */
+/* Everything this game defers — the opponent thinking, the opponent placing,
+   a result sheet, a hint fading — belongs to the table it was scheduled on.
+   Leave one running across a new game and it arrives to mutate a board it has
+   never seen: an opponent's turn resuming in the middle of a solo run, a shot
+   fired at a table that no longer exists. So every deferred call carries the
+   era it was made in, and a new game is a new era. */
+let era = 0;
+function newEra() { era++; clearHint(); }
+function later(fn, ms) { const mine = era; return setTimeout(() => { if (era === mine) fn(); }, ms); }
+
+/* A hint fades itself after a few seconds; that timer is cancelled outright
+   rather than merely ignored, since it is the one we hold a handle to. */
 function clearHint() { clearTimeout(G.hintT); G.hintT = 0; G.hintShot = null; }
 
 /* --------------------------------------------------------------- taking a shot */
@@ -1580,6 +1613,9 @@ const powerCurve = t => 0.055 + 0.945 * Math.pow(clamp(t, 0, 1), 1.75);
 function settled() {
   const ev = G.ev;
   G.trail = null;
+  /* the balls have moved, so any cached aim reading is about a table that no
+     longer exists — the key alone cannot notice that */
+  G.predKey = '';
   if (G.mode === 'study') resolveStudy(ev);
   else if (G.mode === 'nine') resolveNine(ev);
   else resolveRun(ev);
@@ -1608,7 +1644,7 @@ function finishStudy() {
   prefetch(G.n, G.num + 1); prefetch(G.n, G.num + 2);
   pushFx('wave', 0, 0);
   sfx('good');
-  setTimeout(() => sheetStudyDone(inPar), 620);
+  later(() => sheetStudyDone(inPar), 620);
 }
 
 /* -------------------------------------------------------------------- nine-ball
@@ -1635,16 +1671,16 @@ function resolveNine(ev) {
     G.turn = 1 - G.turn;
     G.phase = G.turn === 0 ? 'inhand' : 'aithink';
     say((G.turn === 0 ? 'Foul — ball in hand' : why + ' — ball in hand'), true);
-    if (G.turn === 1) setTimeout(aiPlace, 700);
+    if (G.turn === 1) later(aiPlace, 700);
   } else if (ev.potted.length) {
     sfx('good');
     G.phase = G.turn === 0 ? 'aim' : 'aithink';
-    if (G.turn === 1) setTimeout(aiThink, 620);
+    if (G.turn === 1) later(aiThink, 620);
   } else {
     G.turn = 1 - G.turn;
     G.phase = G.turn === 0 ? 'aim' : 'aithink';
     say(G.turn === 0 ? 'Your table' : 'Missed');
-    if (G.turn === 1) setTimeout(aiThink, 620);
+    if (G.turn === 1) later(aiThink, 620);
   }
 }
 function respot(num) {
@@ -1668,7 +1704,7 @@ function endNine(winner) {
   G.over = true; G.phase = 'done';
   if (winner === 0) { DB.nine.w++; pushFx('wave', 0, 0); sfx('good'); } else { DB.nine.l++; sfx('bad'); }
   save();
-  setTimeout(() => sheetNineDone(winner), 700);
+  later(() => sheetNineDone(winner), 700);
 }
 function aiPlace() {
   /* the machine puts the ball where it can see the most */
@@ -1687,7 +1723,7 @@ function aiPlace() {
   }
   if (best) { cueBall().x = best.x; cueBall().y = best.y; }
   G.phase = 'aithink';
-  setTimeout(aiThink, 520);
+  later(aiThink, 520);
 }
 function aiThink() {
   if (G.over) return;
@@ -1697,7 +1733,7 @@ function aiThink() {
   G.aim = plan.angle; G.power = invPower(plan.power); G.ver = plan.ver || 0; G.side = plan.side || 0;
   syncControls();
   say(plan.why === 'safe' ? 'Playing safe' : '');
-  setTimeout(() => {
+  later(() => {
     if (G.over || G.phase !== 'aithink') return;
     G.phase = 'aim'; G.lowBefore = G.low;
     fire();
@@ -1727,7 +1763,7 @@ function resolveRun(ev) {
     G.over = true; G.phase = 'done';
     if (G.score > DB.run.best) DB.run.best = G.score;
     DB.run.plays++; save();
-    setTimeout(() => sheetRunDone(), 620);
+    later(() => sheetRunDone(), 620);
   }
 }
 function refillRun() {
@@ -1755,12 +1791,14 @@ function pickPocket() { return (Math.random() * 6) | 0; }
 /* ---------------------------------------------------------------- starting up */
 
 function startStudy(n, num) {
-  G.mode = 'study'; G.n = n; G.num = num; G.over = false; G.hinted = false; clearHint();
+  newEra();
+  G.mode = 'study'; G.n = n; G.num = num; G.over = false; G.hinted = false;
   G.shots = 0; G.phase = 'wait'; G.fx = []; G.balls = [];
   showScreen('play'); updateHUD();
   say('Building №' + num + '…');
+  const mine = era;
   getStudy(n, num, g => {
-    if (G.mode !== 'study' || G.num !== num) return;
+    if (era !== mine || G.mode !== 'study' || G.num !== num) return;
     if (!g) { say('Could not build that one — try another', true); return; }
     G.balls = E.cloneBalls(g.balls);
     G.par = g.par;
@@ -1773,7 +1811,8 @@ function startStudy(n, num) {
   });
 }
 function startNine(skill) {
-  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0; G.broke = false; clearHint();
+  newEra();
+  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0; G.broke = false;
   G.balls = E.rack9(Math.random); G.low = 1; G.shots = 0;
   G.phase = 'inhand'; G.breakZone = true; G.fx = [];
   G.aim = 0; G.power = 0.86; G.side = 0; G.ver = 0;
@@ -1781,7 +1820,8 @@ function startNine(skill) {
   say('Place the cue behind the line, then break');
 }
 function startRun() {
-  G.mode = 'run'; G.over = false; G.score = 0; G.shots = 8; G.streak = 0; clearHint();
+  newEra();
+  G.mode = 'run'; G.over = false; G.score = 0; G.shots = 8; G.streak = 0;
   G.balls = E.layoutRun(rngRun, 5, null); G.fx = [];
   G.called = pickPocket();
   G.phase = 'aim';
@@ -1861,12 +1901,18 @@ function syncControls() {
 
 /* ------------------------------------------------------------------ the aim */
 
-function predictNow() {
+/* The physics pass is only run when the aim is actually pointed at a ball.
+   Everything it is asked for — the object ball's travel, the cue ball's
+   afterlife, whether anything drops, whether the stroke even reaches — is
+   downstream of a contact, and an aim with nothing in front of it would
+   otherwise roll to rest through a dozen cushions for no answer at all. */
+function predictNow(hit) {
   const c = cueBall();
   if (!c || !c.live) return null;
+  if (hit && hit.kind !== 'ball') return null;
   const key = [G.aim.toFixed(4), G.power.toFixed(3), G.side.toFixed(2), G.ver.toFixed(2), G.balls.length, objectsLeft()].join(',');
-  if (G.predKey === key && G.pred) return G.pred;
-  G.pred = E.predict(G.balls, { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side }, { ticks:280 });
+  if (G.predKey === key && G.pred !== undefined) return G.pred;
+  G.pred = E.predict(G.balls, { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side });
   G.predKey = key;
   return G.pred;
 }
@@ -1896,8 +1942,8 @@ function drawAim(g) {
 
   /* Now the physics: how far this much speed actually carries, and what the cue
      ball does to itself once it has hit something. */
-  const p = predictNow();
-  const short = p && p.hitAt < 0 && h1.kind === 'ball';   /* pointed at it, cannot reach it */
+  const p = predictNow(h1);
+  const short = p && p.hitAt < 0;                         /* pointed at it, cannot reach it */
 
   if (h1.kind === 'ball') {
     const struck = h1.ball;
@@ -1933,18 +1979,27 @@ function drawAim(g) {
       g.setLineDash([]);
     }
     if (p.potted && p.potted.length) {
-      /* inside the mouth, not around it — a ring drawn outside a corner pocket
-         is a ring drawn off the table, where the clip eats it */
-      g.strokeStyle = C.pw; g.globalAlpha = 0.95; g.lineWidth = PX(3);
+      /* The mouth lights up rather than gaining an outline: leather swallows a
+         hairline whole. Cool, because the called pocket is already warm, and in
+         the accent because this is the object ball's own line arriving. */
       for (let i = 0; i < p.pottedAt.length; i++) {
         const q = pocketCentre(p.pottedAt[i]);
-        g.beginPath(); g.arc(q.x, q.y, q.r - 3.5, 0, TAU); g.stroke();
+        const gr = g.createRadialGradient(q.x, q.y, q.r * 0.05, q.x, q.y, q.r);
+        gr.addColorStop(0, withA(C.pa, 0.92));
+        gr.addColorStop(0.66, withA(C.pa, 0.5));
+        gr.addColorStop(1, withA(C.pa, 0.1));
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(q.x, q.y, q.r - PX(1), 0, TAU); g.fill();
+        g.strokeStyle = C.pa; g.globalAlpha = 0.95; g.lineWidth = PX(2.2);
+        g.beginPath(); g.arc(q.x, q.y, q.r - PX(1.2), 0, TAU); g.stroke();
       }
     }
-    if (p.scratch) {
-      g.strokeStyle = C.pw; g.globalAlpha = 0.85; g.lineWidth = PX(2.2);
-      g.beginPath(); g.arc(c.x, c.y, BR + 7, 0, TAU); g.stroke();
-    }
+  }
+  /* aimed straight into a mouth with nothing in the way is a scratch by
+     geometry alone, and does not need the physics to say so */
+  if ((p && p.scratch) || h1.kind === 'pocket') {
+    g.strokeStyle = C.pw; g.globalAlpha = 0.85; g.lineWidth = PX(2.2);
+    g.beginPath(); g.arc(c.x, c.y, BR + 7, 0, TAU); g.stroke();
   }
   g.globalAlpha = 1;
 
@@ -2043,10 +2098,18 @@ function render(dt) {
     g.setLineDash([]); g.globalAlpha = 1;
   }
   if (G.mode === 'run' && G.called >= 0 && !G.over) {
+    /* the called pocket is lit rather than ringed — a mouth this warm swallows a
+       thin warm outline, but it cannot swallow being alight */
     const q = pocketCentre(G.called);
-    g.strokeStyle = C.pw; g.globalAlpha = 0.5 + 0.22 * Math.sin(performance.now() / 320);
-    g.lineWidth = PX(2.4);
-    g.beginPath(); g.arc(q.x, q.y, q.r + 4, 0, TAU); g.stroke();
+    const pulse = 0.62 + 0.3 * Math.sin(performance.now() / 340);
+    const gr = g.createRadialGradient(q.x, q.y, q.r * 0.05, q.x, q.y, q.r);
+    gr.addColorStop(0, withA(C.pw, 0.9 * pulse));
+    gr.addColorStop(0.65, withA(C.pw, 0.42 * pulse));
+    gr.addColorStop(1, withA(C.pw, 0.08));
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(q.x, q.y, q.r - PX(1), 0, TAU); g.fill();
+    g.strokeStyle = C.pw; g.globalAlpha = 0.5 + 0.4 * pulse; g.lineWidth = PX(2);
+    g.beginPath(); g.arc(q.x, q.y, q.r - PX(1.2), 0, TAU); g.stroke();
     g.globalAlpha = 1;
   }
 
@@ -2429,7 +2492,7 @@ function showBooks() {
   });
   showScreen('books');
 }
-function goHome() { G.mode = null; G.over = false; G.phase = 'idle'; buildHome(); showScreen('home'); }
+function goHome() { newEra(); G.mode = null; G.over = false; G.phase = 'idle'; buildHome(); showScreen('home'); }
 
 /* ------------------------------------------------------------------- chrome */
 

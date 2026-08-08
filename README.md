@@ -18,8 +18,12 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   a cooldown. Neither side may cross halfway, so nobody chases. Single
   self-contained `index.html`.
 - `cushion/` — Cushion, pocket billiards on paper: Tapa's ink-on-paper ground and
-  floating chrome, wearing Huemeld's outlined, hard-shadowed objects. Three modes off
-  one engine. **Studies** are trick shots — two to four balls, clear the table inside
+  floating chrome, wearing Huemeld's outlined, hard-shadowed objects. The cushions are
+  ink and the mouths are leather — a near-black hole in a near-black rail is a hole
+  nobody can see, so the pockets are the one warm thing on the table, lit down the
+  throat and lipped. That makes a lit mouth mean something, and both meanings are
+  used: cool for the pocket this stroke drops a ball into, warm for the run's called
+  pocket. Three modes off one engine. **Studies** are trick shots — two to four balls, clear the table inside
   par — and par is not an author's opinion: the generator beam-searches candidate
   shots, simulates every one of them to rest, and par is however many the shortest
   line it could actually shoot took. It proves them *centre-ball*, so spin is always
