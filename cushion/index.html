@@ -190,29 +190,8 @@
   .hcell b.warn { color:var(--pw); }
   .hcell span { font-size:7.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--pd); margin-top:3px; font-weight:600; }
 
-  /* the stroke control: press and pull back, release to hit */
-  #stroke {
-    position:absolute; z-index:6; left:50%; transform:translateX(-50%);
-    bottom:calc(env(safe-area-inset-bottom) + 16px);
-    width:min(300px, 68vw); height:52px; border-radius:26px;
-    background:var(--chrome); border:1px solid var(--pfaint);
-    box-shadow:0 3px 12px var(--shadow); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
-    overflow:hidden; touch-action:none; cursor:grab;
-  }
-  #strokeFill { position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--pa); opacity:.22; }
-  #strokeLbl {
-    position:absolute; inset:0 16px; display:flex; align-items:center; justify-content:flex-start;
-    pointer-events:none; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
-    color:var(--pd); font-weight:600; font-variant-numeric:tabular-nums;
-  }
-  #strokeGrip {
-    position:absolute; top:6px; bottom:6px; width:3px; border-radius:2px; background:var(--pi);
-    left:8px; pointer-events:none; transition:left .18s var(--pop); opacity:.75;
-  }
-  #stroke.pulling #strokeGrip { transition:none; }
-  #stroke.pulling #strokeFill { transition:none; }
-  #stroke.armed #strokeLbl { color:var(--pa); }
-
+  /* There is no stroke widget any more. The cue is the control: drag away from
+     the ball to aim and to draw the cue back, let go to hit. */
   /* the spin disc: a cue ball you can touch anywhere on */
   #spin {
     position:absolute; z-index:6; right:12px; bottom:calc(env(safe-area-inset-bottom) + 16px);
@@ -230,6 +209,7 @@
     border:1px dashed rgba(42,39,48,.22); pointer-events:none;
   }
   #hintBtn { right:12px; bottom:calc(env(safe-area-inset-bottom) + 80px); }
+  #spin { bottom:calc(env(safe-area-inset-bottom) + 14px); }
   #fitBtn {
     left:12px; bottom:calc(env(safe-area-inset-bottom) + 16px); width:auto; height:32px;
     padding:0 14px; display:none; place-items:center; cursor:pointer;
@@ -240,7 +220,7 @@
   /* a line of prose that says what just happened, and then stops saying it */
   #say {
     position:absolute; z-index:7; left:50%; transform:translateX(-50%);
-    bottom:calc(env(safe-area-inset-bottom) + 82px); pointer-events:none;
+    bottom:calc(env(safe-area-inset-bottom) + 84px); pointer-events:none;
     font-size:12px; color:var(--pi); background:var(--chrome); border:1px solid var(--pfaint);
     padding:7px 15px; border-radius:999px; box-shadow:0 2px 8px var(--shadow);
     opacity:0; transition:opacity .3s var(--calm), transform .3s var(--pop); white-space:nowrap;
@@ -333,11 +313,6 @@
     <button class="float fbtn" id="hintBtn" aria-label="Hint">?</button>
     <div id="say"></div>
     <div id="spin"><div id="spinDot"></div></div>
-    <div id="stroke">
-      <div id="strokeFill"></div>
-      <div id="strokeGrip"></div>
-      <div id="strokeLbl">Pull back</div>
-    </div>
   </section>
 
   <div id="veil"><div class="sheet" id="sheet"></div></div>
@@ -412,16 +387,34 @@ function inPocket(b) {
 }
 
 /* ------------------------------------------------------------------ feeling
-   These eight numbers are the whole game. Everything else is bookkeeping. */
 
-const A_ROLL  = 165;    /* rolling drag: a firm shot runs about two tables */
-const A_SLIDE = 1150;   /* sliding drag — the shorter this is, the further draw reaches */
-const E_BB    = 0.95;   /* ball on ball */
-const E_CU    = 0.76;   /* ball on cushion, along the normal */
-const T_CU    = 0.90;   /* and along it */
-const SPIN_CU = 0.28;   /* how much side spin the cushion converts into travel */
-const V_MAX   = 2150;   /* a full-power stroke */
-const REST_V  = 7;      /* below this a ball has stopped, and says so */
+   These are not tuned by ear. The bed is 940 units long and a real 8-foot bed
+   is 100 inches, so one metre is 370 units and gravity is 3631 units/s². Every
+   number below is a measured coefficient from that scale:
+
+     rolling resistance   mu ~ 0.010   (0.005-0.015 on cloth)
+     sliding friction     mu ~ 0.20    (0.15-0.4)
+     ball on ball          e ~ 0.96
+     ball on cushion       e ~ 0.85 slow, ~0.72 hard — a cushion is rubber and
+                                     rubber gets less bouncy the harder you hit
+
+   The consequence that matters: a ball on cloth barely slows down. What stops
+   it is cushions, not the felt. Balls used to be tuned to die on their own, and
+   they died far too fast. */
+const M         = 370.1;          /* units per metre */
+const GRAV      = 9.81 * M;
+const A_ROLL    = 0.010 * GRAV;   /* 36 — the cloth takes almost nothing */
+const A_SLIDE   = 0.200 * GRAV;   /* 726 — this one is what draw and follow live on */
+const E_BB      = 0.96;
+const E_CU_SLOW = 0.85, E_CU_FAST = 0.72;
+const CU_KNEE   = 4.0 * M;        /* the speed by which a cushion is at its deadest */
+const T_CU      = 0.90;           /* along the cushion; T/E over one is why a bank
+                                     comes off flatter than it went in */
+const SPIN_CU   = 0.28;           /* side spin the cushion turns into travel */
+const V_MAX     = 8.5 * M;        /* a hard shot; a break is a shade under 12 m/s */
+const REST_V    = 0.055 * M;      /* 20 — a ball this slow is done, and creeping to
+                                     a true halt at 36 units/s² takes half a second
+                                     of nothing happening */
 
 const STEP = 1 / 240;
 
@@ -496,7 +489,9 @@ function railHit(b) {
     const tx = -ny, ty = nx;
     const vt = b.vx * tx + b.vy * ty;
     const st = b.sx * tx + b.sy * ty;
-    const nvn = -E_CU * vn;
+    const sp = Math.abs(vn);
+    const e = E_CU_SLOW + (E_CU_FAST - E_CU_SLOW) * Math.min(1, sp / CU_KNEE);
+    const nvn = -e * vn;
     const nvt = vt * T_CU - SPIN_CU * st;
     const ovx = b.vx, ovy = b.vy;
     b.vx = nx * nvn + tx * nvt; b.vy = ny * nvn + ty * nvt;
@@ -630,7 +625,7 @@ function aimPoint(p) {
    less of the approach than of the slide along it, so the ball comes off
    flatter than the reflection says. Solving for that ratio outright beats
    aiming at a mirror and hoping. */
-const BANK_K = (T_CU / E_CU);
+const BANK_K = (T_CU / ((E_CU_SLOW + E_CU_FAST) / 2));
 function bankPoint(b, p, rail) {
   const k = BANK_K;
   if (rail === 0 || rail === 1) {                 /* top / bottom: line y = c */
@@ -762,10 +757,14 @@ function kicks(bs, only) {
    so those need no searching. A bank does not mirror exactly, so a bank gets a
    small fan of aims around the computed one. Either way the sim decides. */
 
+/* Enough speed to carry the whole route and arrive with something left. On this
+   cloth that is far less than it used to be, and the floor matters: leave it high
+   and every shot in the game is struck at the same firm pace, which sends the cue
+   ball two tables past where it was wanted. */
 function powersFor(c) {
-  const need = Math.sqrt(2 * A_ROLL * (c.reach * 1.3 + 170)) / 0.68;
-  const p = clamp(need / V_MAX, 0.20, 1);
-  return [clamp(p * 0.82, 0.15, 1), p, Math.min(1, p * 1.5)];
+  const need = Math.sqrt(2 * A_ROLL * (c.reach * 1.35 + 200)) / 0.68;
+  const p = clamp(need / V_MAX, 0.09, 1);
+  return [clamp(p * 0.85, 0.07, 1), p, Math.min(1, p * 1.6)];
 }
 const FAN_STRAIGHT = [0];
 const FAN_BANK = [0, 0.011, -0.011, 0.024, -0.024];
@@ -1016,10 +1015,13 @@ function layoutRun(rng, k, keepCue) {
    before it is played, so a bad angle on a thin cut is punished the way it
    would punish a person. It never sees a shot it could not explain. */
 
+/* Sigma is the aim error in radians. To drop a ball from a table's length the
+   line has to be right to about a degree, so these three are genuinely different
+   players and not the same player at three volumes. */
 const SKILLS = [
-  { name:'Steady', sigma:0.030, pnoise:0.11, banks:false, combos:false, look:false },
-  { name:'Sharp',  sigma:0.0135, pnoise:0.055, banks:true,  combos:false, look:true  },
-  { name:'Deadly', sigma:0.0048, pnoise:0.022, banks:true,  combos:true,  look:true  },
+  { name:'Steady', sigma:0.042,  pnoise:0.16,  banks:false, combos:false, look:false },
+  { name:'Sharp',  sigma:0.0125, pnoise:0.055, banks:true,  combos:false, look:true  },
+  { name:'Deadly', sigma:0.0040, pnoise:0.020, banks:true,  combos:true,  look:true  },
 ];
 
 const lowestOf = bs => { const o = objects(bs); let m = 99; for (let i = 0; i < o.length; i++) if (o[i].num < m) m = o[i].num; return m === 99 ? -1 : m; };
@@ -1202,7 +1204,7 @@ const V = { s:1, ox:0, oy:0, rot:0, zoom:1, px:0, py:0, vw:0, vh:0, dpr:1 };
 function fitView(vw, vh) {
   const ow = TW + 2 * RAILW, oh = TH + 2 * RAILW;
   V.rot = vw / vh >= 1 ? 0 : 1;
-  V.padT = 54; V.padB = 78; V.padX = 8;
+  V.padT = 54; V.padB = 60; V.padX = 8;   /* the stroke bar is gone; only the spin disc sits low */
   V.vw = vw; V.vh = vh;
   const availW = vw - V.padX * 2, availH = vh - V.padT - V.padB;
   V.base = V.rot ? Math.min(availW / oh, availH / ow) : Math.min(availW / ow, availH / oh);
@@ -1554,7 +1556,7 @@ function prefetch(n, i) {
 
 const G = {
   mode:null, balls:[], phase:'idle',
-  aim:0, power:0.42, side:0, ver:0,
+  aim:0, power:0, side:0, ver:0,
   ev:null, shots:0, par:0, n:2, num:1,
   score:0, left:0, called:-1, streak:0,
   turn:0, skill:1, low:1, broke:false, msg:'',
@@ -1606,9 +1608,10 @@ function fire() {
   G.lowBefore = G.low;
   updateHUD();
 }
-/* The stroke reads square but the table does not: squaring it puts the useful
-   half of the range in the bottom third of the pull. */
-const powerCurve = t => 0.055 + 0.945 * Math.pow(clamp(t, 0, 1), 1.75);
+/* A little softer than linear, so the first part of the pull has resolution —
+   but only a little, because on cloth this loose a quarter-power roll already
+   crosses the table and most shots live down there. */
+const powerCurve = t => 0.04 + 0.96 * Math.pow(clamp(t, 0, 1), 1.5);
 
 function settled() {
   const ev = G.ev;
@@ -1739,7 +1742,7 @@ function aiThink() {
     fire();
   }, 780);
 }
-const invPower = p => Math.pow(clamp((p - 0.055) / 0.945, 0, 1), 1 / 1.75);
+const invPower = p => Math.pow(clamp((p - 0.04) / 0.96, 0, 1), 1 / 1.5);
 
 /* ------------------------------------------------------------------- the run */
 
@@ -1804,7 +1807,7 @@ function startStudy(n, num) {
     G.par = g.par;
     G.phase = 'aim';
     G.aim = Math.atan2(E.objects(G.balls)[0].y - cueBall().y, E.objects(G.balls)[0].x - cueBall().x);
-    G.power = 0.42; G.side = 0; G.ver = 0;
+    G.power = 0; G.side = 0; G.ver = 0;
     syncControls(); updateHUD();
     document.getElementById('say').className = '';
     prefetch(n, num + 1);
@@ -1815,7 +1818,7 @@ function startNine(skill) {
   G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0; G.broke = false;
   G.balls = E.rack9(Math.random); G.low = 1; G.shots = 0;
   G.phase = 'inhand'; G.breakZone = true; G.fx = [];
-  G.aim = 0; G.power = 0.86; G.side = 0; G.ver = 0;
+  G.aim = 0; G.power = 0; G.side = 0; G.ver = 0;
   showScreen('play'); syncControls(); updateHUD();
   say('Place the cue behind the line, then break');
 }
@@ -1825,7 +1828,7 @@ function startRun() {
   G.balls = E.layoutRun(rngRun, 5, null); G.fx = [];
   G.called = pickPocket();
   G.phase = 'aim';
-  G.aim = 0; G.power = 0.42; G.side = 0; G.ver = 0;
+  G.aim = 0; G.power = 0; G.side = 0; G.ver = 0;
   showScreen('play'); syncControls(); updateHUD();
 }
 function replay() {
@@ -1847,11 +1850,11 @@ function nextThing() {
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
+const FONT = 'ui-sans-serif, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif';
 
 function showScreen(id) {
   ['home', 'books', 'play'].forEach(s => $(s).classList.toggle('on', s === id));
   const onTable = id === 'play';
-  $('stroke').style.display = onTable ? '' : 'none';
   $('spin').style.display = onTable ? '' : 'none';
   $('hintBtn').style.display = onTable ? '' : 'none';
   if (onTable) resize();
@@ -1871,31 +1874,24 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 140));
 
 /* ------------------------------------------------------------------- the HUD */
 
+let hudWas = '';
 function updateHUD() {
   const h = $('hud');
   const cell = (v, l, warn) => `<div class="hcell"><b class="${warn ? 'warn' : ''}">${v}</b><span>${l}</span></div>`;
+  let html = '';
   if (G.mode === 'study') {
-    h.innerHTML = cell('№' + G.num, BOOKS[G.n].name) + cell(G.shots + '/' + (G.par || '–'), 'shots', G.par && G.shots > G.par);
+    html = cell('№' + G.num, BOOKS[G.n].name) + cell(G.shots + '/' + (G.par || '–'), 'shots', G.par && G.shots > G.par);
   } else if (G.mode === 'nine') {
-    h.innerHTML = cell(G.turn === 0 ? 'You' : E.SKILLS[G.skill].name, 'turn') + cell(G.low > 0 ? G.low : '–', 'on');
+    html = cell(G.turn === 0 ? 'You' : E.SKILLS[G.skill].name, 'turn') + cell(G.low > 0 ? G.low : '–', 'on');
   } else if (G.mode === 'run') {
-    h.innerHTML = cell(G.shots, 'shots', G.shots <= 2) + cell(G.score, 'score') + cell(DB.run.best, 'best');
+    html = cell(G.shots, 'shots', G.shots <= 2) + cell(G.score, 'score') + cell(DB.run.best, 'best');
   }
+  if (html !== hudWas) { h.innerHTML = html; hudWas = html; }
   $('hintBtn').style.display = (G.phase === 'aim' && !G.over) ? '' : 'none';
   $('fitBtn').classList.toggle('on', V.zoom > 1.02 || Math.abs(V.px) > 2 || Math.abs(V.py) > 2);
 }
 
 function syncControls() {
-  const bar = $('stroke'), grip = $('strokeGrip'), fill = $('strokeFill');
-  const Wb = bar.clientWidth || 300;
-  const left = 8 + (1 - clamp(G.power, 0, 1)) * (Wb - 50);
-  grip.style.left = left + 'px';
-  fill.style.left = (left + 17) + 'px';
-  fill.style.width = Math.max(0, Wb - left - 17) + 'px';
-  const lbl = $('strokeLbl');
-  lbl.textContent = G.power > 0.02 ? Math.round(powerCurve(G.power) * 100) + '%' : 'Pull back';
-  lbl.style.justifyContent = G.power > 0.55 ? 'flex-end' : 'flex-start';
-  bar.classList.toggle('armed', G.power > 0.02);
   $('spinDot').style.transform = `translate(${(G.side * 14).toFixed(1)}px, ${(-G.ver * 14).toFixed(1)}px)`;
 }
 
@@ -1915,6 +1911,28 @@ function predictNow(hit) {
   G.pred = E.predict(G.balls, { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side });
   G.predKey = key;
   return G.pred;
+}
+
+/* On cloth this loose a ball can run three table lengths through four cushions,
+   and drawing all of it turns the aid into a scribble across the whole table.
+   The line is cut at a length that still answers the question — where does this
+   go, and does it drop — and the pocket lighting up says the rest. */
+function polyUpTo(g, pts, from, maxLen) {
+  const a = Math.max(0, from | 0);
+  if (pts.length - a < 2) return false;
+  g.beginPath(); g.moveTo(pts[a].x, pts[a].y);
+  let run = 0, cut = false;
+  for (let i = a + 1; i < pts.length; i++) {
+    const seg = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (run + seg > maxLen) {
+      const k = (maxLen - run) / (seg || 1);
+      g.lineTo(pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k, pts[i - 1].y + (pts[i].y - pts[i - 1].y) * k);
+      cut = true; break;
+    }
+    run += seg; g.lineTo(pts[i].x, pts[i].y);
+  }
+  g.stroke();
+  return !cut;
 }
 
 function poly(g, pts, from, to) {
@@ -1962,13 +1980,15 @@ function drawAim(g) {
     if (p.hitAt > 0) {
       if (p.obj && p.obj.length > 1) {
         g.strokeStyle = C.pa; g.globalAlpha = 0.9; g.lineWidth = PX(2.2);
-        if (poly(g, p.obj, 0, p.obj.length - 1)) g.stroke();
-        const last = p.obj[p.obj.length - 1];
-        g.globalAlpha = 0.55; g.fillStyle = C.pa;
-        g.beginPath(); g.arc(last.x, last.y, PX(2.8), 0, TAU); g.fill();
+        const whole = polyUpTo(g, p.obj, 0, 520);
+        if (whole) {
+          const last = p.obj[p.obj.length - 1];
+          g.globalAlpha = 0.55; g.fillStyle = C.pa;
+          g.beginPath(); g.arc(last.x, last.y, PX(2.8), 0, TAU); g.fill();
+        }
       }
       g.strokeStyle = C.ink; g.globalAlpha = 0.26; g.lineWidth = PX(1.5);
-      if (poly(g, p.cue, p.hitAt, p.cue.length - 1)) g.stroke();
+      polyUpTo(g, p.cue, p.hitAt, 340);
     } else if (p.cue.length > 2 && !p.scratch) {
       /* it does not get there. Say so where it stops, rather than drawing a
          line that promises a contact this stroke cannot make. */
@@ -2008,10 +2028,10 @@ function drawAim(g) {
 
 function drawCueStick(g, c) {
   if (G.phase !== 'aim' && G.phase !== 'aithink') return;
-  const pull = 20 + powerCurve(G.power) * 95;
+  const pull = 20 + powerCurve(G.power) * 150;
   const dx = -Math.cos(G.aim), dy = -Math.sin(G.aim);
   const x0 = c.x + dx * (BR + pull), y0 = c.y + dy * (BR + pull);
-  const x1 = c.x + dx * (BR + pull + 420), y1 = c.y + dy * (BR + pull + 420);
+  const x1 = c.x + dx * (BR + pull + 300), y1 = c.y + dy * (BR + pull + 300);
   g.globalAlpha = G.phase === 'aithink' ? 0.5 : 0.8;
   g.lineCap = 'butt';
   g.strokeStyle = C.dim; g.lineWidth = PX(7);
@@ -2020,7 +2040,24 @@ function drawCueStick(g, c) {
   g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + dx * 40, y0 + dy * 40); g.stroke();
   g.strokeStyle = C.pa; g.globalAlpha = 0.9;
   g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + dx * 7, y0 + dy * 7); g.stroke();
-  g.globalAlpha = 1; g.lineCap = 'round';
+  g.lineCap = 'round';
+  /* the gap the cue has been drawn back through, and how hard that is — read
+     where you are looking, rather than on a bar at the bottom of the screen */
+  if (G.power > 0.015) {
+    g.strokeStyle = C.pa; g.globalAlpha = 0.5; g.lineWidth = PX(1.6);
+    g.setLineDash([PX(3), PX(4)]);
+    g.beginPath(); g.moveTo(c.x + dx * BR, c.y + dy * BR); g.lineTo(x0, y0); g.stroke();
+    g.setLineDash([]);
+    const px = c.x + dx * (BR + pull * 0.5), py = c.y + dy * (BR + pull * 0.5);
+    const lab = Math.round(powerCurve(G.power) * 100) + '%';
+    g.globalAlpha = 1;
+    g.font = '600 ' + PX(11).toFixed(2) + 'px ' + FONT;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = PX(3.5); g.strokeStyle = C.bed; g.lineJoin = 'round';
+    if (V.rot) { g.save(); g.translate(px, py); g.rotate(Math.PI / 2); g.strokeText(lab, 0, 0); g.fillStyle = C.pa; g.fillText(lab, 0, 0); g.restore(); }
+    else { g.strokeText(lab, px, py); g.fillStyle = C.pa; g.fillText(lab, px, py); }
+  }
+  g.globalAlpha = 1;
 }
 
 /* --------------------------------------------------------------------- effects */
@@ -2068,10 +2105,11 @@ function tick(ts) {
 
   if (G.phase === 'rolling') {
     G.rollT += dt;
-    /* real time to begin with; a long dying roll is hurried along, because
-       watching a ball creep for four seconds is not the game */
-    const scale = 1.3 * (G.rollT > 3.0 ? Math.min(3.2, 1 + (G.rollT - 3.0) * 1.2) : 1);
-    const steps = Math.min(64, Math.max(1, Math.round(dt * scale / E.STEP)));
+    /* Real time while it matters, then hurried. On cloth this loose a ball can
+       roll for eight seconds, and everything worth watching — the contact, the
+       pot, the cue ball's answer to it — is over inside the first two. */
+    const scale = 1.35 * clamp(1 + (G.rollT - 1.4) * 0.85, 1, 4.2);
+    const steps = Math.min(96, Math.max(1, Math.round(dt * scale / E.STEP)));
     for (let i = 0; i < steps; i++) {
       E.advance(G.balls, G.ev, soundSink);
       const c = cueBall();
@@ -2172,6 +2210,7 @@ cv.addEventListener('pointerdown', e => {
   pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
   audio();
   if (pointers.size === 2) {
+    stroke = null; G.power = 0;              /* a second finger is a zoom, not a stroke */
     const [a, b] = [...pointers.values()];
     pinch = { d:Math.hypot(a.x - b.x, a.y - b.y), z:V.zoom, mx:(a.x + b.x) / 2, my:(a.y + b.y) / 2, px:V.px, py:V.py };
   } else if (pointers.size === 1) {
@@ -2195,6 +2234,7 @@ cv.addEventListener('pointermove', e => {
 function up(e) {
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinch = null;
+  if (pointers.size === 0 && G.phase === 'aim') releaseStroke();
   if (G.phase === 'inhand' && pointers.size === 0) {
     const c = cueBall();
     if (placeOK(c.x, c.y)) {
@@ -2207,53 +2247,48 @@ function up(e) {
 cv.addEventListener('pointerup', up);
 cv.addEventListener('pointercancel', up);
 
+/* The stroke.
+
+   Your finger is behind the cue ball, where a hand would be: the ball goes the
+   way you are pointing *away* from, and the further you pull, the harder it
+   goes. Power counts from where the drag began, not from the ball, so you may
+   put a finger down anywhere — near for a big swing, far out for a long lever
+   and a finer angle — and still start from nothing. Let go to hit; let go
+   without having pulled and you have only aimed. */
+const MAXPULL = 300;                            /* table units of draw for a full stroke */
+let stroke = null;
+
 function handleOne(px, py, down) {
   if (G.over) return;
   const t = toTable(px, py);
   if (G.phase === 'inhand') {
     const c = cueBall();
-    const nx = clamp(t.x, BR + 1, TW - BR - 1), ny = clamp(t.y, BR + 1, TH - BR - 1);
-    c.x = nx; c.y = ny; G.predKey = '';
+    c.x = clamp(t.x, BR + 1, TW - BR - 1); c.y = clamp(t.y, BR + 1, TH - BR - 1);
+    G.predKey = '';
     return;
   }
   if (G.phase !== 'aim') return;
   const c = cueBall();
   if (!c.live) return;
   const dx = t.x - c.x, dy = t.y - c.y;
-  if (Math.hypot(dx, dy) < 24) return;         /* too close to mean anything */
-  G.aim = Math.atan2(dy, dx);
-  G.hintShot = null;
+  const d = Math.hypot(dx, dy);
+  if (d < 8) return;                            /* right on top of the ball means nothing */
+  G.aim = Math.atan2(-dy, -dx);
+  clearHint();
+  if (down) { stroke = { from:d }; G.power = 0; }
+  else if (stroke) {
+    G.power = clamp((d - stroke.from) / MAXPULL, 0, 1);
+    if (G.power > (stroke.peak || 0) + 0.06) { stroke.peak = G.power; sfx('tick'); }
+  }
   updateHUD();
 }
-
-/* the stroke: pull it back and let go */
-(function () {
-  const bar = $('stroke');
-  let drag = null;
-  bar.addEventListener('pointerdown', e => {
-    if (G.phase !== 'aim' || G.over) return;
-    bar.setPointerCapture(e.pointerId);
-    bar.classList.add('pulling');
-    drag = { x:e.clientX, p:G.power };
-    audio();
-  });
-  bar.addEventListener('pointermove', e => {
-    if (!drag) return;
-    const span = Math.max(60, bar.clientWidth - 50);
-    G.power = clamp(drag.p + (drag.x - e.clientX) / span, 0, 1);
-    syncControls();
-    if (Math.abs(G.power - (drag.last || 0)) > 0.08) { drag.last = G.power; sfx('tick'); }
-  });
-  const done = () => {
-    if (!drag) return;
-    drag = null; bar.classList.remove('pulling');
-    if (G.power > 0.03) fire();
-    G.power = Math.max(G.power, 0.12);
-    syncControls();
-  };
-  bar.addEventListener('pointerup', done);
-  bar.addEventListener('pointercancel', done);
-})();
+function releaseStroke() {
+  if (!stroke) return;
+  const p = G.power;
+  stroke = null;
+  if (p > 0.045) fire();
+  else G.power = 0;
+}
 
 /* the spin disc: it is a cue ball, seen from where you are standing */
 (function () {
@@ -2371,17 +2406,20 @@ function sheetSkill() {
 function sheetHow() {
   openSheet(`
     <div class="sh1">How it works</div>
-    <p><b>Aiming.</b> Touch anywhere on the cloth and the cue points from the ball
-    through your finger — so the further out you touch, the finer the angle. The
-    dashed line and the ring are geometry: the ring is where the cue ball has to be
-    for the contact you are asking for, and an object ball always leaves along the
-    line joining the two centres. The solid line is not geometry — it is this
-    stroke, at this speed, with this spin, run through the physics the table itself
-    runs, which is why it stops where the ball stops. Ask for a contact the stroke
-    cannot reach and it draws a ring where the cue ball actually dies instead.</p>
-    <p><b>The stroke.</b> Pull the bar back and let go. Pull further for more. The
-    faint line past the contact is where the cue ball takes itself afterwards —
-    that, more than the pot, is what the next shot is made of.</p>
+    <p><b>The stroke.</b> Put a finger on the cloth <i>behind</i> the cue ball, where
+    a hand would be, and pull away from it. The ball goes the way you are pulling
+    away from, and the further you pull the harder it goes. Let go to hit. Let go
+    without having pulled and you have only aimed. Power counts from wherever you put
+    your finger down, not from the ball, so you can start close for a quick swing or
+    far out for a long lever and a finer angle.</p>
+    <p><b>The lines.</b> The dashed line and the ring are geometry: the ring is where
+    the cue ball has to be for the contact you are asking for, and an object ball
+    always leaves along the line joining the two centres. The solid line is not
+    geometry — it is this stroke, at this speed, with this spin, run through the
+    physics the table itself runs, which is why it stops where the ball stops. Ask for
+    a contact the stroke cannot reach and it draws a ring where the cue ball actually
+    dies instead. The faint line past the contact is where the cue ball takes itself
+    afterwards — that, more than the pot, is what the next shot is made of.</p>
     <p><b>Spin.</b> The white disc is a cue ball seen from behind. Strike it high to
     follow through, low to draw back, off to one side to bend off a cushion. Tap the
     middle to go back to centre ball.</p>

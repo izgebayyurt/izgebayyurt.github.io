@@ -36,12 +36,23 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   either side and counting what still drops, so it declines thin cuts it has no
   business taking, plays position, and ducks a coin-flip when it is good enough to
   know. **The run** is endless: eight shots, every ball down buys another, two in a
-  stroke buys three, the ringed pocket pays double. The physics is one function the
-  screen and the prover both call, so the table you shoot on is the table par was
-  measured on. Slip — the contact patch against the cloth — is tracked separately from
-  velocity, which is where draw, follow, stun and swerve come from rather than being
-  special-cased; an impulse moves slip by exactly the vector it moves velocity by,
-  which is why a drawn cue ball comes back *after* it has hit something. Cushions are
+  stroke buys three, the ringed pocket pays double. The stroke is the cue itself: put a
+  finger on the cloth behind the ball, where a hand would be, pull away from it — the
+  ball goes the way you pull away from, and the further you pull the harder it goes —
+  and let go to hit; let go without pulling and you have only aimed. Power counts from
+  where the finger went down rather than from the ball, so a long lever and a fine
+  angle cost nothing. The physics is one function the screen and the prover both call,
+  so the table you shoot on is the table par was measured on, and its numbers are
+  measured rather than tuned by ear: the bed is 100 inches, so a metre is 370 units,
+  and rolling resistance is 0.010, sliding friction 0.20, ball-on-ball 0.96, a cushion
+  0.85 slow and 0.72 hard because rubber gets deader the harder you hit it. The
+  consequence worth having is that a ball on cloth barely slows down — what stops it is
+  cushions, not felt — so shots run two and three table lengths and draw reaches half a
+  table, where before they were tuned to die on their own and died far too fast. Slip —
+  the contact patch against the cloth — is tracked separately from velocity, which is
+  where draw, follow, stun and swerve come from rather than being special-cased; an
+  impulse moves slip by exactly the vector it moves velocity by, which is why a drawn
+  cue ball comes back *after* it has hit something. Cushions are
   capsules, so their ends are real jaws a ball can rattle in; a corner takes anything
   that gets close, but a side pocket wants the ball past the nose, so a ball rolling
   the length of the long rail sails by it. Aiming is honest about which half is which:
