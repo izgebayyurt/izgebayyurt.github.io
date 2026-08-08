@@ -1,0 +1,2504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Cushion" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<!-- Two theme-colors keyed to the system scheme get the very first frame right,
+     before any script runs; once a theme is actually chosen the script writes
+     both to the same value, or the media query keeps answering for the one
+     nobody picked. Same trick as Tapa. -->
+<meta name="theme-color" content="#ece9e1" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#191519" media="(prefers-color-scheme: dark)" />
+<title>Cushion</title>
+<meta name="description" content="Cushion — pocket billiards on paper. Trick-shot studies proved clearable by the engine that plays them, nine-ball against a machine that aims like a person, and an endless run." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ece9e1'/%3E%3Ccircle cx='11' cy='13' r='5.4' fill='%23fbf7ee' stroke='%232a2730' stroke-width='1.8'/%3E%3Ccircle cx='22' cy='19' r='5.4' fill='%23ef4a5a' stroke='%232a2730' stroke-width='1.8'/%3E%3C/svg%3E" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<style>
+  :root {
+    --pg:#ece9e1;              /* paper — the page, and the rail caps */
+    --bed:#e3ded0;             /* the bed: paper with the light knocked out of it */
+    --bed2:#dbd5c5;            /* the bed's far edge, for the one soft gradient */
+    --pi:#2a2730;              /* ink — a purple-black, never a neutral one */
+    --rail:#2a2730;            /* the cushions are ink; they are the drawing */
+    --pocket:#211e27;
+    --pa:#7a5e9a;              /* the one accent: aim, and the ball that is on */
+    --pw:#c85f18;             /* the clear moment, and nothing else */
+    --sight:#ece9e1;           /* the rail diamonds, which must read on the rail */
+    --ballline:#231f29;        /* every ball is outlined; this is that outline */
+    --ballrim:rgba(255,255,255,0);
+    --cue:#fbf7ee;
+    --pr:rgba(42,39,48,0.13);
+    --pd:rgba(42,39,48,0.55);
+    --pq:rgba(42,39,48,0.32);
+    --pfaint:rgba(42,39,48,0.20);
+    --chrome:rgba(240,238,231,0.92);   /* the discs of paper the controls float on */
+    --shadow:rgba(42,39,48,0.17);
+    --hard:rgba(42,39,48,0.85);        /* Huemeld's hard drop shadow, calmed down */
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",ui-serif,Georgia,serif;
+    --sans:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --pop:cubic-bezier(.34,1.56,.64,1);
+    --calm:cubic-bezier(.4,0,.2,1);
+    color-scheme:light;
+  }
+  /* The bands the page does not paint — status bar, gesture bar, overscroll
+     gutter — belong to the browser, and it picks their colour from
+     color-scheme, not from anything in the stylesheet. */
+  @media (prefers-color-scheme: dark) { :root { color-scheme:dark; } }
+  html[data-theme="paper"] { color-scheme:light; }
+  html[data-theme="slate"] { color-scheme:dark; }
+  /* Slate is derived from paper rather than inverted: the ground keeps the
+     purple bias, the bed stays a shade above it, and the balls keep their
+     pigment — they gain a light rim so they still cut away from the cloth. */
+  html[data-theme="slate"] {
+    --pg:#191519;
+    --bed:#2e2735;
+    --bed2:#251f2b;
+    --pi:#ded7c8;
+    --rail:#0c0a0f;
+    --pocket:#040305;
+    --sight:#7c7186;
+    --pa:#a888c8;
+    --pw:#ff8a4c;
+    --ballline:#0c0a0f;
+    --ballrim:rgba(255,255,255,0.16);
+    --cue:#f2ece0;
+    --pr:rgba(222,215,200,0.14);
+    --pd:rgba(222,215,200,0.56);
+    --pq:rgba(222,215,200,0.34);
+    --pfaint:rgba(222,215,200,0.22);
+    --chrome:rgba(38,32,39,0.92);
+    --shadow:rgba(0,0,0,0.5);
+    --hard:rgba(0,0,0,0.7);
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--pg); color:var(--pi);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+    touch-action:manipulation;
+  }
+  #app { position:fixed; inset:0; }
+  button { font-family:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--pa); outline-offset:2px; }
+
+  .screen {
+    position:absolute; inset:0; display:none; flex-direction:column;
+    background:var(--pg);
+    padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+  }
+  .screen.on { display:flex; }
+  .scroll { flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; }
+
+  /* ---------- shared chrome ---------- */
+  .bar { flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:14px 12px 8px; min-height:44px; }
+  .icon {
+    width:32px; height:32px; display:grid; place-items:center; color:var(--pd);
+    font-size:18px; line-height:1; cursor:pointer; background:none; border:0;
+    padding:0; border-radius:9px;
+  }
+  .icon:active { background:var(--pr); }
+  .bartitle { font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--pd); font-weight:500; }
+  .grow { margin-left:auto; }
+  .pbtn {
+    display:block; width:100%; padding:14px; border-radius:13px; border:0;
+    background:var(--pi); color:var(--pg); font-size:14.5px; font-weight:600; cursor:pointer;
+  }
+  .pbtn.ghost { background:transparent; color:var(--pd); font-weight:500; border:1px solid var(--pr); }
+  .pbtn:active { opacity:.85; }
+
+  /* ---------- home ---------- */
+  #home .inner { padding:16px 22px 22px; display:flex; flex-direction:column; min-height:100%; }
+  .wordmark { font-family:var(--serif); font-size:42px; line-height:1; font-weight:600; letter-spacing:-0.015em; }
+  .wordsub { font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--pd); margin-top:8px; }
+  .modes { margin-top:26px; display:flex; flex-direction:column; gap:11px; }
+  /* A mode card is Huemeld's confidence at Tapa's volume: a real outline and a
+     hard shadow that the press collapses, but in ink on paper, not candy. */
+  .mode {
+    display:grid; grid-template-columns:54px minmax(0,1fr) auto; gap:14px; align-items:center;
+    padding:13px 15px 13px 13px; text-align:left; width:100%; cursor:pointer; color:inherit;
+    background:var(--chrome); border:1.5px solid var(--pfaint); border-radius:16px;
+    box-shadow:0 3px 0 var(--pr);
+    transition:transform .09s var(--calm), box-shadow .09s var(--calm);
+  }
+  .mode:active { transform:translateY(3px); box-shadow:0 0 0 var(--pr); }
+  .mode canvas { display:block; width:54px; height:54px; }
+  .mode .n { font-family:var(--serif); font-size:19px; font-weight:600; line-height:1.1; }
+  .mode .d { font-size:11px; color:var(--pd); margin-top:3px; line-height:1.35; }
+  .mode .c { font-family:var(--serif); font-size:13.5px; color:var(--pq); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .homefoot { margin-top:auto; padding-top:22px; display:flex; gap:20px; flex-wrap:wrap; }
+  .homefoot button {
+    background:none; border:0; padding:6px 0; cursor:pointer;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd);
+  }
+
+  /* ---------- book list (studies) ---------- */
+  #books .inner { padding:6px 22px 26px; }
+  .booktitle { font-family:var(--serif); font-size:28px; font-weight:600; margin-top:4px; }
+  .booknote { font-size:11.5px; color:var(--pd); margin-top:7px; line-height:1.45; }
+  .books { margin-top:20px; display:flex; flex-direction:column; }
+  .book {
+    display:grid; grid-template-columns:42px minmax(0,1fr) auto; gap:14px; align-items:center;
+    padding:14px 0; border-top:1px solid var(--pr); background:none; border-left:0; border-right:0;
+    border-bottom:0; cursor:pointer; text-align:left; width:100%; color:inherit;
+  }
+  .books .book:last-child { border-bottom:1px solid var(--pr); }
+  .book:active { background:var(--pr); }
+  .book canvas { display:block; width:42px; height:42px; }
+  .book .n { font-family:var(--serif); font-size:17px; font-weight:600; line-height:1.15; }
+  .book .d { font-size:10.5px; color:var(--pd); margin-top:2px; }
+  .book .c { font-family:var(--serif); font-size:13.5px; color:var(--pq); font-variant-numeric:tabular-nums; }
+
+  /* ---------- the table ---------- */
+  #play { background:var(--pg); }
+  #cv { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+  /* Every control floats over the felt on its own disc of paper, so the table
+     never gives up layout space to chrome. */
+  .float {
+    position:absolute; z-index:5; background:var(--chrome); color:var(--pi);
+    border:1px solid var(--pfaint); border-radius:999px;
+    box-shadow:0 2px 8px var(--shadow); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+  }
+  .fbtn {
+    width:38px; height:38px; display:grid; place-items:center; cursor:pointer; padding:0;
+    font-size:16px; line-height:1;
+  }
+  .fbtn:active { transform:scale(.93); }
+  #backBtn { top:calc(env(safe-area-inset-top) + 10px); left:10px; }
+  #menuBtn { top:calc(env(safe-area-inset-top) + 10px); right:10px; }
+  #hud {
+    top:calc(env(safe-area-inset-top) + 10px); left:50%; transform:translateX(-50%);
+    height:38px; display:flex; align-items:center; gap:0; padding:0 4px; max-width:calc(100% - 120px);
+  }
+  .hcell { padding:0 11px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; }
+  .hcell + .hcell { border-left:1px solid var(--pr); }
+  .hcell b { font-family:var(--serif); font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .hcell b.warn { color:var(--pw); }
+  .hcell span { font-size:7.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--pd); margin-top:3px; font-weight:600; }
+
+  /* the stroke control: press and pull back, release to hit */
+  #stroke {
+    position:absolute; z-index:6; left:50%; transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 16px);
+    width:min(300px, 68vw); height:52px; border-radius:26px;
+    background:var(--chrome); border:1px solid var(--pfaint);
+    box-shadow:0 3px 12px var(--shadow); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+    overflow:hidden; touch-action:none; cursor:grab;
+  }
+  #strokeFill { position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--pa); opacity:.22; }
+  #strokeLbl {
+    position:absolute; inset:0 16px; display:flex; align-items:center; justify-content:flex-start;
+    pointer-events:none; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--pd); font-weight:600; font-variant-numeric:tabular-nums;
+  }
+  #strokeGrip {
+    position:absolute; top:6px; bottom:6px; width:3px; border-radius:2px; background:var(--pi);
+    left:8px; pointer-events:none; transition:left .18s var(--pop); opacity:.75;
+  }
+  #stroke.pulling #strokeGrip { transition:none; }
+  #stroke.pulling #strokeFill { transition:none; }
+  #stroke.armed #strokeLbl { color:var(--pa); }
+
+  /* the spin disc: a cue ball you can touch anywhere on */
+  #spin {
+    position:absolute; z-index:6; right:12px; bottom:calc(env(safe-area-inset-bottom) + 16px);
+    width:54px; height:54px; border-radius:50%; background:var(--cue);
+    border:1.5px solid var(--ballline); box-shadow:0 3px 10px var(--shadow);
+    touch-action:none; cursor:pointer;
+  }
+  #spinDot {
+    position:absolute; width:15px; height:15px; border-radius:50%; background:var(--pa);
+    left:50%; top:50%; margin:-7.5px 0 0 -7.5px; pointer-events:none;
+    box-shadow:0 0 0 1.5px var(--cue); transition:transform .12s var(--pop);
+  }
+  #spin::after {
+    content:""; position:absolute; inset:9px; border-radius:50%;
+    border:1px dashed rgba(42,39,48,.22); pointer-events:none;
+  }
+  #hintBtn { right:12px; bottom:calc(env(safe-area-inset-bottom) + 80px); }
+  #fitBtn {
+    left:12px; bottom:calc(env(safe-area-inset-bottom) + 16px); width:auto; height:32px;
+    padding:0 14px; display:none; place-items:center; cursor:pointer;
+    font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--pd); font-weight:600;
+  }
+  #fitBtn.on { display:grid; }
+
+  /* a line of prose that says what just happened, and then stops saying it */
+  #say {
+    position:absolute; z-index:7; left:50%; transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 82px); pointer-events:none;
+    font-size:12px; color:var(--pi); background:var(--chrome); border:1px solid var(--pfaint);
+    padding:7px 15px; border-radius:999px; box-shadow:0 2px 8px var(--shadow);
+    opacity:0; transition:opacity .3s var(--calm), transform .3s var(--pop); white-space:nowrap;
+    max-width:calc(100vw - 40px); overflow:hidden; text-overflow:ellipsis;
+  }
+  #say.on { opacity:1; }
+  #say.bad { color:var(--pw); }
+
+  /* ---------- sheets ---------- */
+  #veil {
+    position:absolute; inset:0; z-index:20; background:rgba(0,0,0,.34);
+    display:none; align-items:flex-end; justify-content:center;
+    padding-bottom:env(safe-area-inset-bottom); backdrop-filter:blur(2px);
+  }
+  #veil.on { display:flex; }
+  .sheet {
+    width:100%; max-width:460px; background:var(--pg); color:var(--pi);
+    border-radius:20px 20px 0 0; padding:8px 22px calc(24px + env(safe-area-inset-bottom));
+    max-height:86vh; overflow-y:auto; animation:rise .26s var(--pop);
+  }
+  @keyframes rise { from { transform:translateY(24px); opacity:0; } to { transform:none; opacity:1; } }
+  .grab { width:36px; height:4px; border-radius:2px; background:var(--pfaint); margin:6px auto 14px; }
+  .sh1 { font-family:var(--serif); font-size:23px; font-weight:600; }
+  .sh2 { font-size:12px; color:var(--pd); margin-top:6px; line-height:1.5; }
+  .sheet p { font-size:13px; line-height:1.6; color:var(--pd); margin:12px 0 0; }
+  .sheet p b, .sheet p strong { color:var(--pi); font-weight:600; }
+  .sheet .rowbtns { margin-top:18px; display:flex; flex-direction:column; gap:9px; }
+  .stat { display:flex; justify-content:space-between; align-items:baseline; padding:9px 0; border-top:1px solid var(--pr); font-size:12.5px; color:var(--pd); }
+  .stat b { font-family:var(--serif); font-size:16px; color:var(--pi); font-weight:600; font-variant-numeric:tabular-nums; }
+  .seg { display:flex; gap:7px; margin-top:14px; }
+  .seg button {
+    flex:1; padding:10px 4px; border-radius:11px; border:1px solid var(--pr); background:none;
+    font-size:12px; font-weight:600; color:var(--pd); cursor:pointer;
+  }
+  .seg button.on { background:var(--pi); color:var(--pg); border-color:var(--pi); }
+  .numgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:16px; }
+  .numgrid button {
+    aspect-ratio:1; border-radius:12px; border:1px solid var(--pr); background:none; cursor:pointer;
+    font-family:var(--serif); font-size:15px; font-weight:600; color:var(--pi); position:relative;
+    font-variant-numeric:tabular-nums;
+  }
+  .numgrid button.done { background:var(--pi); color:var(--pg); border-color:var(--pi); }
+  .numgrid button.here { outline:2px solid var(--pa); outline-offset:1px; }
+  .pager { display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+  .pager button { background:none; border:0; color:var(--pd); font-size:13px; padding:8px 12px; cursor:pointer; }
+  .pager span { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--pq); }
+
+  /* the clear moment: a wave of warm light crossing the sheet */
+  .win .sh1 { color:var(--pw); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="home" class="screen">
+    <div class="scroll"><div class="inner">
+      <div class="wordmark">Cushion</div>
+      <div class="wordsub">Pocket billiards on paper</div>
+      <div class="modes" id="modeList"></div>
+      <div class="homefoot">
+        <button id="howBtn">How</button>
+        <button id="themeBtn">Theme</button>
+        <button id="soundBtn">Sound</button>
+      </div>
+    </div></div>
+  </section>
+
+  <section id="books" class="screen">
+    <div class="bar">
+      <button class="icon" id="booksBack" aria-label="Back">&#8592;</button>
+      <div class="bartitle">Studies</div>
+    </div>
+    <div class="scroll"><div class="inner">
+      <div class="booktitle">Studies</div>
+      <div class="booknote">
+        Clear the table inside par. Every study is generated on this device and then
+        proved: par is the shortest line the engine could actually shoot, centre-ball,
+        with no spin at all. Spin is yours to use — it is never the answer.
+      </div>
+      <div class="books" id="bookList"></div>
+    </div></div>
+  </section>
+
+  <section id="play" class="screen">
+    <canvas id="cv"></canvas>
+    <button class="float fbtn" id="backBtn" aria-label="Back">&#8592;</button>
+    <div class="float" id="hud"></div>
+    <button class="float fbtn" id="menuBtn" aria-label="Menu">&#8942;</button>
+    <button class="float" id="fitBtn">Fit</button>
+    <button class="float fbtn" id="hintBtn" aria-label="Hint">?</button>
+    <div id="say"></div>
+    <div id="spin"><div id="spinDot"></div></div>
+    <div id="stroke">
+      <div id="strokeFill"></div>
+      <div id="strokeGrip"></div>
+      <div id="strokeLbl">Pull back</div>
+    </div>
+  </section>
+
+  <div id="veil"><div class="sheet" id="sheet"></div></div>
+</div>
+<script>
+'use strict';
+/* ===========================================================================
+   Cushion — the engine.
+
+   Everything below is inside one function with no references to anything
+   outside it, because the generator worker is built by stringifying it. One
+   copy of the physics, therefore: the table you shoot on, the table the
+   opponent thinks on, and the table a study is proved on are the same table.
+   If they were not, par would be a guess.
+   =========================================================================== */
+function CUSHION_ENGINE() {
+'use strict';
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const hyp = Math.hypot;
+
+/* ---------------------------------------------------------------- geometry */
+
+const W = 940, H = 470;       /* the bed, corner to corner, in table units */
+const R = 12.5;               /* ball radius — a shade fat for real, and legible for it */
+const JAW = 5.5;              /* the rounded nose of a cushion */
+const RAIL_HIT = R + JAW;     /* so a ball's face rests exactly on the bed edge */
+const CORNER_JAW = 25;        /* how far short of a corner the cushion stops */
+const SIDE_JAW = 22;          /* half the side pocket's mouth */
+const POT_CORNER = 28;        /* a corner takes anything that gets this close */
+const SIDE_LIP = 3.5;         /* a side pocket wants the ball past the nose */
+
+/* Cushion segments live on the nose line, JAW outside the bed, and are
+   collided as capsules — which makes the ends into real jaws that a ball can
+   rattle in, for free. */
+const RAILS = [
+  { ax:CORNER_JAW,   ay:-JAW,  bx:W/2-SIDE_JAW, by:-JAW  },
+  { ax:W/2+SIDE_JAW, ay:-JAW,  bx:W-CORNER_JAW, by:-JAW  },
+  { ax:CORNER_JAW,   ay:H+JAW, bx:W/2-SIDE_JAW, by:H+JAW },
+  { ax:W/2+SIDE_JAW, ay:H+JAW, bx:W-CORNER_JAW, by:H+JAW },
+  { ax:-JAW,   ay:CORNER_JAW, bx:-JAW,   by:H-CORNER_JAW },
+  { ax:W+JAW,  ay:CORNER_JAW, bx:W+JAW,  by:H-CORNER_JAW },
+];
+
+/* A corner is a circle; a side pocket is a mouth you must go past the nose of,
+   so a ball rolling the length of the long rail sails by it, as it should. */
+const POCKETS = [
+  { x:0,   y:0,   kind:'c' }, { x:W/2, y:0, kind:'s', dir:-1 }, { x:W,   y:0,   kind:'c' },
+  { x:0,   y:H,   kind:'c' }, { x:W/2, y:H, kind:'s', dir: 1 }, { x:W,   y:H,   kind:'c' },
+];
+
+function inPocket(b) {
+  for (let i = 0; i < 6; i++) {
+    const p = POCKETS[i];
+    if (p.kind === 'c') {
+      if (hyp(b.x - p.x, b.y - p.y) < POT_CORNER) return i;
+    } else {
+      const past = p.dir < 0 ? (b.y < SIDE_LIP) : (b.y > H - SIDE_LIP);
+      if (past && Math.abs(b.x - p.x) < SIDE_JAW + 2.5) return i;
+    }
+  }
+  /* Nothing should ever leave the bed without falling in, but if the numbers
+     ever misbehave, the nearest pocket eats it rather than the ball escaping
+     to somewhere the renderer will happily draw it. */
+  if (b.x < -60 || b.x > W + 60 || b.y < -60 || b.y > H + 60) {
+    let best = 0, bd = 1e9;
+    for (let i = 0; i < 6; i++) { const d = hyp(b.x - POCKETS[i].x, b.y - POCKETS[i].y); if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  return -1;
+}
+
+/* ------------------------------------------------------------------ feeling
+   These eight numbers are the whole game. Everything else is bookkeeping. */
+
+const A_ROLL  = 165;    /* rolling drag: a firm shot runs about two tables */
+const A_SLIDE = 1150;   /* sliding drag — the shorter this is, the further draw reaches */
+const E_BB    = 0.95;   /* ball on ball */
+const E_CU    = 0.76;   /* ball on cushion, along the normal */
+const T_CU    = 0.90;   /* and along it */
+const SPIN_CU = 0.28;   /* how much side spin the cushion converts into travel */
+const V_MAX   = 2150;   /* a full-power stroke */
+const REST_V  = 7;      /* below this a ball has stopped, and says so */
+
+const STEP = 1 / 240;
+
+function ball(num, x, y) {
+  return { num, x, y, vx:0, vy:0, sx:0, sy:0, live:true, pocket:-1 };
+}
+function cloneBalls(bs) {
+  const o = new Array(bs.length);
+  for (let i = 0; i < bs.length; i++) {
+    const b = bs[i];
+    o[i] = { num:b.num, x:b.x, y:b.y, vx:b.vx, vy:b.vy, sx:b.sx, sy:b.sy, live:b.live, pocket:b.pocket };
+  }
+  return o;
+}
+const cueOf = bs => bs[0];
+const objects = bs => bs.filter((b, i) => i > 0 && b.live);
+
+/* --------------------------------------------------------------- one impulse
+
+   Slip is the velocity of the contact patch against the cloth. Rolling is
+   slip zero; everything interesting is slip not zero. A sudden change in
+   linear velocity does not touch the ball's rotation, so an impulse moves
+   slip by exactly the same vector it moves velocity by — which is the whole
+   reason a drawn cue ball comes back after it has hit something. */
+function impulse(b, dvx, dvy) {
+  b.vx += dvx; b.vy += dvy;
+  b.sx += dvx; b.sy += dvy;
+}
+
+function integrate(b, h) {
+  const sl = hyp(b.sx, b.sy);
+  if (sl > 1) {
+    /* sliding — friction opposes the slip, and drags the ball sideways too,
+       which is where swerve comes from when you have side on */
+    const nx = b.sx / sl, ny = b.sy / sl;
+    const dv = A_SLIDE * h;
+    b.vx -= dv * nx; b.vy -= dv * ny;
+    /* a sphere's slip dies seven-halves faster than its velocity changes;
+       that ratio is what makes a centre-ball hit settle at 5/7 of its speed */
+    const ds = 3.5 * dv;
+    if (ds >= sl) { b.sx = 0; b.sy = 0; }
+    else { b.sx -= ds * nx; b.sy -= ds * ny; }
+  } else {
+    b.sx = 0; b.sy = 0;
+    const v = hyp(b.vx, b.vy);
+    if (v > 0) {
+      const dv = A_ROLL * h;
+      if (dv >= v) { b.vx = 0; b.vy = 0; }
+      else { b.vx -= dv * b.vx / v; b.vy -= dv * b.vy / v; }
+    }
+  }
+  b.x += b.vx * h; b.y += b.vy * h;
+  if (hyp(b.vx, b.vy) < REST_V && hyp(b.sx, b.sy) < 1) { b.vx = 0; b.vy = 0; b.sx = 0; b.sy = 0; }
+}
+
+function railHit(b) {
+  let loudest = 0;
+  for (let i = 0; i < RAILS.length; i++) {
+    const s = RAILS[i];
+    const ex = s.bx - s.ax, ey = s.by - s.ay;
+    const L2 = ex * ex + ey * ey;
+    let t = ((b.x - s.ax) * ex + (b.y - s.ay) * ey) / L2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const cxp = s.ax + ex * t, cyp = s.ay + ey * t;
+    let nx = b.x - cxp, ny = b.y - cyp;
+    let d = hyp(nx, ny);
+    if (d >= RAIL_HIT || d === 0) continue;
+    nx /= d; ny /= d;
+    b.x = cxp + nx * RAIL_HIT; b.y = cyp + ny * RAIL_HIT;
+    const vn = b.vx * nx + b.vy * ny;
+    if (vn >= 0) continue;
+    const tx = -ny, ty = nx;
+    const vt = b.vx * tx + b.vy * ty;
+    const st = b.sx * tx + b.sy * ty;
+    const nvn = -E_CU * vn;
+    const nvt = vt * T_CU - SPIN_CU * st;
+    const ovx = b.vx, ovy = b.vy;
+    b.vx = nx * nvn + tx * nvt; b.vy = ny * nvn + ty * nvt;
+    b.sx += b.vx - ovx; b.sy += b.vy - ovy;
+    /* the cushion scrubs off most of the side that it just spent */
+    b.sx -= st * tx * 0.55; b.sy -= st * ty * 0.55;
+    if (-vn > loudest) loudest = -vn;
+  }
+  return loudest;
+}
+
+function hitBalls(a, b) {
+  let nx = b.x - a.x, ny = b.y - a.y;
+  let d = hyp(nx, ny);
+  if (d >= 2 * R) return 0;
+  if (d < 1e-6) { nx = 1; ny = 0; d = 1e-6; } else { nx /= d; ny /= d; }
+  const overlap = 2 * R - d;
+  a.x -= nx * overlap * 0.5; a.y -= ny * overlap * 0.5;
+  b.x += nx * overlap * 0.5; b.y += ny * overlap * 0.5;
+  const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+  if (vn >= 0) return 0;
+  const j = -(1 + E_BB) * vn * 0.5;
+  impulse(a, -j * nx, -j * ny);
+  impulse(b,  j * nx,  j * ny);
+  return -vn;
+}
+
+/* --------------------------------------------------------------- a whole shot
+
+   Runs to rest and reports what happened on the way, because the rules of
+   every mode are written against these events and nothing else. */
+function strike(bs, shot) {
+  const cue = bs[0];
+  const ang = shot.angle;
+  const v0 = clamp(shot.power, 0, 1) * V_MAX;
+  const ux = Math.cos(ang), uy = Math.sin(ang);
+  cue.vx = ux * v0; cue.vy = uy * v0;
+  /* Strike offsets are fractions of the ball, capped short of a miscue. The
+     natural-roll point sits at 0.8 of the vertical range, so centre ball
+     genuinely slides before it rolls. */
+  const ver = clamp(shot.ver || 0, -1, 1), side = clamp(shot.side || 0, -1, 1);
+  const par = v0 * (1 - 1.25 * ver);
+  const per = -v0 * 1.25 * side;
+  cue.sx = ux * par - uy * per; cue.sy = uy * par + ux * per;
+}
+
+function shoot(balls, shot, sink) {
+  const bs = cloneBalls(balls);
+  strike(bs, shot);
+  const ev = newEvents();
+  let t = 0;
+  while (moving(bs) && t < 22) { t += STEP; advance(bs, ev, sink); }
+  return { balls:bs, ev };
+}
+
+const newEvents = () => ({ potted:[], pottedAt:[], firstHit:-1, railAfter:false, cueScratch:false, contact:false });
+function moving(bs) {
+  for (let i = 0; i < bs.length; i++) if (bs[i].live && (bs[i].vx || bs[i].vy)) return true;
+  return false;
+}
+
+/* One tick of the world, and the only one there is. The screen calls this at
+   sixty frames a second and the prover calls it as fast as it can; that they
+   are the same function is the point. */
+function advance(bs, ev, sink) {
+  /* enough substeps that nothing moves more than a third of a ball */
+  let fastest = 0;
+  for (let i = 0; i < bs.length; i++) if (bs[i].live) { const v = hyp(bs[i].vx, bs[i].vy); if (v > fastest) fastest = v; }
+  const sub = fastest * STEP > R * 0.35 ? Math.min(8, Math.ceil(fastest * STEP / (R * 0.35))) : 1;
+  const h = STEP / sub;
+  for (let k = 0; k < sub; k++) {
+    for (let i = 0; i < bs.length; i++) if (bs[i].live) integrate(bs[i], h);
+    for (let i = 0; i < bs.length; i++) {
+      if (!bs[i].live) continue;
+      for (let j = i + 1; j < bs.length; j++) {
+        if (!bs[j].live) continue;
+        const f = hitBalls(bs[i], bs[j]);
+        if (f > 0) {
+          if (ev.firstHit < 0 && (i === 0 || j === 0)) { ev.firstHit = i === 0 ? bs[j].num : bs[i].num; ev.contact = true; }
+          if (sink) sink('clack', f / V_MAX, (bs[i].x + bs[j].x) / 2, (bs[i].y + bs[j].y) / 2);
+        }
+      }
+    }
+    for (let i = 0; i < bs.length; i++) {
+      if (!bs[i].live) continue;
+      const f = railHit(bs[i]);
+      if (f > 0) { if (ev.contact) ev.railAfter = true; if (sink) sink('rail', f / V_MAX, bs[i].x, bs[i].y); }
+      const p = inPocket(bs[i]);
+      if (p >= 0) {
+        bs[i].live = false; bs[i].pocket = p; bs[i].vx = bs[i].vy = bs[i].sx = bs[i].sy = 0;
+        if (i === 0) ev.cueScratch = true; else { ev.potted.push(bs[i].num); ev.pottedAt.push(p); }
+        if (sink) sink('pot', 1, POCKETS[p].x, POCKETS[p].y);
+      }
+    }
+  }
+}
+
+/* ------------------------------------------------------- reading the table
+
+   A shot is an aim and a speed, but a *candidate* is an argument: this ball,
+   into that pocket, by this route. Enumerating the arguments is what lets one
+   piece of code prove a study, hint at it, and play nine-ball with it. */
+
+const CUT_MAX = Math.cos(78 * Math.PI / 180);
+
+function segDist(px, py, ax, ay, bx, by) {
+  const ex = bx - ax, ey = by - ay, L2 = ex * ex + ey * ey;
+  let t = L2 > 0 ? ((px - ax) * ex + (py - ay) * ey) / L2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return hyp(px - (ax + ex * t), py - (ay + ey * t));
+}
+function laneClear(bs, ax, ay, bx, by, skipA, skipB) {
+  for (let i = 0; i < bs.length; i++) {
+    const b = bs[i];
+    if (!b.live || b.num === skipA || b.num === skipB) continue;
+    if (segDist(b.x, b.y, ax, ay, bx, by) < 2 * R + 0.6) return false;
+  }
+  return true;
+}
+/* The point a corner pocket actually swallows at sits a little inside its
+   mouth; aiming at the exact corner aims at the point of a triangle. */
+function aimPoint(p) {
+  if (p.kind === 'c') {
+    const sx = p.x === 0 ? 1 : -1, sy = p.y === 0 ? 1 : -1;
+    return { x:p.x + sx * 7, y:p.y + sy * 7 };
+  }
+  return { x:p.x, y:p.y + (p.dir < 0 ? 4 : -4) };
+}
+
+/* Where a bank has to strike the rail. A cushion does not mirror — it keeps
+   less of the approach than of the slide along it, so the ball comes off
+   flatter than the reflection says. Solving for that ratio outright beats
+   aiming at a mirror and hoping. */
+const BANK_K = (T_CU / E_CU);
+function bankPoint(b, p, rail) {
+  const k = BANK_K;
+  if (rail === 0 || rail === 1) {                 /* top / bottom: line y = c */
+    const c = rail === 0 ? R : H - R;
+    const d1 = Math.abs(b.y - c), d2 = Math.abs(p.y - c);
+    if ((b.y - c) * (p.y - c) <= 0) return null;  /* they are not on the same side */
+    if (d1 < R * 0.7 || d2 < R * 0.7) return null;
+    const u = (p.x - b.x) * d1 / (d1 + k * d2);
+    const x = b.x + u;
+    if (x < CORNER_JAW + 14 || x > W - CORNER_JAW - 14) return null;
+    if (Math.abs(x - W / 2) < SIDE_JAW + 12) return null;
+    return { x, y:c };
+  }
+  const c = rail === 2 ? R : W - R;               /* left / right: line x = c */
+  const d1 = Math.abs(b.x - c), d2 = Math.abs(p.x - c);
+  if ((b.x - c) * (p.x - c) <= 0) return null;
+  if (d1 < R * 0.7 || d2 < R * 0.7) return null;
+  const u = (p.y - b.y) * d1 / (d1 + k * d2);
+  const y = b.y + u;
+  if (y < CORNER_JAW + 14 || y > H - CORNER_JAW - 14) return null;
+  return { x:c, y };
+}
+
+function mkCandidate(bs, target, pocketIdx, dest, kind) {
+  const cue = bs[0];
+  const dx = dest.x - target.x, dy = dest.y - target.y;
+  const dl = hyp(dx, dy);
+  if (dl < R) return null;
+  const ndx = dx / dl, ndy = dy / dl;
+  const gx = target.x - ndx * 2 * R, gy = target.y - ndy * 2 * R;
+  if (gx < 3 || gx > W - 3 || gy < 3 || gy > H - 3) return null;
+  const ax = gx - cue.x, ay = gy - cue.y;
+  const al = hyp(ax, ay);
+  if (al < R * 0.8) return null;
+  const uax = ax / al, uay = ay / al;
+  const cutCos = uax * ndx + uay * ndy;
+  if (cutCos < CUT_MAX) return null;
+  if (!laneClear(bs, cue.x, cue.y, gx, gy, 0, target.num)) return null;
+  if (!laneClear(bs, target.x, target.y, dest.x, dest.y, target.num, -999)) return null;
+  return {
+    angle: Math.atan2(uay, uax), target: target.num, pocket: pocketIdx, kind,
+    cut: Math.acos(clamp(cutCos, -1, 1)), reach: al + dl,
+    /* one number for how much can go wrong: the thinner the cut, the longer
+       the run, the more a bank asks of the cushion */
+    hard: (1 - cutCos) * 2.6 + (al + dl) / 1400 + (kind === 'bank' ? 0.9 : 0) + (kind === 'combo' ? 1.3 : 0),
+  };
+}
+
+function candidates(bs, opts) {
+  opts = opts || {};
+  const only = opts.only;              /* a set of ball numbers that are legal to strike first */
+  const banks = opts.banks !== false;
+  const combos = !!opts.combos;
+  const out = [];
+  const objs = objects(bs);
+  for (let oi = 0; oi < objs.length; oi++) {
+    const t = objs[oi];
+    if (only && only.indexOf(t.num) < 0) continue;
+    for (let pi = 0; pi < 6; pi++) {
+      const ap = aimPoint(POCKETS[pi]);
+      const c = mkCandidate(bs, t, pi, ap, 'direct');
+      if (c) out.push(c);
+      if (banks) {
+        for (let rail = 0; rail < 4; rail++) {
+          const bp = bankPoint(t, ap, rail);
+          if (!bp) continue;
+          if (!laneClear(bs, bp.x, bp.y, ap.x, ap.y, t.num, -999)) continue;
+          const c2 = mkCandidate(bs, t, pi, bp, 'bank');
+          if (c2) out.push(c2);
+        }
+      }
+    }
+  }
+  /* A combo is the same argument nested: the ball you may strike has to end
+     up where a ghost ball for the second ball would sit. */
+  if (combos) {
+    for (let oi = 0; oi < objs.length; oi++) {
+      const first = objs[oi];
+      if (only && only.indexOf(first.num) < 0) continue;
+      for (let oj = 0; oj < objs.length; oj++) {
+        const second = objs[oj];
+        if (second.num === first.num) continue;
+        if (opts.comboTo && opts.comboTo.indexOf(second.num) < 0) continue;
+        for (let pi = 0; pi < 6; pi++) {
+          const ap = aimPoint(POCKETS[pi]);
+          const dx = ap.x - second.x, dy = ap.y - second.y, dl = hyp(dx, dy);
+          if (dl < R) continue;
+          const gx = second.x - dx / dl * 2 * R, gy = second.y - dy / dl * 2 * R;
+          if (gx < 3 || gx > W - 3 || gy < 3 || gy > H - 3) continue;
+          if (!laneClear(bs, second.x, second.y, ap.x, ap.y, second.num, -999)) continue;
+          if (!laneClear(bs, first.x, first.y, gx, gy, first.num, second.num)) continue;
+          const c = mkCandidate(bs, first, pi, { x:gx, y:gy }, 'combo');
+          if (c) { c.via = second.num; out.push(c); }
+        }
+      }
+    }
+  }
+  out.sort((a, b) => a.hard - b.hard);
+  return out;
+}
+
+/* Cushion-first, for when there is nothing to see. Only the opponent and the
+   hint use these; a study is never proved by one. */
+function kicks(bs, only) {
+  const cue = bs[0], out = [];
+  const objs = objects(bs);
+  for (let oi = 0; oi < objs.length; oi++) {
+    const t = objs[oi];
+    if (only && only.indexOf(t.num) < 0) continue;
+    for (let rail = 0; rail < 4; rail++) {
+      const bp = bankPoint(cue, t, rail);
+      if (!bp) continue;
+      if (!laneClear(bs, cue.x, cue.y, bp.x, bp.y, 0, -999)) continue;
+      if (!laneClear(bs, bp.x, bp.y, t.x, t.y, t.num, -999)) continue;
+      out.push({
+        angle: Math.atan2(bp.y - cue.y, bp.x - cue.x), target:t.num, pocket:-1,
+        kind:'kick', cut:0, reach:hyp(bp.x - cue.x, bp.y - cue.y) + hyp(t.x - bp.x, t.y - bp.y), hard:3,
+      });
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------- trying a shot
+
+   A candidate is geometry; a shot is a fact. Direct and combination lines are
+   exact under this collision model — a frictionless central impact sends a
+   ball down the line of centres, which is the line the ghost was placed on —
+   so those need no searching. A bank does not mirror exactly, so a bank gets a
+   small fan of aims around the computed one. Either way the sim decides. */
+
+function powersFor(c) {
+  const need = Math.sqrt(2 * A_ROLL * (c.reach * 1.3 + 170)) / 0.68;
+  const p = clamp(need / V_MAX, 0.20, 1);
+  return [clamp(p * 0.82, 0.15, 1), p, Math.min(1, p * 1.5)];
+}
+const FAN_STRAIGHT = [0];
+const FAN_BANK = [0, 0.011, -0.011, 0.024, -0.024];
+
+function tryShot(bs, c, opts) {
+  opts = opts || {};
+  const fan = c.kind === 'bank' ? FAN_BANK : FAN_STRAIGHT;
+  const pws = powersFor(c);
+  for (let pi = 0; pi < pws.length; pi++) {
+    for (let fi = 0; fi < fan.length; fi++) {
+      const shot = { angle:c.angle + fan[fi], power:pws[pi], ver:0, side:0, kind:c.kind, target:c.target, pocket:c.pocket };
+      const r = shoot(bs, shot);
+      if (r.ev.cueScratch && !opts.allowScratch) continue;
+      if (r.ev.firstHit !== c.target) continue;
+      if (r.ev.potted.indexOf(c.target) < 0) continue;
+      return { shot, balls:r.balls, ev:r.ev };
+    }
+  }
+  return null;
+}
+
+/* --------------------------------------------------------------- the prover
+
+   Beam search over candidate shots. It cannot cheat: every edge in the tree is
+   a shot that was actually simulated to rest, and every node is the table that
+   shot left behind. A study's par is whatever depth this reaches — a measured
+   number, not an author's opinion. */
+
+function posScore(bs) {
+  const left = objects(bs).length;
+  if (left === 0) return -1000;
+  const cs = candidates(bs, { banks:true });
+  if (!cs.length) return left * 100 + 90;
+  return left * 100 + Math.min(24, cs[0].hard * 9);
+}
+
+function certify(bs0, maxShots, cfg) {
+  cfg = cfg || {};
+  const BEAM = cfg.beam || 5, CAP = cfg.cap || 26;
+  const deadline = cfg.deadline || 0;
+  let frontier = [{ bs:bs0, line:[], hard:0, cut:0 }];
+  for (let depth = 0; depth < maxShots; depth++) {
+    const next = [];
+    for (let fi = 0; fi < frontier.length; fi++) {
+      const node = frontier[fi];
+      const left = objects(node.bs).length;
+      /* every shot here pots at least the ball it aimed at, so a table with
+         more balls than shots remaining is already lost */
+      if (left === 0 || left > maxShots - depth) continue;
+      if (deadline && Date.now() > deadline) return null;
+      const cands = candidates(node.bs, { banks:cfg.banks !== false }).slice(0, CAP);
+      let banksLeft = cfg.bankCap || 9;
+      for (let ci = 0; ci < cands.length; ci++) {
+        const c = cands[ci];
+        if (c.kind === 'bank' && banksLeft-- <= 0) continue;
+        const r = tryShot(node.bs, c);
+        if (!r) continue;
+        const line = node.line.concat([r.shot]);
+        const hard = Math.max(node.hard, c.hard);
+        const cut = Math.max(node.cut, c.cut);
+        if (objects(r.balls).length === 0) return { par:depth + 1, line, hard, cut };
+        next.push({ bs:r.balls, line, hard, cut, score:posScore(r.balls) });
+      }
+    }
+    if (!next.length) return null;
+    next.sort((a, b) => a.score - b.score);
+    frontier = next.slice(0, BEAM);
+  }
+  return null;
+}
+
+/* -------------------------------------------------------------- the studies */
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function farFromPockets(x, y, m) {
+  for (let i = 0; i < 6; i++) if (hyp(x - POCKETS[i].x, y - POCKETS[i].y) < m) return false;
+  return true;
+}
+function canPlace(bs, x, y, skip) {
+  if (x < R + 1 || x > W - R - 1 || y < R + 1 || y > H - R - 1) return false;
+  for (let i = 0; i < bs.length; i++) {
+    const b = bs[i];
+    if (!b.live || b.num === skip) continue;
+    if (hyp(b.x - x, b.y - y) < 2 * R + 0.8) return false;
+  }
+  return inPocket({ x, y }) < 0;
+}
+
+function placeStudy(rng, n) {
+  const bs = [];
+  const push = (num, x, y) => bs.push(ball(num, x, y));
+  let guard = 0;
+  const free = (x, y) => {
+    if (!farFromPockets(x, y, 58)) return false;
+    for (let i = 0; i < bs.length; i++) if (hyp(bs[i].x - x, bs[i].y - y) < 2 * R * 1.7) return false;
+    return true;
+  };
+  push(0, 0, 0);                                  /* the cue, placed last */
+  for (let k = 1; k <= n; k++) {
+    let x = 0, y = 0, ok = false;
+    for (let a = 0; a < 200 && !ok; a++) {
+      guard++;
+      /* a third of the balls are pushed against a cushion, because a ball on a
+         rail is where the interesting cut angles live */
+      if (rng() < 0.34) {
+        const rail = (rng() * 4) | 0, off = R + 2 + rng() * 16;
+        if (rail === 0) { x = R + 30 + rng() * (W - 2 * R - 60); y = off; }
+        else if (rail === 1) { x = R + 30 + rng() * (W - 2 * R - 60); y = H - off; }
+        else if (rail === 2) { x = off; y = R + 30 + rng() * (H - 2 * R - 60); }
+        else { x = W - off; y = R + 30 + rng() * (H - 2 * R - 60); }
+      } else {
+        x = R + 22 + rng() * (W - 2 * R - 44);
+        y = R + 22 + rng() * (H - 2 * R - 44);
+      }
+      ok = free(x, y);
+    }
+    if (!ok) return null;
+    push(k, x, y);
+  }
+  /* the cue goes somewhere it can see at least something */
+  let cx = 0, cy = 0, ok = false;
+  for (let a = 0; a < 260 && !ok; a++) {
+    cx = R + 26 + rng() * (W - 2 * R - 52);
+    cy = R + 26 + rng() * (H - 2 * R - 52);
+    ok = free(cx, cy) && farFromPockets(cx, cy, 74);
+  }
+  if (!ok) return null;
+  bs[0].x = cx; bs[0].y = cy;
+  /* a study crammed into one corner is a study you solve by looking once */
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let i = 0; i < bs.length; i++) { x0 = Math.min(x0, bs[i].x); x1 = Math.max(x1, bs[i].x); y0 = Math.min(y0, bs[i].y); y1 = Math.max(y1, bs[i].y); }
+  if ((x1 - x0) < W * 0.42 && (y1 - y0) < H * 0.45) return null;
+  return bs;
+}
+
+function looseness(bs) {
+  const cs = candidates(bs, { banks:false });
+  let easy = 0;
+  for (let i = 0; i < cs.length; i++) if (cs[i].hard < 0.8) easy++;
+  return easy;
+}
+/* If every ball is already hanging over a pocket at a shallow angle, there is
+   nothing here to work out. Same instinct as throwing away a clue that gives
+   itself away. */
+function allHangers(bs) {
+  const objs = objects(bs), cs = candidates(bs, { banks:false });
+  for (let i = 0; i < objs.length; i++) {
+    let hung = false;
+    for (let j = 0; j < cs.length; j++) if (cs[j].target === objs[i].num && cs[j].hard < 0.62) { hung = true; break; }
+    if (!hung) return false;
+  }
+  return true;
+}
+
+function genStudy(seed, n, budgetMs) {
+  const rng = mulberry32((seed * 2654435761) ^ (n * 40503) ^ 0x9e37);
+  const started = Date.now(), budget = budgetMs || 2600;
+  const deadline = started + budget * 0.72;
+  const want = 1.62 + n * 0.13;
+  let best = null, tried = 0;
+  while (Date.now() < deadline && tried < 240) {
+    tried++;
+    const bs = placeStudy(rng, n);
+    if (!bs) continue;
+    if (allHangers(bs)) continue;
+    let cert = certify(bs, n, { beam:5, cap:24, deadline });
+    let par = n;
+    if (!cert && n >= 3) { cert = certify(bs, n + 1, { beam:4, cap:20, deadline }); par = n + 1; }
+    if (!cert) continue;
+    const banked = cert.line.some(s => s.kind === 'bank');
+    const q = cert.hard + (banked ? 0.55 : 0) + (cert.cut * 180 / Math.PI) / 70 - looseness(bs) * 0.05 - (par > n ? 0.35 : 0);
+    const packed = { balls:bs, par:cert.par, line:cert.line, q, tried };
+    if (!best || q > best.q) best = packed;
+    if (q >= want) break;
+  }
+  if (best) return best;
+  /* Nothing certified in the time given — rather than ship an unproven table,
+     fall back to a plainer one that certainly is. */
+  return genPlain(seed, n, started + budget + 900);
+}
+function genPlain(seed, n, stopAt) {
+  const rng = mulberry32((seed * 22695477) ^ (n * 7919) ^ 0x51ed);
+  const stop = Math.max(stopAt || 0, Date.now() + 700);
+  for (let a = 0; a < 400 && Date.now() < stop; a++) {
+    const bs = placeStudy(rng, n);
+    if (!bs) continue;
+    const cert = certify(bs, n + 1, { beam:3, cap:16, deadline:stop });
+    if (cert) return { balls:bs, par:cert.par, line:cert.line, q:0, tried:a };
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------- racks */
+
+function rack9(rng) {
+  const sp = 2 * R + 0.4, dx = sp * 0.8660254;
+  const ax = W * 0.715, ay = H / 2;
+  const spots = [];
+  const rows = [1, 2, 3, 2, 1];
+  for (let r = 0; r < 5; r++) {
+    for (let i = 0; i < rows[r]; i++) {
+      spots.push({
+        x: ax + r * dx + (rng() - 0.5) * 0.5,
+        y: ay + (i - (rows[r] - 1) / 2) * sp + (rng() - 0.5) * 0.5,
+      });
+    }
+  }
+  const rest = [2, 3, 4, 5, 6, 7, 8];
+  for (let i = rest.length - 1; i > 0; i--) { const j = (rng() * (i + 1)) | 0; const t = rest[i]; rest[i] = rest[j]; rest[j] = t; }
+  const nums = new Array(9);
+  nums[0] = 1; nums[4] = 9;                       /* apex, and the nine in the middle */
+  let k = 0;
+  for (let i = 0; i < 9; i++) if (nums[i] === undefined) nums[i] = rest[k++];
+  const bs = [ball(0, W * 0.20, H / 2 + (rng() - 0.5) * 70)];
+  for (let i = 0; i < 9; i++) bs.push(ball(nums[i], spots[i].x, spots[i].y));
+  bs.sort((a, b) => a.num - b.num);
+  return bs;
+}
+
+function layoutRun(rng, k, keepCue) {
+  const bs = [ball(0, keepCue ? keepCue.x : W * 0.22, keepCue ? keepCue.y : H / 2)];
+  for (let i = 1; i <= k; i++) {
+    let x = 0, y = 0, ok = false;
+    for (let a = 0; a < 300 && !ok; a++) {
+      x = W * 0.30 + rng() * (W * 0.66);
+      y = R + 24 + rng() * (H - 2 * R - 48);
+      ok = farFromPockets(x, y, 62);
+      if (ok) for (let j = 0; j < bs.length; j++) if (hyp(bs[j].x - x, bs[j].y - y) < 2 * R * 1.9) { ok = false; break; }
+    }
+    if (!ok) break;
+    bs.push(ball(i, x, y));
+  }
+  return bs;
+}
+
+/* -------------------------------------------------------------- the opponent
+
+   It reads the table with the same candidate list the prover uses, scores what
+   each shot leaves behind, and then misses — the aim it picked is perturbed
+   before it is played, so a bad angle on a thin cut is punished the way it
+   would punish a person. It never sees a shot it could not explain. */
+
+const SKILLS = [
+  { name:'Steady', sigma:0.030, pnoise:0.11, banks:false, combos:false, look:false },
+  { name:'Sharp',  sigma:0.0135, pnoise:0.055, banks:true,  combos:false, look:true  },
+  { name:'Deadly', sigma:0.0048, pnoise:0.022, banks:true,  combos:true,  look:true  },
+];
+
+const lowestOf = bs => { const o = objects(bs); let m = 99; for (let i = 0; i < o.length; i++) if (o[i].num < m) m = o[i].num; return m === 99 ? -1 : m; };
+
+function aiNine(bs, skill, rng) {
+  const cfg = SKILLS[clamp(skill, 0, 2)];
+  const low = lowestOf(bs);
+  if (low < 0) return null;
+  /* Combinations are only ever worth enumerating onto the nine — that is the
+     shot that ends the game, and every other combo is a worse version of a
+     shot already in the list. */
+  const cs = candidates(bs, { only:[low], banks:cfg.banks, combos:cfg.combos, comboTo:[9] }).slice(0, 20);
+  const found = [];
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i];
+    const r = tryShot(bs, c);
+    if (!r) continue;
+    let sc = r.ev.potted.length * 100 - c.hard * 10;
+    if (r.ev.cueScratch) sc -= 600;
+    if (r.ev.potted.indexOf(9) >= 0 && !r.ev.cueScratch) sc += 900;
+    found.push({ sc, shot:r.shot, res:r, c });
+    if (found.length >= 10) break;
+  }
+  if (!found.length) return safety(bs, low, cfg, rng);
+  found.sort((a, b) => b.sc - a.sc);
+  let best = null;
+  for (let i = 0; i < found.length && i < 6; i++) {
+    const f = found[i];
+    /* How much of this shot survives its own hand? Shoot it again a standard
+       deviation either side and count what still drops. A machine that does not
+       ask this takes thin cuts it has no business taking. */
+    let ok = 1;
+    for (let d = -1; d <= 1; d += 2) {
+      const t = shoot(bs, { angle:f.shot.angle + d * cfg.sigma, power:f.shot.power, ver:0, side:0 });
+      if (t.ev.potted.indexOf(f.c.target) >= 0 && !t.ev.cueScratch) ok++;
+    }
+    const robust = ok / 3;
+    let sc = 100 * f.res.ev.potted.length * robust - f.c.hard * 8;
+    if (f.res.ev.potted.indexOf(9) >= 0 && !f.res.ev.cueScratch) sc += 900 * robust;
+    if (f.res.ev.cueScratch) sc -= 400;
+    if (cfg.look && objects(f.res.balls).length) {
+      const nl = lowestOf(f.res.balls);
+      const nx = candidates(f.res.balls, { only:[nl], banks:true });
+      sc -= (nx.length ? Math.min(55, nx[0].hard * 20) : 85) * robust;
+    }
+    if (!best || sc > best.sc) best = { sc, robust, shot:f.shot };
+  }
+  /* A shot only the perfect aim makes is a shot worth ducking — sometimes, and
+     only if you are good enough to know it. */
+  if (best.robust <= 0.34 && cfg.look && rng() < 0.5) return safety(bs, low, cfg, rng);
+  return jitter(best.shot, cfg, rng, 'pot');
+}
+
+function jitter(shot, cfg, rng, why) {
+  const g = () => (rng() + rng() + rng() + rng() - 2) * 0.9;   /* rough normal */
+  return {
+    angle: shot.angle + g() * cfg.sigma,
+    power: clamp(shot.power * (1 + g() * cfg.pnoise), 0.10, 1),
+    ver: 0, side: 0, why,
+  };
+}
+
+/* Nothing on. Roll up to the ball you are obliged to hit and leave the table
+   as unhelpful as the rules allow. */
+function safety(bs, low, cfg, rng) {
+  const cue = bs[0];
+  let tgt = null;
+  for (let i = 0; i < bs.length; i++) if (bs[i].live && bs[i].num === low) tgt = bs[i];
+  if (!tgt) return null;
+  const base = Math.atan2(tgt.y - cue.y, tgt.x - cue.x);
+  const opts = [];
+  const clear = laneClear(bs, cue.x, cue.y, tgt.x, tgt.y, 0, low);
+  if (clear) for (let d = -3; d <= 3; d++) for (const p of [0.16, 0.24, 0.34]) opts.push({ angle:base + d * 0.055, power:p, ver:0, side:0 });
+  const ks = kicks(bs, [low]);
+  for (let i = 0; i < ks.length && i < 8; i++) for (const p of [0.30, 0.44, 0.60]) opts.push({ angle:ks[i].angle, power:p, ver:0, side:0 });
+  let best = null;
+  for (let i = 0; i < opts.length; i++) {
+    const r = shoot(bs, opts[i]);
+    if (r.ev.firstHit !== low) continue;
+    let sc = 0;
+    if (r.ev.cueScratch) sc -= 500;
+    if (!r.ev.railAfter && !r.ev.potted.length) sc -= 400;   /* no rail after contact is a foul */
+    sc += r.ev.potted.length * 90;
+    const nl = lowestOf(r.balls);
+    if (nl < 0) sc += 500;
+    else {
+      const nx = candidates(r.balls, { only:[nl], banks:true });
+      sc += nx.length ? Math.min(70, nx[0].hard * 26) : 110;  /* the worse for them, the better */
+    }
+    if (!best || sc > best.sc) best = { sc, shot:opts[i] };
+  }
+  if (best) return jitter(best.shot, cfg, rng, 'safe');
+  return jitter({ angle:base, power:0.30 }, cfg, rng, 'blind');
+}
+
+/* ---------------------------------------------------------------- the aim line
+
+   Integrated with the real physics, so it cannot promise anything the table
+   will not do. It stops shortly after the first contact — past that point the
+   truth depends on things a line cannot draw. */
+function predict(bs, shot, opts) {
+  opts = opts || {};
+  const w = cloneBalls(bs);
+  strike(w, shot);
+  const ev = newEvents();
+  const cue = [{ x:w[0].x, y:w[0].y }];
+  let hitAt = -1, hitNum = -1, obj = null, ticks = 0;
+  const cap = opts.ticks || 300;
+  while (ticks < cap) {
+    ticks++;
+    advance(w, ev, null);
+    if (w[0].live) cue.push({ x:w[0].x, y:w[0].y });
+    if (hitAt < 0 && ev.firstHit >= 0) {
+      hitAt = ticks; hitNum = ev.firstHit;
+      for (let i = 0; i < w.length; i++) if (w[i].num === hitNum) obj = [{ x:w[i].x, y:w[i].y }];
+    } else if (hitAt > 0) {
+      for (let i = 0; i < w.length; i++) if (w[i].num === hitNum && w[i].live) obj.push({ x:w[i].x, y:w[i].y });
+      if (ticks > hitAt + 150) break;
+    }
+    if (!moving(w)) break;
+    if (hitAt < 0 && ticks > cap - 1) break;
+  }
+  return { cue, obj, hit:hitNum, hitAt, potted:ev.potted.slice(), pottedAt:ev.pottedAt.slice(), scratch:ev.cueScratch };
+}
+
+return {
+  W, H, R, JAW, RAIL_HIT, CORNER_JAW, SIDE_JAW, POT_CORNER, RAILS, POCKETS, V_MAX, STEP,
+  ball, cloneBalls, objects, cueOf, strike, advance, moving, shoot, newEvents, inPocket,
+  candidates, kicks, tryShot, certify, aimPoint, posScore, laneClear,
+  genStudy, rack9, layoutRun, aiNine, lowestOf, canPlace, mulberry32, predict, SKILLS,
+};
+}
+
+/* ===========================================================================
+   The table, drawn.
+
+   Everything static — frame, cloth, mouths, cushion noses, sights — is baked
+   into an offscreen canvas once per layout, because it never changes and a
+   phone has better things to do sixty times a second. Only the balls, the aim
+   and the small bright things on top are drawn live.
+   =========================================================================== */
+
+const E = CUSHION_ENGINE();
+const { W:TW, H:TH, R:BR, JAW, POCKETS, RAILS, CORNER_JAW, SIDE_JAW } = E;
+const RAILW = 34;                                   /* the frame, outside the bed */
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+
+const BALLCOL = {
+  1:'#f0c33c', 2:'#3d8bdf', 3:'#ef4a5a', 4:'#9b62d6', 5:'#f0902c',
+  6:'#57c268', 7:'#a4453c', 8:'#332e3b', 9:'#f0c33c',
+};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let C = {};
+function readTheme() {
+  C = {
+    pg:css('--pg'), bed:css('--bed'), bed2:css('--bed2'), ink:css('--pi'), rail:css('--rail'),
+    pocket:css('--pocket'), pa:css('--pa'), pw:css('--pw'), line:css('--ballline'),
+    rim:css('--ballrim'), cue:css('--cue'), faint:css('--pfaint'), quiet:css('--pq'), dim:css('--pd'),
+    sight:css('--sight'),
+  };
+}
+
+/* ------------------------------------------------------------------- the view
+
+   One transform, used for drawing and inverted for touching. In portrait the
+   table turns so its long axis runs up the screen and the head rail sits under
+   your thumb; nothing else in the program knows that happened. */
+const V = { s:1, ox:0, oy:0, rot:0, zoom:1, px:0, py:0, vw:0, vh:0, dpr:1 };
+
+/* The chrome floats over the felt, but it must never float over a cushion you
+   have to shoot off, so the fit reserves the bands the HUD and the stroke own. */
+function fitView(vw, vh) {
+  const ow = TW + 2 * RAILW, oh = TH + 2 * RAILW;
+  V.rot = vw / vh >= 1 ? 0 : 1;
+  V.padT = 54; V.padB = 78; V.padX = 8;
+  V.vw = vw; V.vh = vh;
+  const availW = vw - V.padX * 2, availH = vh - V.padT - V.padB;
+  V.base = V.rot ? Math.min(availW / oh, availH / ow) : Math.min(availW / ow, availH / oh);
+  applyZoom();
+}
+function applyZoom() {
+  const s = V.base * V.zoom;
+  const ow = TW + 2 * RAILW, oh = TH + 2 * RAILW;
+  const dw = V.rot ? oh * s : ow * s, dh = V.rot ? ow * s : oh * s;
+  V.s = s;
+  /* clamp the pan so the table can never be dragged off the screen entirely */
+  const slackX = Math.max(0, (dw - V.vw) / 2 + 40), slackY = Math.max(0, (dh - V.vh) / 2 + 40);
+  V.px = clamp(V.px, -slackX, slackX); V.py = clamp(V.py, -slackY, slackY);
+  V.ox = V.padX + (V.vw - 2 * V.padX - dw) / 2 + V.px + RAILW * s;
+  V.oy = V.padT + (V.vh - V.padT - V.padB - dh) / 2 + V.py + RAILW * s;
+}
+function setT(ctx) {
+  const d = V.dpr, s = V.s;
+  if (V.rot) ctx.setTransform(0, -s * d, s * d, 0, V.ox * d, (V.oy + s * TW) * d);
+  else ctx.setTransform(s * d, 0, 0, s * d, V.ox * d, V.oy * d);
+}
+function toScreen(x, y) {
+  return V.rot ? { x:V.ox + V.s * y, y:V.oy + V.s * (TW - x) } : { x:V.ox + V.s * x, y:V.oy + V.s * y };
+}
+function toTable(px, py) {
+  return V.rot ? { x:TW - (py - V.oy) / V.s, y:(px - V.ox) / V.s } : { x:(px - V.ox) / V.s, y:(py - V.oy) / V.s };
+}
+const PX = px => px / V.s;                          /* a width in real screen pixels */
+
+/* --------------------------------------------------------------- static table */
+
+let bake = null, bakeKey = '';
+function bakedTable(vw, vh) {
+  const key = [vw, vh, V.s.toFixed(3), V.ox.toFixed(1), V.oy.toFixed(1), V.rot, document.documentElement.dataset.theme || 'auto'].join('|');
+  if (bake && bakeKey === key) return bake;
+  if (!bake) bake = document.createElement('canvas');
+  bake.width = Math.max(1, vw * V.dpr); bake.height = Math.max(1, vh * V.dpr);
+  const g = bake.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, bake.width, bake.height);
+  setT(g);
+  drawTable(g);
+  bakeKey = key;
+  return bake;
+}
+
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+function drawTable(g) {
+  /* the frame */
+  g.fillStyle = C.rail;
+  roundRect(g, -RAILW, -RAILW, TW + 2 * RAILW, TH + 2 * RAILW, 13);
+  g.fill();
+
+  /* the cloth, with one soft gradient across it so it is not a flat slab */
+  const grad = g.createLinearGradient(0, 0, TW * 0.35, TH);
+  grad.addColorStop(0, C.bed); grad.addColorStop(1, C.bed2);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, TW, TH);
+  /* nap: a sparse dot field, the only texture anywhere in the game */
+  g.save();
+  g.beginPath(); g.rect(0, 0, TW, TH); g.clip();
+  g.fillStyle = C.ink; g.globalAlpha = 0.045;
+  for (let y = 4; y < TH; y += 9) for (let x = ((y / 9) & 1) ? 8.5 : 4; x < TW; x += 9) g.fillRect(x, y, 0.9, 0.9);
+  g.restore();
+
+  /* the mouths, cut through both cloth and frame */
+  g.fillStyle = C.pocket;
+  for (let i = 0; i < 6; i++) {
+    const p = POCKETS[i];
+    g.beginPath();
+    const q = pocketCentre(i);
+    g.arc(q.x, q.y, q.r, 0, TAU);
+    g.fill();
+  }
+
+  /* the cushion noses: capsules whose surface is exactly where a ball stops,
+     and whose rounded ends are the jaws a ball can rattle in */
+  g.strokeStyle = C.rail; g.lineCap = 'round'; g.lineWidth = 2 * JAW;
+  for (let i = 0; i < RAILS.length; i++) {
+    const s = RAILS[i];
+    g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
+  }
+  /* a hairline of light along the nose so the cushion reads as an edge — on a
+     dark cloth this line is most of what tells you where the table stops */
+  g.strokeStyle = C.sight; g.globalAlpha = 0.30; g.lineWidth = PX(1.2);
+  for (let i = 0; i < RAILS.length; i++) {
+    const s = RAILS[i];
+    const nx = s.ay < 0 ? 0 : s.ay > TH ? 0 : (s.ax < 0 ? 1 : -1);
+    const ny = s.ay < 0 ? 1 : s.ay > TH ? -1 : 0;
+    g.beginPath();
+    g.moveTo(s.ax + nx * JAW, s.ay + ny * JAW); g.lineTo(s.bx + nx * JAW, s.by + ny * JAW);
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+
+  /* sights. They are not decoration — a bank is aimed off them. */
+  g.fillStyle = C.sight; g.globalAlpha = 0.42;
+  const dia = (x, y) => { g.save(); g.translate(x, y); g.rotate(Math.PI / 4); g.fillRect(-2.6, -2.6, 5.2, 5.2); g.restore(); };
+  for (let k = 1; k <= 7; k++) { if (k === 4) continue; dia(TW * k / 8, -RAILW / 2); dia(TW * k / 8, TH + RAILW / 2); }
+  for (let k = 1; k <= 3; k++) { dia(-RAILW / 2, TH * k / 4); dia(TW + RAILW / 2, TH * k / 4); }
+  g.globalAlpha = 1;
+}
+
+/* Where a mouth is drawn, which is a little outside where its centre is —
+   anything that rings a pocket has to agree with the pocket. */
+function pocketCentre(i) {
+  const p = POCKETS[i];
+  if (p.kind === 'c') { const sx = p.x === 0 ? 1 : -1, sy = p.y === 0 ? 1 : -1; return { x:p.x - sx * 5, y:p.y - sy * 5, r:E.POT_CORNER + 2 }; }
+  return { x:p.x, y:p.y + (p.dir < 0 ? -3 : 3), r:SIDE_JAW };
+}
+
+function clipTable(g) { roundRect(g, -RAILW, -RAILW, TW + 2 * RAILW, TH + 2 * RAILW, 13); g.clip(); }
+
+/* --------------------------------------------------------------------- casting
+
+   Where does a ball sent from here in this direction first meet something? Pure
+   geometry, so it answers instantly and at any speed — which is what an aim line
+   has to do, since you point before you decide how hard. The physics still gets
+   the last word on what happens after the meeting. */
+function castRay(bs, x, y, ang, skip) {
+  const ux = Math.cos(ang), uy = Math.sin(ang), D = 2 * BR;
+  let bt = Infinity, hb = null;
+  for (let i = 0; i < bs.length; i++) {
+    const b = bs[i];
+    if (!b.live || b.num === skip) continue;
+    const px = b.x - x, py = b.y - y;
+    const pr = px * ux + py * uy;
+    if (pr <= 0) continue;
+    const pp = Math.abs(py * ux - px * uy);
+    if (pp >= D) continue;
+    const t = pr - Math.sqrt(D * D - pp * pp);
+    if (t > 0.01 && t < bt) { bt = t; hb = b; }
+  }
+  let tr = Infinity;
+  if (ux > 1e-9) tr = Math.min(tr, (TW - BR - x) / ux);
+  if (ux < -1e-9) tr = Math.min(tr, (BR - x) / ux);
+  if (uy > 1e-9) tr = Math.min(tr, (TH - BR - y) / uy);
+  if (uy < -1e-9) tr = Math.min(tr, (BR - y) / uy);
+  let tp = Infinity, pi = -1;
+  for (let i = 0; i < 6; i++) {
+    const p = POCKETS[i], cap = p.kind === 'c' ? E.POT_CORNER : SIDE_JAW;
+    const px = p.x - x, py = p.y - y;
+    const pr = px * ux + py * uy;
+    if (pr <= 0) continue;
+    const pp = Math.abs(py * ux - px * uy);
+    if (pp >= cap) continue;
+    const t = pr - Math.sqrt(cap * cap - pp * pp);
+    if (t > 0 && t < tp) { tp = t; pi = i; }
+  }
+  if (hb && bt < Math.min(tr, tp)) return { kind:'ball', ball:hb, t:bt, x:x + ux * bt, y:y + uy * bt };
+  if (pi >= 0 && tp < tr + D) return { kind:'pocket', pocket:pi, t:tp, x:x + ux * tp, y:y + uy * tp };
+  return { kind:'rail', t:tr, x:x + ux * tr, y:y + uy * tr };
+}
+
+/* ------------------------------------------------------------------- the balls */
+
+function ballFace(g, b, alpha, scale) {
+  const r = BR * (scale === undefined ? 1 : scale);
+  if (r <= 0.2) return;
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  /* the contact shadow: Huemeld's hard offset, softened enough to sit on cloth */
+  g.fillStyle = 'rgba(0,0,0,0.19)';
+  g.beginPath(); g.arc(b.x + r * 0.19, b.y + r * 0.26, r * 0.93, 0, TAU); g.fill();
+
+  const col = b.num === 0 ? C.cue : (BALLCOL[b.num] || C.pa);
+  if (b.num === 9) {
+    /* the nine wears a band, the way it does on a real table */
+    g.fillStyle = C.cue;
+    g.beginPath(); g.arc(b.x, b.y, r, 0, TAU); g.fill();
+    g.save(); g.beginPath(); g.arc(b.x, b.y, r, 0, TAU); g.clip();
+    g.fillStyle = col; g.fillRect(b.x - r, b.y - r * 0.46, r * 2, r * 0.92);
+    g.restore();
+  } else {
+    g.fillStyle = col;
+    g.beginPath(); g.arc(b.x, b.y, r, 0, TAU); g.fill();
+  }
+  /* one soft highlight, up and to the left, on every ball, always */
+  const gr = g.createRadialGradient(b.x - r * 0.34, b.y - r * 0.38, r * 0.06, b.x - r * 0.2, b.y - r * 0.24, r * 1.15);
+  gr.addColorStop(0, 'rgba(255,255,255,0.44)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(0,0,0,0.16)');
+  g.fillStyle = gr;
+  g.beginPath(); g.arc(b.x, b.y, r, 0, TAU); g.fill();
+
+  g.lineWidth = PX(1.9); g.strokeStyle = C.line;
+  g.beginPath(); g.arc(b.x, b.y, r - PX(0.6), 0, TAU); g.stroke();
+  if (C.rim && C.rim !== 'rgba(255,255,255,0)') {
+    g.lineWidth = PX(0.9); g.strokeStyle = C.rim;
+    g.beginPath(); g.arc(b.x, b.y, r - PX(2.4), Math.PI * 0.62, Math.PI * 1.9); g.stroke();
+  }
+  g.globalAlpha = 1;
+}
+
+function ballNumber(g, b, scale) {
+  if (!b.num) return;
+  const r = BR * (scale === undefined ? 1 : scale);
+  g.fillStyle = C.cue;
+  g.beginPath(); g.arc(b.x, b.y, r * 0.5, 0, TAU); g.fill();
+  g.fillStyle = '#2a2730';
+  g.font = '600 ' + (r * 0.72).toFixed(2) + 'px ' + (V.rot ? '' : '') + 'ui-sans-serif, -apple-system, Helvetica, Arial, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (V.rot) { g.save(); g.translate(b.x, b.y); g.rotate(Math.PI / 2); g.fillText(String(b.num), 0, r * 0.03); g.restore(); }
+  else g.fillText(String(b.num), b.x, b.y + r * 0.03);
+}
+
+/* ===========================================================================
+   Sound. Four noises, synthesised, because a billiards game with no click is
+   a slideshow — and because a downloaded sample is a thing that can fail to
+   arrive on a train.
+   =========================================================================== */
+let AC = null, muted = false;
+function audio() {
+  if (!AC) { const K = window.AudioContext || window.webkitAudioContext; if (K) AC = new K(); }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+let lastSound = 0;
+function noise(dur, hz, q, gain, type) {
+  const a = audio(); if (!a || muted) return;
+  const n = a.sampleRate * dur | 0;
+  const buf = a.createBuffer(1, Math.max(1, n), a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.4);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const bp = a.createBiquadFilter(); bp.type = type || 'bandpass'; bp.frequency.value = hz; bp.Q.value = q;
+  const g = a.createGain(); g.gain.value = gain;
+  src.connect(bp); bp.connect(g); g.connect(a.destination);
+  src.start();
+}
+function tone(hz, dur, gain, type, slideTo) {
+  const a = audio(); if (!a || muted) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(hz, a.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime + dur);
+  g.gain.setValueAtTime(gain, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur + 0.02);
+}
+function sfx(kind, str) {
+  const t = performance.now();
+  if (kind !== 'pot' && t - lastSound < 16) return;
+  lastSound = t;
+  const s = clamp(str || 0.4, 0.03, 1);
+  if (kind === 'clack') { noise(0.035, 2100 + s * 1800, 2.2, 0.16 * s + 0.02); tone(760 + s * 420, 0.035, 0.05 * s, 'triangle'); }
+  else if (kind === 'rail') { noise(0.075, 320 + s * 260, 1.1, 0.13 * s + 0.015, 'lowpass'); }
+  else if (kind === 'pot') { noise(0.12, 190, 0.7, 0.10, 'lowpass'); tone(300, 0.16, 0.07, 'sine', 120); }
+  else if (kind === 'cue') { noise(0.05, 1500, 1.6, 0.10 * s + 0.02); }
+  else if (kind === 'good') { tone(560, 0.10, 0.05, 'triangle', 840); }
+  else if (kind === 'bad') { tone(210, 0.18, 0.055, 'sine', 132); }
+  else if (kind === 'tick') { tone(1300, 0.02, 0.025, 'square'); }
+}
+
+/* =========================================================================== */
+/* storage                                                                     */
+
+const KEY = 'cushion.v1';
+let DB = { theme:'auto', sound:true, study:{}, nine:{ skill:1, w:0, l:0 }, run:{ best:0, plays:0 } };
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) DB = Object.assign(DB, JSON.parse(raw));
+  } catch (e) {}
+  for (const n of [2, 3, 4]) if (!DB.study[n]) DB.study[n] = { at:1, done:{} };
+  muted = !DB.sound;
+}
+let saveT = 0;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }, 180); }
+
+/* =========================================================================== */
+/* the generator, off the main thread                                          */
+
+/* Two of them, not one. Building the next study takes seconds, and a hint asked
+   for while that is running would queue behind it and arrive after the player
+   has given up waiting — so asking and building never share a thread. */
+const WK = { gen:null, solve:null };
+let wid = 0, waiting = {};
+function startWorker() {
+  try {
+    const src = 'const E = (' + CUSHION_ENGINE.toString() + ')();\n' +
+      'self.onmessage = function(e){ var m = e.data;\n' +
+      '  if (m.t === "gen") { var g = E.genStudy(m.seed, m.n, m.budget);\n' +
+      '    postMessage({t:"gen", id:m.id, g: g ? {balls:g.balls, par:g.par, q:g.q} : null}); }\n' +
+      '  else if (m.t === "solve") { var c = E.certify(m.balls, m.max, {beam:5, cap:26, deadline:Date.now()+m.budget});\n' +
+      '    postMessage({t:"solve", id:m.id, line: c ? c.line : null}); }\n' +
+      '};';
+    const url = URL.createObjectURL(new Blob([src], { type:'text/javascript' }));
+    const mk = () => {
+      const w = new Worker(url);
+      w.onmessage = e => { const cb = waiting[e.data.id]; if (cb) { delete waiting[e.data.id]; cb(e.data); } };
+      w.onerror = () => { WK.gen = null; WK.solve = null; };
+      return w;
+    };
+    WK.gen = mk(); WK.solve = mk();
+  } catch (e) { WK.gen = null; WK.solve = null; }
+}
+function ask(msg, cb, timeoutMs) {
+  const id = ++wid;
+  const w = msg.t === 'solve' ? WK.solve : WK.gen;
+  if (!w) {                            /* no worker here — do it in the open, and say so by being slow */
+    setTimeout(() => {
+      if (msg.t === 'gen') { const g = E.genStudy(msg.seed, msg.n, Math.min(msg.budget, 1400)); cb({ g: g ? { balls:g.balls, par:g.par, q:g.q } : null }); }
+      else { const c = E.certify(msg.balls, msg.max, { beam:4, cap:20, deadline:Date.now() + 900 }); cb({ line:c ? c.line : null }); }
+    }, 16);
+    return;
+  }
+  waiting[id] = cb;
+  if (timeoutMs) setTimeout(() => { if (waiting[id]) { delete waiting[id]; cb({ timeout:true }); } }, timeoutMs);
+  w.postMessage(Object.assign({ id }, msg));
+}
+
+/* Studies are deterministic but not stored: №47 of the Trio is the same table
+   on every device forever, because the number is the seed. What is opened is
+   kept, and the next one is quietly built while you are still on this one. */
+const cache = {};
+const ckey = (n, i) => n + ':' + i;
+function getStudy(n, i, cb) {
+  const k = ckey(n, i);
+  if (cache[k]) { cb(cache[k]); return; }
+  ask({ t:'gen', seed:i, n, budget:n >= 4 ? 5200 : 3200 }, r => {
+    if (r.g) { cache[k] = r.g; cb(r.g); } else cb(null);
+  });
+}
+function prefetch(n, i) {
+  const k = ckey(n, i);
+  if (cache[k] || i > 999) return;
+  ask({ t:'gen', seed:i, n, budget:n >= 4 ? 5200 : 3200 }, r => { if (r.g) cache[k] = r.g; });
+}
+
+/* =========================================================================== */
+/* game state                                                                  */
+
+const G = {
+  mode:null, balls:[], phase:'idle',
+  aim:0, power:0.42, side:0, ver:0,
+  ev:null, shots:0, par:0, n:2, num:1,
+  score:0, left:0, called:-1, streak:0,
+  turn:0, skill:1, low:1, broke:false, msg:'',
+  hinted:false, hintShot:null, hintT:0, aiShot:null, over:false,
+  fx:[], trail:null, pred:null, predKey:'', t0:0, rollT:0,
+};
+const rngRun = () => Math.random();
+
+function objectsLeft() { return E.objects(G.balls).length; }
+function cueBall() { return G.balls[0]; }
+
+function say(text, bad) {
+  const el = document.getElementById('say');
+  el.textContent = text;
+  el.className = 'on' + (bad ? ' bad' : '');
+  clearTimeout(say._t);
+  say._t = setTimeout(() => { el.className = ''; }, 2200);
+}
+
+function pushFx(kind, x, y, extra) { G.fx.push(Object.assign({ kind, x, y, t:0 }, extra || {})); }
+
+/* A hint fades itself after a few seconds. That timer belongs to the table it
+   was asked about, so any new table — or any stroke — has to cancel it, or it
+   comes back later and wipes the advice for a board it never saw. */
+function clearHint() { clearTimeout(G.hintT); G.hintT = 0; G.hintShot = null; }
+
+/* --------------------------------------------------------------- taking a shot */
+
+function fire() {
+  if (G.phase !== 'aim' || G.over) return;
+  const p = powerCurve(G.power);
+  if (p < 0.06) return;
+  G.trail = [{ x:cueBall().x, y:cueBall().y }];
+  E.strike(G.balls, { angle:G.aim, power:p, ver:G.ver, side:G.side });
+  G.ev = E.newEvents();
+  G.phase = 'rolling'; G.rollT = 0;
+  clearHint(); G.aiShot = null;
+  sfx('cue', 0.4 + p * 0.6);
+  if (navigator.vibrate) try { navigator.vibrate(8 + p * 14); } catch (e) {}
+  G.lowBefore = G.low;
+  updateHUD();
+}
+/* The stroke reads square but the table does not: squaring it puts the useful
+   half of the range in the bottom third of the pull. */
+const powerCurve = t => 0.055 + 0.945 * Math.pow(clamp(t, 0, 1), 1.75);
+
+function settled() {
+  const ev = G.ev;
+  G.trail = null;
+  if (G.mode === 'study') resolveStudy(ev);
+  else if (G.mode === 'nine') resolveNine(ev);
+  else resolveRun(ev);
+  updateHUD();
+}
+
+/* ------------------------------------------------------------------- studies */
+
+function resolveStudy(ev) {
+  G.shots++;
+  const left = objectsLeft();
+  if (ev.potted.length) sfx('good');
+  if (left === 0) { finishStudy(); return; }
+  if (ev.cueScratch) { reviveCue(); G.phase = 'inhand'; say('Scratch — place the cue ball', true); sfx('bad'); }
+  else G.phase = 'aim';
+}
+function finishStudy() {
+  G.phase = 'done'; G.over = true;
+  const inPar = G.shots <= G.par;
+  const rec = DB.study[G.n];
+  const prev = rec.done[G.num];
+  const clean = inPar && !G.hinted;
+  if (!prev || (clean && prev !== 2) || (inPar && !prev)) rec.done[G.num] = clean ? 2 : 1;
+  if (rec.at <= G.num) rec.at = G.num + 1;
+  save();
+  prefetch(G.n, G.num + 1); prefetch(G.n, G.num + 2);
+  pushFx('wave', 0, 0);
+  sfx('good');
+  setTimeout(() => sheetStudyDone(inPar), 620);
+}
+
+/* -------------------------------------------------------------------- nine-ball
+
+   Lowest ball first; anything that falls counts; the nine ends it. A miss, a
+   scratch, or nothing reaching a cushion afterwards hands over the table and
+   the ball with it. */
+function resolveNine(ev) {
+  const low = G.lowBefore;
+  let foul = false, why = '';
+  if (ev.firstHit !== low) { foul = true; why = ev.firstHit < 0 ? 'No contact' : 'Hit the ' + ev.firstHit + ' first'; }
+  else if (!ev.railAfter && !ev.potted.length) { foul = true; why = 'Nothing reached a cushion'; }
+  if (ev.cueScratch) { foul = true; why = 'Scratch'; }
+
+  const nine = ev.potted.indexOf(9) >= 0;
+  if (nine && !foul) { endNine(G.turn); return; }
+  if (nine) respot(9);
+  if (ev.cueScratch) reviveCue();
+  G.low = E.lowestOf(G.balls);
+  if (G.low < 0) { endNine(G.turn); return; }
+
+  if (foul) {
+    sfx('bad');
+    G.turn = 1 - G.turn;
+    G.phase = G.turn === 0 ? 'inhand' : 'aithink';
+    say((G.turn === 0 ? 'Foul — ball in hand' : why + ' — ball in hand'), true);
+    if (G.turn === 1) setTimeout(aiPlace, 700);
+  } else if (ev.potted.length) {
+    sfx('good');
+    G.phase = G.turn === 0 ? 'aim' : 'aithink';
+    if (G.turn === 1) setTimeout(aiThink, 620);
+  } else {
+    G.turn = 1 - G.turn;
+    G.phase = G.turn === 0 ? 'aim' : 'aithink';
+    say(G.turn === 0 ? 'Your table' : 'Missed');
+    if (G.turn === 1) setTimeout(aiThink, 620);
+  }
+}
+function respot(num) {
+  for (let i = 0; i < G.balls.length; i++) {
+    const b = G.balls[i];
+    if (b.num !== num) continue;
+    b.live = true; b.vx = b.vy = b.sx = b.sy = 0; b.pocket = -1;
+    let x = E.W * 0.75, y = E.H / 2;
+    for (let k = 0; k < 400 && !E.canPlace(G.balls, x, y, num); k++) { x += 6; if (x > E.W - 30) { x = E.W * 0.55; y += 9; } if (y > E.H - 30) y = 40; }
+    b.x = x; b.y = y;
+  }
+}
+function reviveCue() {
+  const c = cueBall();
+  c.live = true; c.pocket = -1; c.vx = c.vy = c.sx = c.sy = 0;
+  let x = E.W * 0.22, y = E.H / 2;
+  for (let k = 0; k < 400 && !E.canPlace(G.balls, x, y, 0); k++) { x += 7; if (x > E.W - 30) { x = 40; y += 11; } if (y > E.H - 30) y = 40; }
+  c.x = x; c.y = y;
+}
+function endNine(winner) {
+  G.over = true; G.phase = 'done';
+  if (winner === 0) { DB.nine.w++; pushFx('wave', 0, 0); sfx('good'); } else { DB.nine.l++; sfx('bad'); }
+  save();
+  setTimeout(() => sheetNineDone(winner), 700);
+}
+function aiPlace() {
+  /* the machine puts the ball where it can see the most */
+  const low = G.low;
+  let best = null;
+  for (let a = 0; a < 220; a++) {
+    const x = 30 + Math.random() * (E.W - 60), y = 30 + Math.random() * (E.H - 60);
+    if (!E.canPlace(G.balls, x, y, 0)) continue;
+    const c = cueBall(); const ox = c.x, oy = c.y;
+    c.x = x; c.y = y;
+    const cs = E.candidates(G.balls, { only:[low], banks:false });
+    const sc = cs.length ? -cs[0].hard : -9;
+    c.x = ox; c.y = oy;
+    if (!best || sc > best.sc) best = { x, y, sc };
+    if (best.sc > -0.35) break;
+  }
+  if (best) { cueBall().x = best.x; cueBall().y = best.y; }
+  G.phase = 'aithink';
+  setTimeout(aiThink, 520);
+}
+function aiThink() {
+  if (G.over) return;
+  const plan = E.aiNine(G.balls, G.skill, Math.random);
+  if (!plan) { G.turn = 0; G.phase = 'aim'; return; }
+  G.aiShot = plan;
+  G.aim = plan.angle; G.power = invPower(plan.power); G.ver = plan.ver || 0; G.side = plan.side || 0;
+  syncControls();
+  say(plan.why === 'safe' ? 'Playing safe' : '');
+  setTimeout(() => {
+    if (G.over || G.phase !== 'aithink') return;
+    G.phase = 'aim'; G.lowBefore = G.low;
+    fire();
+  }, 780);
+}
+const invPower = p => Math.pow(clamp((p - 0.055) / 0.945, 0, 1), 1 / 1.75);
+
+/* ------------------------------------------------------------------- the run */
+
+function resolveRun(ev) {
+  const n = ev.potted.length;
+  G.shots--;
+  if (n) {
+    let gain = n === 1 ? 1 : n === 2 ? 3 : 6;
+    let pts = gain;
+    if (ev.pottedAt && ev.pottedAt.indexOf(G.called) >= 0) { pts *= 2; gain += 1; say('Called pocket — double'); }
+    G.shots = Math.min(16, G.shots + gain);
+    G.score += pts;
+    G.streak++;
+    sfx('good');
+  } else { G.streak = 0; }
+  if (ev.cueScratch) { G.shots--; reviveCue(); G.phase = 'inhand'; say('Scratch', true); sfx('bad'); }
+  else G.phase = 'aim';
+  refillRun();
+  G.called = pickPocket();
+  if (G.shots <= 0) {
+    G.over = true; G.phase = 'done';
+    if (G.score > DB.run.best) DB.run.best = G.score;
+    DB.run.plays++; save();
+    setTimeout(() => sheetRunDone(), 620);
+  }
+}
+function refillRun() {
+  if (objectsLeft() >= 3) return;
+  const keep = E.objects(G.balls).map(b => ({ x:b.x, y:b.y }));
+  const c = cueBall();
+  const fresh = E.layoutRun(rngRun, 5 - keep.length, { x:c.x, y:c.y });
+  let next = 1;
+  const used = {};
+  for (let i = 0; i < G.balls.length; i++) if (G.balls[i].live) used[G.balls[i].num] = 1;
+  for (let i = 1; i < fresh.length; i++) {
+    while (used[next]) next++;
+    if (next > 7) next = 1;
+    let ok = E.canPlace(G.balls, fresh[i].x, fresh[i].y, -1);
+    if (!ok) continue;
+    const nb = E.ball(next, fresh[i].x, fresh[i].y);
+    G.balls.push(nb); used[next] = 1;
+    pushFx('spawn', nb.x, nb.y);
+  }
+  /* forget the dead ones so the array cannot grow without end */
+  G.balls = G.balls.filter((b, i) => i === 0 || b.live);
+}
+function pickPocket() { return (Math.random() * 6) | 0; }
+
+/* ---------------------------------------------------------------- starting up */
+
+function startStudy(n, num) {
+  G.mode = 'study'; G.n = n; G.num = num; G.over = false; G.hinted = false; clearHint();
+  G.shots = 0; G.phase = 'wait'; G.fx = []; G.balls = [];
+  showScreen('play'); updateHUD();
+  say('Building №' + num + '…');
+  getStudy(n, num, g => {
+    if (G.mode !== 'study' || G.num !== num) return;
+    if (!g) { say('Could not build that one — try another', true); return; }
+    G.balls = E.cloneBalls(g.balls);
+    G.par = g.par;
+    G.phase = 'aim';
+    G.aim = Math.atan2(E.objects(G.balls)[0].y - cueBall().y, E.objects(G.balls)[0].x - cueBall().x);
+    G.power = 0.42; G.side = 0; G.ver = 0;
+    syncControls(); updateHUD();
+    document.getElementById('say').className = '';
+    prefetch(n, num + 1);
+  });
+}
+function startNine(skill) {
+  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0; G.broke = false; clearHint();
+  G.balls = E.rack9(Math.random); G.low = 1; G.shots = 0;
+  G.phase = 'inhand'; G.breakZone = true; G.fx = [];
+  G.aim = 0; G.power = 0.86; G.side = 0; G.ver = 0;
+  showScreen('play'); syncControls(); updateHUD();
+  say('Place the cue behind the line, then break');
+}
+function startRun() {
+  G.mode = 'run'; G.over = false; G.score = 0; G.shots = 8; G.streak = 0; clearHint();
+  G.balls = E.layoutRun(rngRun, 5, null); G.fx = [];
+  G.called = pickPocket();
+  G.phase = 'aim';
+  G.aim = 0; G.power = 0.42; G.side = 0; G.ver = 0;
+  showScreen('play'); syncControls(); updateHUD();
+}
+function replay() {
+  if (G.mode === 'study') startStudy(G.n, G.num);
+  else if (G.mode === 'nine') startNine(G.skill);
+  else startRun();
+  closeSheet();
+}
+function nextThing() {
+  if (G.mode === 'study') startStudy(G.n, G.num + 1);
+  else replay();
+  closeSheet();
+}
+
+/* ===========================================================================
+   The screen, the finger, and the frame.
+   =========================================================================== */
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+
+function showScreen(id) {
+  ['home', 'books', 'play'].forEach(s => $(s).classList.toggle('on', s === id));
+  const onTable = id === 'play';
+  $('stroke').style.display = onTable ? '' : 'none';
+  $('spin').style.display = onTable ? '' : 'none';
+  $('hintBtn').style.display = onTable ? '' : 'none';
+  if (onTable) resize();
+}
+
+function resize() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  V.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.width = Math.max(1, vw * V.dpr); cv.height = Math.max(1, vh * V.dpr);
+  cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
+  fitView(vw, vh);
+  bakeKey = '';
+  G.predKey = '';
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 140));
+
+/* ------------------------------------------------------------------- the HUD */
+
+function updateHUD() {
+  const h = $('hud');
+  const cell = (v, l, warn) => `<div class="hcell"><b class="${warn ? 'warn' : ''}">${v}</b><span>${l}</span></div>`;
+  if (G.mode === 'study') {
+    h.innerHTML = cell('№' + G.num, BOOKS[G.n].name) + cell(G.shots + '/' + (G.par || '–'), 'shots', G.par && G.shots > G.par);
+  } else if (G.mode === 'nine') {
+    h.innerHTML = cell(G.turn === 0 ? 'You' : E.SKILLS[G.skill].name, 'turn') + cell(G.low > 0 ? G.low : '–', 'on');
+  } else if (G.mode === 'run') {
+    h.innerHTML = cell(G.shots, 'shots', G.shots <= 2) + cell(G.score, 'score') + cell(DB.run.best, 'best');
+  }
+  $('hintBtn').style.display = (G.phase === 'aim' && !G.over) ? '' : 'none';
+  $('fitBtn').classList.toggle('on', V.zoom > 1.02 || Math.abs(V.px) > 2 || Math.abs(V.py) > 2);
+}
+
+function syncControls() {
+  const bar = $('stroke'), grip = $('strokeGrip'), fill = $('strokeFill');
+  const Wb = bar.clientWidth || 300;
+  const left = 8 + (1 - clamp(G.power, 0, 1)) * (Wb - 50);
+  grip.style.left = left + 'px';
+  fill.style.left = (left + 17) + 'px';
+  fill.style.width = Math.max(0, Wb - left - 17) + 'px';
+  const lbl = $('strokeLbl');
+  lbl.textContent = G.power > 0.02 ? Math.round(powerCurve(G.power) * 100) + '%' : 'Pull back';
+  lbl.style.justifyContent = G.power > 0.55 ? 'flex-end' : 'flex-start';
+  bar.classList.toggle('armed', G.power > 0.02);
+  $('spinDot').style.transform = `translate(${(G.side * 14).toFixed(1)}px, ${(-G.ver * 14).toFixed(1)}px)`;
+}
+
+/* ------------------------------------------------------------------ the aim */
+
+function predictNow() {
+  const c = cueBall();
+  if (!c || !c.live) return null;
+  const key = [G.aim.toFixed(4), G.power.toFixed(3), G.side.toFixed(2), G.ver.toFixed(2), G.balls.length, objectsLeft()].join(',');
+  if (G.predKey === key && G.pred) return G.pred;
+  G.pred = E.predict(G.balls, { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side }, { ticks:280 });
+  G.predKey = key;
+  return G.pred;
+}
+
+function poly(g, pts, from, to) {
+  g.beginPath();
+  const a = Math.max(0, from | 0), b = Math.min(pts.length - 1, to === undefined ? pts.length - 1 : to);
+  if (b <= a) return false;
+  g.moveTo(pts[a].x, pts[a].y);
+  for (let i = a + 1; i <= b; i++) g.lineTo(pts[i].x, pts[i].y);
+  return true;
+}
+
+function drawAim(g) {
+  const c = cueBall();
+  if (!c || !c.live) return;
+
+  g.lineCap = 'round'; g.lineJoin = 'round';
+
+  /* Where the aim points, at any speed. Geometry answers this, so the line is
+     the same length whether you are about to feather it or murder it. */
+  const h1 = castRay(G.balls, c.x, c.y, G.aim, 0);
+  g.strokeStyle = C.ink; g.globalAlpha = 0.5; g.lineWidth = PX(1.5);
+  g.setLineDash([PX(5.5), PX(5)]);
+  g.beginPath(); g.moveTo(c.x, c.y); g.lineTo(h1.x, h1.y); g.stroke();
+  g.setLineDash([]);
+
+  /* Now the physics: how far this much speed actually carries, and what the cue
+     ball does to itself once it has hit something. */
+  const p = predictNow();
+  const short = p && p.hitAt < 0 && h1.kind === 'ball';   /* pointed at it, cannot reach it */
+
+  if (h1.kind === 'ball') {
+    const struck = h1.ball;
+    const objDir = Math.atan2(struck.y - h1.y, struck.x - h1.x);
+    /* the ghost: where the cue ball has to be for the contact you are asking for */
+    g.globalAlpha = short ? 0.2 : 0.42; g.lineWidth = PX(1.3); g.setLineDash([PX(3), PX(3.4)]);
+    g.beginPath(); g.arc(h1.x, h1.y, BR, 0, TAU); g.stroke();
+    g.setLineDash([]);
+    /* and the line of centres, which is the way the object ball must leave */
+    const h2 = castRay(G.balls, struck.x, struck.y, objDir, struck.num);
+    g.strokeStyle = C.pa; g.globalAlpha = short ? 0.15 : 0.4; g.lineWidth = PX(1.6);
+    g.beginPath(); g.moveTo(struck.x, struck.y); g.lineTo(h2.x, h2.y); g.stroke();
+  }
+
+  if (p) {
+    if (p.hitAt > 0) {
+      if (p.obj && p.obj.length > 1) {
+        g.strokeStyle = C.pa; g.globalAlpha = 0.9; g.lineWidth = PX(2.2);
+        if (poly(g, p.obj, 0, p.obj.length - 1)) g.stroke();
+        const last = p.obj[p.obj.length - 1];
+        g.globalAlpha = 0.55; g.fillStyle = C.pa;
+        g.beginPath(); g.arc(last.x, last.y, PX(2.8), 0, TAU); g.fill();
+      }
+      g.strokeStyle = C.ink; g.globalAlpha = 0.26; g.lineWidth = PX(1.5);
+      if (poly(g, p.cue, p.hitAt, p.cue.length - 1)) g.stroke();
+    } else if (p.cue.length > 2 && !p.scratch) {
+      /* it does not get there. Say so where it stops, rather than drawing a
+         line that promises a contact this stroke cannot make. */
+      const end = p.cue[p.cue.length - 1];
+      g.strokeStyle = C.pw; g.globalAlpha = 0.7; g.lineWidth = PX(1.8);
+      g.setLineDash([PX(2.5), PX(3.5)]);
+      g.beginPath(); g.arc(end.x, end.y, BR, 0, TAU); g.stroke();
+      g.setLineDash([]);
+    }
+    if (p.potted && p.potted.length) {
+      /* inside the mouth, not around it — a ring drawn outside a corner pocket
+         is a ring drawn off the table, where the clip eats it */
+      g.strokeStyle = C.pw; g.globalAlpha = 0.95; g.lineWidth = PX(3);
+      for (let i = 0; i < p.pottedAt.length; i++) {
+        const q = pocketCentre(p.pottedAt[i]);
+        g.beginPath(); g.arc(q.x, q.y, q.r - 3.5, 0, TAU); g.stroke();
+      }
+    }
+    if (p.scratch) {
+      g.strokeStyle = C.pw; g.globalAlpha = 0.85; g.lineWidth = PX(2.2);
+      g.beginPath(); g.arc(c.x, c.y, BR + 7, 0, TAU); g.stroke();
+    }
+  }
+  g.globalAlpha = 1;
+
+  drawCueStick(g, c);
+}
+
+function drawCueStick(g, c) {
+  if (G.phase !== 'aim' && G.phase !== 'aithink') return;
+  const pull = 20 + powerCurve(G.power) * 95;
+  const dx = -Math.cos(G.aim), dy = -Math.sin(G.aim);
+  const x0 = c.x + dx * (BR + pull), y0 = c.y + dy * (BR + pull);
+  const x1 = c.x + dx * (BR + pull + 420), y1 = c.y + dy * (BR + pull + 420);
+  g.globalAlpha = G.phase === 'aithink' ? 0.5 : 0.8;
+  g.lineCap = 'butt';
+  g.strokeStyle = C.dim; g.lineWidth = PX(7);
+  g.beginPath(); g.moveTo(x0 + dx * 38, y0 + dy * 38); g.lineTo(x1, y1); g.stroke();
+  g.strokeStyle = C.quiet; g.lineWidth = PX(4.4);
+  g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + dx * 40, y0 + dy * 40); g.stroke();
+  g.strokeStyle = C.pa; g.globalAlpha = 0.9;
+  g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + dx * 7, y0 + dy * 7); g.stroke();
+  g.globalAlpha = 1; g.lineCap = 'round';
+}
+
+/* --------------------------------------------------------------------- effects */
+
+function drawFx(g, dt) {
+  for (let i = G.fx.length - 1; i >= 0; i--) {
+    const f = G.fx[i];
+    f.t += dt;
+    if (f.kind === 'pot') {
+      const k = f.t / 0.55;
+      if (k >= 1) { G.fx.splice(i, 1); continue; }
+      g.globalAlpha = (1 - k) * 0.85; g.strokeStyle = C.pw; g.lineWidth = PX(2.8);
+      g.beginPath(); g.arc(f.x, f.y, 14 + k * 30, 0, TAU); g.stroke();
+    } else if (f.kind === 'spawn') {
+      const k = f.t / 0.4;
+      if (k >= 1) { G.fx.splice(i, 1); continue; }
+      g.globalAlpha = (1 - k) * 0.7; g.strokeStyle = C.pa; g.lineWidth = PX(2);
+      g.beginPath(); g.arc(f.x, f.y, BR + 26 * (1 - k), 0, TAU); g.stroke();
+    } else if (f.kind === 'wave') {
+      /* the clear: one band of warm light crossing the cloth, and then paper */
+      const k = f.t / 1.1;
+      if (k >= 1) { G.fx.splice(i, 1); continue; }
+      const x = -140 + k * (TW + 300);
+      const gr = g.createLinearGradient(x - 150, 0, x + 150, 0);
+      gr.addColorStop(0, 'rgba(200,95,24,0)'); gr.addColorStop(0.5, 'rgba(200,95,24,' + (0.3 * (1 - k * 0.5)).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(200,95,24,0)');
+      g.globalAlpha = 1; g.fillStyle = gr;
+      g.save(); g.beginPath(); g.rect(0, 0, TW, TH); g.clip(); g.fillRect(x - 160, 0, 320, TH); g.restore();
+    }
+  }
+  g.globalAlpha = 1;
+}
+
+/* ------------------------------------------------------------------ the frame */
+
+let last = 0;
+function soundSink(kind, str, x, y) {
+  sfx(kind, str);
+  if (kind === 'pot') pushFx('pot', x, y);
+}
+
+function tick(ts) {
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.06, (ts - last) / 1000 || 0); last = ts;
+  if (!$('play').classList.contains('on')) return;
+
+  if (G.phase === 'rolling') {
+    G.rollT += dt;
+    /* real time to begin with; a long dying roll is hurried along, because
+       watching a ball creep for four seconds is not the game */
+    const scale = 1.3 * (G.rollT > 3.0 ? Math.min(3.2, 1 + (G.rollT - 3.0) * 1.2) : 1);
+    const steps = Math.min(64, Math.max(1, Math.round(dt * scale / E.STEP)));
+    for (let i = 0; i < steps; i++) {
+      E.advance(G.balls, G.ev, soundSink);
+      const c = cueBall();
+      if (G.trail && c.live && (i & 3) === 0) G.trail.push({ x:c.x, y:c.y });
+      if (!E.moving(G.balls)) break;
+    }
+    if (!E.moving(G.balls)) { G.phase = 'settle'; settled(); }
+  }
+  render(dt);
+}
+
+function render(dt) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = C.pg; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(bakedTable(vw, vh), 0, 0);
+  setT(ctx);
+  const g = ctx;
+  g.save(); clipTable(g);
+
+  if (G.mode === 'nine' && G.breakZone && G.phase === 'inhand') {
+    g.strokeStyle = C.ink; g.globalAlpha = 0.22; g.lineWidth = PX(1.2); g.setLineDash([PX(6), PX(6)]);
+    g.beginPath(); g.moveTo(TW * 0.25, 0); g.lineTo(TW * 0.25, TH); g.stroke();
+    g.setLineDash([]); g.globalAlpha = 1;
+  }
+  if (G.mode === 'run' && G.called >= 0 && !G.over) {
+    const q = pocketCentre(G.called);
+    g.strokeStyle = C.pw; g.globalAlpha = 0.5 + 0.22 * Math.sin(performance.now() / 320);
+    g.lineWidth = PX(2.4);
+    g.beginPath(); g.arc(q.x, q.y, q.r + 4, 0, TAU); g.stroke();
+    g.globalAlpha = 1;
+  }
+
+  if (G.trail && G.trail.length > 1) {
+    g.strokeStyle = C.ink; g.globalAlpha = 0.14; g.lineWidth = PX(1.6);
+    poly(g, G.trail, 0, G.trail.length - 1) && g.stroke();
+    g.globalAlpha = 1;
+  }
+
+  if ((G.phase === 'aim' || G.phase === 'aithink') && !G.over) drawAim(g);
+  if (G.hintShot) drawHint(g);
+
+  for (let i = 0; i < G.balls.length; i++) {
+    const b = G.balls[i];
+    if (!b.live) continue;
+    if (G.mode === 'nine' && b.num === G.low && b.num > 0) {
+      g.strokeStyle = C.pa; g.globalAlpha = 0.85; g.lineWidth = PX(2.2);
+      g.beginPath(); g.arc(b.x, b.y, BR + PX(5), 0, TAU); g.stroke();
+      g.globalAlpha = 1;
+    }
+    ballFace(g, b);
+    if (G.mode === 'nine') ballNumber(g, b);
+  }
+  if (G.phase === 'inhand') drawInHand(g);
+  drawFx(g, dt);
+  g.restore();
+}
+
+function drawInHand(g) {
+  const c = cueBall();
+  const ok = placeOK(c.x, c.y);
+  ballFace(g, c, 0.8);
+  g.strokeStyle = ok ? C.pa : C.pw; g.lineWidth = PX(2); g.setLineDash([PX(4), PX(4)]);
+  g.beginPath(); g.arc(c.x, c.y, BR + PX(6), 0, TAU); g.stroke();
+  g.setLineDash([]);
+}
+function placeOK(x, y) {
+  if (!E.canPlace(G.balls, x, y, 0)) return false;
+  if (G.mode === 'nine' && G.breakZone && x > TW * 0.25) return false;
+  return true;
+}
+function drawHint(g) {
+  const s = G.hintShot;
+  const c = cueBall(); if (!c || !c.live) return;
+  const p = E.predict(G.balls, s, { ticks:280 });
+  g.strokeStyle = C.pw; g.globalAlpha = 0.55; g.lineWidth = PX(2.2); g.setLineDash([PX(9), PX(6)]);
+  poly(g, p.cue, 0, p.hitAt > 0 ? p.hitAt : p.cue.length - 1) && g.stroke();
+  g.setLineDash([]);
+  if (p.obj && p.obj.length > 1) { g.globalAlpha = 0.4; poly(g, p.obj, 0, p.obj.length - 1) && g.stroke(); }
+  g.globalAlpha = 1;
+}
+
+/* ------------------------------------------------------------------- touching */
+
+const pointers = new Map();
+let pinch = null;
+
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  audio();
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d:Math.hypot(a.x - b.x, a.y - b.y), z:V.zoom, mx:(a.x + b.x) / 2, my:(a.y + b.y) / 2, px:V.px, py:V.py };
+  } else if (pointers.size === 1) {
+    handleOne(e.clientX, e.clientY, true);
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if (pointers.size === 2 && pinch) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    V.zoom = clamp(pinch.z * (d / pinch.d), 1, 3.4);
+    V.px = pinch.px + ((a.x + b.x) / 2 - pinch.mx);
+    V.py = pinch.py + ((a.y + b.y) / 2 - pinch.my);
+    applyZoom(); bakeKey = ''; updateHUD();
+  } else if (pointers.size === 1) {
+    handleOne(e.clientX, e.clientY, false);
+  }
+});
+function up(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (G.phase === 'inhand' && pointers.size === 0) {
+    const c = cueBall();
+    if (placeOK(c.x, c.y)) {
+      G.phase = 'aim'; G.predKey = '';
+      if (G.mode === 'nine' && G.breakZone) { G.breakZone = false; say('Break'); }
+      updateHUD();
+    }
+  }
+}
+cv.addEventListener('pointerup', up);
+cv.addEventListener('pointercancel', up);
+
+function handleOne(px, py, down) {
+  if (G.over) return;
+  const t = toTable(px, py);
+  if (G.phase === 'inhand') {
+    const c = cueBall();
+    const nx = clamp(t.x, BR + 1, TW - BR - 1), ny = clamp(t.y, BR + 1, TH - BR - 1);
+    c.x = nx; c.y = ny; G.predKey = '';
+    return;
+  }
+  if (G.phase !== 'aim') return;
+  const c = cueBall();
+  if (!c.live) return;
+  const dx = t.x - c.x, dy = t.y - c.y;
+  if (Math.hypot(dx, dy) < 24) return;         /* too close to mean anything */
+  G.aim = Math.atan2(dy, dx);
+  G.hintShot = null;
+  updateHUD();
+}
+
+/* the stroke: pull it back and let go */
+(function () {
+  const bar = $('stroke');
+  let drag = null;
+  bar.addEventListener('pointerdown', e => {
+    if (G.phase !== 'aim' || G.over) return;
+    bar.setPointerCapture(e.pointerId);
+    bar.classList.add('pulling');
+    drag = { x:e.clientX, p:G.power };
+    audio();
+  });
+  bar.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const span = Math.max(60, bar.clientWidth - 50);
+    G.power = clamp(drag.p + (drag.x - e.clientX) / span, 0, 1);
+    syncControls();
+    if (Math.abs(G.power - (drag.last || 0)) > 0.08) { drag.last = G.power; sfx('tick'); }
+  });
+  const done = () => {
+    if (!drag) return;
+    drag = null; bar.classList.remove('pulling');
+    if (G.power > 0.03) fire();
+    G.power = Math.max(G.power, 0.12);
+    syncControls();
+  };
+  bar.addEventListener('pointerup', done);
+  bar.addEventListener('pointercancel', done);
+})();
+
+/* the spin disc: it is a cue ball, seen from where you are standing */
+(function () {
+  const d = $('spin');
+  let on = false, tapT = 0;
+  const set = e => {
+    const r = d.getBoundingClientRect();
+    const dx = (e.clientX - r.left - r.width / 2) / (r.width / 2 - 6);
+    const dy = (e.clientY - r.top - r.height / 2) / (r.height / 2 - 6);
+    const m = Math.hypot(dx, dy);
+    const k = m > 1 ? 1 / m : 1;
+    G.side = clamp(dx * k, -1, 1); G.ver = clamp(-dy * k, -1, 1);
+    G.predKey = ''; syncControls();
+  };
+  d.addEventListener('pointerdown', e => { d.setPointerCapture(e.pointerId); on = true; tapT = performance.now(); set(e); });
+  d.addEventListener('pointermove', e => { if (on) set(e); });
+  const off = e => {
+    if (!on) return; on = false;
+    if (performance.now() - tapT < 180 && Math.hypot(G.side, G.ver) < 0.34) { G.side = 0; G.ver = 0; G.predKey = ''; syncControls(); }
+  };
+  d.addEventListener('pointerup', off);
+  d.addEventListener('pointercancel', off);
+})();
+
+/* ---------------------------------------------------------------------- sheets */
+
+function openSheet(html, cls) {
+  const s = $('sheet');
+  s.className = 'sheet' + (cls ? ' ' + cls : '');
+  s.innerHTML = '<div class="grab"></div>' + html;
+  $('veil').classList.add('on');
+}
+function closeSheet() { $('veil').classList.remove('on'); }
+$('veil').addEventListener('pointerdown', e => { if (e.target === $('veil')) closeSheet(); });
+
+const BOOKS = {
+  2:{ name:'Duet', d:'Two balls, two shots' },
+  3:{ name:'Trio', d:'Three balls, three shots' },
+  4:{ name:'Quartet', d:'Four balls, and no room to waste one' },
+};
+
+function sheetStudyDone(inPar) {
+  const clean = inPar && !G.hinted;
+  openSheet(`
+    <div class="sh1">${clean ? 'Cleared, in par' : inPar ? 'Cleared, with a hint' : 'Cleared'}</div>
+    <div class="sh2">${BOOKS[G.n].name} №${G.num} — ${G.shots} shot${G.shots === 1 ? '' : 's'}, par ${G.par}.</div>
+    ${inPar ? '' : '<p>Par is the shortest line the engine could shoot on this table. It is there, if you want it again.</p>'}
+    <div class="rowbtns">
+      <button class="pbtn" onclick="nextThing()">Next study</button>
+      <button class="pbtn ghost" onclick="replay()">Shoot it again</button>
+      <button class="pbtn ghost" onclick="closeSheet();goHome()">Done</button>
+    </div>`, clean ? 'win' : '');
+}
+function sheetNineDone(winner) {
+  openSheet(`
+    <div class="sh1">${winner === 0 ? 'You take it' : E.SKILLS[G.skill].name + ' takes it'}</div>
+    <div class="sh2">${winner === 0 ? 'The nine went down on a legal shot.' : 'The machine got there first.'}</div>
+    <div class="stat"><span>Against ${E.SKILLS[G.skill].name}</span><b>${DB.nine.w}–${DB.nine.l}</b></div>
+    <div class="rowbtns">
+      <button class="pbtn" onclick="replay()">Rack again</button>
+      <button class="pbtn ghost" onclick="closeSheet();goHome()">Done</button>
+    </div>`, winner === 0 ? 'win' : '');
+}
+function sheetRunDone() {
+  const rec = G.score >= DB.run.best && G.score > 0;
+  openSheet(`
+    <div class="sh1">${rec ? 'Best run yet' : 'Out of shots'}</div>
+    <div class="sh2">${G.score} ball${G.score === 1 ? '' : 's'} down.</div>
+    <div class="stat"><span>Best</span><b>${DB.run.best}</b></div>
+    <div class="stat"><span>Runs</span><b>${DB.run.plays}</b></div>
+    <div class="rowbtns">
+      <button class="pbtn" onclick="replay()">Again</button>
+      <button class="pbtn ghost" onclick="closeSheet();goHome()">Done</button>
+    </div>`, rec ? 'win' : '');
+}
+function sheetMenu() {
+  const extra = G.mode === 'study'
+    ? '<button class="pbtn ghost" onclick="closeSheet();sheetNumbers()">Pick a number</button>' : '';
+  openSheet(`
+    <div class="sh1">${G.mode === 'study' ? BOOKS[G.n].name + ' №' + G.num : G.mode === 'nine' ? 'Nine-ball' : 'The run'}</div>
+    <div class="rowbtns">
+      <button class="pbtn" onclick="closeSheet()">Keep playing</button>
+      <button class="pbtn ghost" onclick="replay()">Start over</button>
+      ${extra}
+      <button class="pbtn ghost" onclick="closeSheet();sheetHow()">How it works</button>
+      <button class="pbtn ghost" onclick="closeSheet();goHome()">Leave the table</button>
+    </div>`);
+}
+let numPage = 0;
+function sheetNumbers() {
+  const rec = DB.study[G.n];
+  const per = 25, from = numPage * per + 1;
+  let cells = '';
+  for (let i = from; i < from + per; i++) {
+    const d = rec.done[i];
+    cells += `<button class="${d === 2 ? 'done' : ''} ${i === G.num ? 'here' : ''}" onclick="closeSheet();startStudy(${G.n},${i})">${i}${d === 1 ? '·' : ''}</button>`;
+  }
+  openSheet(`
+    <div class="sh1">${BOOKS[G.n].name}</div>
+    <div class="sh2">Every number is the same table on every device, forever — the number is the seed.</div>
+    <div class="numgrid">${cells}</div>
+    <div class="pager">
+      <button onclick="numPage=Math.max(0,numPage-1);sheetNumbers()">&#8592;</button>
+      <span>${from}–${from + per - 1}</span>
+      <button onclick="numPage++;sheetNumbers()">&#8594;</button>
+    </div>`);
+}
+function sheetSkill() {
+  const b = (i, d) => `<button class="pbtn ${i === DB.nine.skill ? '' : 'ghost'}" onclick="DB.nine.skill=${i};save();closeSheet();startNine(${i})">${E.SKILLS[i].name} — ${d}</button>`;
+  openSheet(`
+    <div class="sh1">Nine-ball</div>
+    <div class="sh2">Lowest ball first. Anything that falls counts. The nine ends it.</div>
+    <div class="rowbtns">${b(0, 'misses like a beginner')}${b(1, 'plays position')}${b(2, 'banks and combos')}</div>`);
+}
+function sheetHow() {
+  openSheet(`
+    <div class="sh1">How it works</div>
+    <p><b>Aiming.</b> Touch anywhere on the cloth and the cue points from the ball
+    through your finger — so the further out you touch, the finer the angle. The
+    dashed line and the ring are geometry: the ring is where the cue ball has to be
+    for the contact you are asking for, and an object ball always leaves along the
+    line joining the two centres. The solid line is not geometry — it is this
+    stroke, at this speed, with this spin, run through the physics the table itself
+    runs, which is why it stops where the ball stops. Ask for a contact the stroke
+    cannot reach and it draws a ring where the cue ball actually dies instead.</p>
+    <p><b>The stroke.</b> Pull the bar back and let go. Pull further for more. The
+    faint line past the contact is where the cue ball takes itself afterwards —
+    that, more than the pot, is what the next shot is made of.</p>
+    <p><b>Spin.</b> The white disc is a cue ball seen from behind. Strike it high to
+    follow through, low to draw back, off to one side to bend off a cushion. Tap the
+    middle to go back to centre ball.</p>
+    <p><b>Studies.</b> Clear the table inside par. Every study is built on this device
+    and then proved: the engine searches for a line, shoots every shot in it to rest,
+    and par is however many that took. It proves them centre-ball, so spin is always
+    yours to use and never the answer.</p>
+    <p><b>Nine-ball.</b> Hit the lowest ball first. Anything that drops counts, and the
+    nine wins. Miss it, scratch, or drive nothing to a cushion and the table goes to
+    the other side with the ball in their hand.</p>
+    <p><b>The run.</b> Eight shots to start. Every ball down buys another; two in a
+    stroke buys three; the ringed pocket pays double. It ends when the shots do.</p>
+    <div class="rowbtns"><button class="pbtn" onclick="closeSheet()">Right</button></div>`);
+}
+
+/* --------------------------------------------------------------------- home */
+
+function drawMark(cvs, kind) {
+  const d = Math.min(window.devicePixelRatio || 1, 2.5);
+  const w = cvs.clientWidth || 54, h = cvs.clientHeight || 54;
+  cvs.width = w * d; cvs.height = h * d;
+  const g = cvs.getContext('2d');
+  g.setTransform(d, 0, 0, d, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const pad = 3, bw = w - pad * 2, bh = bw * 0.5, by = (h - bh) / 2;
+  g.fillStyle = C.rail; roundRect(g, pad, by - 3.5, bw, bh + 7, 4); g.fill();
+  g.fillStyle = C.bed; g.fillRect(pad + 2.5, by, bw - 5, bh);
+  g.fillStyle = C.pocket;
+  const px = [pad + 3.5, pad + bw / 2, pad + bw - 3.5], py = [by + 0.5, by + bh - 0.5];
+  for (const x of px) for (const y of py) { g.beginPath(); g.arc(x, y, 2.5, 0, TAU); g.fill(); }
+  const dot = (fx, fy, col, r) => {
+    g.fillStyle = col; g.beginPath(); g.arc(pad + 2.5 + fx * (bw - 5), by + fy * bh, r || 3.1, 0, TAU); g.fill();
+    g.lineWidth = 0.9; g.strokeStyle = C.line; g.stroke();
+  };
+  if (kind === 'study') {
+    g.strokeStyle = C.ink; g.globalAlpha = 0.4; g.lineWidth = 0.9; g.setLineDash([2, 2]);
+    g.beginPath(); g.moveTo(pad + 2.5 + 0.2 * (bw - 5), by + 0.7 * bh); g.lineTo(pad + 2.5 + 0.62 * (bw - 5), by + 0.32 * bh); g.stroke();
+    g.setLineDash([]); g.globalAlpha = 1;
+    dot(0.2, 0.7, C.cue); dot(0.68, 0.28, '#ef4a5a');
+  } else if (kind === 'nine') {
+    dot(0.18, 0.5, C.cue);
+    dot(0.62, 0.5, '#f0c33c'); dot(0.76, 0.34, '#3d8bdf'); dot(0.76, 0.66, '#57c268'); dot(0.9, 0.5, '#9b62d6');
+  } else {
+    dot(0.16, 0.62, C.cue);
+    dot(0.5, 0.3, '#3d8bdf'); dot(0.66, 0.66, '#f0902c'); dot(0.84, 0.4, '#57c268');
+    g.strokeStyle = C.pw; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(pad + bw - 3.5, by + bh - 0.5, 4.2, 0, TAU); g.stroke();
+  }
+}
+
+/* The launcher mark, drawn by the same routine that draws a ball on the table.
+   It is not a picture of a shot — it is one: the ghost sits exactly two radii
+   back along the line of centres, so the cue ball, the ghost and the object
+   ball are collinear because the arithmetic says so, not because it looked
+   right. Exported so the icon files can be rendered from the game itself. */
+function drawIcon(g, size, bleed) {
+  const U = 68, scale = size / U, keep = V.s;
+  V.s = scale;
+  g.setTransform(scale, 0, 0, scale, 0, 0);
+  g.fillStyle = C.pg;
+  if (bleed) g.fillRect(0, 0, U, U); else { roundRect(g, 0, 0, U, U, 14); g.fill(); }
+  /* the instant of contact: the two centres are exactly two radii apart, which
+     is the only distance at which this picture is true */
+  const ang = -0.70;
+  const ux = Math.cos(ang), uy = Math.sin(ang);
+  const cue = { num:0, x:22.5, y:45.5 };
+  const obj = { num:3, x:cue.x + ux * 2 * BR, y:cue.y + uy * 2 * BR };
+  g.lineCap = 'round';
+  g.strokeStyle = C.ink; g.globalAlpha = 0.42; g.lineWidth = PX(size * 0.03);
+  g.setLineDash([PX(size * 0.052), PX(size * 0.05)]);
+  g.beginPath(); g.moveTo(cue.x - ux * (BR + 3), cue.y - uy * (BR + 3));
+  g.lineTo(cue.x - ux * (BR + 17), cue.y - uy * (BR + 17)); g.stroke();
+  g.setLineDash([]);
+  /* and the way the object ball has to leave, which is the line of centres */
+  g.strokeStyle = C.pa; g.globalAlpha = 0.92; g.lineWidth = PX(size * 0.04);
+  g.beginPath(); g.moveTo(obj.x + ux * (BR + 3), obj.y + uy * (BR + 3));
+  g.lineTo(obj.x + ux * (BR + 15), obj.y + uy * (BR + 15)); g.stroke();
+  g.globalAlpha = 1;
+  ballFace(g, cue); ballFace(g, obj);
+  V.s = keep;
+}
+window.CUSHION_MARK = drawIcon;
+
+function buildHome() {
+  const list = $('modeList');
+  const done = n => Object.keys(DB.study[n].done).length;
+  const rows = [
+    { k:'study', n:'Studies', d:'Clear the table inside par. Certified, never authored.', c:(done(2) + done(3) + done(4)) + ' done', go:() => showBooks() },
+    { k:'nine', n:'Nine-ball', d:'Lowest ball first, against a machine that aims like a person.', c:DB.nine.w + '–' + DB.nine.l, go:() => sheetSkill() },
+    { k:'run', n:'The run', d:'Every ball down buys another shot. Keep it going.', c:DB.run.best ? 'best ' + DB.run.best : '', go:() => startRun() },
+  ];
+  list.innerHTML = rows.map(r => `<button class="mode" data-k="${r.k}"><canvas></canvas><div><div class="n">${r.n}</div><div class="d">${r.d}</div></div><div class="c">${r.c}</div></button>`).join('');
+  [...list.children].forEach((el, i) => {
+    drawMark(el.querySelector('canvas'), rows[i].k);
+    el.addEventListener('click', rows[i].go);
+  });
+}
+function showBooks() {
+  const list = $('bookList');
+  list.innerHTML = [2, 3, 4].map(n => {
+    const rec = DB.study[n], d = Object.keys(rec.done).length;
+    return `<button class="book" data-n="${n}"><canvas></canvas><div><div class="n">${BOOKS[n].name}</div><div class="d">${BOOKS[n].d}</div></div><div class="c">${d ? d + ' cleared' : '—'}</div></button>`;
+  }).join('');
+  [...list.children].forEach(el => {
+    const n = +el.dataset.n;
+    drawMark(el.querySelector('canvas'), 'study');
+    el.addEventListener('click', () => startStudy(n, DB.study[n].at));
+  });
+  showScreen('books');
+}
+function goHome() { G.mode = null; G.over = false; G.phase = 'idle'; buildHome(); showScreen('home'); }
+
+/* ------------------------------------------------------------------- chrome */
+
+$('backBtn').addEventListener('click', goHome);
+$('booksBack').addEventListener('click', goHome);
+$('menuBtn').addEventListener('click', sheetMenu);
+$('howBtn').addEventListener('click', sheetHow);
+$('fitBtn').addEventListener('click', () => { V.zoom = 1; V.px = 0; V.py = 0; applyZoom(); bakeKey = ''; updateHUD(); });
+$('themeBtn').addEventListener('click', () => {
+  DB.theme = DB.theme === 'auto' ? 'paper' : DB.theme === 'paper' ? 'slate' : 'auto';
+  applyTheme(); save();
+  say('Theme: ' + DB.theme);
+});
+$('soundBtn').addEventListener('click', () => { DB.sound = !DB.sound; muted = !DB.sound; save(); sfx('tick'); say(DB.sound ? 'Sound on' : 'Sound off'); });
+$('hintBtn').addEventListener('click', () => {
+  if (G.phase !== 'aim' || G.over) return;
+  $('hintBtn').textContent = '…';
+  const finish = shot => {
+    $('hintBtn').textContent = '?';
+    if (!shot) { say('Nothing certain from here', true); return; }
+    G.hinted = true;
+    G.hintShot = shot;
+    G.aim = shot.angle; G.power = invPower(shot.power); G.ver = 0; G.side = 0;
+    syncControls(); updateHUD();
+    say('This one goes');
+    G.hintT = setTimeout(() => { G.hintShot = null; G.hintT = 0; }, 5000);
+  };
+  const anyPot = () => {
+    const only = G.mode === 'nine' ? [G.low] : E.objects(G.balls).map(b => b.num);
+    const cs = E.candidates(G.balls, { only, banks:true, combos:G.mode === 'nine' });
+    for (let i = 0; i < cs.length && i < 20; i++) { const t = E.tryShot(G.balls, cs[i]); if (t) return t.shot; }
+    return null;
+  };
+  if (G.mode === 'study') {
+    /* Ask for a line one shot longer than the balls left: from a position the
+       player has spoiled, a clean line may no longer exist, and a shot that
+       simply drops something is better advice than a shrug. */
+    ask({ t:'solve', balls:E.cloneBalls(G.balls), max:objectsLeft() + 1, budget:2400 },
+      r => finish((r.line && r.line[0]) || anyPot()), 2900);
+  } else {
+    finish(anyPot());
+  }
+});
+
+function applyTheme() {
+  const t = DB.theme;
+  document.documentElement.dataset.theme = t === 'auto' ? '' : t;
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+  readTheme();
+  bakeKey = '';
+  const dark = t === 'slate' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  [...document.querySelectorAll('meta[name="theme-color"]')].forEach(m => { m.media = ''; m.content = dark ? '#191519' : '#ece9e1'; });
+  buildHome();
+  if ($('books').classList.contains('on')) showBooks();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (DB.theme === 'auto') applyTheme(); });
+
+/* --------------------------------------------------------------------- boot */
+
+load();
+readTheme();
+startWorker();
+applyTheme();
+buildHome();
+showScreen('home');
+resize();
+requestAnimationFrame(tick);
+for (const n of [2, 3, 4]) prefetch(n, DB.study[n].at);
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
