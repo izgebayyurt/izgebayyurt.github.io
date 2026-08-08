@@ -163,6 +163,39 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   five-wide burrow — connected, ring-free, its one chamber's walk verified
   rather than eyeballed. Single self-contained `index.html` with
   `manifest.webmanifest`, `sw.js` and the icons beside it.
+- `goopslide/` — sliding-puzzle experiments; `escape2.html` ("Goop Out") is the
+  finished one. Swipe and *every* droplet slides at once; same colours merge on
+  contact, different colours block; each family escapes through its own gap in
+  the wall, and you win when the board is empty. 202 levels in five packs, with
+  sticky pads, wall goo, bumpers, deflecting wedges, pressure plates and doors,
+  portals, and exits that demand an exact size.
+  `tools/` is a certifier for the thing that actually goes wrong in a puzzle
+  like this: not solvability — every level was solvable and every `par` already
+  exact — but **elegance**, elements printed on the board that the player never
+  has to use. It calls an element *dodgeable* when some par-length solution
+  never engages it, and *inert* when deleting it changes neither the shortest
+  solution nor the number of shortest solutions. It found 43 such faults across
+  21 levels, worst in the packs named after their own mechanic: all ten Plates
+  levels carried a second plate that was pure clutter, and L126 could be beaten
+  at par touching neither plate nor door. All 21 are repaired — by the smallest
+  edit that makes the mechanic unavoidable, since a generated level is correct
+  but anonymous and these were composed by someone. `certify.js` exits non-zero
+  on any fault, so the standard holds for new levels too.
+  Two mistakes shaped the tool and are worth knowing. Testing dodgeability by
+  watching droplet trails is wrong exactly where wedges live — a bounce
+  reverses a droplet *before* it enters the deflecting cell, so the cell shows
+  up in no trail while doing the whole job — and it wrongly cleared five
+  wedges; the fix runs the board against a gadget-neutralised copy in lockstep
+  and demands identical droplets throughout. And walls are not gadgets: judged
+  by par alone 265 look inert, but removing them turns corridor puzzles into
+  empty boxes, so they are held to an unchanged-state-space test and reported
+  as notes, never faults. Nobody feels cheated by a wall that happens not to
+  matter; a plate you are taught to use and never need is a broken promise.
+  The rules are not reimplemented — `engine.js` slices `parse()` and
+  `simulate()` verbatim out of `escape2.html`, and the slice is cross-checked
+  by replaying its solutions through the real game in a browser (31/31 agreed).
+  Editing any map changes the FNV hash that keys a player's best, so `apply.js`
+  writes a `REKEY` table into the page to carry recorded times across.
 - `prismnets/` — standalone Three.js net-folding app (ESM + importmap, no build).
 - `Izge Bayyurt - CV.pdf` — linked from the nav.
 
