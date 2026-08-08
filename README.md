@@ -17,6 +17,41 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   it; time crawls while you aim but the hold is on a leash, and every launch costs
   a cooldown. Neither side may cross halfway, so nobody chases. Single
   self-contained `index.html`.
+- `cushion/` — Cushion, pocket billiards on paper: Tapa's ink-on-paper ground and
+  floating chrome, wearing Huemeld's outlined, hard-shadowed objects. Three modes off
+  one engine. **Studies** are trick shots — two to four balls, clear the table inside
+  par — and par is not an author's opinion: the generator beam-searches candidate
+  shots, simulates every one of them to rest, and par is however many the shortest
+  line it could actually shoot took. It proves them *centre-ball*, so spin is always
+  yours to use and never the answer, and a study whose every ball already hangs over
+  a pocket is thrown away before it is offered. Books are by ball count and endless,
+  numbered like Tapa's: №47 is the same table on every device forever, because the
+  number is the seed. **Nine-ball** is against a machine reading the table through the
+  same candidate list, at three strengths that differ in what they will attempt and in
+  how much they miss by — and it picks by shooting each shot again a standard deviation
+  either side and counting what still drops, so it declines thin cuts it has no
+  business taking, plays position, and ducks a coin-flip when it is good enough to
+  know. **The run** is endless: eight shots, every ball down buys another, two in a
+  stroke buys three, the ringed pocket pays double. The physics is one function the
+  screen and the prover both call, so the table you shoot on is the table par was
+  measured on. Slip — the contact patch against the cloth — is tracked separately from
+  velocity, which is where draw, follow, stun and swerve come from rather than being
+  special-cased; an impulse moves slip by exactly the vector it moves velocity by,
+  which is why a drawn cue ball comes back *after* it has hit something. Cushions are
+  capsules, so their ends are real jaws a ball can rattle in; a corner takes anything
+  that gets close, but a side pocket wants the ball past the nose, so a ball rolling
+  the length of the long rail sails by it. Aiming is honest about which half is which:
+  the dashed line and the ghost ring are geometry and hold at any speed, the solid line
+  is this stroke at this speed run through the real physics and stops where the ball
+  stops, and a contact the stroke cannot reach draws a ring where the cue ball actually
+  dies instead. Generation runs in a Worker — a second one, so a hint asked for while
+  the next study is building does not queue behind it — 0.2–3 s a board, prefetched
+  while you shoot. Paper and slate themes, pinch zoom, times and bests kept locally,
+  synthesised clicks, installable and playable offline. The launcher mark is drawn by
+  the same routine that draws a ball on the table, at the instant of contact: the two
+  centres are exactly two radii apart because the arithmetic says so. Single
+  self-contained `index.html` with `manifest.webmanifest`, `sw.js` and the icons
+  beside it. (`carom/` took the other billiards word first; it is a different game.)
 - `burnbridge/` — graph-theory puzzler for two to four travellers. They share one
   pool of bridges and every crossing burns the bridge behind it, so each span one
   spends is denied to the others forever. Formally: edge-disjoint trails, one per
