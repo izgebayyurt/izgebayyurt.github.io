@@ -35,13 +35,30 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   how much they miss by — and it picks by shooting each shot again a standard deviation
   either side and counting what still drops, so it declines thin cuts it has no
   business taking, plays position, and ducks a coin-flip when it is good enough to
-  know. **The run** is endless: eight shots, every ball down buys another, two in a
-  stroke buys three, the ringed pocket pays double. The stroke is the cue itself: put a
+  know. **The run** is endless and is the arcade one: eight shots to start, every ball
+  down buys another, two in a stroke buys three. The stroke is the cue itself: put a
   finger on the cloth behind the ball, where a hand would be, pull away from it — the
   ball goes the way you pull away from, and the further you pull the harder it goes —
   and let go to hit; let go without pulling and you have only aimed. Power counts from
   where the finger went down rather than from the ball, so a long lever and a fine
-  angle cost nothing. The physics is one function the screen and the prover both call,
+  angle cost nothing — and crucially the aim *latches* once you have drawn past the
+  detent, so pulling the shot back no longer walks the line you just set, which is
+  the single thing that made the control feel wrong. Past the latch, sideways is a
+  fine adjustment through a dead zone at reduced gain and straight back is pure
+  power; run out of glass behind a rail-frozen ball and the pull carries on around
+  the arc, so a full stroke is reachable from anywhere on the table against one
+  fixed span. Firing is a stroke rather than an instant: backswing, drive, contact,
+  follow-through, an eighth of a second, with the ball leaving at the contact frame.
+  The world stops for a few dozen milliseconds on the first contact and again on a
+  pot, the roll is hurried once nothing is about to happen but never past a ball
+  creeping at a mouth, a held finger fast-forwards, and a potted ball is drawn
+  sinking into the leather rather than blinking out. Impacts go through one bus into
+  a compressor with up to four a frame played for real and the rest summed into a
+  body thud, so a break sounds like a break; a chain of pots arpeggiates up a scale.
+  The run keeps one number system — a ball is worth its own number times whatever
+  its mouth is paying, the prices turn every shot with one mouth lit at four times,
+  and potting on consecutive shots multiplies everything — with the gains floating
+  up off the cloth where they were earned. The physics is one function the screen and the prover both call,
   so the table you shoot on is the table par was measured on, and its numbers are
   measured rather than tuned by ear: the bed is 100 inches, so a metre is 370 units,
   and rolling resistance is 0.010, sliding friction 0.20, ball-on-ball 0.96, a cushion
@@ -56,9 +73,7 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   capsules, so their ends are real jaws a ball can rattle in; a corner takes anything
   that gets close, but a side pocket wants the ball past the nose, so a ball rolling
   the length of the long rail sails by it. The table is inset rather than flush,
-  because a ball against a cushion needs glass behind it to pull a cue into, and the
-  pull is measured against the room that is actually there — less room, shorter pull,
-  same full range — so a frozen ball still reaches a full stroke. Aiming is drawn from
+  because a ball against a cushion needs glass behind it to pull a cue into. Aiming is drawn from
   the simulated path wherever the simulation can answer, which is the honest half of a
   lesson learnt the hard way: a straight ray from the cue ball is exact for a centre-ball
   stroke, and a lie the moment you put side on, naming the wrong ball one time in twenty

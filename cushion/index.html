@@ -220,13 +220,14 @@
   /* a line of prose that says what just happened, and then stops saying it */
   #say {
     position:absolute; z-index:7; left:50%; transform:translateX(-50%);
-    bottom:calc(env(safe-area-inset-bottom) + 84px); pointer-events:none;
+    top:calc(env(safe-area-inset-top) + 58px); pointer-events:none;
     font-size:12px; color:var(--pi); background:var(--chrome); border:1px solid var(--pfaint);
     padding:7px 15px; border-radius:999px; box-shadow:0 2px 8px var(--shadow);
     opacity:0; transition:opacity .3s var(--calm), transform .3s var(--pop); white-space:nowrap;
     max-width:calc(100vw - 40px); overflow:hidden; text-overflow:ellipsis;
   }
-  #say.on { opacity:1; }
+  #say.on { opacity:1; transform:translateX(-50%) translateY(0); }
+  #say { transform:translateX(-50%) translateY(-6px); }
   #say.bad { color:var(--pw); }
 
   /* ---------- sheets ---------- */
@@ -557,7 +558,7 @@ function shoot(balls, shot, sink) {
   return { balls:bs, ev };
 }
 
-const newEvents = () => ({ potted:[], pottedAt:[], firstHit:-1, railAfter:false, cueScratch:false, contact:false });
+const newEvents = () => ({ potted:[], pottedAt:[], firstHit:-1, railAfter:false, cueScratch:false, contact:false, kick:false, banked:{} });
 function moving(bs) {
   for (let i = 0; i < bs.length; i++) if (bs[i].live && (bs[i].vx || bs[i].vy)) return true;
   return false;
@@ -588,12 +589,16 @@ function advance(bs, ev, sink) {
     for (let i = 0; i < bs.length; i++) {
       if (!bs[i].live) continue;
       const f = railHit(bs[i]);
-      if (f > 0) { if (ev.contact) ev.railAfter = true; if (sink) sink('rail', f / V_MAX, bs[i].x, bs[i].y); }
+      if (f > 0) {
+        if (ev.contact) ev.railAfter = true; else if (i === 0) ev.kick = true;
+        ev.banked[bs[i].num] = 1;
+        if (sink) sink('rail', f / V_MAX, bs[i].x, bs[i].y);
+      }
       const p = inPocket(bs[i]);
       if (p >= 0) {
         bs[i].live = false; bs[i].pocket = p; bs[i].vx = bs[i].vy = bs[i].sx = bs[i].sy = 0;
         if (i === 0) ev.cueScratch = true; else { ev.potted.push(bs[i].num); ev.pottedAt.push(p); }
-        if (sink) sink('pot', 1, POCKETS[p].x, POCKETS[p].y);
+        if (sink) sink('pot', 1, bs[i].x, bs[i].y, { num:bs[i].num, pocket:p, cue:i === 0 });
       }
     }
   }
@@ -1147,8 +1152,8 @@ function predict(bs, shot, opts) {
   const ev = newEvents();
   const cue = [{ x:w[0].x, y:w[0].y }];
   let hitAt = -1, hitNum = -1, obj = null, hitBall = null, ticks = 0;
-  const cap = opts.ticks || 900;
-  const tail = opts.tail === undefined ? 110 : opts.tail;
+  const cap = opts.ticks || 620;
+  const tail = opts.tail === undefined ? 60 : opts.tail;
   while (ticks < cap) {
     ticks++;
     advance(w, ev, null);
@@ -1225,7 +1230,7 @@ function fitView(vw, vh) {
   /* The table is inset rather than flush. You shoot by pulling away from the cue
      ball, so a ball against a cushion needs glass behind it to pull into; with the
      table edge-to-edge there was nowhere to put a finger. */
-  const m = Math.max(30, Math.min(vw, vh) * 0.075);
+  const m = Math.max(24, Math.min(vw, vh) * 0.055);
   V.padX = m; V.padT = 54 + m * 0.35; V.padB = 60 + m * 0.35;
   V.vw = vw; V.vh = vh;
   const availW = vw - V.padX * 2, availH = vh - V.padT - V.padB;
@@ -1310,16 +1315,7 @@ function drawTable(g) {
   /* The mouths, cut through both cloth and frame. A hole is not a dark disc: it
      is lighter where the light reaches its near edge and black down the throat,
      and it has a lip. Without the lip it disappears into a rail this dark. */
-  for (let i = 0; i < 6; i++) {
-    const q = pocketCentre(i);
-    const gr = g.createRadialGradient(q.x, q.y - q.r * 0.18, q.r * 0.1, q.x, q.y, q.r);
-    gr.addColorStop(0, C.pdeep); gr.addColorStop(0.62, C.pdeep); gr.addColorStop(1, C.pocket);
-    g.fillStyle = gr;
-    g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill();
-    g.strokeStyle = C.plip; g.globalAlpha = 0.5; g.lineWidth = PX(1.3);
-    g.beginPath(); g.arc(q.x, q.y, q.r - PX(0.7), 0, TAU); g.stroke();
-    g.globalAlpha = 1;
-  }
+  for (let i = 0; i < 6; i++) drawPocket(g, i);
 
   /* the cushion noses: capsules whose surface is exactly where a ball stops,
      and whose rounded ends are the jaws a ball can rattle in */
@@ -1355,6 +1351,19 @@ function pocketCentre(i) {
   const p = POCKETS[i];
   if (p.kind === 'c') { const sx = p.x === 0 ? 1 : -1, sy = p.y === 0 ? 1 : -1; return { x:p.x - sx * 5, y:p.y - sy * 5, r:E.POT_CORNER + 2 }; }
   return { x:p.x, y:p.y + (p.dir < 0 ? -3 : 3), r:SIDE_JAW };
+}
+
+/* Drawn into the baked table, and again live over a ball that is dropping, so
+   the ball goes *into* the mouth rather than sitting on top of it. */
+function drawPocket(g, i) {
+  const q = pocketCentre(i);
+  const gr = g.createRadialGradient(q.x, q.y - q.r * 0.18, q.r * 0.1, q.x, q.y, q.r);
+  gr.addColorStop(0, C.pdeep); gr.addColorStop(0.62, C.pdeep); gr.addColorStop(1, C.pocket);
+  g.fillStyle = gr;
+  g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill();
+  g.strokeStyle = C.plip; g.globalAlpha = 0.5; g.lineWidth = PX(1.3);
+  g.beginPath(); g.arc(q.x, q.y, q.r - PX(0.7), 0, TAU); g.stroke();
+  g.globalAlpha = 1;
 }
 
 function clipTable(g) { roundRect(g, -RAILW, -RAILW, TW + 2 * RAILW, TH + 2 * RAILW, 13); g.clip(); }
@@ -1454,14 +1463,24 @@ function ballNumber(g, b, scale) {
    a slideshow — and because a downloaded sample is a thing that can fail to
    arrive on a train.
    =========================================================================== */
-let AC = null, muted = false;
+let AC = null, BUS = null, muted = false;
 function audio() {
   if (!AC) { const K = window.AudioContext || window.webkitAudioContext; if (K) AC = new K(); }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (!AC) return null;
+  if (AC.state === 'suspended') AC.resume();
+  if (!BUS) {
+    /* Everything goes through one bus into a compressor. A break is a dozen
+       impacts inside a few frames, and without this they sum into a clipped
+       blat — which is why the old code had to throttle them to one click. */
+    BUS = AC.createGain(); BUS.gain.value = 0.95;
+    const comp = AC.createDynamicsCompressor();
+    comp.threshold.value = -18; comp.knee.value = 22; comp.ratio.value = 7;
+    comp.attack.value = 0.003; comp.release.value = 0.16;
+    BUS.connect(comp); comp.connect(AC.destination);
+  }
   return AC;
 }
-let lastSound = 0;
-function noise(dur, hz, q, gain, type) {
+function noise(dur, hz, q, gain, type, at) {
   const a = audio(); if (!a || muted) return;
   const n = a.sampleRate * dur | 0;
   const buf = a.createBuffer(1, Math.max(1, n), a.sampleRate);
@@ -1470,44 +1489,87 @@ function noise(dur, hz, q, gain, type) {
   const src = a.createBufferSource(); src.buffer = buf;
   const bp = a.createBiquadFilter(); bp.type = type || 'bandpass'; bp.frequency.value = hz; bp.Q.value = q;
   const g = a.createGain(); g.gain.value = gain;
-  src.connect(bp); bp.connect(g); g.connect(a.destination);
-  src.start();
+  src.connect(bp); bp.connect(g); g.connect(BUS);
+  src.start(a.currentTime + (at || 0));
 }
-function tone(hz, dur, gain, type, slideTo) {
+function tone(hz, dur, gain, type, slideTo, at) {
   const a = audio(); if (!a || muted) return;
+  const t0 = a.currentTime + (at || 0);
   const o = a.createOscillator(), g = a.createGain();
-  o.type = type || 'sine'; o.frequency.setValueAtTime(hz, a.currentTime);
-  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime + dur);
-  g.gain.setValueAtTime(gain, a.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-  o.connect(g); g.connect(a.destination);
-  o.start(); o.stop(a.currentTime + dur + 0.02);
+  o.type = type || 'sine'; o.frequency.setValueAtTime(hz, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + dur);
+  g.gain.setValueAtTime(gain, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(BUS);
+  o.start(t0); o.stop(t0 + dur + 0.02);
 }
+
+/* A rack breaking is not one click. Up to four impacts a frame are played for
+   real, staggered so they read as separate events; anything past that is summed
+   and comes back as a single body thud, which is what a pile-up actually sounds
+   like. Pots never queue behind anything. */
+let frameAt = 0, frameHits = 0, spill = 0;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+
+function clack(s, at) {
+  const det = rnd(0.94, 1.06), lvl = rnd(0.85, 1.15);
+  noise(0.030 + 0.02 * s, (1900 + s * 2100) * det, 2.4, (0.15 * s + 0.02) * lvl, 'bandpass', at);
+  tone((680 + s * 520) * det, 0.032, 0.05 * s * lvl, 'triangle', null, at);
+  if (s > 0.45) noise(0.055, 260, 1.0, 0.05 * s, 'lowpass', at);
+}
+
 function sfx(kind, str) {
-  const t = performance.now();
-  if (kind !== 'pot' && t - lastSound < 16) return;
-  lastSound = t;
-  const s = clamp(str || 0.4, 0.03, 1);
-  if (kind === 'clack') { noise(0.035, 2100 + s * 1800, 2.2, 0.16 * s + 0.02); tone(760 + s * 420, 0.035, 0.05 * s, 'triangle'); }
-  else if (kind === 'rail') { noise(0.075, 320 + s * 260, 1.1, 0.13 * s + 0.015, 'lowpass'); }
-  else if (kind === 'pot') { noise(0.12, 190, 0.7, 0.10, 'lowpass'); tone(300, 0.16, 0.07, 'sine', 120); }
-  else if (kind === 'cue') { noise(0.05, 1500, 1.6, 0.10 * s + 0.02); }
-  else if (kind === 'good') { tone(560, 0.10, 0.05, 'triangle', 840); }
-  else if (kind === 'bad') { tone(210, 0.18, 0.055, 'sine', 132); }
-  else if (kind === 'tick') { tone(1300, 0.02, 0.025, 'square'); }
+  const s = clamp(str === undefined ? 0.4 : str, 0.03, 1);
+  if (kind === 'clack') {
+    const now = performance.now();
+    if (now - frameAt > 18) {
+      frameAt = now; frameHits = 0;
+      if (spill > 0) { noise(0.12, 150, 0.8, Math.min(0.16, 0.05 + spill * 0.05), 'lowpass'); spill = 0; }
+    }
+    if (frameHits < 4) { clack(s, frameHits * 0.013); frameHits++; }
+    else spill += s;
+    return;
+  }
+  if (kind === 'rail') {
+    noise(0.075, 300 + s * 240, 1.1, 0.11 * s + 0.012, 'lowpass');
+    tone(95 + s * 45, 0.09, 0.05 * s, 'sine');           /* cushions have a body */
+  } else if (kind === 'pot') {
+    /* lip, drop, and the hollow of the pocket — and a note that climbs while a
+       chain of pots is still running, so a three-ball shot arpeggiates */
+    const n = Math.min(G.potChain || 0, SCALE.length - 1);
+    const f = 300 * Math.pow(2, SCALE[n] / 12);
+    tone(1650, 0.018, 0.045, 'square');
+    noise(0.11, 190, 0.7, 0.10, 'lowpass', 0.012);
+    tone(f, 0.17, 0.075, 'sine', f * 0.55, 0.012);
+    noise(0.09, 120, 0.9, 0.04, 'lowpass', 0.06);
+  } else if (kind === 'cue') {
+    noise(0.045, 1400 + s * 900, 1.7, 0.09 * s + 0.02);
+    tone(150, 0.05, 0.04 * s, 'sine', 90);
+  } else if (kind === 'good') {
+    const n = Math.min(G.streak || 0, SCALE.length - 1);
+    const f = 520 * Math.pow(2, SCALE[n] / 12);
+    tone(f, 0.10, 0.05, 'triangle', f * 1.5);
+  } else if (kind === 'win') {
+    for (let i = 0; i < 3; i++) tone(520 * Math.pow(2, [0, 4, 7][i] / 12), 0.16, 0.055, 'triangle', null, i * 0.065);
+  } else if (kind === 'bad') { tone(210, 0.18, 0.055, 'sine', 132); }
+  else if (kind === 'tick') { tone(900 + 1000 * s, 0.02, 0.022, 'square'); }
 }
 
 /* =========================================================================== */
 /* storage                                                                     */
 
 const KEY = 'cushion.v1';
-let DB = { theme:'auto', sound:true, study:{}, nine:{ skill:1, w:0, l:0 }, run:{ best:0, plays:0 } };
+let DB = { theme:'auto', sound:true, study:{}, nine:{ skill:1, w:0, l:0 }, run:{ best:0, plays:0, v2:0 } };
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) DB = Object.assign(DB, JSON.parse(raw));
   } catch (e) {}
   for (const n of [2, 3, 4]) if (!DB.study[n]) DB.study[n] = { at:1, done:{} };
+  /* the run used to score in balls and now scores in points, so an old best is
+     not a smaller number, it is a different unit — retire it, keep the studies */
+  if (!DB.run.v2) { DB.run.best = 0; DB.run.v2 = 1; }
   muted = !DB.sound;
 }
 let saveT = 0;
@@ -1578,12 +1640,13 @@ function prefetch(n, i) {
 
 const G = {
   mode:null, balls:[], phase:'idle',
-  aim:0, power:0, side:0, ver:0,
+  aim:0, aimTarget:0, power:0, side:0, ver:0,
   ev:null, shots:0, par:0, n:2, num:1,
-  score:0, left:0, called:-1, streak:0,
-  turn:0, skill:1, low:1, broke:false, msg:'',
-  hinted:false, hintShot:null, hintT:0, aiShot:null, over:false,
-  fx:[], trail:null, pred:null, predKey:'', guide:null, guideKey:'', t0:0, rollT:0,
+  score:0, left:0, called:-1, streak:0, multRot:0,
+  turn:0, skill:1, low:1, potChain:0, ff:0,
+  hinted:false, hintShot:null, hintPath:null, hintT:0, aiShot:null, over:false,
+  fx:[], trail:null, trailFade:0, pred:null, predKey:'', guide:null, guideKey:'', t0:0, rollT:0,
+  shot:null, strokeT:0, cueFollow:0, hold:0, held:0, slowed:false, near:{}, aimIn:1, scoreShown:0,
 };
 const rngRun = () => Math.random();
 
@@ -1599,6 +1662,13 @@ function say(text, bad) {
 }
 
 function pushFx(kind, x, y, extra) { G.fx.push(Object.assign({ kind, x, y, t:0 }, extra || {})); }
+const wrapPi = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+const buzz = ms => { if (DB.sound && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };
+
+/* Point the cue at something, now rather than eased — used when the game itself
+   chooses the line, which is never a moment that wants to glide. */
+function setAim(a) { G.aim = a; G.aimTarget = a; invalidateAim(); }
+function aimAt(b) { const c = cueBall(); if (b && c) setAim(Math.atan2(b.y - c.y, b.x - c.x)); }
 
 /* Everything this game defers — the opponent thinking, the opponent placing,
    a result sheet, a hint fading — belongs to the table it was scheduled on.
@@ -1612,21 +1682,33 @@ function later(fn, ms) { const mine = era; return setTimeout(() => { if (era ===
 
 /* A hint fades itself after a few seconds; that timer is cancelled outright
    rather than merely ignored, since it is the one we hold a handle to. */
-function clearHint() { clearTimeout(G.hintT); G.hintT = 0; G.hintShot = null; }
+function clearHint() { clearTimeout(G.hintT); G.hintT = 0; G.hintShot = null; G.hintPath = null; }
 
 /* --------------------------------------------------------------- taking a shot */
 
+/* A cue does not teleport. Backswing, drive, contact, follow-through — under a
+   fifth of a second all told, and the entire difference between "the ball moved"
+   and "you hit it". The ball leaves at the contact frame, not at the release. */
+const T_BACK = 0.085, T_DRIVE = 0.042, T_AFTER = 0.07;
+
 function fire() {
   if (G.phase !== 'aim' || G.over) return;
-  const p = powerCurve(G.power);
-  if (p < 0.06) return;
-  G.trail = [{ x:cueBall().x, y:cueBall().y }];
-  E.strike(G.balls, { angle:G.aim, power:p, ver:G.ver, side:G.side });
-  G.ev = E.newEvents();
-  G.phase = 'rolling'; G.rollT = 0;
+  if (G.power <= FIRE_T) { G.power = 0; return; }   /* one floor, and releaseStroke shares it */
+  G.shot = { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side };
+  G.phase = 'stroke'; G.strokeT = 0;
   clearHint(); G.aiShot = null;
+  updateHUD();
+}
+
+function strikeNow() {
+  const p = G.shot.power;
+  G.trail = [{ x:cueBall().x, y:cueBall().y }];
+  E.strike(G.balls, G.shot);
+  G.ev = E.newEvents();
+  G.phase = 'rolling'; G.rollT = 0; G.hold = 0; G.held = 0; G.slowed = false; G.near = {}; G.potChain = 0; G.ff = 0;
+  G.cueFollow = T_AFTER;
   sfx('cue', 0.4 + p * 0.6);
-  if (navigator.vibrate) try { navigator.vibrate(8 + p * 14); } catch (e) {}
+  buzz(8 + p * 16);
   G.lowBefore = G.low;
   updateHUD();
 }
@@ -1637,7 +1719,10 @@ const powerCurve = t => 0.04 + 0.96 * Math.pow(clamp(t, 0, 1), 1.5);
 
 function settled() {
   const ev = G.ev;
-  G.trail = null;
+  G.trailFade = 0.34;
+  /* a new shot starts from rest — the cue used to open already drawn back at the
+     last shot's power, on the last shot's line */
+  G.power = 0; G.aimIn = 0; G.cueFollow = 0;
   /* the balls have moved, so any cached aim reading is about a table that no
      longer exists — the key alone cannot notice that */
   G.predKey = ''; G.guideKey = '';
@@ -1652,7 +1737,7 @@ function settled() {
 function resolveStudy(ev) {
   G.shots++;
   const left = objectsLeft();
-  if (ev.potted.length) sfx('good');
+  if (ev.potted.length) { sfx('good'); const nm = nameShot(ev); if (nm) say(nm); }
   if (left === 0) { finishStudy(); return; }
   if (ev.cueScratch) { reviveCue(); G.phase = 'inhand'; say('Scratch — place the cue ball', true); sfx('bad'); }
   else G.phase = 'aim';
@@ -1668,8 +1753,8 @@ function finishStudy() {
   save();
   prefetch(G.n, G.num + 1); prefetch(G.n, G.num + 2);
   pushFx('wave', 0, 0);
-  sfx('good');
-  later(() => sheetStudyDone(inPar), 620);
+  sfx('win');
+  later(() => sheetStudyDone(inPar), 1150);
 }
 
 /* -------------------------------------------------------------------- nine-ball
@@ -1727,9 +1812,9 @@ function reviveCue() {
 }
 function endNine(winner) {
   G.over = true; G.phase = 'done';
-  if (winner === 0) { DB.nine.w++; pushFx('wave', 0, 0); sfx('good'); } else { DB.nine.l++; sfx('bad'); }
+  if (winner === 0) { DB.nine.w++; pushFx('wave', 0, 0); sfx('win'); } else { DB.nine.l++; sfx('bad'); }
   save();
-  later(() => sheetNineDone(winner), 700);
+  later(() => sheetNineDone(winner), 1000);
 }
 function aiPlace() {
   /* the machine puts the ball where it can see the most */
@@ -1755,7 +1840,7 @@ function aiThink() {
   const plan = E.aiNine(G.balls, G.skill, Math.random);
   if (!plan) { G.turn = 0; G.phase = 'aim'; return; }
   G.aiShot = plan;
-  G.aim = plan.angle; G.power = invPower(plan.power); G.ver = plan.ver || 0; G.side = plan.side || 0;
+  setAim(plan.angle); G.power = invPower(plan.power); G.ver = plan.ver || 0; G.side = plan.side || 0;
   syncControls();
   say(plan.why === 'safe' ? 'Playing safe' : '');
   later(() => {
@@ -1768,27 +1853,49 @@ const invPower = p => Math.pow(clamp((p - 0.04) / 0.96, 0, 1), 1 / 1.5);
 
 /* ------------------------------------------------------------------- the run */
 
+/* Every mouth is worth something and one is worth four times as much; the set
+   turns once a shot, so the good pocket is a thing you plan for rather than a
+   thing that happens to you. A ball is worth its own number, so which ball you
+   take is a decision too. */
+const MULTS = [1, 1, 2, 2, 3, 4];
+const multAt = i => MULTS[(i + G.multRot) % 6];
+function rollMults() {
+  G.multRot = (G.multRot + 1 + ((Math.random() * 4) | 0)) % 6;
+  for (let i = 0; i < 6; i++) if (multAt(i) === 4) G.called = i;
+}
+
 function resolveRun(ev) {
   const n = ev.potted.length;
   G.shots--;
   if (n) {
-    let gain = n === 1 ? 1 : n === 2 ? 3 : 6;
-    let pts = gain;
-    if (ev.pottedAt && ev.pottedAt.indexOf(G.called) >= 0) { pts *= 2; gain += 1; say('Called pocket — double'); }
-    G.shots = Math.min(16, G.shots + gain);
+    const bonus = 1 + 0.25 * Math.min(G.streak, 4);
+    let pts = 0;
+    for (let i = 0; i < n; i++) {
+      const m = multAt(ev.pottedAt[i]);
+      const v = Math.max(1, Math.round(ev.potted[i] * m * bonus));
+      pts += v;
+      const q = pocketCentre(ev.pottedAt[i]);
+      /* nudged in off the mouth, or a corner one is half off the table */
+      pushFx('gain', q.x + (q.x < E.W / 2 ? 34 : -34), q.y + (q.y < E.H / 2 ? 26 : -26),
+             { text:'+' + v, big:m >= 3 });
+    }
+    G.shots = Math.min(16, G.shots + (n === 1 ? 1 : n === 2 ? 3 : 6));
     G.score += pts;
     G.streak++;
     sfx('good');
+    const nm = nameShot(ev);
+    if (nm) say(nm);
+    else if (G.streak >= 3) say(G.streak + ' in a row');
   } else { G.streak = 0; }
-  if (ev.cueScratch) { G.shots--; reviveCue(); G.phase = 'inhand'; say('Scratch', true); sfx('bad'); }
+  if (ev.cueScratch) { G.shots--; reviveCue(); G.phase = 'inhand'; say('Scratch', true); sfx('bad'); buzz([40, 60, 40]); }
   else G.phase = 'aim';
   refillRun();
-  G.called = pickPocket();
+  rollMults();
   if (G.shots <= 0) {
     G.over = true; G.phase = 'done';
     if (G.score > DB.run.best) DB.run.best = G.score;
     DB.run.plays++; save();
-    later(() => sheetRunDone(), 620);
+    later(() => sheetRunDone(), 950);
   }
 }
 function refillRun() {
@@ -1811,7 +1918,18 @@ function refillRun() {
   /* forget the dead ones so the array cannot grow without end */
   G.balls = G.balls.filter((b, i) => i === 0 || b.live);
 }
-function pickPocket() { return (Math.random() * 6) | 0; }
+/* What just happened, said once and only when it is worth saying. Label an
+   ordinary pot and the game turns into a slot machine. */
+function nameShot(ev) {
+  if (!ev.potted.length) return null;
+  if (ev.potted.length > 2) return 'Three at once';
+  if (ev.potted.length === 2) return 'Double';
+  const num = ev.potted[0];
+  if (ev.kick) return 'Kick';
+  if (ev.firstHit >= 0 && num !== ev.firstHit) return 'Carom';
+  if (ev.banked && ev.banked[num]) return 'Bank';
+  return null;
+}
 
 /* ---------------------------------------------------------------- starting up */
 
@@ -1828,7 +1946,7 @@ function startStudy(n, num) {
     G.balls = E.cloneBalls(g.balls);
     G.par = g.par;
     G.phase = 'aim';
-    G.aim = Math.atan2(E.objects(G.balls)[0].y - cueBall().y, E.objects(G.balls)[0].x - cueBall().x);
+    aimAt(E.objects(G.balls)[0]);
     G.power = 0; G.side = 0; G.ver = 0;
     syncControls(); updateHUD();
     document.getElementById('say').className = '';
@@ -1837,10 +1955,10 @@ function startStudy(n, num) {
 }
 function startNine(skill) {
   newEra();
-  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0; G.broke = false;
+  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0;
   G.balls = E.rack9(Math.random); G.low = 1; G.shots = 0;
   G.phase = 'inhand'; G.breakZone = true; G.fx = [];
-  G.aim = 0; G.power = 0; G.side = 0; G.ver = 0;
+  setAim(0); G.power = 0; G.side = 0; G.ver = 0;
   showScreen('play'); syncControls(); updateHUD();
   say('Place the cue behind the line, then break');
 }
@@ -1848,9 +1966,9 @@ function startRun() {
   newEra();
   G.mode = 'run'; G.over = false; G.score = 0; G.shots = 8; G.streak = 0;
   G.balls = E.layoutRun(rngRun, 5, null); G.fx = [];
-  G.called = pickPocket();
+  G.multRot = 0; G.scoreShown = 0; rollMults();
   G.phase = 'aim';
-  G.aim = 0; G.power = 0; G.side = 0; G.ver = 0;
+  setAim(0); G.power = 0; G.side = 0; G.ver = 0;
   showScreen('play'); syncControls(); updateHUD();
 }
 function replay() {
@@ -1873,6 +1991,7 @@ const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
 const FONT = 'ui-sans-serif, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif';
+const SERIF = '"Iowan Old Style", Palatino, ui-serif, Georgia, serif';
 
 function showScreen(id) {
   ['home', 'books', 'play'].forEach(s => $(s).classList.toggle('on', s === id));
@@ -1906,7 +2025,9 @@ function updateHUD() {
   } else if (G.mode === 'nine') {
     html = cell(G.turn === 0 ? 'You' : E.SKILLS[G.skill].name, 'turn') + cell(G.low > 0 ? G.low : '–', 'on');
   } else if (G.mode === 'run') {
-    html = cell(G.shots, 'shots', G.shots <= 2) + cell(G.score, 'score') + cell(DB.run.best, 'best');
+    html = cell(G.shots, 'shots', G.shots <= 2) + cell(Math.round(G.scoreShown), 'score')
+         + (G.streak > 1 ? cell('\u00d7' + (1 + 0.25 * Math.min(G.streak, 4)).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''), 'streak') : '')
+         + cell(DB.run.best, 'best');
   }
   if (html !== hudWas) { h.innerHTML = html; hudWas = html; }
   $('hintBtn').style.display = (G.phase === 'aim' && !G.over) ? '' : 'none';
@@ -1938,14 +2059,14 @@ function syncControls() {
 function predictNow() {
   const c = cueBall();
   if (!c || !c.live) return null;
-  const key = [G.aim.toFixed(4), G.power.toFixed(3), G.side.toFixed(2), G.ver.toFixed(2), G.balls.length, objectsLeft()].join(',');
+  const key = [G.aim.toFixed(3), G.power.toFixed(2), G.side.toFixed(2), G.ver.toFixed(2), G.balls.length, objectsLeft()].join(',');
   if (G.predKey === key && G.pred !== undefined) return G.pred;
   G.pred = E.predict(G.balls, { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side });
   G.predKey = key;
   return G.pred;
 }
 function guideFor(dist) {
-  const key = [G.aim.toFixed(4), G.side.toFixed(2), G.ver.toFixed(2), dist.toFixed(0), G.balls.length, objectsLeft()].join(',');
+  const key = [G.aim.toFixed(3), G.side.toFixed(2), G.ver.toFixed(2), dist.toFixed(0), G.balls.length, objectsLeft()].join(',');
   if (G.guideKey === key && G.guide !== undefined) return G.guide;
   G.guide = E.predict(G.balls, { angle:G.aim, power:E.powerToReach(dist), ver:G.ver, side:G.side });
   G.guideKey = key;
@@ -2038,7 +2159,7 @@ function drawAim(g) {
       polyUpTo(g, p.cue, p.hitAt, p.cue.length - 1, 340);
     } else if (short && p.cue.length > 2 && !p.scratch) {
       const end = p.cue[p.cue.length - 1];
-      g.strokeStyle = C.pw; g.globalAlpha = 0.7; g.lineWidth = PX(1.8);
+      g.strokeStyle = C.ink; g.globalAlpha = 0.4; g.lineWidth = PX(1.8);
       g.setLineDash([PX(2.5), PX(3.5)]);
       g.beginPath(); g.arc(end.x, end.y, BR, 0, TAU); g.stroke();
       g.setLineDash([]);
@@ -2060,20 +2181,38 @@ function drawAim(g) {
     }
   }
   if ((p && p.scratch) || (!spinOn() && h1.kind === 'pocket')) {
-    g.strokeStyle = C.pw; g.globalAlpha = 0.85; g.lineWidth = PX(2.2);
+    /* a warning, not a reward — warm is reserved for things going right */
+    g.strokeStyle = C.ink; g.globalAlpha = 0.55; g.lineWidth = PX(2.2);
+    g.setLineDash([PX(3), PX(4)]);
     g.beginPath(); g.arc(c.x, c.y, BR + 7, 0, TAU); g.stroke();
+    g.setLineDash([]);
   }
   g.globalAlpha = 1;
   drawCueStick(g, c);
 }
 
+/* Where the tip is this frame. At rest it sits back by the power it is holding;
+   through a stroke it draws further, drives through the ball and overshoots. */
+function cuePull() {
+  const base = 20 + powerCurve(G.power) * 150;
+  if (G.phase === 'stroke') {
+    const t = G.strokeT;
+    if (t < T_BACK) { const k = 1 - Math.pow(1 - t / T_BACK, 3); return base * (1 + 0.22 * k); }
+    const k = clamp((t - T_BACK) / T_DRIVE, 0, 1);
+    return lerp(base * 1.22, -18, k * k);
+  }
+  if (G.cueFollow > 0) return -18;
+  return base;
+}
+
 function drawCueStick(g, c) {
-  if (G.phase !== 'aim' && G.phase !== 'aithink') return;
-  const pull = 20 + powerCurve(G.power) * 150;
+  const striking = G.phase === 'stroke' || G.cueFollow > 0;
+  if (!striking && G.phase !== 'aim' && G.phase !== 'aithink') return;
+  const pull = cuePull();
   const dx = -Math.cos(G.aim), dy = -Math.sin(G.aim);
   const x0 = c.x + dx * (BR + pull), y0 = c.y + dy * (BR + pull);
   const x1 = c.x + dx * (BR + pull + 300), y1 = c.y + dy * (BR + pull + 300);
-  g.globalAlpha = G.phase === 'aithink' ? 0.5 : 0.8;
+  g.globalAlpha = (G.phase === 'aithink' ? 0.5 : 0.8) * (G.cueFollow > 0 ? clamp(G.cueFollow / T_AFTER, 0, 1) : G.aimIn);
   g.lineCap = 'butt';
   g.strokeStyle = C.dim; g.lineWidth = PX(7);
   g.beginPath(); g.moveTo(x0 + dx * 38, y0 + dy * 38); g.lineTo(x1, y1); g.stroke();
@@ -2084,7 +2223,7 @@ function drawCueStick(g, c) {
   g.lineCap = 'round';
   /* the gap the cue has been drawn back through, and how hard that is — read
      where you are looking, rather than on a bar at the bottom of the screen */
-  if (G.power > 0.015) {
+  if (G.power > 0.015 && G.phase === 'aim') {
     g.strokeStyle = C.pa; g.globalAlpha = 0.5; g.lineWidth = PX(1.6);
     g.setLineDash([PX(3), PX(4)]);
     g.beginPath(); g.moveTo(c.x + dx * BR, c.y + dy * BR); g.lineTo(x0, y0); g.stroke();
@@ -2112,6 +2251,25 @@ function drawFx(g, dt) {
       if (k >= 1) { G.fx.splice(i, 1); continue; }
       g.globalAlpha = (1 - k) * 0.85; g.strokeStyle = C.pw; g.lineWidth = PX(2.8);
       g.beginPath(); g.arc(f.x, f.y, 14 + k * 30, 0, TAU); g.stroke();
+    } else if (f.kind === 'drop') {
+      /* the ball goes down the mouth rather than blinking out of existence */
+      const k = f.t / 0.17;
+      if (k >= 1) { G.fx.splice(i, 1); continue; }
+      const e = k * k;
+      ballFace(g, { num:f.num, x:lerp(f.x, f.tx, e), y:lerp(f.y, f.ty, e) }, 1 - k * 0.3, 1 - e * 0.7);
+      drawPocket(g, f.pocket);
+    } else if (f.kind === 'gain') {
+      const k = f.t / 0.8;
+      if (k >= 1) { G.fx.splice(i, 1); continue; }
+      const rise = 26 * (1 - Math.pow(1 - k, 2));
+      const pop = k < 0.14 ? 1 + (0.14 - k) * 2.4 : 1;
+      g.globalAlpha = k > 0.6 ? (1 - k) / 0.4 : 1;
+      g.font = '600 ' + PX((f.big ? 19 : 15) * pop).toFixed(2) + 'px ' + SERIF;
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = PX(4); g.strokeStyle = C.bed; g.lineJoin = 'round';
+      const x = f.x, y = f.y - rise;
+      if (V.rot) { g.save(); g.translate(x, y); g.rotate(Math.PI / 2); g.strokeText(f.text, 0, 0); g.fillStyle = f.big ? C.pw : C.pa; g.fillText(f.text, 0, 0); g.restore(); }
+      else { g.strokeText(f.text, x, y); g.fillStyle = f.big ? C.pw : C.pa; g.fillText(f.text, x, y); }
     } else if (f.kind === 'spawn') {
       const k = f.t / 0.4;
       if (k >= 1) { G.fx.splice(i, 1); continue; }
@@ -2122,8 +2280,10 @@ function drawFx(g, dt) {
       const k = f.t / 1.1;
       if (k >= 1) { G.fx.splice(i, 1); continue; }
       const x = -140 + k * (TW + 300);
+      /* built from the token, not from the light theme's hex — the celebration
+         used to come out wrong on a slate table */
       const gr = g.createLinearGradient(x - 150, 0, x + 150, 0);
-      gr.addColorStop(0, 'rgba(200,95,24,0)'); gr.addColorStop(0.5, 'rgba(200,95,24,' + (0.3 * (1 - k * 0.5)).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(200,95,24,0)');
+      gr.addColorStop(0, withA(C.pw, 0)); gr.addColorStop(0.5, withA(C.pw, 0.3 * (1 - k * 0.5))); gr.addColorStop(1, withA(C.pw, 0));
       g.globalAlpha = 1; g.fillStyle = gr;
       g.save(); g.beginPath(); g.rect(0, 0, TW, TH); g.clip(); g.fillRect(x - 160, 0, 320, TH); g.restore();
     }
@@ -2134,9 +2294,43 @@ function drawFx(g, dt) {
 /* ------------------------------------------------------------------ the frame */
 
 let last = 0;
-function soundSink(kind, str, x, y) {
+
+/* How fast the world runs. Real time while anything is about to happen, hurried
+   once nothing is, and never hurried past a ball that is rolling at a pocket —
+   that is the one second of a billiards shot worth sitting through. */
+const NEAR_POCKET = BR * 3.4;
+function timeScale() {
+  if (G.ff) return 7;
+  let creeping = false;
+  for (let i = 0; i < G.balls.length; i++) {
+    const b = G.balls[i];
+    if (!b.live || (!b.vx && !b.vy)) continue;
+    for (let k = 0; k < 6; k++) {
+      const q = pocketCentre(k);
+      const dx = q.x - b.x, dy = q.y - b.y;
+      const dd = Math.hypot(dx, dy);
+      if (dd < NEAR_POCKET && (b.vx * dx + b.vy * dy) > 0) { creeping = true; break; }
+    }
+    if (creeping) break;
+  }
+  if (creeping) return G.slowed ? 0.45 : 1;
+  return 1.35 * clamp(1 + (G.rollT - 0.7) * 0.9, 1, 4.4);
+}
+
+function soundSink(kind, str, x, y, info) {
+  if (kind === 'pot' && info && !info.cue) G.potChain++;
   sfx(kind, str);
-  if (kind === 'pot') pushFx('pot', x, y);
+  if (kind === 'clack' && !G.held) {
+    /* one freeze on the shot's first contact, sized by how hard it was */
+    G.hold = Math.min(0.115, 0.024 + 0.055 * str); G.held = 1;
+  }
+  if (kind === 'pot') {
+    const q = pocketCentre(info ? info.pocket : 0);
+    pushFx('pot', q.x, q.y);
+    if (info && !info.cue) pushFx('drop', x, y, { num:info.num, tx:q.x, ty:q.y, pocket:info.pocket });
+    if (G.held < 2) { G.hold = Math.max(G.hold, 0.07); G.held = 2; }
+    buzz(16);
+  }
 }
 
 function tick(ts) {
@@ -2144,21 +2338,44 @@ function tick(ts) {
   const dt = Math.min(0.06, (ts - last) / 1000 || 0); last = ts;
   if (!$('play').classList.contains('on')) return;
 
-  if (G.phase === 'rolling') {
-    G.rollT += dt;
-    /* Real time while it matters, then hurried. On cloth this loose a ball can
-       roll for eight seconds, and everything worth watching — the contact, the
-       pot, the cue ball's answer to it — is over inside the first two. */
-    const scale = 1.35 * clamp(1 + (G.rollT - 1.4) * 0.85, 1, 4.2);
-    const steps = Math.min(96, Math.max(1, Math.round(dt * scale / E.STEP)));
-    for (let i = 0; i < steps; i++) {
-      E.advance(G.balls, G.ev, soundSink);
-      const c = cueBall();
-      if (G.trail && c.live && (i & 3) === 0) G.trail.push({ x:c.x, y:c.y });
-      if (!E.moving(G.balls)) break;
-    }
-    if (!E.moving(G.balls)) { G.phase = 'settle'; settled(); }
+  /* Smoothing belongs here and not in the pointer handler: move events arrive at
+     whatever rate the browser feels like coalescing them to, and a per-event
+     filter is a filter with no fixed time constant. */
+  if (G.phase === 'aim' && G.aimTarget !== G.aim) {
+    const k = 1 - Math.exp(-dt / 0.055);
+    const dA = wrapPi(G.aimTarget - G.aim);
+    G.aim = Math.abs(dA) < 0.0006 ? G.aimTarget : G.aim + dA * k;
+    invalidateAim();
   }
+
+  if (G.phase === 'stroke') {
+    G.strokeT += dt;
+    if (G.strokeT >= T_BACK + T_DRIVE) strikeNow();
+  } else if (G.phase === 'rolling') {
+    if (G.cueFollow > 0) G.cueFollow -= dt;
+    if (G.hold > 0) {
+      /* Hit stop. The world holds, the drawing does not — fx and audio envelopes
+         keep running, and the hurry ramp must not count this as elapsed roll. */
+      G.hold -= dt;
+    } else {
+      G.rollT += dt;
+      const steps = Math.min(96, Math.max(1, Math.round(dt * timeScale() / E.STEP)));
+      for (let i = 0; i < steps; i++) {
+        E.advance(G.balls, G.ev, soundSink);
+        const c = cueBall();
+        if (G.trail && c.live && (i & 3) === 0 && G.trail.length < 900) G.trail.push({ x:c.x, y:c.y });
+        if (G.hold > 0 || !E.moving(G.balls)) break;   /* a freeze set mid-loop is a freeze now */
+      }
+      if (!E.moving(G.balls)) { G.phase = 'settle'; settled(); }
+    }
+  }
+  if (G.trailFade > 0) G.trailFade = Math.max(0, G.trailFade - dt);
+  if (G.scoreShown !== G.score) {
+    const d2 = G.score - G.scoreShown;
+    G.scoreShown = Math.abs(d2) < 1 ? G.score : G.scoreShown + d2 * (1 - Math.exp(-dt / 0.14));
+    updateHUD();
+  }
+  if (G.aimIn < 1) G.aimIn = Math.min(1, G.aimIn + dt / 0.16);
   render(dt);
 }
 
@@ -2176,6 +2393,24 @@ function render(dt) {
     g.beginPath(); g.moveTo(TW * 0.25, 0); g.lineTo(TW * 0.25, TH); g.stroke();
     g.setLineDash([]); g.globalAlpha = 1;
   }
+  if (G.mode === 'run' && !G.over) {
+    /* what each mouth is worth, at the mouth */
+    g.font = '600 ' + PX(11).toFixed(2) + 'px ' + FONT;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = 0; i < 6; i++) {
+      const m = multAt(i);
+      if (m < 2) continue;
+      const q = pocketCentre(i);
+      const ix = q.x < TW / 2 ? 1 : -1, iy = q.y < TH / 2 ? 1 : -1;
+      const lx = q.x + ix * (q.r + 11), ly = q.y + iy * (q.r + 11);
+      g.fillStyle = m >= 4 ? C.pw : C.pa;
+      g.globalAlpha = m >= 4 ? 0.95 : 0.6;
+      const lab = '\u00d7' + m;
+      if (V.rot) { g.save(); g.translate(lx, ly); g.rotate(Math.PI / 2); g.fillText(lab, 0, 0); g.restore(); }
+      else g.fillText(lab, lx, ly);
+    }
+    g.globalAlpha = 1;
+  }
   if (G.mode === 'run' && G.called >= 0 && !G.over) {
     /* the called pocket is lit rather than ringed — a mouth this warm swallows a
        thin warm outline, but it cannot swallow being alight */
@@ -2192,13 +2427,15 @@ function render(dt) {
     g.globalAlpha = 1;
   }
 
-  if (G.trail && G.trail.length > 1) {
-    g.strokeStyle = C.ink; g.globalAlpha = 0.14; g.lineWidth = PX(1.6);
+  if (G.trail && G.trail.length > 1 && (G.phase === 'rolling' || G.trailFade > 0)) {
+    g.strokeStyle = C.ink; g.globalAlpha = 0.14 * (G.trailFade > 0 ? G.trailFade / 0.34 : 1);
+    g.lineWidth = PX(1.6);
     poly(g, G.trail, 0, G.trail.length - 1) && g.stroke();
     g.globalAlpha = 1;
   }
 
   if ((G.phase === 'aim' || G.phase === 'aithink') && !G.over) drawAim(g);
+  else if (G.phase === 'stroke' || G.cueFollow > 0) drawCueStick(g, cueBall());
   if (G.hintShot) drawHint(g);
 
   for (let i = 0; i < G.balls.length; i++) {
@@ -2210,7 +2447,7 @@ function render(dt) {
       g.globalAlpha = 1;
     }
     ballFace(g, b);
-    if (G.mode === 'nine') ballNumber(g, b);
+    if (G.mode === 'nine' || G.mode === 'run') ballNumber(g, b);
   }
   if (G.phase === 'inhand') drawInHand(g);
   drawFx(g, dt);
@@ -2233,8 +2470,9 @@ function placeOK(x, y) {
 function drawHint(g) {
   const s = G.hintShot;
   const c = cueBall(); if (!c || !c.live) return;
-  const p = E.predict(G.balls, s, { ticks:280 });
-  g.strokeStyle = C.pw; g.globalAlpha = 0.55; g.lineWidth = PX(2.2); g.setLineDash([PX(9), PX(6)]);
+  if (!G.hintPath) G.hintPath = E.predict(G.balls, s, { ticks:400 });
+  const p = G.hintPath;
+  g.strokeStyle = C.pa; g.globalAlpha = 0.7; g.lineWidth = PX(2.2); g.setLineDash([PX(9), PX(6)]);
   polyUpTo(g, p.cue, 0, p.hitAt > 0 ? p.hitAt : p.cue.length - 1, 1e9);
   g.setLineDash([]);
   if (p.obj && p.obj.length > 1) { g.globalAlpha = 0.4; polyUpTo(g, p.obj, 0, p.obj.length - 1, 520); }
@@ -2275,18 +2513,27 @@ cv.addEventListener('pointermove', e => {
 function up(e) {
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinch = null;
+  if (pointers.size === 0) G.ff = 0;
   if (pointers.size === 0 && G.phase === 'aim') releaseStroke();
   if (G.phase === 'inhand' && pointers.size === 0) {
     const c = cueBall();
     if (placeOK(c.x, c.y)) {
-      G.phase = 'aim'; G.predKey = '';
+      G.phase = 'aim'; invalidateAim();
       if (G.mode === 'nine' && G.breakZone) { G.breakZone = false; say('Break'); }
       updateHUD();
     }
   }
 }
+/* A system gesture arriving mid-pull used to fire the shot. It does not now. */
+function cancelled(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (pointers.size === 0) G.ff = 0;
+  cancelStroke();
+  updateHUD();
+}
 cv.addEventListener('pointerup', up);
-cv.addEventListener('pointercancel', up);
+cv.addEventListener('pointercancel', cancelled);
 
 /* The stroke.
 
@@ -2296,14 +2543,19 @@ cv.addEventListener('pointercancel', up);
    put a finger down anywhere — near for a big swing, far out for a long lever
    and a finer angle — and still start from nothing. Let go to hit; let go
    without having pulled and you have only aimed. */
-const PULL_FULL = 170;      /* screen pixels of draw for a full stroke, at most */
-const PULL_MIN = 42;        /* and at least, when the ball is against a cushion */
+const PULL_SPAN = 150;      /* screen pixels of draw for a full stroke, always */
+const LATCH = 16;           /* pull this far and the aim stops following the finger */
+const AIM_DEAD = 0.020;     /* radians of slack before a latched aim moves at all */
+const AIM_GAIN = 0.40;      /* and how much of the swing survives after that */
+const AIM_CATCH = 0.30;     /* a swing this big is a re-aim, not a tremor */
+const FIRE_T = 0.10;        /* below this a release is not a shot, in either place */
 let stroke = null;
 
-/* How far the finger can still travel before it runs out of glass. A ball frozen
-   on a rail has almost no room behind it, and demanding a fixed pull there would
-   cap the shot at whatever the screen edge allowed. So the pull is measured
-   against the room that exists: less room, shorter pull, same full range. */
+
+/* How far the finger can still travel before it runs out of glass. This used to
+   shrink the pull to fit, which meant the same drag was a tap in one place and a
+   smash in another. Now it only answers one question — has the finger run out of
+   room — and when it has, the pull carries on around the arc instead. */
 function roomBehind(sx, sy, ux, uy) {
   const m = 10;
   let t = Infinity;
@@ -2314,6 +2566,19 @@ function roomBehind(sx, sy, ux, uy) {
   return Math.max(0, t);
 }
 
+/* The stroke, in two regimes.
+
+   The first version of this wrote the aim on every single move, which meant the
+   act of loading the shot destroyed the aim it was loading — the ghost ball
+   walked while you pulled, and what fired was wherever the aim happened to be
+   at the instant your finger left the glass. That is the whole of "something is
+   not right".
+
+   So: while the pull is still short the finger points the shot, as before. Once
+   you have drawn past the latch the line is yours and stops chasing the finger;
+   from there sideways movement is a fine adjustment through a dead zone at
+   reduced gain, and movement straight back is pure power and moves the aim not
+   at all. Swing far enough to mean it and the anchor comes with you. */
 function handleOne(px, py, down) {
   if (G.over) return;
   const t = toTable(px, py);
@@ -2323,24 +2588,70 @@ function handleOne(px, py, down) {
     invalidateAim();
     return;
   }
+  if (G.phase === 'rolling' || G.phase === 'stroke') { G.ff = 1; return; }
   if (G.phase !== 'aim') return;
   const c = cueBall();
   if (!c.live) return;
   const cs = toScreen(c.x, c.y);
   const sx = px - cs.x, sy = py - cs.y;
   const d = Math.hypot(sx, sy);
-  if (d < 10) return;                           /* right on top of the ball means nothing */
-  G.aim = Math.atan2(c.y - t.y, c.x - t.x);     /* the ball goes away from the finger */
-  clearHint();
+  if (d < 12) { if (down) stroke = null; return; }   /* atan2 is ill-conditioned here */
+  const aimRaw = Math.atan2(c.y - t.y, c.x - t.x);   /* the ball goes away from the finger */
+
   if (down) {
-    stroke = { from:d, span:Math.max(PULL_MIN, Math.min(PULL_FULL, roomBehind(px, py, sx / d, sy / d) - 8)) };
+    clearHint();
+    G.aimTarget = aimRaw; G.aim = aimRaw;
+    stroke = { ax:sx / d, ay:sy / d, aim0:aimRaw, from:d, latched:false, peak:0 };
     G.power = 0;
-  } else if (stroke) {
-    G.power = clamp((d - stroke.from) / stroke.span, 0, 1);
-    if (G.power > (stroke.peak || 0) + 0.06) { stroke.peak = G.power; sfx('tick'); }
+    updateHUD();
+    return;
+  }
+  if (!stroke) return;
+
+  if (!stroke.latched) {
+    /* Still acquiring: the finger points the shot, and power is simply how far it
+       has drawn back from where it went down. The anchor must NOT follow the
+       finger here, or the pull can never accumulate and the latch never trips. */
+    const pull0 = d - stroke.from;
+    G.aimTarget = aimRaw;
+    if (pull0 > LATCH) {
+      stroke.latched = true;
+      stroke.ax = sx / d; stroke.ay = sy / d; stroke.aim0 = aimRaw;
+      stroke.from = d - LATCH;             /* so power carries through the latch unbroken */
+      sfx('tick'); buzz(5);
+      G.power = clamp(LATCH / PULL_SPAN, 0, 1);
+    } else {
+      stroke.aim0 = aimRaw;
+      G.power = 0;
+    }
+  }
+  if (stroke.latched) {
+    const axis = sx * stroke.ax + sy * stroke.ay;
+    /* Pinned against the edge of the glass: a ball frozen on a cushion has barely
+       any room behind it, so from here the pull carries on around the arc — the
+       aim is latched, so swinging wide costs nothing but distance. */
+    const pinned = roomBehind(px, py, stroke.ax, stroke.ay) < 14;
+    G.power = clamp(((pinned ? Math.max(axis, d) : axis) - stroke.from) / PULL_SPAN, 0, 1);
+    if (!pinned) {
+      const dA = wrapPi(aimRaw - stroke.aim0), mag = Math.abs(dA);
+      if (mag > AIM_CATCH) stroke.aim0 += dA * 0.12;
+      G.aimTarget = stroke.aim0 + (mag > AIM_DEAD ? Math.sign(dA) * (mag - AIM_DEAD) * AIM_GAIN : 0);
+    }
+    if (G.power > stroke.peak + 0.08) { stroke.peak = G.power; sfx('tick', G.power); }
   }
   updateHUD();
 }
+
+function releaseStroke() {
+  if (!stroke) return;
+  const p = G.power;
+  stroke = null;
+  G.aim = G.aimTarget;                 /* whatever was drawn is what is shot */
+  if (p > FIRE_T) fire();
+  else { G.power = 0; updateHUD(); }   /* the cue collapsing to rest is the message */
+}
+function cancelStroke() { stroke = null; G.power = 0; }
+
 function releaseStroke() {
   if (!stroke) return;
   const p = G.power;
@@ -2415,7 +2726,7 @@ function sheetRunDone() {
   const rec = G.score >= DB.run.best && G.score > 0;
   openSheet(`
     <div class="sh1">${rec ? 'Best run yet' : 'Out of shots'}</div>
-    <div class="sh2">${G.score} ball${G.score === 1 ? '' : 's'} down.</div>
+    <div class="sh2">${G.score} points.</div>
     <div class="stat"><span>Best</span><b>${DB.run.best}</b></div>
     <div class="stat"><span>Runs</span><b>${DB.run.plays}</b></div>
     <div class="rowbtns">
@@ -2489,8 +2800,11 @@ function sheetHow() {
     <p><b>Nine-ball.</b> Hit the lowest ball first. Anything that drops counts, and the
     nine wins. Miss it, scratch, or drive nothing to a cushion and the table goes to
     the other side with the ball in their hand.</p>
-    <p><b>The run.</b> Eight shots to start. Every ball down buys another; two in a
-    stroke buys three; the ringed pocket pays double. It ends when the shots do.</p>
+    <p><b>The run.</b> Eight shots to start, and every ball down buys another — two
+    in a stroke buys three. A ball is worth its own number times whatever its pocket
+    is paying, and the mouths change price every shot, so the lit one is worth
+    planning for. Pot on consecutive shots and the streak multiplies everything. It
+    ends when the shots do.</p>
     <div class="rowbtns"><button class="pbtn" onclick="closeSheet()">Right</button></div>`);
 }
 
@@ -2611,8 +2925,8 @@ $('hintBtn').addEventListener('click', () => {
     $('hintBtn').textContent = '?';
     if (!shot) { say('Nothing certain from here', true); return; }
     G.hinted = true;
-    G.hintShot = shot;
-    G.aim = shot.angle; G.power = invPower(shot.power); G.ver = 0; G.side = 0;
+    G.hintShot = shot; G.hintPath = null;
+    setAim(shot.angle); G.power = invPower(shot.power); G.ver = 0; G.side = 0;
     syncControls(); updateHUD();
     say('This one goes');
     G.hintT = setTimeout(() => { G.hintShot = null; G.hintT = 0; }, 5000);
