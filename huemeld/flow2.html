@@ -140,7 +140,13 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 .pickcard .pcsub{ font-size:11px; color:var(--ink-soft); font-weight:600; line-height:1.3; }
 .pickcard .pcprog{ margin-left:auto; font-size:12px; font-weight:800; color:var(--ink-soft); white-space:nowrap; padding-left:8px; }
 .mk.pickback{ height:44px; padding:0 18px; font-size:14px; background:var(--card); color:var(--ink); }
-#ovMech,#ovDemoEnd{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovMech,#ovDemoEnd,#ovLang{ position:fixed; border-radius:0; background:rgba(10,7,16,.9); }
+#ovLang .panel{ max-width:300px; }
+#ovLang .mk{ width:100%; }
+.langrow{ display:flex; align-items:center; justify-content:space-between; background:var(--card); color:var(--ink); }
+.langrow.cur{ background:#ffd15c; color:#2c2733; }
+.langrow .lgcheck{ opacity:0; }
+.langrow.cur .lgcheck{ opacity:1; }
 #ovSet{ position:fixed; border-radius:0; background:rgba(10,7,16,.92); }   /* full-screen fade: cover the top bar + nav, not just the board */
 #ovMech .panel,#ovDemoEnd .panel{ max-width:320px; }
 #ovMech .mk,#ovDemoEnd .mk{ width:100%; height:58px; padding:0 12px; margin-top:10px; }
@@ -241,6 +247,13 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
         <button class="mk" id="btnMenuKofi" style="display:none;background:#ffd6e0">♥ Support Huemeld</button>
         <button class="mk" id="btnMenuLang" style="background:var(--card);color:var(--ink)">Türkçe</button>
+      </div>
+    </div>
+    <div class="ov" id="ovLang">
+      <div class="panel">
+        <h2 data-t="Language">Language</h2>
+        <div id="langList"></div>
+        <button class="mk" id="btnLangClose" style="background:var(--card);color:var(--ink);margin-top:12px" data-t="Close">Close</button>
       </div>
     </div>
     <div class="ov" id="ovMech">
@@ -357,6 +370,7 @@ var TR = {
   "Levels":"Bölümler",                                              /* 3 */
   "levels":"bölümler",                                              /* 4 */
   "Settings":"Ayarlar",                                             /* 5 */
+  "Language":"Dil",
   "How to play":"Nasıl oynanır",                                    /* 6 */
   "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
   "Support Huemeld":"Huemeld'e Destek Ol",
@@ -2280,7 +2294,7 @@ function applyLang(){
   applyIconButtons();
   var wn=document.getElementById("btnWinNext"); if(wn) wn.innerHTML=T("Next")+" "+icn("arrowR",15);
   var sk=document.getElementById("demoskip"); if(sk) sk.innerHTML=T("Skip tutorial")+" "+icn("arrowR",13);
-  var lb=document.getElementById("btnMenuLang"); if(lb) lb.innerHTML=icn("globe",16)+" "+(LANG==="tr"?"English":"Türkçe");
+  var lb=document.getElementById("btnMenuLang"); if(lb) lb.innerHTML=icn("globe",16)+" "+(LANG==="tr"?"Türkçe":"English");
   refreshProLabels();
   try{ relabel(); }catch(e){}
   try{ syncToggles(); }catch(e){}
@@ -2301,7 +2315,20 @@ document.getElementById("btnMenuDaily").addEventListener("click", function(){ en
 document.getElementById("btnMenuLevels").addEventListener("click", function(){ ensureAudio(); pickView=null; hideToast(); renderPicker(); ovPick.classList.add("show"); });
 document.getElementById("btnMenuSet").addEventListener("click", function(){ ensureAudio(); ovSet.classList.add("show"); });
 document.getElementById("btnMenuHelp").addEventListener("click", function(){ ensureAudio(); document.getElementById("ovHelp").classList.add("show"); });
-document.getElementById("btnMenuLang").addEventListener("click", function(){ ensureAudio(); setLang(LANG==="tr"?"en":"tr"); });
+var LANGS=[{code:"en", name:"English"},{code:"tr", name:"Türkçe"}];
+var ovLang=document.getElementById("ovLang");
+function renderLangList(){
+  document.getElementById("langList").innerHTML = LANGS.map(function(L){
+    return '<button class="mk langrow'+(L.code===LANG?" cur":"")+'" data-lang="'+L.code+'">'
+      +'<span>'+L.name+'</span><span class="lgcheck">'+icn("check",16)+'</span></button>';
+  }).join("");
+}
+document.getElementById("btnMenuLang").addEventListener("click", function(){ ensureAudio(); renderLangList(); ovLang.classList.add("show"); });
+document.getElementById("langList").addEventListener("click", function(e){
+  var b=e.target.closest(".langrow"); if(!b) return;
+  ensureAudio(); ovLang.classList.remove("show"); setLang(b.dataset.lang);
+});
+document.getElementById("btnLangClose").addEventListener("click", function(){ ovLang.classList.remove("show"); });
 document.getElementById("btnMenuKofi").addEventListener("click", function(){ ensureAudio(); try{ window.open(KOFI_URL,"_blank","noopener"); }catch(e){ location.href=KOFI_URL; } });
 document.getElementById("btnDaily").addEventListener("click", function(){ ensureAudio(); hideMenu(); ovPick.classList.remove("show"); loadDaily(0); });
 document.getElementById("archArea").addEventListener("click", function(e){
