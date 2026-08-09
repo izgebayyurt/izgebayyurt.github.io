@@ -9,183 +9,196 @@
 <title>burnbridge</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23061119'/%3E%3Cpath d='M6 20 L16 11 L26 20' stroke='%23ff8a4c' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='21' r='3.4' fill='%23d8ccb1'/%3E%3Ccircle cx='26' cy='21' r='3.4' fill='%234ec9e8'/%3E%3C/svg%3E" />
 <style>
+  /* Ink on paper, borrowed wholesale from tapa: the same page, the same ink,
+     the same one-accent discipline. Travellers are the exception — a map with
+     four parties on it needs four pigments — so they are chosen as printing
+     inks of roughly equal weight rather than as screen colours. */
   :root {
-    --sea:    #061119;
-    --chrome: #0a1620;
-    --chrome2:#10222e;
-    --line:   #1b3441;
-    --ink:    #e9f2f5;
-    --dim:    #7c96a1;
-    --dimmer: #526874;
-    --t0:     #ff8a4c;
-    --t1:     #4ec9e8;
-    --t2:     #b98cff;
-    --t3:     #8fdc6a;
-    --gold:   #ffcf6b;
-    --good:   #5fdca0;
-    --burn:   #24343d;
+    --pg:#ece9e1;            /* paper */
+    --pi:#2a2730;            /* ink — a purple-black, not a neutral one */
+    --pr:rgba(42,39,48,0.14);
+    --pd:rgba(42,39,48,0.55);
+    --pq:rgba(42,39,48,0.32);
+    --pfaint:rgba(42,39,48,0.20);
+    --t0:#c85f18;            /* vermilion */
+    --t1:#2f6f8f;            /* steel */
+    --t2:#7a5e9a;            /* violet */
+    --t3:#5c7a3c;            /* olive */
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",ui-serif,Georgia,serif;
+    --sans:"Geist",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* Night derived from paper rather than inverted: the ground keeps the purple
+     bias, the ink goes warm chalk, and the pigments lift instead of flipping. */
+  html[data-theme="night"] {
+    --pg:#191519;
+    --pi:#ded7c8;
+    --pr:rgba(222,215,200,0.15);
+    --pd:rgba(222,215,200,0.56);
+    --pq:rgba(222,215,200,0.34);
+    --pfaint:rgba(222,215,200,0.22);
+    --t0:#ff8a4c;
+    --t1:#5aa8c8;
+    --t2:#a888c8;
+    --t3:#8fb85e;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body {
-    margin: 0; padding: 0; height: 100%; overflow: hidden;
-    background: var(--sea); color: var(--ink);
-    font-family: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    user-select: none; -webkit-user-select: none;
-    overscroll-behavior: none;
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--pg); color:var(--pi);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    user-select:none; -webkit-user-select:none; overscroll-behavior:none;
   }
-  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
-  .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #app { position:fixed; inset:0; display:flex; flex-direction:column; }
+  button { font-family:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--t2); outline-offset:2px; }
+  .serif { font-family:var(--serif); font-variant-numeric:tabular-nums; }
+  .label { font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--pd); font-weight:500; }
 
   /* ---------- top bar ---------- */
   #hud {
-    flex: 0 0 auto; background: var(--chrome);
-    border-bottom: 1px solid var(--line);
-    padding: 8px 11px 0;
-    padding-top: max(8px, env(safe-area-inset-top));
+    flex:0 0 auto; padding:0 12px;
+    padding-top:max(6px, env(safe-area-inset-top));
+    border-bottom:1px solid var(--pr);
   }
-  #hudTop { display: flex; align-items: center; gap: 9px; }
-  .iconbtn {
-    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px;
-    background: var(--chrome2); border: 1px solid var(--line); color: var(--dim);
-    font-size: 14px; cursor: pointer; display: grid; place-items: center; padding: 0;
-    font-family: inherit; line-height: 1;
+  #hudTop { display:flex; align-items:center; gap:10px; min-height:44px; }
+  .icon {
+    width:30px; height:30px; display:grid; place-items:center;
+    color:var(--pd); font-size:19px; line-height:1; cursor:pointer;
+    background:none; border:0; padding:0; border-radius:8px; flex:0 0 auto;
   }
-  .iconbtn:active { background: #16303e; color: var(--ink); }
-  .iconbtn[disabled] { opacity: .34; }
-  #lname { flex: 1 1 auto; font-size: 14px; font-weight: 600; }
-  #tally { flex: 0 0 auto; text-align: right; }
-  #cost { font-size: 18px; font-weight: 500; letter-spacing: .04em; line-height: 1.1; }
-  #cost.over { color: var(--t0); }
-  #par { font-size: 9.5px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+  .icon:active { background:var(--pr); }
+  .icon[disabled] { opacity:0.3; }
+  #lname { flex:1 1 auto; font-family:var(--serif); font-size:19px; font-weight:600; letter-spacing:-0.01em; }
+  #tally { flex:0 0 auto; text-align:right; margin-right:2px; }
+  #cost { font-family:var(--serif); font-size:19px; font-weight:600; line-height:1.05; font-variant-numeric:tabular-nums; }
+  #cost.over { color:var(--t0); }
+  #par { font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pq); margin-top:1px; }
 
-  /* ---------- traveller chips: legend and selector in one ---------- */
-  #chips { display: flex; gap: 6px; padding: 7px 0 8px; overflow-x: auto; scrollbar-width: none; }
-  #chips::-webkit-scrollbar { display: none; }
+  /* traveller chips: legend and selector in one */
+  #chips { display:flex; gap:6px; padding:0 2px 9px; overflow-x:auto; scrollbar-width:none; }
+  #chips::after { content:''; flex:0 0 2px; }
+  #chips::-webkit-scrollbar { display:none; }
   .chip {
-    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 9px 4px 7px; border-radius: 8px; cursor: pointer;
-    background: transparent; border: 1px solid var(--line);
-    font-family: inherit; font-size: 11.5px; font-weight: 500; color: var(--dim);
-    line-height: 1;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    padding:5px 10px; border-radius:9px; cursor:pointer; line-height:1;
+    background:none; border:1px solid var(--pr); color:var(--pd);
+    font-size:11px; letter-spacing:0.04em;
   }
-  .chip .gl { font-size: 10px; }
-  .chip.on { background: var(--chrome2); color: var(--ink); }
-  .chip.done { opacity: .4; }
-  .chip.neutral { border-style: dashed; cursor: default; }
-  .chip.stuck { text-decoration: line-through; opacity: .45; }
+  .chip .ct { font-family:var(--serif); font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .chip.on { border-color:currentColor; }
+  .chip.done { opacity:0.42; }
+  .chip.stuck { opacity:0.3; }
+  .chip.neutral { border-style:dashed; cursor:default; }
+  .chip canvas { display:block; width:13px; height:13px; }
 
   /* ---------- board ---------- */
-  #board { flex: 1 1 auto; position: relative; min-height: 0; }
-  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #board { flex:1 1 auto; position:relative; min-height:0; }
+  #cv { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   #hint {
-    position: absolute; left: 14px; right: 14px; bottom: 10px;
-    text-align: center; font-size: 12px; color: var(--dim);
-    pointer-events: none; transition: opacity .4s; line-height: 1.5;
+    position:absolute; left:20px; right:20px; bottom:14px; text-align:center;
+    font-size:12px; line-height:1.55; color:var(--pd); pointer-events:none;
+    transition:opacity .4s;
   }
-  #hint.gone { opacity: 0; }
-  #hint b { color: var(--ink); font-weight: 500; }
+  #hint.gone { opacity:0; }
+  #hint b { color:var(--pi); font-weight:600; }
 
-  /* A bar, not a modal — the board stays playable while it is up. */
+  /* A card on the page, not a modal over it — the board stays playable. */
   #warn {
-    position: absolute; left: 10px; right: 10px;
-    bottom: max(10px, env(safe-area-inset-bottom));
-    display: flex; align-items: center; gap: 8px;
-    padding: 9px 9px 9px 12px; border-radius: 12px;
-    background: rgba(14,28,36,.94); border: 1px solid #4a3a22;
-    box-shadow: 0 6px 22px rgba(0,0,0,.4);
-    transition: opacity .3s, transform .3s;
+    position:absolute; left:12px; right:12px;
+    bottom:max(12px, env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:10px;
+    padding:11px 11px 11px 14px; border-radius:13px;
+    background:var(--pg); border:1px solid var(--pr);
+    box-shadow:0 8px 26px rgba(42,39,48,0.10);
+    transition:opacity .3s, transform .3s;
   }
-  #warn.gone { opacity: 0; transform: translateY(8px); pointer-events: none; }
-  #warnText { flex: 1 1 auto; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
-  #warnText b { color: var(--gold); font-weight: 500; }
-  #warn button {
-    flex: 0 0 auto; font-family: inherit; font-size: 11.5px; font-weight: 500;
-    border-radius: 8px; cursor: pointer; padding: 7px 11px;
-    background: var(--gold); border: 1px solid var(--gold); color: #241a06;
+  html[data-theme="night"] #warn { box-shadow:0 8px 26px rgba(0,0,0,0.45); }
+  #warn.gone { opacity:0; transform:translateY(8px); pointer-events:none; }
+  #warnText { flex:1 1 auto; font-size:11.5px; line-height:1.5; color:var(--pd); }
+  #warnText b { color:var(--pi); font-weight:600; }
+  #warnGo {
+    flex:0 0 auto; border:0; border-radius:9px; cursor:pointer;
+    padding:8px 13px; background:var(--pi); color:var(--pg);
+    font-size:11.5px; font-weight:600;
   }
-  #warn button:active { filter: brightness(1.1); }
-  #warn #warnX {
-    background: transparent; border-color: transparent; color: var(--dimmer);
-    padding: 7px 6px; font-size: 12px;
-  }
+  #warnGo:active { opacity:0.85; }
+  #warnX { flex:0 0 auto; background:none; border:0; color:var(--pq); font-size:13px; cursor:pointer; padding:8px 4px; }
 
-  /* ---------- screens & overlays ---------- */
+  /* ---------- screens ---------- */
   .screen {
-    position: absolute; inset: 0; z-index: 5; background: var(--sea);
-    display: flex; flex-direction: column;
-    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    position:absolute; inset:0; z-index:5; background:var(--pg);
+    display:flex; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding:max(16px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom));
   }
-  .ov {
-    position: absolute; inset: 0; z-index: 8; background: rgba(4,11,16,.82);
-    display: flex; align-items: center; justify-content: center; padding: 22px;
-    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
-  }
-  .hidden { display: none !important; }
-  .card {
-    width: 100%; max-width: 380px; background: var(--chrome);
-    border: 1px solid var(--line); border-radius: 16px; padding: 20px 18px; text-align: center;
-  }
-  .card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
-  .card p { margin: 0 0 14px; font-size: 13px; color: var(--dim); line-height: 1.6; }
-  .card p.tight { margin-bottom: 8px; }
-  .card p b { color: var(--ink); font-weight: 500; }
-  .btn {
-    display: block; width: 100%; margin-top: 9px; padding: 12px 14px;
-    border-radius: 11px; border: 1px solid var(--line); background: var(--chrome2);
-    color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
-  }
-  .btn:active { background: #17313f; }
-  .btn.primary { background: var(--t0); border-color: var(--t0); color: #1a0c05; font-weight: 600; }
-  .btn.ghost { background: transparent; color: var(--dim); }
-  .row2 { display: flex; gap: 9px; }
-  .row2 .btn { margin-top: 9px; }
+  .hidden { display:none !important; }
 
-  .stars { font-size: 24px; letter-spacing: 6px; margin: 4px 0 12px; color: var(--burn); }
-  .stars b { color: var(--gold); font-weight: 400; }
-  .scoreline { display: flex; justify-content: center; gap: 22px; margin: 2px 0 14px; }
-  .scoreline div { text-align: center; }
-  .scoreline .v { font-size: 22px; font-weight: 500; }
-  .scoreline .k { font-size: 9.5px; color: var(--dim); letter-spacing: .11em; text-transform: uppercase; margin-top: 2px; }
-
-  #menu { justify-content: center; align-items: center; text-align: center; }
-  #menu .wrap { width: 100%; max-width: 340px; }
-  .logo { font-size: 40px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 2px; }
-  .logo span { color: var(--t0); }
-  .logo em { color: var(--t1); font-style: normal; }
-  .tag { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin-bottom: 26px; }
-  .credit { margin-top: 24px; font-size: 10.5px; color: var(--dimmer); letter-spacing: .04em; }
-
-  #levels .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  #levels .head h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1 1 auto; }
-  #levels .head .tot { font-size: 12px; color: var(--gold); }
-  .actlabel {
-    font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--dimmer); margin: 16px 0 8px;
+  .pbtn {
+    display:block; width:100%; margin-top:9px; padding:14px; border-radius:12px; border:0;
+    background:var(--pi); color:var(--pg); font-size:14.5px; font-weight:600; cursor:pointer;
   }
-  .actlabel:first-of-type { margin-top: 0; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+  .pbtn.ghost { background:transparent; color:var(--pd); font-weight:500; border:1px solid var(--pr); }
+  .pbtn:active { opacity:0.85; }
+  .row2 { display:flex; gap:9px; }
+
+  /* ---------- menu ---------- */
+  #menu { justify-content:center; }
+  #menu .wrap { width:100%; max-width:360px; margin:0 auto; }
+  .wordmark { font-family:var(--serif); font-size:40px; line-height:1; font-weight:600; letter-spacing:-0.015em; }
+  .wordsub { margin-top:9px; margin-bottom:30px; }
+  .homefoot { margin-top:26px; display:flex; gap:22px; }
+  .homefoot button {
+    background:none; border:0; padding:6px 0; cursor:pointer;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pd);
+  }
+
+  /* ---------- level index ---------- */
+  #levels .idxh { display:flex; align-items:baseline; gap:10px; padding:2px 2px 6px; }
+  #levels .idxh .t { font-family:var(--serif); font-size:23px; font-weight:600; }
+  #levels .idxh .s { margin-left:auto; font-family:var(--serif); font-size:13.5px; color:var(--pq); font-variant-numeric:tabular-nums; }
+  .actlabel { margin:20px 0 10px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:9px; }
   .tile {
-    background: var(--chrome); border: 1px solid var(--line); border-radius: 12px;
-    padding: 9px 8px; cursor: pointer; color: var(--ink); font-family: inherit;
-    min-height: 58px; display: flex; flex-direction: column; justify-content: space-between;
+    border:1px solid var(--pr); border-radius:12px; background:none; cursor:pointer;
+    padding:14px 6px 10px; display:flex; flex-direction:column; align-items:center; gap:7px;
   }
-  .tile:active { background: var(--chrome2); }
-  .tile .n { font-size: 14px; font-weight: 500; }
-  .tile .st { font-size: 9.5px; letter-spacing: 2px; color: var(--burn); margin-top: 5px; }
-  .tile .st b { color: var(--gold); font-weight: 400; }
-  .tile .st.done { color: var(--good); letter-spacing: 0; }
-  .tile.locked { opacity: .32; }
-  .tile.mark { border-color: #3a3320; }
-  .tile.mark .n { color: var(--gold); font-size: 12px; }
+  .tile:active { background:var(--pr); }
+  .tile .n { font-family:var(--serif); font-size:19px; font-weight:600; color:var(--pd); font-variant-numeric:tabular-nums; }
+  .tile.solved .n { color:var(--pi); }
+  .tile .st { display:flex; gap:3px; }
+  .tile .st i { width:4px; height:4px; border-radius:50%; background:var(--pr); }
+  .tile .st i.on { background:var(--pi); }
+  .tile.locked { opacity:0.32; }
+  .tile.mark .n { font-size:15px; color:var(--t2); }
 
-  .howlist { text-align: left; font-size: 13px; color: var(--dim); line-height: 1.65; margin: 0 0 14px; padding-left: 18px; }
-  .howlist li { margin-bottom: 7px; }
-  .howlist b { color: var(--ink); font-weight: 500; }
-  .key { display: flex; flex-direction: column; gap: 7px; margin: 0 0 15px; }
-  .keyrow { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); text-align: left; }
-  .keyrow canvas { flex: 0 0 auto; }
+  /* ---------- cards ---------- */
+  .ov {
+    position:absolute; inset:0; z-index:8; display:flex; align-items:center; justify-content:center;
+    padding:22px; background:color-mix(in srgb, var(--pg) 82%, transparent);
+    backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  }
+  .card {
+    width:100%; max-width:380px; background:var(--pg);
+    border:1px solid var(--pr); border-radius:16px; padding:22px 20px; text-align:center;
+    box-shadow:0 12px 40px rgba(42,39,48,0.12);
+  }
+  html[data-theme="night"] .card { box-shadow:0 12px 40px rgba(0,0,0,0.5); }
+  .card h2 { margin:0 0 10px; font-family:var(--serif); font-size:22px; font-weight:600; }
+  .card p { margin:0 0 14px; font-size:13px; color:var(--pd); line-height:1.65; }
+  .card p.tight { margin-bottom:9px; }
+  .card p b { color:var(--pi); font-weight:600; }
+  .scoreline { display:flex; justify-content:center; gap:26px; margin:14px 0 16px; }
+  .scoreline .v { font-family:var(--serif); font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .scoreline .k { font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--pq); margin-top:3px; }
+  .marks { display:flex; justify-content:center; gap:7px; margin:2px 0 4px; }
+  .marks i { width:7px; height:7px; border-radius:50%; background:var(--pr); }
+  .marks i.on { background:var(--pi); }
+
+  .howlist { text-align:left; font-size:13px; color:var(--pd); line-height:1.7; margin:0 0 16px; padding-left:17px; }
+  .howlist li { margin-bottom:8px; }
+  .howlist b { color:var(--pi); font-weight:600; }
+  .key { display:flex; flex-direction:column; gap:9px; margin:0 0 16px; }
+  .keyrow { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--pd); text-align:left; }
+  .keyrow canvas { flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -193,11 +206,11 @@
 
   <div id="hud">
     <div id="hudTop">
-      <button class="iconbtn" id="bBack" aria-label="Back">‹</button>
+      <button class="icon" id="bBack" aria-label="Back">‹</button>
       <div id="lname">—</div>
-      <div id="tally"><div id="cost" class="mono">0</div><div id="par">par —</div></div>
-      <button class="iconbtn" id="bUndo" aria-label="Undo">↶</button>
-      <button class="iconbtn" id="bRestart" aria-label="Restart">↺</button>
+      <div id="tally"><div id="cost">0</div><div id="par">par —</div></div>
+      <button class="icon" id="bUndo" aria-label="Undo">↶</button>
+      <button class="icon" id="bRestart" aria-label="Restart">↺</button>
     </div>
     <div id="chips"></div>
   </div>
@@ -213,18 +226,20 @@
 
     <div class="screen" id="menu">
       <div class="wrap">
-        <div class="logo">burn<span>br</span><em>idge</em></div>
-        <div class="tag">Travellers who share one set of bridges.<br />Every crossing burns the bridge behind it.</div>
-        <button class="btn primary" id="bPlay">Play</button>
-        <button class="btn" id="bLevels">Crossings</button>
-        <button class="btn" id="bDrift">Drift · endless</button>
-        <button class="btn ghost" id="bHow">How to play</button>
-        <div class="credit">after Euler, Königsberg, 1736</div>
+        <div class="wordmark">Burnbridge</div>
+        <div class="wordsub label">Every crossing burns the bridge</div>
+        <button class="pbtn" id="bPlay">Play</button>
+        <button class="pbtn ghost" id="bLevels">Crossings</button>
+        <button class="pbtn ghost" id="bDrift">Drift · endless</button>
+        <div class="homefoot">
+          <button id="bHow">How to play</button>
+          <button id="bTheme">Theme</button>
+        </div>
       </div>
     </div>
 
     <div class="screen hidden" id="levels">
-      <div class="head"><h2>Crossings</h2><div class="tot" id="totStars">0 ★</div></div>
+      <div class="idxh"><div class="t">Crossings</div><div class="s" id="totStars">0</div></div>
       <div id="acts"></div>
     </div>
 
@@ -238,6 +253,7 @@
 
 var $ = function (id) { return document.getElementById(id); };
 var TAU = Math.PI * 2;
+var SERIF = '"Iowan Old Style","Palatino Linotype",Palatino,ui-serif,Georgia,serif';
 var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
 
 /* ============================================================
@@ -256,211 +272,211 @@ var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
 
 var RAW = [
   { id: 'c01', hint: 'Two travellers. Tap one to pick it up, then drag. Every bridge <b>burns behind whoever crosses it</b>.',
-    starts: [1, 0],
-    nodes: [[0.670,0.183],[0.504,0.771],[0.556,0.484],[0.883,0.562],[0.252,0.341,1],[0.217,0.769,2]],
-    edges: [[1,5],[1,2],[0,2],[2,4],[2,3],[1,5],[4,5],[1,3],[0,3]] },
+    starts: [5, 2],
+    nodes: [[0.266,0.445,2],[0.438,0.637],[0.867,0.715],[0.539,0.319],[0.818,0.348,1],[0.163,0.228]],
+    edges: [[0,5],[0,1],[3,4],[0,3],[2,4],[1,3],[3,5],[1,2],[1,4]] },
 
   { id: 'c02', hint: 'A shape on an island means only <b>that</b> traveller can settle it. Every island must be reached by someone.',
-    starts: [2, 5],
-    nodes: [[0.528,0.309],[0.691,0.742,1],[0.153,0.584],[0.295,0.817,2],[0.475,0.621],[0.813,0.326]],
-    edges: [[1,4],[3,4],[2,3],[0,5],[0,4],[1,4],[2,3],[0,5],[1,3]] },
+    starts: [5, 4],
+    nodes: [[0.368,0.369],[0.570,0.568],[0.462,0.112,2],[0.673,0.794,1],[0.350,0.703],[0.676,0.270]],
+    edges: [[1,3],[1,4],[2,5],[0,2],[0,1],[1,5],[0,5],[0,4],[3,4]] },
 
   { id: 'c03', starts: [5, 3],
     nodes: [[0.660,0.230,2],[0.621,0.468],[0.153,0.422],[0.566,0.876],[0.154,0.788,1],[0.372,0.185]],
-    edges: [[0,1],[0,5],[2,5],[2,4],[1,3],[0,1],[0,5],[2,5],[2,4],[3,4]] },
+    edges: [[0,1],[0,5],[2,5],[2,4],[1,3],[1,5],[3,4],[1,2]] },
 
-  { id: 'c04', starts: [3, 6],
+  { id: 'c04', starts: [0, 5],
+    nodes: [[0.288,0.587],[0.648,0.416],[0.481,0.857,2],[0.405,0.135,1],[0.138,0.391],[0.781,0.176],[0.660,0.685]],
+    edges: [[0,4],[2,6],[1,6],[1,5],[0,2],[3,4],[1,3],[3,5],[0,6],[0,1]] },
+
+  { id: 'c05', starts: [0, 6],
+    nodes: [[0.243,0.248],[0.354,0.793],[0.580,0.285],[0.644,0.551],[0.858,0.308,1],[0.102,0.585,2],[0.838,0.772]],
+    edges: [[2,3],[2,4],[3,6],[1,5],[0,2],[0,5],[3,4],[1,3],[4,6]] },
+
+  { id: 'c06', starts: [3, 6],
     nodes: [[0.800,0.217],[0.468,0.177,1],[0.228,0.869],[0.615,0.685],[0.888,0.664,2],[0.315,0.560],[0.216,0.257]],
-    edges: [[1,6],[3,4],[5,6],[2,5],[3,5],[0,1],[1,6],[3,4],[5,6],[0,1],[2,3]] },
+    edges: [[1,6],[3,4],[5,6],[2,5],[3,5],[0,1],[1,5],[2,3],[0,4]] },
 
-  { id: 'c05', starts: [6, 4],
-    nodes: [[0.260,0.620],[0.827,0.260],[0.397,0.830,1],[0.226,0.286,2],[0.880,0.682],[0.586,0.646],[0.462,0.396]],
-    edges: [[0,2],[3,6],[2,5],[5,6],[4,5],[1,6],[0,2],[3,6],[2,5],[0,3],[1,4]] },
-
-  { id: 'c06', starts: [4, 5],
-    nodes: [[0.449,0.271],[0.343,0.767,1],[0.896,0.603,2],[0.216,0.149],[0.890,0.173],[0.148,0.564],[0.663,0.881]],
-    edges: [[0,3],[1,5],[1,6],[2,6],[3,5],[2,4],[0,3],[1,5],[1,6],[2,6],[3,5],[0,4]] },
-
-  { id: 'c07', starts: [3, 5],
-    nodes: [[0.278,0.601,1],[0.806,0.624,1],[0.564,0.593],[0.409,0.147],[0.771,0.245,2],[0.668,0.879],[0.134,0.198,2]],
-    edges: [[1,2],[3,6],[0,2],[1,5],[3,4],[1,4],[1,2],[3,6],[0,2],[3,4],[0,6],[0,5]] },
+  { id: 'c07', starts: [2, 1],
+    nodes: [[0.245,0.328,1],[0.318,0.783],[0.660,0.371],[0.877,0.494,2],[0.570,0.869,1],[0.880,0.121,2],[0.587,0.624]],
+    edges: [[4,6],[2,3],[2,6],[1,4],[2,5],[0,2],[1,6],[3,6],[3,5],[0,1]] },
 
   { id: 'c08', starts: [4, 6],
-    nodes: [[0.256,0.322,2],[0.566,0.151,1],[0.750,0.759],[0.739,0.385,1],[0.391,0.625],[0.325,0.890,2],[0.893,0.185]],
-    edges: [[3,6],[4,5],[1,3],[0,4],[0,1],[2,3],[3,6],[4,5],[1,6],[0,4],[0,1],[2,5]] },
+    nodes: [[0.518,0.883],[0.617,0.589,1],[0.555,0.257,1],[0.278,0.860,2],[0.218,0.626],[0.146,0.301,2],[0.892,0.768]],
+    edges: [[0,3],[3,4],[0,1],[1,6],[4,5],[1,2],[0,6],[0,4],[1,4],[2,5]] },
 
-  { id: 'c09', starts: [6, 3],
-    nodes: [[0.240,0.780,2],[0.509,0.418],[0.165,0.157,2],[0.829,0.827],[0.809,0.509,1],[0.518,0.807,1],[0.205,0.508]],
-    edges: [[0,6],[0,5],[3,5],[1,4],[1,6],[2,6],[0,6],[0,5],[3,5],[1,4],[3,4],[1,2]] },
+  { id: 'c09', starts: [2, 5],
+    nodes: [[0.589,0.437,2],[0.300,0.694],[0.688,0.717],[0.380,0.256,1],[0.771,0.132,1],[0.154,0.403],[0.478,0.885,2]],
+    edges: [[1,6],[2,6],[3,5],[0,3],[0,2],[0,4],[1,5],[0,1],[1,2],[3,4]] },
 
-  { id: 'c10', starts: [6, 5],
-    nodes: [[0.585,0.362],[0.521,0.702,1],[0.756,0.127,2],[0.227,0.683],[0.882,0.506,1],[0.747,0.829],[0.268,0.224],[0.498,0.109,2]],
-    edges: [[6,7],[2,7],[1,5],[0,7],[1,3],[0,4],[0,1],[6,7],[1,5],[0,2],[4,5],[2,4],[3,6]] },
+  { id: 'c10', starts: [1, 3],
+    nodes: [[0.647,0.769,1],[0.589,0.351],[0.218,0.174],[0.195,0.703],[0.898,0.646,1],[0.817,0.231,2],[0.530,0.102,2],[0.334,0.477]],
+    edges: [[1,6],[1,5],[3,7],[0,4],[1,7],[2,6],[0,1],[5,6],[2,7],[4,5],[6,7],[0,3]] },
 
-  { id: 'c11', starts: [3, 4],
-    nodes: [[0.393,0.296],[0.127,0.804,2],[0.709,0.762,2],[0.376,0.725],[0.866,0.174],[0.884,0.482,1],[0.630,0.486],[0.126,0.327,1]],
-    edges: [[5,6],[1,3],[0,7],[2,6],[0,6],[4,5],[2,3],[5,6],[1,3],[0,7],[4,5],[2,3],[1,7]] },
+  { id: 'c11', starts: [1, 7],
+    nodes: [[0.251,0.184],[0.572,0.363],[0.828,0.716,2],[0.861,0.280,2],[0.148,0.546,1],[0.373,0.729],[0.587,0.869,1],[0.117,0.847]],
+    edges: [[5,6],[5,7],[2,6],[4,5],[1,3],[0,1],[0,4],[4,7],[1,5],[1,2],[2,3],[6,7]] },
 
-  { id: 'c12', starts: [6, 7],
-    nodes: [[0.722,0.205,2],[0.729,0.733,2],[0.314,0.811,1],[0.570,0.408],[0.330,0.367],[0.197,0.154,1],[0.850,0.431],[0.107,0.474]],
-    edges: [[3,4],[4,7],[4,5],[0,3],[0,6],[1,6],[2,7],[3,4],[0,3],[0,6],[1,6],[5,7],[2,7]] },
+  { id: 'c12', starts: [7, 1],
+    nodes: [[0.145,0.314,2],[0.873,0.758],[0.523,0.318,2],[0.482,0.741,1],[0.762,0.441],[0.113,0.624,1],[0.846,0.214],[0.332,0.101]],
+    edges: [[4,6],[2,4],[0,7],[2,7],[0,5],[1,4],[3,5],[2,6],[0,2],[1,3],[3,4]] },
 
-  { id: 'c13', starts: [3, 4],
-    nodes: [[0.233,0.286,1],[0.837,0.862],[0.563,0.126,2],[0.656,0.460],[0.246,0.838],[0.230,0.558],[0.896,0.273,2],[0.561,0.895,1],[0.886,0.587]],
-    edges: [[3,8],[0,5],[1,7],[1,8],[4,5],[3,6],[4,7],[2,3],[3,8],[0,5],[1,7],[1,8],[4,5],[4,7],[2,6]] },
+  { id: 'c13', starts: [8, 6],
+    nodes: [[0.858,0.783,2],[0.342,0.898,1],[0.263,0.167,1],[0.688,0.149,2],[0.342,0.464],[0.580,0.496],[0.129,0.739],[0.546,0.759],[0.790,0.369]],
+    edges: [[4,5],[3,8],[5,8],[1,7],[5,7],[1,6],[2,4],[0,7],[4,6],[4,7],[3,5],[0,8],[2,3]] },
 
-  { id: 'c14', starts: [4, 1],
-    nodes: [[0.794,0.339,1],[0.642,0.146],[0.642,0.774],[0.393,0.866,2],[0.119,0.851],[0.230,0.255],[0.461,0.552],[0.837,0.605,1],[0.130,0.608,2]],
-    edges: [[4,8],[0,1],[2,7],[2,3],[0,7],[3,4],[2,6],[5,8],[4,8],[0,1],[2,7],[0,7],[3,4],[3,6],[5,6]] },
+  { id: 'c14', starts: [0, 1],
+    nodes: [[0.812,0.797],[0.190,0.311],[0.263,0.691],[0.765,0.170],[0.441,0.877,2],[0.515,0.443],[0.855,0.545,2],[0.411,0.182,1],[0.126,0.896,1]],
+    edges: [[2,8],[1,7],[0,6],[2,4],[5,7],[2,5],[3,7],[5,6],[4,8],[1,5],[0,4],[3,6],[1,2]] },
 
-  { id: 'c15', starts: [4, 0],
-    nodes: [[0.236,0.181],[0.232,0.462],[0.802,0.168,1],[0.792,0.445],[0.611,0.776],[0.882,0.779,2],[0.313,0.797,2],[0.478,0.509],[0.504,0.168,1]],
-    edges: [[1,7],[0,8],[4,5],[2,3],[0,1],[2,8],[4,6],[4,7],[1,7],[0,8],[4,5],[2,3],[0,1],[2,8],[6,7]] },
+  { id: 'c15', starts: [0, 1],
+    nodes: [[0.808,0.864],[0.272,0.269],[0.686,0.243],[0.847,0.503,2],[0.491,0.618],[0.193,0.663],[0.500,0.870,2],[0.887,0.105,1],[0.115,0.891,1]],
+    edges: [[5,8],[2,7],[4,6],[4,5],[2,3],[0,6],[0,3],[1,5],[5,6],[3,4],[6,8],[3,7],[0,4],[1,2]] },
 
-  { id: 'c16', starts: [4, 3],
-    nodes: [[0.559,0.682],[0.728,0.133],[0.408,0.268,2],[0.879,0.838],[0.247,0.135],[0.309,0.550],[0.175,0.860,1],[0.121,0.355,2],[0.835,0.540,1],[0.401,0.826]],
-    edges: [[2,4],[0,9],[6,9],[4,7],[5,7],[0,5],[3,8],[0,8],[1,2],[2,4],[0,9],[6,9],[4,7],[5,7],[2,5],[3,8],[1,8]] },
+  { id: 'c16', starts: [1, 6],
+    nodes: [[0.714,0.498,1],[0.229,0.122],[0.525,0.172,2],[0.493,0.858,1],[0.315,0.387],[0.503,0.555],[0.748,0.788],[0.816,0.159],[0.116,0.324,2],[0.274,0.665]],
+    edges: [[4,8],[0,5],[1,8],[4,5],[5,9],[3,6],[2,7],[3,9],[1,2],[1,4],[4,9],[0,6],[3,5],[0,7],[8,9],[0,2]] },
 
-  { id: 'c17', starts: [1, 4],
-    nodes: [[0.162,0.186,1],[0.869,0.461],[0.288,0.650],[0.670,0.749],[0.205,0.870],[0.684,0.178,2],[0.596,0.375],[0.469,0.114,2],[0.101,0.379,1],[0.333,0.411]],
-    edges: [[0,8],[5,6],[5,7],[2,4],[8,9],[2,9],[6,9],[1,6],[1,3],[0,8],[5,6],[5,7],[2,4],[8,9],[0,7],[1,3]] },
+  { id: 'c17', starts: [3, 1],
+    nodes: [[0.862,0.613,2],[0.415,0.163],[0.126,0.349,1],[0.485,0.894],[0.638,0.521],[0.760,0.863,2],[0.192,0.744],[0.886,0.360,1],[0.414,0.652],[0.305,0.471]],
+    edges: [[8,9],[2,9],[6,8],[0,4],[3,8],[0,7],[4,8],[0,5],[1,9],[3,5],[4,7],[6,9],[3,6],[1,2],[4,5],[2,6]] },
 
-  { id: 'c18', starts: [0, 2],
-    nodes: [[0.312,0.343],[0.800,0.472,1],[0.687,0.898],[0.286,0.797],[0.320,0.101,2],[0.596,0.476],[0.513,0.795,1],[0.514,0.162,2],[0.130,0.498],[0.774,0.189]],
-    edges: [[2,6],[4,7],[1,5],[3,6],[0,8],[0,4],[7,9],[1,9],[5,6],[2,6],[4,7],[1,5],[0,8],[0,4],[7,9],[1,9],[3,8]] },
+  { id: 'c18', starts: [2, 6],
+    nodes: [[0.728,0.207,2],[0.871,0.794],[0.689,0.588],[0.273,0.545],[0.353,0.122,1],[0.873,0.414,2],[0.145,0.789],[0.224,0.317,1],[0.536,0.787],[0.590,0.389]],
+    edges: [[2,9],[0,9],[3,7],[4,7],[2,8],[0,5],[1,2],[3,6],[3,9],[2,5],[5,9],[1,8],[3,8],[1,5],[0,4],[6,8]] },
 
   { id: 'kbg', euler: true, interlude: true, starts: [0],
     hint: 'Every bridge, exactly once. Nobody has ever done it.',
     nodes: [[0.50,0.16],[0.50,0.84],[0.32,0.50],[0.77,0.50]],
     edges: [[0,2],[0,2],[1,2],[1,2],[0,3],[1,3],[2,3]] },
 
-  { id: 'c19', starts: [2, 5, 0],
-    nodes: [[0.206,0.213],[0.646,0.834,1],[0.875,0.247],[0.416,0.484],[0.501,0.122,2],[0.331,0.783],[0.859,0.642,3]],
-    edges: [[1,6],[0,4],[3,5],[1,5],[0,3],[2,4],[1,6],[0,4],[3,5],[1,5],[0,3],[2,6]] },
+  { id: 'c19', starts: [5, 4, 1],
+    nodes: [[0.385,0.398],[0.775,0.473],[0.147,0.297,3],[0.244,0.753,1],[0.536,0.854],[0.295,0.101],[0.634,0.163,2]],
+    edges: [[2,5],[0,2],[3,4],[1,6],[0,6],[0,3],[0,5],[5,6],[1,4],[2,3]] },
 
-  { id: 'c20', starts: [4, 6, 3],
-    nodes: [[0.537,0.242,2],[0.340,0.642,1],[0.636,0.644],[0.216,0.392],[0.793,0.312],[0.880,0.640,3],[0.662,0.888]],
-    edges: [[2,5],[2,6],[0,4],[1,3],[1,2],[4,5],[2,5],[0,4],[1,3],[5,6],[0,3]] },
+  { id: 'c20', starts: [6, 1, 0],
+    nodes: [[0.676,0.334],[0.219,0.199],[0.710,0.614],[0.357,0.669,3],[0.126,0.528,1],[0.170,0.889,2],[0.537,0.850]],
+    edges: [[3,6],[3,4],[0,2],[3,5],[2,6],[1,4],[2,3],[4,5],[5,6],[0,1]] },
 
-  { id: 'c21', starts: [6, 2, 4],
-    nodes: [[0.824,0.534,3],[0.258,0.252,2],[0.847,0.793],[0.500,0.646,1],[0.182,0.593],[0.454,0.110],[0.609,0.303]],
-    edges: [[1,5],[5,6],[0,2],[0,6],[3,4],[0,3],[1,5],[5,6],[0,2],[3,4],[1,4]] },
+  { id: 'c21', starts: [3, 0, 4],
+    nodes: [[0.443,0.179],[0.815,0.265,1],[0.849,0.621,2],[0.556,0.848],[0.103,0.783],[0.613,0.540,3],[0.178,0.552]],
+    edges: [[4,6],[2,5],[3,5],[1,5],[0,1],[5,6],[1,2],[2,3],[0,6],[3,4]] },
 
-  { id: 'c22', starts: [4, 5, 1],
-    nodes: [[0.173,0.606],[0.316,0.121],[0.608,0.242,2],[0.686,0.800,3],[0.746,0.491],[0.110,0.866],[0.143,0.360,1],[0.400,0.715]],
-    edges: [[0,6],[0,7],[0,5],[2,4],[1,6],[3,7],[3,4],[0,6],[2,4],[1,6],[3,7],[3,4],[1,2],[5,7]] },
+  { id: 'c22', starts: [7, 4, 5],
+    nodes: [[0.789,0.786,3],[0.532,0.787],[0.516,0.163,1],[0.296,0.564,2],[0.848,0.476],[0.179,0.201],[0.615,0.542],[0.173,0.846]],
+    edges: [[4,6],[0,1],[1,6],[3,7],[3,6],[2,5],[3,5],[0,6],[0,4],[1,3],[1,7],[2,4]] },
 
-  { id: 'c23', starts: [7, 5, 2],
-    nodes: [[0.473,0.260,1],[0.831,0.753,3],[0.188,0.435],[0.246,0.863,2],[0.814,0.414],[0.686,0.120],[0.399,0.625],[0.546,0.834]],
-    edges: [[0,5],[6,7],[3,6],[2,6],[1,7],[4,5],[0,2],[0,5],[6,7],[1,7],[4,5],[0,2],[1,4],[2,3]] },
+  { id: 'c23', starts: [2, 4, 0],
+    nodes: [[0.126,0.488],[0.357,0.564],[0.669,0.135],[0.747,0.669,1],[0.523,0.806],[0.829,0.326,3],[0.449,0.322],[0.228,0.158,2]],
+    edges: [[0,1],[2,5],[1,6],[3,4],[6,7],[2,6],[1,4],[0,7],[3,5],[0,6],[1,3],[2,7]] },
 
-  { id: 'c24', starts: [3, 5, 1],
-    nodes: [[0.709,0.337,1],[0.340,0.141],[0.105,0.298,2],[0.261,0.742],[0.501,0.559],[0.879,0.513],[0.687,0.776,3],[0.234,0.501]],
-    edges: [[2,7],[3,7],[0,5],[4,7],[1,2],[4,6],[0,4],[2,7],[0,5],[1,2],[4,6],[5,6],[0,1],[3,6]] },
+  { id: 'c24', starts: [0, 7, 2],
+    nodes: [[0.265,0.878],[0.608,0.145,1],[0.337,0.303],[0.427,0.562],[0.897,0.534],[0.674,0.814,3],[0.157,0.661,2],[0.896,0.103]],
+    edges: [[0,6],[2,3],[3,6],[1,7],[1,2],[3,5],[4,5],[0,3],[2,6],[0,5],[4,7]] },
 
-  { id: 'c25', starts: [0, 8, 5],
-    nodes: [[0.591,0.401],[0.798,0.263,2],[0.705,0.764,1],[0.324,0.657,3],[0.478,0.880,1],[0.166,0.477],[0.871,0.584,3],[0.301,0.180,2],[0.217,0.883]],
-    edges: [[3,5],[2,6],[0,1],[3,8],[2,4],[4,8],[5,7],[1,6],[3,5],[2,6],[0,1],[3,8],[2,4],[4,8],[0,7]] },
+  { id: 'c25', starts: [3, 2, 1],
+    nodes: [[0.206,0.213,3],[0.646,0.834],[0.875,0.247],[0.416,0.484],[0.501,0.122,1],[0.331,0.783,2],[0.859,0.642,1],[0.671,0.462,3],[0.131,0.556,2]],
+    edges: [[3,7],[6,7],[1,6],[3,8],[2,7],[5,8],[0,4],[0,3],[3,5],[1,5],[0,8],[1,7],[2,4],[2,6]] },
 
-  { id: 'c26', starts: [4, 8, 3],
-    nodes: [[0.586,0.893,1],[0.418,0.713,3],[0.416,0.280,2],[0.132,0.336],[0.805,0.294],[0.807,0.755,3],[0.142,0.652,1],[0.598,0.527,2],[0.180,0.896]],
-    edges: [[6,8],[0,1],[1,7],[0,5],[1,6],[2,3],[2,7],[4,7],[6,8],[0,1],[0,5],[2,3],[2,7],[3,6],[4,5]] },
+  { id: 'c26', starts: [2, 8, 4],
+    nodes: [[0.659,0.364,3],[0.121,0.542,2],[0.417,0.828],[0.875,0.815,3],[0.379,0.344],[0.550,0.108,1],[0.893,0.545,1],[0.669,0.657,2],[0.857,0.189]],
+    edges: [[6,7],[3,7],[0,8],[0,5],[0,4],[0,7],[2,7],[1,4],[3,6],[4,5],[5,8],[6,8],[1,2],[2,3]] },
 
-  { id: 'c27', starts: [5, 4, 3],
-    nodes: [[0.306,0.675,2],[0.586,0.430,3],[0.504,0.189,1],[0.534,0.862],[0.807,0.258],[0.192,0.454],[0.771,0.658,1],[0.244,0.179,3],[0.148,0.862,2]],
-    edges: [[0,8],[0,5],[1,2],[2,7],[1,4],[5,7],[1,6],[0,3],[0,8],[1,2],[2,7],[5,7],[3,6],[3,8],[4,6]] },
+  { id: 'c27', starts: [0, 7, 8],
+    nodes: [[0.180,0.705],[0.286,0.249,3],[0.773,0.668,1],[0.651,0.436,3],[0.699,0.162,1],[0.483,0.867,2],[0.390,0.542,2],[0.892,0.384],[0.870,0.898]],
+    edges: [[3,7],[2,8],[2,3],[0,6],[3,4],[3,6],[1,6],[5,6],[4,7],[2,7],[0,5],[2,5],[5,8],[1,4]] },
 
-  { id: 'c28', starts: [8, 4, 2],
-    nodes: [[0.529,0.438,3],[0.757,0.842,3],[0.131,0.272],[0.431,0.166,1],[0.795,0.131],[0.480,0.688,2],[0.163,0.682,2],[0.846,0.444,1],[0.294,0.884]],
-    edges: [[6,8],[0,5],[5,8],[0,3],[0,7],[1,5],[4,7],[2,3],[6,8],[0,5],[4,7],[2,3],[3,4],[1,7],[2,6]] },
+  { id: 'c28', starts: [3, 0, 8],
+    nodes: [[0.822,0.132],[0.619,0.270,3],[0.219,0.442,2],[0.501,0.546],[0.845,0.761,1],[0.406,0.100,1],[0.372,0.758,2],[0.885,0.432,3],[0.117,0.747]],
+    edges: [[0,1],[3,6],[6,8],[1,5],[1,3],[2,3],[0,7],[4,7],[1,7],[2,8],[2,6],[2,5],[3,7],[0,5],[4,6]] },
 
-  { id: 'c29', starts: [7, 5, 4],
-    nodes: [[0.139,0.519,1],[0.512,0.847,2],[0.616,0.198,1],[0.881,0.456,3],[0.161,0.806],[0.314,0.185],[0.626,0.456,2],[0.747,0.778],[0.389,0.496,3]],
-    edges: [[6,8],[1,7],[0,8],[3,6],[2,6],[0,4],[2,5],[6,7],[1,7],[0,8],[0,4],[2,5],[5,8],[3,7],[1,4]] },
+  { id: 'c29', starts: [3, 6, 2],
+    nodes: [[0.329,0.893,3],[0.523,0.372,3],[0.798,0.506],[0.599,0.898],[0.690,0.145,1],[0.203,0.451,1],[0.388,0.119],[0.410,0.641,2],[0.823,0.787,2]],
+    edges: [[3,8],[0,7],[0,3],[5,7],[1,4],[2,8],[1,6],[1,7],[4,6],[1,2],[3,7],[2,4],[5,6],[2,3],[0,5]] },
 
-  { id: 'c30', starts: [2, 8, 1],
-    nodes: [[0.825,0.861,2],[0.384,0.719],[0.897,0.481],[0.619,0.544,2],[0.223,0.383,1],[0.810,0.210,3],[0.503,0.156,3],[0.108,0.649,1],[0.136,0.117]],
-    edges: [[4,8],[1,7],[2,5],[2,3],[4,7],[1,3],[5,6],[0,3],[4,8],[1,7],[2,5],[2,3],[4,7],[5,6],[6,8],[0,1]] },
+  { id: 'c30', starts: [3, 4, 7],
+    nodes: [[0.417,0.621,3],[0.824,0.429,2],[0.519,0.365,1],[0.822,0.822],[0.261,0.249],[0.510,0.883,2],[0.489,0.102,1],[0.899,0.147],[0.113,0.655,3]],
+    edges: [[2,6],[4,6],[0,2],[0,5],[1,7],[0,8],[1,2],[3,5],[2,4],[1,3],[0,4],[6,7],[4,8],[5,8],[1,6]] },
 
-  { id: 'c31', starts: [8, 4, 5],
-    nodes: [[0.869,0.337,1],[0.273,0.861,3],[0.208,0.239,2],[0.434,0.493],[0.846,0.695],[0.611,0.284],[0.242,0.619,3],[0.640,0.884,1],[0.123,0.434],[0.406,0.117,2]],
-    edges: [[2,8],[6,8],[3,6],[2,9],[1,6],[0,5],[5,9],[4,7],[0,4],[2,8],[6,8],[2,9],[0,5],[5,9],[4,7],[0,4],[1,7],[1,3]] },
+  { id: 'c31', starts: [8, 2, 0],
+    nodes: [[0.178,0.207],[0.799,0.617,3],[0.131,0.805],[0.572,0.103,2],[0.310,0.376],[0.479,0.827,1],[0.579,0.362,2],[0.344,0.595,3],[0.797,0.180],[0.142,0.581,1]],
+    edges: [[7,9],[0,4],[4,7],[2,9],[3,8],[3,6],[5,7],[4,6],[1,6],[4,9],[6,8],[2,7],[2,5],[0,9],[1,5],[0,3]] },
 
-  { id: 'c32', starts: [0, 4, 3],
-    nodes: [[0.574,0.282],[0.501,0.886,1],[0.379,0.683,1],[0.688,0.745],[0.170,0.805],[0.769,0.338,2],[0.284,0.470,3],[0.509,0.490,3],[0.810,0.100,2],[0.767,0.545]],
-    edges: [[0,5],[5,9],[3,9],[0,7],[6,7],[2,6],[1,3],[5,8],[2,4],[0,5],[3,9],[0,7],[6,7],[2,6],[1,3],[1,2],[1,4],[8,9]] },
+  { id: 'c32', starts: [9, 7, 1],
+    nodes: [[0.882,0.793,2],[0.164,0.669],[0.714,0.677,3],[0.597,0.846,2],[0.186,0.428,1],[0.729,0.361,3],[0.507,0.224,1],[0.190,0.191],[0.447,0.610],[0.895,0.567]],
+    edges: [[0,2],[2,3],[2,9],[4,7],[1,4],[5,6],[5,9],[2,8],[1,8],[0,9],[3,8],[0,3],[4,8],[6,7],[4,6],[1,3]] },
 
-  { id: 'c33', starts: [5, 4, 8],
-    nodes: [[0.521,0.295,1],[0.605,0.738,3],[0.308,0.784,2],[0.211,0.461,2],[0.875,0.519],[0.103,0.714],[0.718,0.332,1],[0.840,0.859,1],[0.175,0.206],[0.441,0.568,3]],
-    edges: [[0,6],[2,5],[1,9],[4,6],[3,9],[2,9],[3,8],[1,7],[0,9],[0,6],[2,5],[4,6],[3,8],[1,7],[3,5],[1,2],[4,7]] },
+  { id: 'c33', starts: [2, 8, 1],
+    nodes: [[0.437,0.182,1],[0.133,0.816],[0.812,0.864],[0.494,0.681,1],[0.762,0.548,2],[0.877,0.105,3],[0.120,0.343,1],[0.543,0.886,2],[0.221,0.133],[0.688,0.222,3]],
+    edges: [[3,7],[0,8],[5,9],[6,8],[0,9],[2,7],[3,4],[4,9],[1,3],[2,4],[0,6],[2,3],[1,7],[0,5],[4,5],[1,6]] },
 
-  { id: 'c34', starts: [7, 3, 9],
-    nodes: [[0.505,0.859,1],[0.280,0.195,2],[0.704,0.282,2],[0.868,0.879],[0.801,0.531,3],[0.272,0.718,1],[0.123,0.526,1],[0.480,0.470],[0.559,0.105,3],[0.140,0.872]],
-    edges: [[5,9],[2,8],[5,6],[2,4],[0,5],[2,7],[1,8],[5,7],[3,4],[2,8],[1,8],[4,7],[1,7],[6,9],[3,4],[0,3],[0,9]] },
+  { id: 'c34', starts: [9, 1, 8],
+    nodes: [[0.864,0.608,3],[0.744,0.214],[0.478,0.280,1],[0.389,0.551,2],[0.892,0.389,1],[0.300,0.741,2],[0.769,0.794,3],[0.583,0.462,1],[0.198,0.311],[0.454,0.891]],
+    edges: [[0,6],[3,5],[2,7],[3,7],[5,9],[0,4],[1,4],[1,2],[2,8],[2,3],[1,7],[3,8],[0,7],[6,9],[0,1],[5,8],[5,6]] },
 
-  { id: 'c35', starts: [3, 2, 7, 6],
-    nodes: [[0.522,0.844,1],[0.464,0.341,4],[0.267,0.730],[0.837,0.119],[0.186,0.341,3],[0.723,0.591,2],[0.371,0.103],[0.768,0.853]],
-    edges: [[0,7],[1,6],[5,7],[1,4],[0,2],[1,5],[1,3],[0,7],[5,7],[0,2],[4,6],[2,4],[3,6]] },
+  { id: 'c35', starts: [6, 5, 1, 2],
+    nodes: [[0.641,0.535,4],[0.304,0.764],[0.678,0.288],[0.560,0.850,2],[0.172,0.538,1],[0.311,0.102],[0.897,0.613],[0.446,0.353,3]],
+    edges: [[2,7],[0,2],[1,4],[0,6],[1,3],[5,7],[0,3],[0,7],[4,7],[2,6],[2,5],[3,6],[4,5]] },
 
-  { id: 'c36', starts: [1, 4, 0, 3],
-    nodes: [[0.741,0.665],[0.574,0.270],[0.831,0.252,2],[0.172,0.395],[0.133,0.805],[0.394,0.768,1],[0.400,0.101,3],[0.467,0.515,4]],
-    edges: [[1,6],[1,2],[5,7],[4,5],[1,7],[0,7],[3,7],[1,6],[4,5],[0,5],[3,6],[3,4],[0,2]] },
+  { id: 'c36', starts: [3, 5, 6, 4],
+    nodes: [[0.819,0.704,2],[0.265,0.295,3],[0.305,0.874,1],[0.758,0.414],[0.520,0.162],[0.119,0.545],[0.538,0.787],[0.464,0.446,4]],
+    edges: [[2,6],[1,7],[1,4],[1,5],[0,6],[3,7],[0,3],[4,7],[3,4],[6,7],[2,5],[3,6]] },
 
-  { id: 'c37', starts: [3, 5, 2, 4],
-    nodes: [[0.488,0.306,1],[0.288,0.728,2],[0.774,0.273],[0.481,0.887],[0.826,0.663],[0.330,0.125],[0.312,0.484,3],[0.562,0.549,4]],
-    edges: [[0,5],[1,6],[0,6],[1,3],[0,7],[0,2],[4,7],[1,6],[1,3],[6,7],[4,7],[2,4],[3,4],[2,5]] },
+  { id: 'c37', starts: [6, 7, 0, 1],
+    nodes: [[0.169,0.140],[0.840,0.290],[0.409,0.732,4],[0.250,0.393,1],[0.741,0.676,3],[0.560,0.233,2],[0.589,0.481],[0.142,0.812]],
+    edges: [[4,6],[5,6],[0,3],[2,7],[1,5],[2,6],[3,5],[1,6],[2,4],[2,3],[1,4],[0,5],[3,7]] },
 
-  { id: 'c38', starts: [5, 3, 1, 0],
-    nodes: [[0.236,0.723],[0.610,0.177],[0.549,0.888,3],[0.119,0.309],[0.483,0.627],[0.900,0.663],[0.899,0.254,2],[0.719,0.499,4],[0.433,0.356,1]],
-    edges: [[5,7],[1,8],[0,4],[2,4],[4,7],[4,8],[1,6],[3,8],[5,7],[1,8],[1,6],[6,7],[0,2],[5,6],[2,5],[0,3]] },
+  { id: 'c38', starts: [3, 0, 7, 4],
+    nodes: [[0.163,0.785],[0.593,0.618],[0.826,0.497,4],[0.619,0.129],[0.227,0.328],[0.502,0.884,1],[0.364,0.543,3],[0.824,0.877],[0.867,0.199,2]],
+    edges: [[1,6],[4,6],[3,8],[1,2],[1,5],[2,8],[0,6],[5,7],[1,7],[0,5],[5,6],[2,7],[2,3],[3,4],[0,4]] },
 
-  { id: 'c39', starts: [3, 0, 5, 1],
-    nodes: [[0.168,0.713],[0.703,0.864],[0.539,0.610,3],[0.869,0.224],[0.495,0.320],[0.110,0.140],[0.872,0.522,2],[0.417,0.841,1],[0.208,0.440,4]],
-    edges: [[2,7],[0,8],[0,7],[1,7],[2,4],[3,6],[5,8],[2,6],[2,7],[0,8],[3,6],[4,8],[1,6],[3,4],[4,5]] },
+  { id: 'c39', starts: [3, 4, 6, 5],
+    nodes: [[0.820,0.413,1],[0.251,0.194,2],[0.503,0.385,4],[0.164,0.589],[0.876,0.774],[0.475,0.894],[0.717,0.184],[0.183,0.873,3],[0.582,0.618]],
+    edges: [[2,8],[0,6],[3,7],[2,6],[5,7],[5,8],[1,2],[4,8],[0,8],[0,2],[0,4],[1,3],[4,5],[3,5],[1,6]] },
 
-  { id: 'c40', starts: [7, 2, 4, 1],
-    nodes: [[0.440,0.234,3],[0.181,0.302],[0.166,0.758],[0.876,0.478,2],[0.816,0.840],[0.630,0.550,4],[0.412,0.669],[0.734,0.128],[0.567,0.881,1]],
-    edges: [[5,6],[4,8],[3,5],[6,8],[2,6],[0,1],[0,7],[0,5],[5,6],[4,8],[0,1],[3,4],[3,7],[2,8],[1,2]] },
+  { id: 'c40', starts: [7, 1, 8, 5],
+    nodes: [[0.488,0.684,3],[0.265,0.131],[0.818,0.559,4],[0.678,0.141,1],[0.390,0.433],[0.126,0.584],[0.324,0.887,2],[0.743,0.816],[0.898,0.286]],
+    edges: [[0,6],[3,8],[2,7],[0,4],[2,8],[0,7],[4,5],[1,4],[0,2],[5,6],[3,4],[1,3],[6,7],[2,3],[1,5]] },
 
-  { id: 'c41', starts: [1, 8, 4, 7],
-    nodes: [[0.450,0.824,2],[0.144,0.707],[0.331,0.480,1],[0.524,0.162,3],[0.879,0.759],[0.586,0.527,4],[0.883,0.480,1],[0.134,0.248],[0.798,0.118]],
-    edges: [[2,5],[3,8],[4,6],[1,2],[5,6],[2,7],[0,5],[3,5],[3,8],[4,6],[1,2],[0,1],[6,8],[3,7],[0,4]] },
+  { id: 'c41', starts: [2, 3, 0, 1],
+    nodes: [[0.265,0.765],[0.767,0.338],[0.251,0.114],[0.836,0.802],[0.473,0.336,3],[0.608,0.622,1],[0.205,0.506,4],[0.485,0.871,1],[0.597,0.117,2]],
+    edges: [[0,7],[4,8],[0,6],[5,7],[1,8],[3,5],[2,4],[4,5],[1,4],[1,5],[2,8],[3,7],[2,6],[6,7],[1,3]] },
 
-  { id: 'c42', starts: [5, 2, 4, 0],
-    nodes: [[0.205,0.324],[0.506,0.716,1],[0.228,0.771],[0.529,0.229,3],[0.769,0.679],[0.875,0.188],[0.336,0.538,1],[0.576,0.478,4],[0.829,0.439,2]],
-    edges: [[1,6],[6,7],[4,8],[0,6],[3,7],[5,8],[7,8],[2,6],[4,8],[1,7],[1,4],[1,2],[0,3],[3,5],[0,2]] },
+  { id: 'c42', starts: [4, 8, 3, 0],
+    nodes: [[0.823,0.829],[0.746,0.596,2],[0.538,0.404,1],[0.367,0.825],[0.873,0.381],[0.157,0.537,1],[0.358,0.190,4],[0.594,0.146,3],[0.125,0.115]],
+    edges: [[6,7],[6,8],[0,1],[1,4],[2,7],[1,2],[3,5],[5,6],[2,6],[2,4],[4,7],[5,8],[1,3],[0,4],[0,3]] },
 
-  { id: 'c43', starts: [1, 8, 4, 3],
-    nodes: [[0.413,0.729,2],[0.816,0.739],[0.610,0.128,3],[0.830,0.263],[0.162,0.870],[0.375,0.333,4],[0.130,0.395,1],[0.630,0.486,1],[0.223,0.143]],
-    edges: [[5,8],[5,6],[2,3],[0,4],[5,7],[3,7],[1,7],[0,7],[5,8],[2,3],[6,8],[0,4],[2,8],[0,1],[4,6]] },
+  { id: 'c43', starts: [1, 6, 3, 2],
+    nodes: [[0.451,0.327,3],[0.121,0.646],[0.228,0.210],[0.638,0.737],[0.763,0.445,4],[0.386,0.640,1],[0.868,0.181],[0.434,0.881,2],[0.632,0.117,1]],
+    edges: [[6,8],[5,7],[3,7],[0,2],[1,5],[0,8],[4,6],[3,4],[3,5],[0,5],[0,4],[4,8],[1,7],[2,8],[1,2]] },
 
-  { id: 'c44', starts: [4, 8, 3, 0],
-    nodes: [[0.457,0.375],[0.683,0.847,1],[0.761,0.402,3],[0.349,0.884],[0.140,0.245],[0.374,0.564,2],[0.163,0.608,4],[0.632,0.649,1],[0.863,0.674],[0.320,0.157,2]],
-    edges: [[4,9],[1,7],[0,5],[5,6],[7,8],[0,9],[5,7],[2,7],[3,5],[4,9],[1,8],[0,9],[2,8],[0,2],[3,6],[1,3],[4,6]] },
+  { id: 'c44', starts: [0, 1, 2, 7],
+    nodes: [[0.552,0.206],[0.611,0.823],[0.107,0.511],[0.283,0.713,1],[0.286,0.338,4],[0.114,0.171,2],[0.657,0.529,2],[0.888,0.586],[0.840,0.294,3],[0.409,0.521,1]],
+    edges: [[4,9],[3,9],[6,7],[4,5],[6,9],[2,4],[7,8],[1,6],[0,4],[2,3],[6,8],[0,8],[2,9],[2,5],[1,3],[1,7],[0,5]] },
 
-  { id: 'c45', starts: [3, 9, 2, 6],
-    nodes: [[0.798,0.416,4],[0.174,0.673,1],[0.890,0.163],[0.627,0.530],[0.758,0.835,2],[0.308,0.285,1],[0.456,0.146],[0.472,0.865,3],[0.375,0.475,2],[0.114,0.396]],
-    edges: [[5,8],[5,6],[0,3],[5,9],[3,8],[0,2],[1,8],[4,7],[3,4],[5,8],[0,3],[0,2],[1,9],[4,7],[1,7],[6,9],[2,6]] },
+  { id: 'c45', starts: [6, 9, 3, 1],
+    nodes: [[0.326,0.532,2],[0.113,0.569],[0.279,0.883,3],[0.750,0.412],[0.373,0.320,1],[0.623,0.201,1],[0.538,0.800],[0.796,0.698,2],[0.581,0.521,4],[0.234,0.171]],
+    edges: [[3,8],[4,9],[0,1],[0,4],[3,5],[0,8],[2,6],[6,7],[7,8],[4,5],[6,8],[3,7],[0,6],[1,2],[1,4],[5,9],[1,9]] },
 
-  { id: 'c46', starts: [4, 5, 7, 6],
-    nodes: [[0.380,0.743,3],[0.194,0.312,1],[0.654,0.193,4],[0.465,0.366,1],[0.762,0.483],[0.174,0.739],[0.634,0.849],[0.352,0.144],[0.840,0.106,2],[0.540,0.577,2]],
-    edges: [[0,5],[2,8],[3,9],[0,9],[1,7],[4,9],[3,7],[2,3],[0,6],[0,5],[2,8],[3,9],[1,7],[2,7],[4,8],[4,6],[1,5]] },
+  { id: 'c46', starts: [0, 9, 5, 6],
+    nodes: [[0.362,0.895],[0.842,0.349,1],[0.485,0.542,1],[0.304,0.698,2],[0.612,0.228,4],[0.230,0.334],[0.744,0.771],[0.107,0.603,2],[0.522,0.740,3],[0.818,0.135]],
+    edges: [[2,8],[0,3],[1,9],[3,7],[3,8],[6,8],[4,9],[5,7],[2,4],[0,8],[2,3],[1,4],[2,5],[0,7],[4,5],[0,6],[1,6]] },
 
-  { id: 'c47', starts: [5, 8, 0, 6],
-    nodes: [[0.133,0.197],[0.445,0.663,3],[0.442,0.267,4],[0.860,0.503,2],[0.236,0.699,1],[0.757,0.169],[0.657,0.737],[0.370,0.899,1],[0.142,0.882],[0.262,0.499,3],[0.616,0.472,2]],
-    edges: [[4,9],[4,8],[1,4],[1,6],[7,8],[3,10],[1,10],[2,10],[0,2],[2,5],[4,9],[1,6],[7,8],[3,10],[2,9],[3,6],[0,9],[6,7],[3,5]] },
+  { id: 'c47', starts: [2, 7, 1, 9],
+    nodes: [[0.894,0.523,2],[0.815,0.229],[0.824,0.783],[0.369,0.555,3],[0.543,0.106,4],[0.336,0.238,1],[0.652,0.421,2],[0.110,0.291],[0.525,0.707,3],[0.249,0.788],[0.105,0.495,1]],
+    edges: [[7,10],[3,8],[5,7],[4,5],[1,6],[3,9],[0,6],[0,2],[3,10],[1,4],[8,9],[0,1],[2,8],[6,8],[3,6],[9,10],[5,10],[4,7]] },
 
-  { id: 'c48', starts: [2, 7, 6, 5],
-    nodes: [[0.384,0.756,1],[0.534,0.484,3],[0.886,0.206],[0.843,0.468,2],[0.144,0.350,1],[0.433,0.202],[0.884,0.857],[0.155,0.631],[0.625,0.821,4],[0.671,0.259,3],[0.683,0.628,2]],
-    edges: [[8,10],[1,10],[2,9],[3,10],[5,9],[0,8],[6,8],[0,7],[1,9],[4,7],[8,10],[2,9],[0,7],[2,3],[4,7],[1,5],[1,3],[4,5],[3,6]] },
+  { id: 'c48', starts: [3, 1, 7, 0],
+    nodes: [[0.168,0.137],[0.816,0.859],[0.737,0.100,3],[0.542,0.256],[0.600,0.607,1],[0.763,0.343,3],[0.442,0.482,2],[0.201,0.697],[0.386,0.827,1],[0.882,0.534,4],[0.137,0.448,2]],
+    edges: [[4,6],[5,9],[7,8],[3,5],[2,5],[3,6],[7,10],[4,8],[0,10],[1,9],[2,3],[4,9],[6,10],[4,5],[6,7],[0,3],[1,8],[2,9]] },
 
-  { id: 'c49', starts: [4, 7, 5, 3],
-    nodes: [[0.878,0.324,2],[0.585,0.795,1],[0.196,0.625,1],[0.113,0.219],[0.549,0.234],[0.801,0.689],[0.343,0.422,2],[0.315,0.825],[0.574,0.448,4],[0.325,0.209,3],[0.396,0.622,3]],
-    edges: [[2,10],[6,10],[3,9],[6,9],[4,8],[7,10],[4,9],[1,5],[1,10],[0,8],[3,9],[4,8],[6,8],[2,7],[1,5],[2,6],[1,7],[0,4],[0,5]] },
+  { id: 'c49', starts: [3, 5, 10, 4],
+    nodes: [[0.645,0.361,3],[0.432,0.652,4],[0.810,0.746,1],[0.177,0.388],[0.659,0.117],[0.899,0.488],[0.286,0.824,2],[0.406,0.361,2],[0.292,0.165,3],[0.630,0.621,1],[0.552,0.871]],
+    edges: [[1,9],[2,9],[1,6],[7,8],[3,7],[0,7],[0,4],[1,10],[0,9],[2,5],[3,8],[9,10],[6,10],[0,5],[2,10],[1,7],[4,8],[4,5],[3,6]] },
 
-  { id: 'c50', starts: [3, 1, 10, 8],
-    nodes: [[0.307,0.784,4],[0.832,0.868],[0.232,0.388,2],[0.415,0.122],[0.834,0.579,3],[0.683,0.371,3],[0.528,0.836,1],[0.467,0.535,1],[0.844,0.115],[0.105,0.591,2],[0.107,0.868]],
-    edges: [[0,10],[0,6],[2,9],[4,5],[5,7],[2,7],[9,10],[1,4],[5,8],[2,3],[0,10],[0,6],[2,9],[4,5],[9,10],[1,4],[6,7],[1,6],[3,7],[3,8]] }
+  { id: 'c50', starts: [5, 2, 10, 8],
+    nodes: [[0.731,0.681,4],[0.695,0.171,3],[0.121,0.279],[0.109,0.577,1],[0.525,0.690,2],[0.716,0.457],[0.361,0.137,1],[0.553,0.340,3],[0.352,0.514],[0.603,0.881,2],[0.359,0.896]],
+    edges: [[5,7],[4,9],[0,4],[1,7],[0,5],[9,10],[4,8],[3,8],[2,6],[6,7],[0,9],[4,10],[7,8],[1,5],[2,3],[2,8],[1,6],[3,10]] }
 ];
 
 /* ============================================================
@@ -701,6 +717,13 @@ function buildBoard(rnd, n, extra, W, nClaim) {
   function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
   function tryAdd(c) {
     if (c[2] > 0.48 || deg[c[0]] >= 4 || deg[c[1]] >= 4) return false;
+    for (var d = 0; d < edges.length; d++) {
+      // One span per pair of islands. Two bridges between the same two shores
+      // read as a smudge rather than a choice, and the second one adds nothing
+      // a single span between a different pair would not add better.
+      if ((edges[d][0] === c[0] && edges[d][1] === c[1]) ||
+          (edges[d][0] === c[1] && edges[d][1] === c[0])) return false;
+    }
     for (var e = 0; e < edges.length; e++) {
       var f = edges[e];
       if (f[0] === c[0] || f[0] === c[1] || f[1] === c[0] || f[1] === c[1]) continue;
@@ -724,10 +747,7 @@ function buildBoard(rnd, n, extra, W, nClaim) {
     for (var ck = 0; ck < cand.length && deg[v] < 2; ck++) {
       var c3 = cand[ck];
       if (c3[0] !== v && c3[1] !== v) continue;
-      var dup = false;
-      for (var q3 = 0; q3 < edges.length; q3++)
-        if (edges[q3][0] === c3[0] && edges[q3][1] === c3[1]) { dup = true; break; }
-      if (!dup) tryAdd(c3);
+      tryAdd(c3);
     }
     if (deg[v] < 2) return null;
   }
@@ -802,7 +822,7 @@ function driftLevel(depth) {
    Persistence
    ============================================================ */
 
-var SAVE = { stars: {}, best: {}, drift: 0, seenHow: false };
+var SAVE = { stars: {}, best: {}, drift: 0, seenHow: false, theme: 'auto' };
 try {
   var sv = localStorage.getItem('burnbridge.v3');
   if (sv) { var pj = JSON.parse(sv); if (pj && typeof pj === 'object') SAVE = Object.assign(SAVE, pj); }
@@ -826,8 +846,8 @@ var G = {
   par: 0, oddInfo: null,
   pos: [], paths: [], used: [], burnt: null, met: [],
   vis: 0, cost: 0, undos: 0, sel: 0,
-  deadAt: null, deadTime: 0, warnDismissed: -1,
-  overlay: null, revealOdd: false, parts: [], t: 0
+  deadAt: null, deadTime: 0, warnDismissed: -1, burnAt: {}, solvedAt: 0,
+  overlay: null, revealOdd: false, t: 0
 };
 
 function loadLevel(lv, idx, mode) {
@@ -851,7 +871,7 @@ function resetLevel() {
   G.used = [];
   G.burnt = new Uint8Array(lv.edges.length);
   G.vis = s.vis;
-  G.cost = 0; G.sel = 0; G.parts.length = 0;
+  G.cost = 0; G.sel = 0; G.burnAt = {}; G.solvedAt = 0;
   G.deadAt = null; G.deadTime = 0; G.warnDismissed = -1;
   syncHud();
 }
@@ -928,10 +948,10 @@ function cross(w, ei) {
   var bit = lv.claimBit[w][nx];
   if (bit !== undefined) G.met[w] |= bit;
   G.sel = w;
-  spawnEmbers(ei, w);
+  markBurn(ei);
   syncHud();
 
-  if (isWon()) { G.deadAt = null; finishLevel(); return true; }
+  if (isWon()) { G.deadAt = null; G.solvedAt = G.t; finishLevel(); return true; }
   refreshDead();
   if (!anyMoveLeft()) setOverlay('stranded');
   else if (!canMove(w)) selectNextMovable();
@@ -1001,14 +1021,45 @@ function finishLevel() {
 
 var cv = $('cv'), ctx = cv.getContext('2d');
 var VW = 0, VH = 0, DPR = 1, SX = 0, SY = 0, OX = 0, OY = 0, R = 14, SC = 1;
-var TEAM  = ['#ff8a4c', '#4ec9e8', '#b98cff', '#8fdc6a'];
-var TEAMD = [[255,138,76], [78,201,232], [185,140,255], [143,220,106]];
-var GLYPH = ['▲', '■', '◆', '⬟'];
 
+/* The canvas takes its colours from the stylesheet, so paper and night are one
+   source of truth. Read once per theme change rather than per frame. */
+var INK = {};
+function readTheme() {
+  var cs = getComputedStyle(document.documentElement);
+  function v(n) { return cs.getPropertyValue(n).trim(); }
+  INK.paper = v('--pg');
+  INK.ink = v('--pi');
+  INK.team = [v('--t0'), v('--t1'), v('--t2'), v('--t3')];
+  INK.inkRGB = hexRGB(INK.ink);
+  INK.teamRGB = INK.team.map(hexRGB);
+}
+function hexRGB(h) {
+  h = h.replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
 function rgba(w, alpha) {
-  var c = TEAMD[w];
+  var c = INK.teamRGB[w];
   return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
 }
+function inkA(alpha) {
+  var c = INK.inkRGB;
+  return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
+}
+
+function applyTheme() {
+  var t = SAVE.theme || 'auto';
+  var night = t === 'night' ||
+    (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', night ? 'night' : 'paper');
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', night ? '#191519' : '#ece9e1');
+  readTheme();
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+  if ((SAVE.theme || 'auto') === 'auto') { applyTheme(); syncHud(); }
+});
 
 function resize() {
   var r = cv.getBoundingClientRect();
@@ -1079,45 +1130,33 @@ function distToEdge(e, px, py) {
   return best;
 }
 
-function spawnEmbers(ei, w) {
-  var e = G.lv.edges[ei];
-  for (var i = 0; i < 14; i++) {
-    var p = bezAt(e, i / 13);
-    G.parts.push({
-      x: p[0], y: p[1], w: w,
-      vx: (Math.random() - 0.5) * 0.5, vy: -0.25 - Math.random() * 0.6,
-      life: 1, decay: 0.009 + Math.random() * 0.013, r: 1 + Math.random() * 1.8
-    });
-  }
+/* Burning a bridge is the only motion on the page: the span fades from live
+   pigment to spent over a moment, and its arrowhead grows in. No particles —
+   this is a map being drawn on, not a fire. */
+function markBurn(ei) { G.burnAt[ei] = G.t; }
+function burnPhase(ei) {
+  var t0 = G.burnAt[ei];
+  if (t0 === undefined) return 1;
+  return clamp((G.t - t0) / 300, 0, 1);
 }
 
-function drawSea() {
-  var g = ctx.createLinearGradient(0, 0, 0, VH);
-  g.addColorStop(0, '#08161f'); g.addColorStop(1, '#040d14');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
-  ctx.strokeStyle = 'rgba(90,150,175,0.05)'; ctx.lineWidth = 1;
-  for (var y = 18; y < VH; y += 28) {
-    ctx.beginPath();
-    for (var x = -10; x <= VW + 10; x += 16) {
-      var yy = y + Math.sin((x * 0.017) + G.t * 0.0006 + y * 0.05) * 2.2;
-      if (x <= 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
-    }
-    ctx.stroke();
-  }
+function drawPaper() {
+  ctx.fillStyle = INK.paper;
+  ctx.fillRect(0, 0, VW, VH);
 }
 
 /* ---------- bridges: three states, three unmistakable treatments ----------
-   standing  — thin, cool, low contrast. It recedes.
-   reachable — the selected traveller can cross it right now: thick, bright,
-               tinted with that traveller's colour.
-   burnt     — dashed in the colour of whoever burnt it, with an arrowhead
-               showing which way they went. Spent, by them, that way.        */
+   standing  — an ink hairline. Present, but it recedes into the page.
+   crossable — solid, in the pigment of the traveller you have picked up. The
+               only saturated lines on the board are the ones you may take now.
+   burnt     — the same pigment at a fraction of its strength, with a solid
+               arrowhead: spent, by them, that way.                          */
 
-function drawStanding(e) {
+function drawStanding(e, fade) {
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(126,156,171,0.34)';
-  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = inkA(0.30 * (fade === undefined ? 1 : fade));
+  ctx.lineWidth = 1.6;
   edgePath(e); ctx.stroke();
   ctx.restore();
 }
@@ -1125,71 +1164,66 @@ function drawStanding(e) {
 function drawReachable(e, w) {
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.strokeStyle = rgba(w, 0.13);
-  ctx.lineWidth = 13;
-  edgePath(e); ctx.stroke();
-  ctx.strokeStyle = 'rgba(236,226,208,0.92)';
-  ctx.lineWidth = 4.4;
+  ctx.strokeStyle = rgba(w, 0.95);
+  ctx.lineWidth = 3.4;
   edgePath(e); ctx.stroke();
   ctx.restore();
 }
 
 function drawBurnt(mv) {
-  var e = G.lv.edges[mv.ei];
+  var e = G.lv.edges[mv.ei], ph = burnPhase(mv.ei);
   ctx.save();
-  ctx.lineCap = 'butt';
-  ctx.setLineDash([5, 5]);
-  ctx.strokeStyle = rgba(mv.w, 0.62);
-  ctx.lineWidth = 2.8;
+  ctx.lineCap = 'round';
+  // Live pigment settling to spent.
+  ctx.strokeStyle = rgba(mv.w, 0.95 - 0.62 * ph);
+  ctx.lineWidth = 3.4 - 1.2 * ph;
   edgePath(e); ctx.stroke();
-  ctx.setLineDash([]);
 
-  // Arrowhead at the midpoint, pointing the way the traveller walked.
   var fwd = (e.a === mv.from);
-  var t = 0.5, p = bezAt(e, t), q = bezAt(e, t + (fwd ? 0.06 : -0.06));
+  var p = bezAt(e, 0.5), q = bezAt(e, 0.5 + (fwd ? 0.06 : -0.06));
   var dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1;
   dx /= L; dy /= L;
-  var s = clamp(R * 0.42, 5, 9);
+  var sz = clamp(R * 0.36, 4.5, 8) * (0.4 + 0.6 * ph);
   ctx.beginPath();
-  ctx.moveTo(p[0] + dx * s, p[1] + dy * s);
-  ctx.lineTo(p[0] - dx * s * 0.55 - dy * s * 0.62, p[1] - dy * s * 0.55 + dx * s * 0.62);
-  ctx.lineTo(p[0] - dx * s * 0.55 + dy * s * 0.62, p[1] - dy * s * 0.55 - dx * s * 0.62);
+  ctx.moveTo(p[0] + dx * sz, p[1] + dy * sz);
+  ctx.lineTo(p[0] - dx * sz * 0.5 - dy * sz * 0.66, p[1] - dy * sz * 0.5 + dx * sz * 0.66);
+  ctx.lineTo(p[0] - dx * sz * 0.5 + dy * sz * 0.66, p[1] - dy * sz * 0.5 - dx * sz * 0.66);
   ctx.closePath();
-  ctx.fillStyle = rgba(mv.w, 0.9);
+  ctx.fillStyle = rgba(mv.w, 0.85);
   ctx.fill();
   ctx.restore();
 }
 
-// One visual channel each: a glyph means the island is claimed, a ring means
-// a traveller is standing on it. Never both for the same thing.
-function claimGlyph(x, y, claim, size, solid) {
-  var w = claim - 1;
+/* A claimed island carries its owner's mark on a disc of bare paper, so it
+   stays legible whether the island is still blank or has been inked in. */
+function claimShape(x, y, w, size) {
   ctx.beginPath();
-  if (w === 0) {                       // triangle
+  if (w === 0) {
     ctx.moveTo(x, y - size);
     ctx.lineTo(x + size * 0.92, y + size * 0.72);
     ctx.lineTo(x - size * 0.92, y + size * 0.72);
     ctx.closePath();
-  } else if (w === 1) {                // square
+  } else if (w === 1) {
     ctx.rect(x - size * 0.82, y - size * 0.82, size * 1.64, size * 1.64);
-  } else if (w === 2) {                // diamond
-    ctx.moveTo(x, y - size * 1.05);
-    ctx.lineTo(x + size * 0.95, y);
-    ctx.lineTo(x, y + size * 1.05);
-    ctx.lineTo(x - size * 0.95, y);
+  } else if (w === 2) {
+    ctx.moveTo(x, y - size * 1.06);
+    ctx.lineTo(x + size * 0.96, y);
+    ctx.lineTo(x, y + size * 1.06);
+    ctx.lineTo(x - size * 0.96, y);
     ctx.closePath();
-  } else {                             // pentagon
+  } else {
     for (var i = 0; i < 5; i++) {
       var ang = -Math.PI / 2 + i * TAU / 5;
-      var px = x + Math.cos(ang) * size * 1.05, py = y + Math.sin(ang) * size * 1.05;
+      var px = x + Math.cos(ang) * size * 1.06, py = y + Math.sin(ang) * size * 1.06;
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.closePath();
   }
-  if (solid) { ctx.fillStyle = TEAM[w]; ctx.fill(); }
-  else { ctx.strokeStyle = TEAM[w]; ctx.lineWidth = 2.1; ctx.stroke(); }
 }
 
+/* An island is blank paper until someone stands on it, then it is inked in.
+   Reaching every island is the goal, so that is the loudest thing on the page:
+   the board fills with ink as it is solved. */
 function drawNode(i) {
   var n = G.lv.nodes[i], x = PX(n), y = PY(n);
   var visited = !!((G.vis >> i) & 1);
@@ -1200,60 +1234,55 @@ function drawNode(i) {
   }
 
   ctx.beginPath(); ctx.arc(x, y, R, 0, TAU);
-  if (visited) { ctx.fillStyle = '#bfb49b'; ctx.fill(); }
-  else {
-    ctx.fillStyle = '#0d1e28'; ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(206,195,170,0.62)'; ctx.stroke();
+  if (visited) {
+    ctx.fillStyle = INK.ink; ctx.fill();
+  } else {
+    ctx.fillStyle = INK.paper; ctx.fill();
+    ctx.lineWidth = 1.8; ctx.strokeStyle = inkA(0.5); ctx.stroke();
   }
+
   if (claim) {
-    ctx.save();
-    ctx.globalAlpha = settled ? 1 : 0.52 + 0.38 * Math.sin(G.t * 0.004);
-    claimGlyph(x, y, claim, R * 0.5, settled);
-    ctx.restore();
+    var w = claim - 1, r2 = R * 0.66;
+    ctx.beginPath(); ctx.arc(x, y, r2, 0, TAU);
+    ctx.fillStyle = INK.paper; ctx.fill();
+    if (settled) {
+      claimShape(x, y, w, r2 * 0.72);
+      ctx.fillStyle = INK.team[w]; ctx.fill();
+    } else {
+      claimShape(x, y, w, r2 * 0.7);
+      ctx.strokeStyle = INK.team[w]; ctx.lineWidth = 1.9; ctx.stroke();
+    }
   }
 
   if (G.revealOdd && G.oddInfo && G.oddInfo.deg) {
     var d = G.oddInfo.deg[i], odd = d % 2 === 1;
-    ctx.beginPath(); ctx.arc(x, y, R + 9, 0, TAU);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = odd ? 'rgba(255,207,107,' + (0.55 + 0.35 * Math.sin(G.t * 0.006)).toFixed(3) + ')'
-                          : 'rgba(95,220,160,0.3)';
-    ctx.stroke();
-    ctx.font = '600 12px "Geist Mono", ui-monospace, monospace';
-    ctx.fillStyle = odd ? '#ffcf6b' : '#5fdca0';
+    ctx.font = '600 13px ' + SERIF;
+    ctx.fillStyle = odd ? INK.team[0] : inkA(0.4);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(d), x, y - R - 18);
+    ctx.fillText(String(d), x, y - R - 15);
   }
 }
 
+/* The traveller is a ring outside the island — never an outline of the island
+   itself, which already means "not yet reached". Rings nest so several
+   travellers standing together stay countable. */
 function drawWalker(w) {
   var n = G.lv.nodes[G.pos[w]], x = PX(n), y = PY(n);
   var isSel = (G.sel === w) && G.lv.W > 1;
   var stuck = !canMove(w);
-  // Concentric rings so two travellers on one island stay distinguishable.
-  var rad = R + 4.5 + w * 4.2;
-  if (isSel) {
-    var pulse = 1 + Math.sin(G.t * 0.005) * 0.08;
-    ctx.beginPath(); ctx.arc(x, y, rad * 1.42 * pulse, 0, TAU);
-    ctx.fillStyle = rgba(w, 0.11); ctx.fill();
-  }
+  var rad = R + 5.5 + w * 4.4;
+  ctx.save();
+  // A hairline of bare paper first, so the ring never merges into an inked island.
   ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
-  ctx.lineWidth = isSel ? 3.4 : 1.8;
-  ctx.strokeStyle = TEAM[w];
-  ctx.globalAlpha = stuck ? 0.28 : (isSel ? 1 : 0.5);
+  ctx.lineWidth = (isSel ? 3.4 : 2.2) + 2.4;
+  ctx.strokeStyle = INK.paper;
   ctx.stroke();
-  ctx.globalAlpha = 1;
-}
-
-function drawParts() {
-  for (var i = G.parts.length - 1; i >= 0; i--) {
-    var p = G.parts[i];
-    p.x += p.vx; p.y += p.vy; p.vy -= 0.008; p.life -= p.decay;
-    if (p.life <= 0) { G.parts.splice(i, 1); continue; }
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life, 0, TAU);
-    ctx.fillStyle = rgba(p.w, (p.life * 0.8).toFixed(3));
-    ctx.fill();
-  }
+  ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
+  ctx.lineWidth = isSel ? 3.4 : 2.2;
+  ctx.strokeStyle = INK.team[w];
+  ctx.globalAlpha = stuck ? 0.3 : (isSel ? 1 : 0.8);
+  ctx.stroke();
+  ctx.restore();
 }
 
 var warnOn = false, warnBack = -1;
@@ -1274,18 +1303,25 @@ function updateWarn() {
 function frame(ts) {
   G.t = ts || 0;
   updateWarn();
-  drawSea();
+  drawPaper();
   if (G.lv && G.screen === 'play') {
     var reach = {};
     if (!G.overlay) availableFrom(G.pos[G.sel]).forEach(function (ei) { reach[ei] = true; });
 
-    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && !reach[e.i]) drawStanding(e); });
+    // On the solve, the spans nobody took fade off the page, leaving the routes
+    // and the inked islands behind — the map, finished.
+    var fade = G.solvedAt ? clamp(1 - (G.t - G.solvedAt) / 900, 0, 1) : 1;
+
+    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && !reach[e.i]) drawStanding(e, fade); });
     G.used.forEach(drawBurnt);
-    G.lv.edges.forEach(function (e) { if (!G.burnt[e.i] && reach[e.i]) drawReachable(e, G.sel); });
-    drawParts();
+    G.lv.edges.forEach(function (e) {
+      if (!G.burnt[e.i] && reach[e.i]) {
+        if (fade < 1) drawStanding(e, fade); else drawReachable(e, G.sel);
+      }
+    });
     for (var i = 0; i < G.lv.nodes.length; i++) drawNode(i);
     for (var k = G.lv.W - 1; k >= 0; k--) if (k !== G.sel) drawWalker(k);
-    drawWalker(G.sel);
+    if (G.lv.W > 1) drawWalker(G.sel);
   }
   requestAnimationFrame(frame);
 }
@@ -1416,7 +1452,7 @@ function syncHud() {
     ? 'Drift ' + G.index
     : (lv.interlude ? 'Königsberg, 1736' : String(lv.no).padStart(2, '0'));
   $('cost').textContent = String(G.cost);
-  $('cost').className = 'mono' + (!lv.euler && G.cost > G.par ? ' over' : '');
+  $('cost').className = (!lv.euler && G.cost > G.par ? 'over' : '');
   $('par').textContent = lv.euler ? ('of ' + lv.edges.length) : ('par ' + G.par);
   $('bUndo').disabled = G.used.length === 0;
 
@@ -1426,23 +1462,44 @@ function syncHud() {
       var owed = lv.claims[w].length - popcount(G.met[w]);
       var cls = 'chip' + (w === G.sel ? ' on' : '') + (owed === 0 ? ' done' : '') +
                 (canMove(w) ? '' : ' stuck');
-      html += '<button class="' + cls + '" data-w="' + w + '" style="color:' +
-              (w === G.sel ? TEAM[w] : '') + '">' +
-              '<span class="gl" style="color:' + TEAM[w] + '">' + GLYPH[w] + '</span>' +
-              (lv.claims[w].length ? owed + ' left' : 'free') + '</button>';
+      html += '<button class="' + cls + '" data-w="' + w + '"' +
+              (w === G.sel ? ' style="color:' + INK.team[w] + '"' : '') + '>' +
+              '<canvas class="cg" data-g="' + w + '" width="13" height="13"></canvas>' +
+              (lv.claims[w].length ? '<span class="ct">' + owed + '</span> left' : 'free') +
+              '</button>';
     }
     var unseen = lv.nodes.length - popcount(G.vis);
-    html += '<span class="chip neutral' + (unseen ? '' : ' done') + '">○ ' + unseen + ' island' +
-            (unseen === 1 ? '' : 's') + '</span>';
+    html += '<span class="chip neutral' + (unseen ? '' : ' done') + '">' +
+            '<span class="ct">' + unseen + '</span> island' + (unseen === 1 ? '' : 's') + '</span>';
   } else {
     html = '<span class="chip neutral">every bridge, exactly once</span>';
   }
   $('chips').innerHTML = html;
+  // Draw each chip's mark with the same code the board uses, so the legend can
+  // never drift from the thing it is labelling.
+  Array.prototype.forEach.call($('chips').querySelectorAll('canvas.cg'), function (c) {
+    paintGlyph(c, +c.getAttribute('data-g'));
+  });
   Array.prototype.forEach.call($('chips').querySelectorAll('.chip[data-w]'), function (c) {
     c.addEventListener('click', function () {
       G.sel = +c.getAttribute('data-w'); syncHud();
     });
   });
+}
+
+function paintGlyph(el, w, solid) {
+  var d = Math.min(window.devicePixelRatio || 1, 2.5);
+  var size = el.width || 13;
+  el.width = size * d; el.height = size * d;
+  el.style.width = size + 'px'; el.style.height = size + 'px';
+  var c = el.getContext('2d');
+  c.setTransform(d, 0, 0, d, 0, 0);
+  var save = ctx;
+  ctx = c;                            // claimShape draws through the shared ctx
+  claimShape(size / 2, size / 2, w, size * 0.36);
+  ctx = save;
+  if (solid === false) { c.strokeStyle = INK.team[w]; c.lineWidth = 1.6; c.stroke(); }
+  else { c.fillStyle = INK.team[w]; c.fill(); }
 }
 
 function setScreen(name) {
@@ -1465,13 +1522,16 @@ function showHint(txt) {
 }
 function hideHint() { $('hint').classList.add('gone'); }
 
-function starStr(n) {
+// Three dots, filled as earned — quieter than stars and it sits on paper.
+function marks(n, cls) {
   var out = '';
-  for (var i = 0; i < 3; i++) out += (i < n ? '<b>★</b>' : '★');
-  return out;
+  for (var i = 0; i < 3; i++) out += '<i class="' + (i < n ? 'on' : '') + '"></i>';
+  return '<div class="' + (cls || 'st') + '">' + out + '</div>';
 }
+// Count only crossings that exist now — a save carried over from an older
+// build can hold ids this version no longer ships.
 function totalStars() {
-  return Object.keys(SAVE.stars).reduce(function (s, k) { return s + (SAVE.stars[k] || 0); }, 0);
+  return LV.reduce(function (n, lv) { return n + (SAVE.stars[lv.id] || 0); }, 0);
 }
 function unlockedUpTo() {
   var i = 0;
@@ -1483,22 +1543,20 @@ var ACTS = ['Two travellers', 'Three travellers', 'Four travellers'];
 
 function buildGrid() {
   var open = unlockedUpTo();
-  $('totStars').innerHTML = totalStars() + ' ★';
+  $('totStars').textContent = totalStars() + ' / ' + (LV.filter(function (l) { return !l.interlude; }).length * 3);
   var html = '', act = -1;
   LV.forEach(function (lv, i) {
     var a = lv.interlude ? act : (lv.W - 2);
     if (a !== act) {
       if (act >= 0) html += '</div>';
-      html += '<div class="actlabel">' + (ACTS[a] || '') + '</div><div class="grid">';
+      html += '<div class="actlabel label">' + (ACTS[a] || '') + '</div><div class="grid">';
       act = a;
     }
     var st = SAVE.stars[lv.id], locked = i > open;
     var label = lv.interlude ? '1736' : String(lv.no).padStart(2, '0');
-    var stEl = lv.interlude
-      ? '<div class="st ' + (st !== undefined ? 'done' : '') + '">' + (st !== undefined ? '✓' : '—') + '</div>'
-      : '<div class="st">' + starStr(st || 0) + '</div>';
+    var stEl = lv.interlude ? marks(st !== undefined ? 3 : 0) : marks(st || 0);
     html += '<button class="tile' + (locked ? ' locked' : '') + (lv.interlude ? ' mark' : '') +
-      '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
+      (st ? ' solved' : '') + '" data-i="' + i + '"' + (locked ? ' disabled' : '') + '>' +
       '<div class="n">' + label + '</div>' + stEl + '</button>';
   });
   html += '</div>';
@@ -1536,87 +1594,93 @@ var OVERLAYS = {
                    : diff + ' bridge' + (diff === 1 ? '' : 's') + ' more than needed.');
     var nextTxt = (G.mode === 'drift') ? 'Drift on'
                 : (G.index + 1 < LV.length ? 'Next' : 'Back to crossings');
-    return '<h2>Crossed</h2><div class="stars">' + starStr(st) + '</div>' +
+    return '<h2>Crossed</h2>' + marks(st, 'marks') +
       '<div class="scoreline">' +
-        '<div><div class="v mono">' + G.cost + '</div><div class="k">burnt</div></div>' +
-        '<div><div class="v mono">' + G.par + '</div><div class="k">par</div></div></div>' +
+        '<div><div class="v">' + G.cost + '</div><div class="k">burnt</div></div>' +
+        '<div><div class="v">' + G.par + '</div><div class="k">par</div></div></div>' +
       '<p class="tight">' + verdict + '</p>' +
-      '<button class="btn primary" data-act="next">' + nextTxt + '</button>' +
-      '<div class="row2"><button class="btn" data-act="replay">Again</button>' +
-      '<button class="btn" data-act="quit">Crossings</button></div>';
+      '<button class="pbtn" data-act="next">' + nextTxt + '</button>' +
+      '<div class="row2"><button class="pbtn ghost" data-act="replay">Again</button>' +
+      '<button class="pbtn ghost" data-act="quit">Crossings</button></div>';
   },
   stranded: function () {
-    var why = G.lv.interlude ? '<button class="btn" data-act="why">Why can nobody do this?</button>' : '';
+    var why = G.lv.interlude ? '<button class="pbtn ghost" data-act="why">Why can nobody do this?</button>' : '';
     return '<h2>Stranded</h2>' +
       '<p class="tight">Every bridge within reach is ash.</p>' +
-      '<button class="btn primary" data-act="undo">Step back</button>' +
-      '<button class="btn" data-act="replay">Restart</button>' + why +
-      '<button class="btn ghost" data-act="quit">Give up</button>';
+      '<button class="pbtn" data-act="undo">Step back</button>' +
+      '<button class="pbtn ghost" data-act="replay">Restart</button>' + why +
+      '<button class="pbtn ghost" data-act="quit">Give up</button>';
   },
   interludeIntro: function () {
     return '<h2>Königsberg, 1736</h2>' +
       '<p>Seven bridges over the Pregel. The city argued for years over one question: <b>can you walk a route that crosses every bridge exactly once?</b></p>' +
       '<p class="tight">One traveller this time. Try it.</p>' +
-      '<button class="btn primary" data-act="close">Try the walk</button>' +
-      '<button class="btn ghost" data-act="why">Just tell me</button>';
+      '<button class="pbtn" data-act="close">Try the walk</button>' +
+      '<button class="pbtn ghost" data-act="why">Just tell me</button>';
   },
   why: function () {
     G.revealOdd = true;
     return '<h2>It cannot be done</h2>' +
-      '<p class="tight">The number on each shore is how many bridges it has.</p>' +
+      '<p class="tight">The number beside each shore is how many bridges it has.</p>' +
       '<p class="tight">Every shore you pass <b>through</b> spends bridges in pairs: one to arrive, one to leave. So a shore with an odd count can only be where you <b>start</b> or where you <b>finish</b>.</p>' +
       '<p class="tight">All four of Königsberg\'s shores are odd. A walk has two ends. Four will not fit into two.</p>' +
       '<p>Euler proved it by ignoring the map entirely and looking only at the counts. Graph theory starts here.</p>' +
-      '<button class="btn primary" data-act="passInterlude">Understood</button>';
+      '<button class="pbtn" data-act="passInterlude">Understood</button>';
   },
   how: function () {
     return '<h2>How to play</h2>' +
       '<div class="key">' +
-        '<div class="keyrow"><canvas id="k0" width="54" height="20"></canvas>A bridge still standing</div>' +
-        '<div class="keyrow"><canvas id="k1" width="54" height="20"></canvas>One the picked traveller can cross now</div>' +
-        '<div class="keyrow"><canvas id="k2" width="54" height="20"></canvas>Burnt — the arrow shows who went, and which way</div>' +
+        '<div class="keyrow"><canvas id="k0" width="56" height="18"></canvas>A bridge still standing</div>' +
+        '<div class="keyrow"><canvas id="k1" width="56" height="18"></canvas>One the traveller you have picked up can cross now</div>' +
+        '<div class="keyrow"><canvas id="k2" width="56" height="18"></canvas>Burnt — the arrow says who crossed, and which way</div>' +
+        '<div class="keyrow"><canvas id="k3" width="56" height="18"></canvas>An island, before and after someone reaches it</div>' +
       '</div>' +
       '<ul class="howlist">' +
-      '<li>Tap a traveller (or its chip up top) to pick it up, then drag or tap to move.</li>' +
+      '<li>Tap a traveller — or its chip up top — to pick it up, then drag or tap to move.</li>' +
       '<li>Every bridge <b>burns behind whoever crosses it</b>. One pool, shared by all of them.</li>' +
-      '<li><b>Every island must be reached.</b> An island marked with a traveller\'s shape only counts when <b>that</b> traveller stands on it.</li>' +
-      '<li><b>Par</b> is the fewest crossings that can settle the board. Match it for three stars.</li>' +
-      '<li><b>Undo</b> is unlimited. If a board becomes impossible the game waits a couple of moves before saying so — then offers to rewind to the last position that could still be won.</li>' +
-      '</ul><button class="btn primary" data-act="close">Got it</button>';
+      '<li><b>Every island must be reached</b>, and inks in when it is. An island carrying a traveller\'s mark only counts when <b>that</b> traveller stands on it.</li>' +
+      '<li><b>Par</b> is the fewest crossings that can settle the board.</li>' +
+      '<li><b>Undo</b> is unlimited. If a board becomes impossible the game waits a couple of moves before saying so, then offers to rewind to the last position that could still be won.</li>' +
+      '</ul><button class="pbtn" data-act="close">Got it</button>';
   }
 };
 
-// Little swatches in the how-to, drawn with the same code paths as the board.
+// Swatches for the how-to, drawn with the board's own colours.
 function drawKey() {
   var specs = [
     ['k0', function (c) {
-      c.strokeStyle = 'rgba(126,156,171,0.34)'; c.lineWidth = 2.4;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+      c.strokeStyle = inkA(0.30); c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(3, 9); c.lineTo(53, 9); c.stroke();
     }],
     ['k1', function (c) {
-      c.strokeStyle = rgba(0, 0.13); c.lineWidth = 13;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
-      c.strokeStyle = 'rgba(236,226,208,0.92)'; c.lineWidth = 4.4;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
+      c.strokeStyle = rgba(0, 0.95); c.lineWidth = 3.4;
+      c.beginPath(); c.moveTo(3, 9); c.lineTo(53, 9); c.stroke();
     }],
     ['k2', function (c) {
-      c.setLineDash([5, 5]); c.strokeStyle = rgba(1, 0.62); c.lineWidth = 2.8;
-      c.beginPath(); c.moveTo(4, 10); c.lineTo(50, 10); c.stroke();
-      c.setLineDash([]);
-      c.fillStyle = rgba(1, 0.9);
-      c.beginPath(); c.moveTo(34, 10); c.lineTo(25, 5); c.lineTo(25, 15); c.closePath(); c.fill();
+      c.strokeStyle = rgba(1, 0.33); c.lineWidth = 2.2;
+      c.beginPath(); c.moveTo(3, 9); c.lineTo(53, 9); c.stroke();
+      c.fillStyle = rgba(1, 0.85);
+      c.beginPath(); c.moveTo(35, 9); c.lineTo(27, 4.6); c.lineTo(27, 13.4); c.closePath(); c.fill();
+    }],
+    ['k3', function (c) {
+      c.fillStyle = INK.paper; c.strokeStyle = inkA(0.5); c.lineWidth = 1.8;
+      c.beginPath(); c.arc(11, 9, 7.5, 0, TAU); c.fill(); c.stroke();
+      c.fillStyle = inkA(0.3);
+      c.beginPath(); c.moveTo(24, 9); c.lineTo(31, 9); c.stroke();
+      c.fillStyle = INK.ink;
+      c.beginPath(); c.arc(44, 9, 7.5, 0, TAU); c.fill();
     }]
   ];
-  specs.forEach(function (s) {
-    var el = $(s[0]);
+  specs.forEach(function (sp) {
+    var el = $(sp[0]);
     if (!el) return;
     var c = el.getContext('2d');
     var d = Math.min(window.devicePixelRatio || 1, 2.5);
-    el.width = 54 * d; el.height = 20 * d;
-    el.style.width = '54px'; el.style.height = '20px';
+    el.width = 56 * d; el.height = 18 * d;
+    el.style.width = '56px'; el.style.height = '18px';
     c.setTransform(d, 0, 0, d, 0, 0);
     c.lineCap = 'round';
-    s[1](c);
+    sp[1](c);
   });
 }
 
@@ -1648,6 +1712,13 @@ $('bPlay').addEventListener('click', function () {
 });
 $('bLevels').addEventListener('click', function () { setScreen('levels'); });
 $('bHow').addEventListener('click', function () { setScreen('menu'); setOverlay('how'); });
+var THEMES = ['auto', 'paper', 'night'];
+$('bTheme').addEventListener('click', function () {
+  SAVE.theme = THEMES[(THEMES.indexOf(SAVE.theme || 'auto') + 1) % 3];
+  persist(); applyTheme(); labelTheme();
+  if (G.lv) syncHud();
+});
+function labelTheme() { $('bTheme').textContent = 'Theme · ' + (SAVE.theme || 'auto'); }
 $('bDrift').addEventListener('click', function () {
   var d = Math.max(1, SAVE.drift || 1), lv = driftLevel(d);
   if (lv) loadLevel(lv, d, 'drift');
@@ -1658,6 +1729,8 @@ $('warnX').addEventListener('click', function () { G.warnDismissed = G.deadAt; }
 $('bUndo').addEventListener('click', undo);
 $('bRestart').addEventListener('click', function () { G.undos = 0; resetLevel(); setOverlay(null); });
 
+applyTheme();
+labelTheme();
 resize();
 setScreen('menu');
 requestAnimationFrame(frame);
