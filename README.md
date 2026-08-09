@@ -55,11 +55,17 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   cue ball comes back *after* it has hit something. Cushions are
   capsules, so their ends are real jaws a ball can rattle in; a corner takes anything
   that gets close, but a side pocket wants the ball past the nose, so a ball rolling
-  the length of the long rail sails by it. Aiming is honest about which half is which:
-  the dashed line and the ghost ring are geometry and hold at any speed, the solid line
-  is this stroke at this speed run through the real physics and stops where the ball
-  stops, and a contact the stroke cannot reach draws a ring where the cue ball actually
-  dies instead. Generation runs in a Worker — a second one, so a hint asked for while
+  the length of the long rail sails by it. The table is inset rather than flush,
+  because a ball against a cushion needs glass behind it to pull a cue into, and the
+  pull is measured against the room that is actually there — less room, shorter pull,
+  same full range — so a frozen ball still reaches a full stroke. Aiming is drawn from
+  the simulated path wherever the simulation can answer, which is the honest half of a
+  lesson learnt the hard way: a straight ray from the cue ball is exact for a centre-ball
+  stroke, and a lie the moment you put side on, naming the wrong ball one time in twenty
+  and missing the object ball's direction by twelve degrees at the median. The ray is now
+  only the fallback for an empty lane. When your stroke cannot reach the ball you are
+  pointing at, the contact is shown from the softest stroke that would get there and a
+  ring marks where this one actually dies. Generation runs in a Worker — a second one, so a hint asked for while
   the next study is building does not queue behind it — 0.2–3 s a board, prefetched
   while you shoot. Paper and slate themes, pinch zoom, times and bests kept locally,
   synthesised clicks, installable and playable offline. The launcher mark is drawn by
