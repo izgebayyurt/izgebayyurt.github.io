@@ -488,16 +488,26 @@ function railHit(b) {
     if (vn >= 0) continue;
     const tx = -ny, ty = nx;
     const vt = b.vx * tx + b.vy * ty;
-    const st = b.sx * tx + b.sy * ty;
     const sp = Math.abs(vn);
     const e = E_CU_SLOW + (E_CU_FAST - E_CU_SLOW) * Math.min(1, sp / CU_KNEE);
     const nvn = -e * vn;
-    const nvt = vt * T_CU - SPIN_CU * st;
+    /* Only genuine side counts here. A ball that is simply sliding has its whole
+       slip pointing the way it is going, and a cushion must not read that as
+       english — doing so bent every ordinary bank off the rail. Sideways spin is
+       the part of the slip across the line of travel, and nothing else. */
+    const vl = hyp(b.vx, b.vy);
+    let kick = 0, sideS = 0, pxn = 0, pyn = 0;
+    if (vl > 1) {
+      pxn = -b.vy / vl; pyn = b.vx / vl;
+      sideS = b.sx * pxn + b.sy * pyn;
+      kick = SPIN_CU * sideS * (pxn * tx + pyn * ty);
+    }
+    const nvt = vt * T_CU - kick;
     const ovx = b.vx, ovy = b.vy;
     b.vx = nx * nvn + tx * nvt; b.vy = ny * nvn + ty * nvt;
     b.sx += b.vx - ovx; b.sy += b.vy - ovy;
-    /* the cushion scrubs off most of the side that it just spent */
-    b.sx -= st * tx * 0.55; b.sy -= st * ty * 0.55;
+    /* the cushion scrubs off most of the side it just spent */
+    b.sx -= sideS * pxn * 0.55; b.sy -= sideS * pyn * 0.55;
     if (-vn > loudest) loudest = -vn;
   }
   return loudest;
@@ -766,6 +776,14 @@ function powersFor(c) {
   const p = clamp(need / V_MAX, 0.09, 1);
   return [clamp(p * 0.85, 0.07, 1), p, Math.min(1, p * 1.6)];
 }
+/* The softest stroke that still carries a route of this length. The aim display
+   needs it: when your actual stroke cannot reach the ball you are pointing at,
+   the line has to be drawn from a stroke that can, or there is nothing to aim
+   with. */
+function powerToReach(dist) {
+  return clamp(Math.sqrt(2 * A_ROLL * (dist * 1.25 + 190)) / 0.68 / V_MAX, 0.10, 1);
+}
+
 const FAN_STRAIGHT = [0];
 const FAN_BANK = [0, 0.011, -0.011, 0.024, -0.024];
 
@@ -1155,7 +1173,7 @@ function predict(bs, shot, opts) {
 return {
   W, H, R, JAW, RAIL_HIT, CORNER_JAW, SIDE_JAW, POT_CORNER, RAILS, POCKETS, V_MAX, STEP,
   ball, cloneBalls, objects, cueOf, strike, advance, moving, shoot, newEvents, inPocket,
-  candidates, kicks, tryShot, certify, aimPoint, posScore, laneClear,
+  candidates, kicks, tryShot, certify, aimPoint, posScore, laneClear, powerToReach,
   genStudy, rack9, layoutRun, aiNine, lowestOf, canPlace, mulberry32, predict, SKILLS,
 };
 }
@@ -1204,7 +1222,11 @@ const V = { s:1, ox:0, oy:0, rot:0, zoom:1, px:0, py:0, vw:0, vh:0, dpr:1 };
 function fitView(vw, vh) {
   const ow = TW + 2 * RAILW, oh = TH + 2 * RAILW;
   V.rot = vw / vh >= 1 ? 0 : 1;
-  V.padT = 54; V.padB = 60; V.padX = 8;   /* the stroke bar is gone; only the spin disc sits low */
+  /* The table is inset rather than flush. You shoot by pulling away from the cue
+     ball, so a ball against a cushion needs glass behind it to pull into; with the
+     table edge-to-edge there was nowhere to put a finger. */
+  const m = Math.max(30, Math.min(vw, vh) * 0.075);
+  V.padX = m; V.padT = 54 + m * 0.35; V.padB = 60 + m * 0.35;
   V.vw = vw; V.vh = vh;
   const availW = vw - V.padX * 2, availH = vh - V.padT - V.padB;
   V.base = V.rot ? Math.min(availW / oh, availH / ow) : Math.min(availW / ow, availH / oh);
@@ -1561,7 +1583,7 @@ const G = {
   score:0, left:0, called:-1, streak:0,
   turn:0, skill:1, low:1, broke:false, msg:'',
   hinted:false, hintShot:null, hintT:0, aiShot:null, over:false,
-  fx:[], trail:null, pred:null, predKey:'', t0:0, rollT:0,
+  fx:[], trail:null, pred:null, predKey:'', guide:null, guideKey:'', t0:0, rollT:0,
 };
 const rngRun = () => Math.random();
 
@@ -1618,7 +1640,7 @@ function settled() {
   G.trail = null;
   /* the balls have moved, so any cached aim reading is about a table that no
      longer exists — the key alone cannot notice that */
-  G.predKey = '';
+  G.predKey = ''; G.guideKey = '';
   if (G.mode === 'study') resolveStudy(ev);
   else if (G.mode === 'nine') resolveNine(ev);
   else resolveRun(ev);
@@ -1867,7 +1889,7 @@ function resize() {
   cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
   fitView(vw, vh);
   bakeKey = '';
-  G.predKey = '';
+  invalidateAim();
 }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 140));
@@ -1897,32 +1919,51 @@ function syncControls() {
 
 /* ------------------------------------------------------------------ the aim */
 
-/* The physics pass is only run when the aim is actually pointed at a ball.
-   Everything it is asked for — the object ball's travel, the cue ball's
-   afterlife, whether anything drops, whether the stroke even reaches — is
-   downstream of a contact, and an aim with nothing in front of it would
-   otherwise roll to rest through a dozen cushions for no answer at all. */
-function predictNow(hit) {
+/* The aim, and the difference between a line that is convenient and a line that
+   is true.
+
+   A straight ray from the cue ball is exact for a centre-ball stroke, and is
+   what lets the aim hold at any speed. It is also a lie the moment you put side
+   on: english makes the cue ball swerve, so the ray names the wrong ball about
+   one time in twenty and misses the object ball's direction by twelve degrees at
+   the median. So the ray is only ever a fallback now. Where the physics can
+   answer — and it can answer whenever the stroke reaches something — the drawn
+   contact comes from the simulated path, curve and all.
+
+   Two predictions can be in play. The first is your actual stroke, which is what
+   the object ball's travel and the pot are read from. The second only appears
+   when your stroke cannot reach the ball you are pointing at: aiming still has
+   to work, so the contact is shown from the softest stroke that would get there,
+   and the orange ring says the one you have chosen will not. */
+function predictNow() {
   const c = cueBall();
   if (!c || !c.live) return null;
-  if (hit && hit.kind !== 'ball') return null;
   const key = [G.aim.toFixed(4), G.power.toFixed(3), G.side.toFixed(2), G.ver.toFixed(2), G.balls.length, objectsLeft()].join(',');
   if (G.predKey === key && G.pred !== undefined) return G.pred;
   G.pred = E.predict(G.balls, { angle:G.aim, power:powerCurve(G.power), ver:G.ver, side:G.side });
   G.predKey = key;
   return G.pred;
 }
+function guideFor(dist) {
+  const key = [G.aim.toFixed(4), G.side.toFixed(2), G.ver.toFixed(2), dist.toFixed(0), G.balls.length, objectsLeft()].join(',');
+  if (G.guideKey === key && G.guide !== undefined) return G.guide;
+  G.guide = E.predict(G.balls, { angle:G.aim, power:E.powerToReach(dist), ver:G.ver, side:G.side });
+  G.guideKey = key;
+  return G.guide;
+}
+const spinOn = () => Math.abs(G.side) > 0.02 || Math.abs(G.ver) > 0.02;
+function invalidateAim() { G.predKey = ''; G.guideKey = ''; }
 
 /* On cloth this loose a ball can run three table lengths through four cushions,
    and drawing all of it turns the aid into a scribble across the whole table.
    The line is cut at a length that still answers the question — where does this
    go, and does it drop — and the pocket lighting up says the rest. */
-function polyUpTo(g, pts, from, maxLen) {
-  const a = Math.max(0, from | 0);
-  if (pts.length - a < 2) return false;
+function polyUpTo(g, pts, from, to, maxLen) {
+  const a = Math.max(0, from | 0), z = Math.min(pts.length - 1, to);
+  if (z - a < 1) return false;
   g.beginPath(); g.moveTo(pts[a].x, pts[a].y);
   let run = 0, cut = false;
-  for (let i = a + 1; i < pts.length; i++) {
+  for (let i = a + 1; i <= z; i++) {
     const seg = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
     if (run + seg > maxLen) {
       const k = (maxLen - run) / (seg || 1);
@@ -1947,40 +1988,46 @@ function poly(g, pts, from, to) {
 function drawAim(g) {
   const c = cueBall();
   if (!c || !c.live) return;
-
   g.lineCap = 'round'; g.lineJoin = 'round';
 
-  /* Where the aim points, at any speed. Geometry answers this, so the line is
-     the same length whether you are about to feather it or murder it. */
   const h1 = castRay(G.balls, c.x, c.y, G.aim, 0);
+  const ahead = h1.kind === 'ball';
+  /* with side on, even an empty lane curves, so the physics is asked either way */
+  const p = (ahead || spinOn()) ? predictNow() : null;
+  const short = ahead && p && p.hitAt < 0;
+  const guide = short ? guideFor(h1.t) : p;
+  const shown = (guide && guide.hitAt > 0) ? guide : null;
+
+  /* the cue ball's approach — the simulated one whenever there is one, because a
+     straight line here is exactly what english makes untrue */
   g.strokeStyle = C.ink; g.globalAlpha = 0.5; g.lineWidth = PX(1.5);
   g.setLineDash([PX(5.5), PX(5)]);
-  g.beginPath(); g.moveTo(c.x, c.y); g.lineTo(h1.x, h1.y); g.stroke();
+  if (shown) polyUpTo(g, shown.cue, 0, shown.hitAt, 1e9);
+  else if (p && spinOn() && p.cue.length > 2) polyUpTo(g, p.cue, 0, p.cue.length - 1, 540);
+  else { g.beginPath(); g.moveTo(c.x, c.y); g.lineTo(h1.x, h1.y); g.stroke(); }
   g.setLineDash([]);
 
-  /* Now the physics: how far this much speed actually carries, and what the cue
-     ball does to itself once it has hit something. */
-  const p = predictNow(h1);
-  const short = p && p.hitAt < 0;                         /* pointed at it, cannot reach it */
-
-  if (h1.kind === 'ball') {
-    const struck = h1.ball;
-    const objDir = Math.atan2(struck.y - h1.y, struck.x - h1.x);
-    /* the ghost: where the cue ball has to be for the contact you are asking for */
+  if (shown) {
+    const gh = shown.cue[shown.hitAt];
+    let struck = null;
+    for (let i = 0; i < G.balls.length; i++) if (G.balls[i].num === shown.hit) struck = G.balls[i];
     g.globalAlpha = short ? 0.2 : 0.42; g.lineWidth = PX(1.3); g.setLineDash([PX(3), PX(3.4)]);
-    g.beginPath(); g.arc(h1.x, h1.y, BR, 0, TAU); g.stroke();
+    g.beginPath(); g.arc(gh.x, gh.y, BR, 0, TAU); g.stroke();
     g.setLineDash([]);
-    /* and the line of centres, which is the way the object ball must leave */
-    const h2 = castRay(G.balls, struck.x, struck.y, objDir, struck.num);
-    g.strokeStyle = C.pa; g.globalAlpha = short ? 0.15 : 0.4; g.lineWidth = PX(1.6);
-    g.beginPath(); g.moveTo(struck.x, struck.y); g.lineTo(h2.x, h2.y); g.stroke();
+    /* the line of centres, taken from where the cue ball really arrives */
+    if (struck) {
+      const objDir = Math.atan2(struck.y - gh.y, struck.x - gh.x);
+      const h2 = castRay(G.balls, struck.x, struck.y, objDir, struck.num);
+      g.strokeStyle = C.pa; g.globalAlpha = short ? 0.15 : 0.4; g.lineWidth = PX(1.6);
+      g.beginPath(); g.moveTo(struck.x, struck.y); g.lineTo(h2.x, h2.y); g.stroke();
+    }
   }
 
   if (p) {
     if (p.hitAt > 0) {
       if (p.obj && p.obj.length > 1) {
         g.strokeStyle = C.pa; g.globalAlpha = 0.9; g.lineWidth = PX(2.2);
-        const whole = polyUpTo(g, p.obj, 0, 520);
+        const whole = polyUpTo(g, p.obj, 0, p.obj.length - 1, 520);
         if (whole) {
           const last = p.obj[p.obj.length - 1];
           g.globalAlpha = 0.55; g.fillStyle = C.pa;
@@ -1988,10 +2035,8 @@ function drawAim(g) {
         }
       }
       g.strokeStyle = C.ink; g.globalAlpha = 0.26; g.lineWidth = PX(1.5);
-      polyUpTo(g, p.cue, p.hitAt, 340);
-    } else if (p.cue.length > 2 && !p.scratch) {
-      /* it does not get there. Say so where it stops, rather than drawing a
-         line that promises a contact this stroke cannot make. */
+      polyUpTo(g, p.cue, p.hitAt, p.cue.length - 1, 340);
+    } else if (short && p.cue.length > 2 && !p.scratch) {
       const end = p.cue[p.cue.length - 1];
       g.strokeStyle = C.pw; g.globalAlpha = 0.7; g.lineWidth = PX(1.8);
       g.setLineDash([PX(2.5), PX(3.5)]);
@@ -2000,8 +2045,7 @@ function drawAim(g) {
     }
     if (p.potted && p.potted.length) {
       /* The mouth lights up rather than gaining an outline: leather swallows a
-         hairline whole. Cool, because the called pocket is already warm, and in
-         the accent because this is the object ball's own line arriving. */
+         hairline whole. Cool, because the called pocket is already warm. */
       for (let i = 0; i < p.pottedAt.length; i++) {
         const q = pocketCentre(p.pottedAt[i]);
         const gr = g.createRadialGradient(q.x, q.y, q.r * 0.05, q.x, q.y, q.r);
@@ -2015,14 +2059,11 @@ function drawAim(g) {
       }
     }
   }
-  /* aimed straight into a mouth with nothing in the way is a scratch by
-     geometry alone, and does not need the physics to say so */
-  if ((p && p.scratch) || h1.kind === 'pocket') {
+  if ((p && p.scratch) || (!spinOn() && h1.kind === 'pocket')) {
     g.strokeStyle = C.pw; g.globalAlpha = 0.85; g.lineWidth = PX(2.2);
     g.beginPath(); g.arc(c.x, c.y, BR + 7, 0, TAU); g.stroke();
   }
   g.globalAlpha = 1;
-
   drawCueStick(g, c);
 }
 
@@ -2194,9 +2235,9 @@ function drawHint(g) {
   const c = cueBall(); if (!c || !c.live) return;
   const p = E.predict(G.balls, s, { ticks:280 });
   g.strokeStyle = C.pw; g.globalAlpha = 0.55; g.lineWidth = PX(2.2); g.setLineDash([PX(9), PX(6)]);
-  poly(g, p.cue, 0, p.hitAt > 0 ? p.hitAt : p.cue.length - 1) && g.stroke();
+  polyUpTo(g, p.cue, 0, p.hitAt > 0 ? p.hitAt : p.cue.length - 1, 1e9);
   g.setLineDash([]);
-  if (p.obj && p.obj.length > 1) { g.globalAlpha = 0.4; poly(g, p.obj, 0, p.obj.length - 1) && g.stroke(); }
+  if (p.obj && p.obj.length > 1) { g.globalAlpha = 0.4; polyUpTo(g, p.obj, 0, p.obj.length - 1, 520); }
   g.globalAlpha = 1;
 }
 
@@ -2255,8 +2296,23 @@ cv.addEventListener('pointercancel', up);
    put a finger down anywhere — near for a big swing, far out for a long lever
    and a finer angle — and still start from nothing. Let go to hit; let go
    without having pulled and you have only aimed. */
-const MAXPULL = 300;                            /* table units of draw for a full stroke */
+const PULL_FULL = 170;      /* screen pixels of draw for a full stroke, at most */
+const PULL_MIN = 42;        /* and at least, when the ball is against a cushion */
 let stroke = null;
+
+/* How far the finger can still travel before it runs out of glass. A ball frozen
+   on a rail has almost no room behind it, and demanding a fixed pull there would
+   cap the shot at whatever the screen edge allowed. So the pull is measured
+   against the room that exists: less room, shorter pull, same full range. */
+function roomBehind(sx, sy, ux, uy) {
+  const m = 10;
+  let t = Infinity;
+  if (ux > 1e-6) t = Math.min(t, (V.vw - m - sx) / ux);
+  if (ux < -1e-6) t = Math.min(t, (m - sx) / ux);
+  if (uy > 1e-6) t = Math.min(t, (V.vh - m - sy) / uy);
+  if (uy < -1e-6) t = Math.min(t, (m - sy) / uy);
+  return Math.max(0, t);
+}
 
 function handleOne(px, py, down) {
   if (G.over) return;
@@ -2264,20 +2320,23 @@ function handleOne(px, py, down) {
   if (G.phase === 'inhand') {
     const c = cueBall();
     c.x = clamp(t.x, BR + 1, TW - BR - 1); c.y = clamp(t.y, BR + 1, TH - BR - 1);
-    G.predKey = '';
+    invalidateAim();
     return;
   }
   if (G.phase !== 'aim') return;
   const c = cueBall();
   if (!c.live) return;
-  const dx = t.x - c.x, dy = t.y - c.y;
-  const d = Math.hypot(dx, dy);
-  if (d < 8) return;                            /* right on top of the ball means nothing */
-  G.aim = Math.atan2(-dy, -dx);
+  const cs = toScreen(c.x, c.y);
+  const sx = px - cs.x, sy = py - cs.y;
+  const d = Math.hypot(sx, sy);
+  if (d < 10) return;                           /* right on top of the ball means nothing */
+  G.aim = Math.atan2(c.y - t.y, c.x - t.x);     /* the ball goes away from the finger */
   clearHint();
-  if (down) { stroke = { from:d }; G.power = 0; }
-  else if (stroke) {
-    G.power = clamp((d - stroke.from) / MAXPULL, 0, 1);
+  if (down) {
+    stroke = { from:d, span:Math.max(PULL_MIN, Math.min(PULL_FULL, roomBehind(px, py, sx / d, sy / d) - 8)) };
+    G.power = 0;
+  } else if (stroke) {
+    G.power = clamp((d - stroke.from) / stroke.span, 0, 1);
     if (G.power > (stroke.peak || 0) + 0.06) { stroke.peak = G.power; sfx('tick'); }
   }
   updateHUD();
@@ -2301,13 +2360,13 @@ function releaseStroke() {
     const m = Math.hypot(dx, dy);
     const k = m > 1 ? 1 / m : 1;
     G.side = clamp(dx * k, -1, 1); G.ver = clamp(-dy * k, -1, 1);
-    G.predKey = ''; syncControls();
+    invalidateAim(); syncControls();
   };
   d.addEventListener('pointerdown', e => { d.setPointerCapture(e.pointerId); on = true; tapT = performance.now(); set(e); });
   d.addEventListener('pointermove', e => { if (on) set(e); });
   const off = e => {
     if (!on) return; on = false;
-    if (performance.now() - tapT < 180 && Math.hypot(G.side, G.ver) < 0.34) { G.side = 0; G.ver = 0; G.predKey = ''; syncControls(); }
+    if (performance.now() - tapT < 180 && Math.hypot(G.side, G.ver) < 0.34) { G.side = 0; G.ver = 0; invalidateAim(); syncControls(); }
   };
   d.addEventListener('pointerup', off);
   d.addEventListener('pointercancel', off);
