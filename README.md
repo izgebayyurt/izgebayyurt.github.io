@@ -80,7 +80,19 @@ mock-up. Pure static (no build step); served by GitHub Pages with `.nojekyll`.
   and missing the object ball's direction by twelve degrees at the median. The ray is now
   only the fallback for an empty lane. When your stroke cannot reach the ball you are
   pointing at, the contact is shown from the softest stroke that would get there and a
-  ring marks where this one actually dies. Generation runs in a Worker — a second one, so a hint asked for while
+  ring marks where this one actually dies. But a game that answers every question
+  before it is asked has nothing left to decide, and this one did: you swept the aim
+  until the pocket lit, and pulled. So the answer costs something now. Unsighted you
+  are shown the line to the ghost ball and the ghost itself — where you will strike
+  it, which is the part a player can learn to read — and nothing about what happens
+  after: no object-ball line, no cue-ball afterlife, no pocket lighting. Tap the eye
+  and the whole truth comes back for that one shot. You are given three, and the only
+  way to get more is to pot without one, so the resource is earned by the skill it
+  substitutes for and the player who needs it least is holding the most of it when
+  the hard shot arrives. A blind pot pays double in the run; a study cleared in par
+  without ever sighting is the only thing that fills its number in. Warnings are not
+  answers, so a stroke too soft to reach and a shot that scratches your own cue ball
+  are both still shown for free. Generation runs in a Worker — a second one, so a hint asked for while
   the next study is building does not queue behind it — 0.2–3 s a board, prefetched
   while you shoot. Paper and slate themes, pinch zoom, times and bests kept locally,
   synthesised clicks, installable and playable offline. The launcher mark is drawn by

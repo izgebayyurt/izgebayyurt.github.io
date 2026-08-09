@@ -208,7 +208,26 @@
     content:""; position:absolute; inset:9px; border-radius:50%;
     border:1px dashed rgba(42,39,48,.22); pointer-events:none;
   }
-  #hintBtn { right:12px; bottom:calc(env(safe-area-inset-bottom) + 80px); }
+  /* The one control that matters now. Tap it and this shot's outcome is shown;
+     you have only so many, and the way to get more is to stop needing them. */
+  #sightBtn {
+    right:12px; bottom:calc(env(safe-area-inset-bottom) + 80px);
+    height:38px; padding:0 14px; display:flex; align-items:center; gap:7px;
+    cursor:pointer; font-family:var(--serif); font-size:16px; font-weight:600;
+    font-variant-numeric:tabular-nums; color:var(--pi);
+  }
+  #sightBtn .eye {
+    width:15px; height:15px; border-radius:50%; border:2px solid var(--pa);
+    position:relative;
+  }
+  #sightBtn .eye::after {
+    content:""; position:absolute; inset:3px; border-radius:50%; background:var(--pa);
+  }
+  #sightBtn.spent { opacity:.42; }
+  #sightBtn.on .eye { border-color:var(--pw); }
+  #sightBtn.on .eye::after { background:var(--pw); }
+  #sightBtn:active { transform:scale(.93); }
+  #hintBtn { display:none !important; }
   #spin { bottom:calc(env(safe-area-inset-bottom) + 14px); }
   #fitBtn {
     left:12px; bottom:calc(env(safe-area-inset-bottom) + 16px); width:auto; height:32px;
@@ -312,6 +331,7 @@
     <button class="float fbtn" id="menuBtn" aria-label="Menu">&#8942;</button>
     <button class="float" id="fitBtn">Fit</button>
     <button class="float fbtn" id="hintBtn" aria-label="Hint">?</button>
+    <button class="float" id="sightBtn" aria-label="Sight the shot"><span class="eye"></span><span id="sightN">3</span></button>
     <div id="say"></div>
     <div id="spin"><div id="spinDot"></div></div>
   </section>
@@ -1645,6 +1665,7 @@ const G = {
   score:0, left:0, called:-1, streak:0, multRot:0,
   turn:0, skill:1, low:1, potChain:0, ff:0,
   hinted:false, hintShot:null, hintPath:null, hintT:0, aiShot:null, over:false,
+  sight:3, sighted:false, blind:0, sightUsed:0, wasSighted:false,
   fx:[], trail:null, trailFade:0, pred:null, predKey:'', guide:null, guideKey:'', t0:0, rollT:0,
   shot:null, strokeT:0, cueFollow:0, hold:0, held:0, slowed:false, near:{}, aimIn:1, scoreShown:0,
 };
@@ -1664,6 +1685,32 @@ function say(text, bad) {
 function pushFx(kind, x, y, extra) { G.fx.push(Object.assign({ kind, x, y, t:0 }, extra || {})); }
 const wrapPi = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 const buzz = ms => { if (DB.sound && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };
+
+/* ------------------------------------------------------------------- sight
+
+   The aim used to answer every question before it was asked: where the object
+   ball goes, whether it drops, where the cue ball ends up. A game that answers
+   itself is a game with nothing to decide, so the answer now costs something.
+
+   Unsighted you get the line to the ghost and the ghost itself — where you will
+   hit it, which is the part a player can learn to read — and nothing about what
+   happens after. Spend a sighting and the whole truth comes back for that shot.
+
+   You are given three, and the only way to get more is to pot without one. So
+   the resource is earned by the skill it substitutes for, and the player who
+   needs it least ends up holding the most of it when the hard shot arrives. */
+const SIGHT_MAX = 6;
+function resetSight() { G.sight = 3; G.sighted = false; G.blind = 0; G.sightUsed = 0; }
+function spendSight() {
+  if (G.phase !== 'aim' || G.over || G.sighted || G.sight <= 0) return;
+  G.sight--; G.sighted = true; G.sightUsed++;
+  invalidateAim(); sfx('tick', 0.8); buzz(6);
+  updateHUD();
+}
+function earnSight(n) {
+  if (G.sight >= SIGHT_MAX) return;
+  G.sight = Math.min(SIGHT_MAX, G.sight + n);
+}
 
 /* Point the cue at something, now rather than eased — used when the game itself
    chooses the line, which is never a moment that wants to glide. */
@@ -1702,6 +1749,7 @@ function fire() {
 
 function strikeNow() {
   const p = G.shot.power;
+  G.wasSighted = G.sighted;
   G.trail = [{ x:cueBall().x, y:cueBall().y }];
   E.strike(G.balls, G.shot);
   G.ev = E.newEvents();
@@ -1722,7 +1770,7 @@ function settled() {
   G.trailFade = 0.34;
   /* a new shot starts from rest — the cue used to open already drawn back at the
      last shot's power, on the last shot's line */
-  G.power = 0; G.aimIn = 0; G.cueFollow = 0;
+  G.power = 0; G.aimIn = 0; G.cueFollow = 0; G.sighted = false;
   /* the balls have moved, so any cached aim reading is about a table that no
      longer exists — the key alone cannot notice that */
   G.predKey = ''; G.guideKey = '';
@@ -1737,7 +1785,12 @@ function settled() {
 function resolveStudy(ev) {
   G.shots++;
   const left = objectsLeft();
-  if (ev.potted.length) { sfx('good'); const nm = nameShot(ev); if (nm) say(nm); }
+  if (ev.potted.length) {
+    sfx('good');
+    const nm = nameShot(ev);
+    if (!G.wasSighted) { G.blind++; earnSight(1); say(nm || 'Blind'); }
+    else if (nm) say(nm);
+  }
   if (left === 0) { finishStudy(); return; }
   if (ev.cueScratch) { reviveCue(); G.phase = 'inhand'; say('Scratch — place the cue ball', true); sfx('bad'); }
   else G.phase = 'aim';
@@ -1747,7 +1800,7 @@ function finishStudy() {
   const inPar = G.shots <= G.par;
   const rec = DB.study[G.n];
   const prev = rec.done[G.num];
-  const clean = inPar && !G.hinted;
+  const clean = inPar && !G.hinted && G.sightUsed === 0;
   if (!prev || (clean && prev !== 2) || (inPar && !prev)) rec.done[G.num] = clean ? 2 : 1;
   if (rec.at <= G.num) rec.at = G.num + 1;
   save();
@@ -1784,6 +1837,7 @@ function resolveNine(ev) {
     if (G.turn === 1) later(aiPlace, 700);
   } else if (ev.potted.length) {
     sfx('good');
+    if (G.turn === 0 && !G.wasSighted) { G.blind++; earnSight(1); }
     G.phase = G.turn === 0 ? 'aim' : 'aithink';
     if (G.turn === 1) later(aiThink, 620);
   } else {
@@ -1868,7 +1922,8 @@ function resolveRun(ev) {
   const n = ev.potted.length;
   G.shots--;
   if (n) {
-    const bonus = 1 + 0.25 * Math.min(G.streak, 4);
+    /* the whole point of the economy: certainty is worth half a shot's score */
+    const bonus = (1 + 0.25 * Math.min(G.streak, 4)) * (G.wasSighted ? 1 : 2);
     let pts = 0;
     for (let i = 0; i < n; i++) {
       const m = multAt(ev.pottedAt[i]);
@@ -1884,7 +1939,8 @@ function resolveRun(ev) {
     G.streak++;
     sfx('good');
     const nm = nameShot(ev);
-    if (nm) say(nm);
+    if (!G.wasSighted) { G.blind++; earnSight(1); say(nm ? nm + ' — blind, double' : 'Blind — double'); }
+    else if (nm) say(nm);
     else if (G.streak >= 3) say(G.streak + ' in a row');
   } else { G.streak = 0; }
   if (ev.cueScratch) { G.shots--; reviveCue(); G.phase = 'inhand'; say('Scratch', true); sfx('bad'); buzz([40, 60, 40]); }
@@ -1935,7 +1991,7 @@ function nameShot(ev) {
 
 function startStudy(n, num) {
   newEra();
-  G.mode = 'study'; G.n = n; G.num = num; G.over = false; G.hinted = false;
+  G.mode = 'study'; G.n = n; G.num = num; G.over = false; G.hinted = false; resetSight();
   G.shots = 0; G.phase = 'wait'; G.fx = []; G.balls = [];
   showScreen('play'); updateHUD();
   say('Building №' + num + '…');
@@ -1955,7 +2011,7 @@ function startStudy(n, num) {
 }
 function startNine(skill) {
   newEra();
-  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0;
+  G.mode = 'nine'; G.skill = skill; G.over = false; G.turn = 0; resetSight();
   G.balls = E.rack9(Math.random); G.low = 1; G.shots = 0;
   G.phase = 'inhand'; G.breakZone = true; G.fx = [];
   setAim(0); G.power = 0; G.side = 0; G.ver = 0;
@@ -1964,7 +2020,7 @@ function startNine(skill) {
 }
 function startRun() {
   newEra();
-  G.mode = 'run'; G.over = false; G.score = 0; G.shots = 8; G.streak = 0;
+  G.mode = 'run'; G.over = false; G.score = 0; G.shots = 8; G.streak = 0; resetSight();
   G.balls = E.layoutRun(rngRun, 5, null); G.fx = [];
   G.multRot = 0; G.scoreShown = 0; rollMults();
   G.phase = 'aim';
@@ -1997,7 +2053,7 @@ function showScreen(id) {
   ['home', 'books', 'play'].forEach(s => $(s).classList.toggle('on', s === id));
   const onTable = id === 'play';
   $('spin').style.display = onTable ? '' : 'none';
-  $('hintBtn').style.display = onTable ? '' : 'none';
+  $('sightBtn').style.display = onTable ? '' : 'none';
   if (onTable) resize();
 }
 
@@ -2030,7 +2086,11 @@ function updateHUD() {
          + cell(DB.run.best, 'best');
   }
   if (html !== hudWas) { h.innerHTML = html; hudWas = html; }
-  $('hintBtn').style.display = (G.phase === 'aim' && !G.over) ? '' : 'none';
+  const sb = $('sightBtn');
+  sb.style.display = (G.mode && !G.over && G.phase !== 'idle') ? '' : 'none';
+  $('sightN').textContent = G.sight;
+  sb.classList.toggle('spent', G.sight <= 0 && !G.sighted);
+  sb.classList.toggle('on', !!G.sighted);
   $('fitBtn').classList.toggle('on', V.zoom > 1.02 || Math.abs(V.px) > 2 || Math.abs(V.py) > 2);
 }
 
@@ -2118,13 +2178,14 @@ function drawAim(g) {
   const short = ahead && p && p.hitAt < 0;
   const guide = short ? guideFor(h1.t) : p;
   const shown = (guide && guide.hitAt > 0) ? guide : null;
+  const fade = G.aimIn;                 /* the aid eases in after a shot settles */
 
   /* the cue ball's approach — the simulated one whenever there is one, because a
      straight line here is exactly what english makes untrue */
-  g.strokeStyle = C.ink; g.globalAlpha = 0.5; g.lineWidth = PX(1.5);
+  g.strokeStyle = C.ink; g.globalAlpha = 0.5 * fade; g.lineWidth = PX(1.5);
   g.setLineDash([PX(5.5), PX(5)]);
   if (shown) polyUpTo(g, shown.cue, 0, shown.hitAt, 1e9);
-  else if (p && spinOn() && p.cue.length > 2) polyUpTo(g, p.cue, 0, p.cue.length - 1, 540);
+  else if (p && spinOn() && p.cue.length > 2) polyUpTo(g, p.cue, 0, p.cue.length - 1, G.sighted ? 540 : 300);
   else { g.beginPath(); g.moveTo(c.x, c.y); g.lineTo(h1.x, h1.y); g.stroke(); }
   g.setLineDash([]);
 
@@ -2132,19 +2193,21 @@ function drawAim(g) {
     const gh = shown.cue[shown.hitAt];
     let struck = null;
     for (let i = 0; i < G.balls.length; i++) if (G.balls[i].num === shown.hit) struck = G.balls[i];
-    g.globalAlpha = short ? 0.2 : 0.42; g.lineWidth = PX(1.3); g.setLineDash([PX(3), PX(3.4)]);
+    g.globalAlpha = (short ? 0.2 : 0.42) * fade; g.lineWidth = PX(1.3); g.setLineDash([PX(3), PX(3.4)]);
     g.beginPath(); g.arc(gh.x, gh.y, BR, 0, TAU); g.stroke();
     g.setLineDash([]);
-    /* the line of centres, taken from where the cue ball really arrives */
-    if (struck) {
+    /* the line of centres, taken from where the cue ball really arrives. Only
+       once the shot has been sighted — unsighted, where you will strike it is
+       yours to see and what it does afterwards is yours to judge. */
+    if (struck && G.sighted) {
       const objDir = Math.atan2(struck.y - gh.y, struck.x - gh.x);
       const h2 = castRay(G.balls, struck.x, struck.y, objDir, struck.num);
-      g.strokeStyle = C.pa; g.globalAlpha = short ? 0.15 : 0.4; g.lineWidth = PX(1.6);
+      g.strokeStyle = C.pa; g.globalAlpha = (short ? 0.15 : 0.4) * fade; g.lineWidth = PX(1.6);
       g.beginPath(); g.moveTo(struck.x, struck.y); g.lineTo(h2.x, h2.y); g.stroke();
     }
   }
 
-  if (p) {
+  if (p && G.sighted) {
     if (p.hitAt > 0) {
       if (p.obj && p.obj.length > 1) {
         g.strokeStyle = C.pa; g.globalAlpha = 0.9; g.lineWidth = PX(2.2);
@@ -2179,6 +2242,15 @@ function drawAim(g) {
         g.beginPath(); g.arc(q.x, q.y, q.r - PX(1.2), 0, TAU); g.stroke();
       }
     }
+  }
+  /* Warnings are not answers — a stroke that cannot reach, or one that puts your
+     own cue ball down a hole, is about your stroke and stays visible for free. */
+  if (p && p.hitAt < 0 && ahead && p.cue.length > 2 && !p.scratch && !G.sighted) {
+    const end = p.cue[p.cue.length - 1];
+    g.strokeStyle = C.ink; g.globalAlpha = 0.4 * fade; g.lineWidth = PX(1.8);
+    g.setLineDash([PX(2.5), PX(3.5)]);
+    g.beginPath(); g.arc(end.x, end.y, BR, 0, TAU); g.stroke();
+    g.setLineDash([]);
   }
   if ((p && p.scratch) || (!spinOn() && h1.kind === 'pocket')) {
     /* a warning, not a reward — warm is reserved for things going right */
@@ -2703,9 +2775,9 @@ const BOOKS = {
 function sheetStudyDone(inPar) {
   const clean = inPar && !G.hinted;
   openSheet(`
-    <div class="sh1">${clean ? 'Cleared, in par' : inPar ? 'Cleared, with a hint' : 'Cleared'}</div>
-    <div class="sh2">${BOOKS[G.n].name} №${G.num} — ${G.shots} shot${G.shots === 1 ? '' : 's'}, par ${G.par}.</div>
-    ${inPar ? '' : '<p>Par is the shortest line the engine could shoot on this table. It is there, if you want it again.</p>'}
+    <div class="sh1">${clean ? 'Cleared blind, in par' : inPar ? 'Cleared, in par' : 'Cleared'}</div>
+    <div class="sh2">${BOOKS[G.n].name} №${G.num} — ${G.shots} shot${G.shots === 1 ? '' : 's'}, par ${G.par}${G.sightUsed ? ', ' + G.sightUsed + ' sighted' : ''}.</div>
+    ${inPar ? (clean ? '' : '<p>The mark on the number is for clearing it in par without once sighting a shot.</p>') : '<p>Par is the shortest line the engine could shoot on this table. It is there, if you want it again.</p>'}
     <div class="rowbtns">
       <button class="pbtn" onclick="nextThing()">Next study</button>
       <button class="pbtn ghost" onclick="replay()">Shoot it again</button>
@@ -2726,7 +2798,7 @@ function sheetRunDone() {
   const rec = G.score >= DB.run.best && G.score > 0;
   openSheet(`
     <div class="sh1">${rec ? 'Best run yet' : 'Out of shots'}</div>
-    <div class="sh2">${G.score} points.</div>
+    <div class="sh2">${G.score} points${G.blind ? ', ' + G.blind + ' of them blind' : ''}.</div>
     <div class="stat"><span>Best</span><b>${DB.run.best}</b></div>
     <div class="stat"><span>Runs</span><b>${DB.run.plays}</b></div>
     <div class="rowbtns">
@@ -2736,7 +2808,8 @@ function sheetRunDone() {
 }
 function sheetMenu() {
   const extra = G.mode === 'study'
-    ? '<button class="pbtn ghost" onclick="closeSheet();sheetNumbers()">Pick a number</button>' : '';
+    ? '<button class="pbtn ghost" onclick="closeSheet();$(\'hintBtn\').click()">Show me a shot</button>'
+    + '<button class="pbtn ghost" onclick="closeSheet();sheetNumbers()">Pick a number</button>' : '';
   openSheet(`
     <div class="sh1">${G.mode === 'study' ? BOOKS[G.n].name + ' №' + G.num : G.mode === 'nine' ? 'Nine-ball' : 'The run'}</div>
     <div class="rowbtns">
@@ -2782,7 +2855,12 @@ function sheetHow() {
     without having pulled and you have only aimed. Power counts from wherever you put
     your finger down, not from the ball, so you can start close for a quick swing or
     far out for a long lever and a finer angle.</p>
-    <p><b>The lines.</b> The dashed line and the ring are geometry: the ring is where
+    <p><b>Sight.</b> You are shown where you will strike the ball and nothing after
+    it — what the object ball then does is yours to judge. Tap the eye to sight the
+    shot and the whole truth comes back: the object ball's line, where the cue ball
+    ends up, and the pocket lighting if it drops. You start with three, and the only
+    way to get more is to pot without one. In the run a blind pot pays double.</p>
+    <p><b>The lines, once sighted.</b> The dashed line and the ring are geometry: the ring is where
     the cue ball has to be for the contact you are asking for, and an object ball
     always leaves along the line joining the two centres. The solid line is not
     geometry — it is this stroke, at this speed, with this spin, run through the
@@ -2918,6 +2996,7 @@ $('themeBtn').addEventListener('click', () => {
   say('Theme: ' + DB.theme);
 });
 $('soundBtn').addEventListener('click', () => { DB.sound = !DB.sound; muted = !DB.sound; save(); sfx('tick'); say(DB.sound ? 'Sound on' : 'Sound off'); });
+$('sightBtn').addEventListener('click', spendSight);
 $('hintBtn').addEventListener('click', () => {
   if (G.phase !== 'aim' || G.over) return;
   $('hintBtn').textContent = '…';
