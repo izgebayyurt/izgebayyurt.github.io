@@ -2095,11 +2095,13 @@ function renderPaths(){
 }
 window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
 /* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti.
-   It idles (no redraw) while an opaque screen covers the board - the main menu, or the
-   near-opaque full-screen Settings / Pro panels - so the menu doesn't burn battery. */
-var ovSetEl=document.getElementById("ovSet"), ovUpEl=document.getElementById("ovUp");
+   It idles (no redraw) while any menu or pop-up covers the board - the main menu, or any
+   .ov overlay (all have a 90%+ backdrop) - so menus don't burn battery. Play stays 60 fps. */
+var overlayEls=document.getElementsByClassName("ov");
 function boardHidden(){
-  return document.body.classList.contains("menuopen") || ovSetEl.classList.contains("show") || ovUpEl.classList.contains("show");
+  if(document.body.classList.contains("menuopen")) return true;
+  for(var i=0;i<overlayEls.length;i++) if(overlayEls[i].classList.contains("show")) return true;
+  return false;
 }
 function frame(){ animT=nowMs()-animStart;
   if(!boardHidden()) renderPaths();
