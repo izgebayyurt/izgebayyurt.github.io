@@ -1,5 +1,6 @@
 /* Huemeld native bootstrap — injected before the game script by sync.mjs.
-   Provides window.HuemeldNative = { interstitial, buyRemoveAds, buyFull, restore }
+   Provides window.HuemeldNative = { rewarded, buyFull, restore, privacyChoices, haptic }
+   (+ the retired interstitial / buyRemoveAds, kept so old call sites stay harmless)
    on top of @capacitor-community/admob and @revenuecat/purchases-capacitor.
 
    ┌─────────────────────────────────────────────────────────────────────┐
@@ -32,8 +33,17 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   var AdMob = P.AdMob, Purchases = P.Purchases, Haptics = P.Haptics;
   var adUnit = USE_TEST_ADS ? (isAndroid ? AND_TEST_INTERSTITIAL : IOS_TEST_INTERSTITIAL) : (isAndroid ? ANDROID_INTERSTITIAL_ID : IOS_INTERSTITIAL_ID);
   var rewardUnit = USE_TEST_ADS ? (isAndroid ? AND_TEST_REWARDED : IOS_TEST_REWARDED) : (isAndroid ? ANDROID_REWARDED_ID : IOS_REWARDED_ID);
+  // Android IDs still placeholders? Then keep ads + purchases OFF on that platform
+  // (fail cleanly as "unavailable") instead of firing broken requests at AdMob/RevenueCat.
+  var PLACEHOLDER = /X{6}|N{6}/;
+  if (PLACEHOLDER.test(rewardUnit)) AdMob = null;   // rewarded is the only ad format in use
+  if (PLACEHOLDER.test(RC_API_KEY)) Purchases = null;
   var adReady = false, attAsked = false, attInFlight = false;
   var rewardReady = false, rewardGot = false, rewardCb = null, rewardWired = false;
+  var rewardLoading = null, rewardShowing = false;
+  // hold the game's audio while a full-screen ad plays (focus/pageshow can't restart it)
+  function audioOff() { if (window.__audioHold) window.__audioHold("ad", true); else if (window.__suspendAudio) window.__suspendAudio(); }
+  function audioOn() { if (window.__audioHold) window.__audioHold("ad", false); else if (window.__resumeAudio) window.__resumeAudio(); }
 
   function prepareAd() {
     if (!AdMob) return;
@@ -45,22 +55,32 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
      Reward is confirmed by the onRewardedVideoAdReward event (fired only if the
      video played to the end); onRewardedVideoAdDismissed then reports the result
      back — got=true only when the reward actually fired, so closing early = no hint. */
+  // one load at a time; resolves true once a video is ready, false if the load failed
   function prepareReward() {
-    if (!AdMob) return;
-    AdMob.prepareRewardVideoAd({ adId: rewardUnit }).then(function () { rewardReady = true; })
-      .catch(function () { rewardReady = false; });
+    if (!AdMob) return Promise.resolve(false);
+    if (rewardReady) return Promise.resolve(true);
+    if (rewardLoading) return rewardLoading;
+    rewardLoading = AdMob.prepareRewardVideoAd({ adId: rewardUnit })
+      .then(function () { rewardReady = true; return true; })
+      .catch(function () { rewardReady = false; return false; })
+      .then(function (ok) { rewardLoading = null; return ok; });
+    return rewardLoading;
+  }
+  // the ad is over (finished, closed early, or failed): report + reload the next one
+  function rewardDone(got) {
+    var cb = rewardCb; rewardCb = null; rewardReady = false; rewardShowing = false;
+    audioOn(); prepareReward();
+    if (cb) cb(got, got ? undefined : "closed");
   }
   function wireReward() {
     if (rewardWired || !AdMob) return;
     rewardWired = true;
     AdMob.addListener("onRewardedVideoAdReward", function () { rewardGot = true; });
-    AdMob.addListener("onRewardedVideoAdDismissed", function () {
-      var cb = rewardCb; rewardCb = null; rewardReady = false; prepareReward();
-      if (cb) cb(rewardGot);
-    });
+    AdMob.addListener("onRewardedVideoAdDismissed", function () { rewardDone(rewardGot); });
     AdMob.addListener("onRewardedVideoAdFailedToShow", function () {
-      var cb = rewardCb; rewardCb = null; rewardReady = false; prepareReward();
-      if (cb) cb(false);
+      var cb = rewardCb; rewardCb = null; rewardReady = false; rewardShowing = false;
+      audioOn(); prepareReward();
+      if (cb) cb(false, "unavailable");
     });
   }
 
@@ -78,11 +98,24 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     }).catch(function () {}).then(function () { attInFlight = false; });
   }
 
+  /* GDPR (EEA/UK/CH): Google's UMP consent form, shown before ads initialise when the
+     region requires it. Needs a published GDPR message in AdMob → Privacy & messaging;
+     elsewhere the status is NOT_REQUIRED and this is a quick no-op. Any error falls
+     through, so ads still start. */
+  function gatherConsent() {
+    if (!AdMob || !AdMob.requestConsentInfo) return Promise.resolve();
+    return AdMob.requestConsentInfo().then(function (info) {
+      if (info && info.status === "REQUIRED" && info.isConsentFormAvailable) return AdMob.showConsentForm();
+    }).catch(function () {});
+  }
+
   function entsOf(info) {
     var act = info && info.customerInfo && info.customerInfo.entitlements && info.customerInfo.entitlements.active || {};
     return { noads: !!act[ENT_NOADS] || !!act[ENT_FULL], full: !!act[ENT_FULL] };
   }
-  function pushEnts(e) { if (window.__applyEnt) window.__applyEnt(e); }
+  // e comes from RevenueCat's CustomerInfo (the source of truth): the game sets AND clears
+  // its flags from it, so refunds revoke. Only ever called with a successful read.
+  function pushEnts(e) { if (window.__applyEnt) window.__applyEnt(e, true); }
 
   function buy(productId, entKey, cb) {
     if (!Purchases) { cb(false); return; }
@@ -101,7 +134,7 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     }
     // purchaseStoreProduct needs a REAL StoreProduct from the store (a synthesized
     // {identifier} is rejected). Fetch it first, then purchase that object.
-    Purchases.getProducts({ productIdentifiers: [productId] })
+    Purchases.getProducts({ productIdentifiers: [productId], type: "NON_SUBSCRIPTION" })   // Android defaults to subs
       .then(function (res) {
         var product = res && res.products && res.products[0];
         if (!product) { reconcile(); return; }               // fetch odd? still check existing entitlements
@@ -121,13 +154,38 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
           .finally(prepareAd);
       });
     },
+    /* cb(got, reason): got=true only when the video played to the end.
+       reason: "unavailable" (no video could load in time / failed to show),
+               "closed" (closed early), "busy" (one is already playing). */
     rewarded: function (cb) {
-      if (!AdMob) { cb(false); return; }
-      if (!rewardReady) { prepareReward(); cb(false); return; }   // not loaded yet — the game asks the player to retry
-      ensureATT().then(function () {
-        rewardGot = false; rewardCb = cb; rewardReady = false;
-        AdMob.showRewardVideoAd().catch(function () { var c = rewardCb; rewardCb = null; prepareReward(); if (c) c(false); });
+      if (!AdMob) { cb(false, "unavailable"); return; }
+      if (rewardShowing) { cb(false, "busy"); return; }
+      rewardShowing = true;
+      // not loaded yet (first tap after launch, slow network)? wait up to 8 s for it
+      var timeout = new Promise(function (res) { setTimeout(function () { res(false); }, 8000); });
+      Promise.race([prepareReward(), timeout]).then(function (ok) {
+        if (!ok || !rewardReady) { rewardShowing = false; cb(false, "unavailable"); return; }
+        ensureATT().then(function () {
+          rewardGot = false; rewardCb = cb; rewardReady = false;
+          audioOff();   // a full-screen ad doesn't hide the webview: silence the game music
+          AdMob.showRewardVideoAd().catch(function () {
+            var c = rewardCb; rewardCb = null; rewardShowing = false; audioOn(); prepareReward();
+            if (c) c(false, "unavailable");
+          });
+        });
       });
+    },
+    // Settings → "Privacy choices": let EEA/UK players change their consent (Google requires it)
+    privacyChoices: function (cb) {
+      cb = cb || function () {};
+      if (!AdMob || !AdMob.requestConsentInfo) { cb(false); return; }
+      var reset = AdMob.resetConsentInfo ? AdMob.resetConsentInfo() : Promise.resolve();
+      reset.then(function () { return AdMob.requestConsentInfo(); })
+        .then(function (info) {
+          if (info && info.isConsentFormAvailable) return AdMob.showConsentForm().then(function () { cb(true); });
+          cb(false);
+        })
+        .catch(function () { cb(false); });
     },
     haptic: function (kind) {
       if (!Haptics) return;
@@ -142,7 +200,7 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     buyFull: function (cb) { buy(PRODUCT_FULL, "full", cb); },
     restore: function (cb) {
       if (!Purchases) { cb(null); return; }
-      Purchases.restorePurchases().then(function (res) { cb(entsOf(res)); })
+      Purchases.restorePurchases().then(function (res) { var e = entsOf(res); pushEnts(e); cb(e); })
         .catch(function () { cb(null); });
     },
   };
@@ -157,13 +215,17 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
      rewarded-unlock progress (hm_flow2_adunlock_*) all come back too. ---- */
   var CloudKV = P.CloudKV, Prefs = P.Preferences;
   var SAVE_PREFIX = "hm_flow2_", SAVE_KEY = "hmsave";
+  // purchase flags are NOT mirrored: iCloud is per Apple ID, purchases are per store account,
+  // and RevenueCat re-reports the real entitlements on every launch anyway
+  var ENT_PREFIX = "hm_flow2_ent_";
+  function saveable(k) { return k && k.indexOf(SAVE_PREFIX) === 0 && k.indexOf(ENT_PREFIX) !== 0 && k !== "hm_flow2_noads"; }
   var lastPushed = "";
   // snapshot NOW: native.js runs before the game script, which writes
   // hm_flow2_seen at boot and would otherwise mask a fresh install
   var freshInstall = !(localStorage.getItem("hm_flow2_done") || localStorage.getItem("hm_flow2_solves") || localStorage.getItem("hm_flow2_seen"));
   function collectSave() {
     var o = {};
-    for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(SAVE_PREFIX) === 0) o[k] = localStorage.getItem(k); }
+    for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (saveable(k)) o[k] = localStorage.getItem(k); }
     return JSON.stringify(o);
   }
   function durableSet(value) {   // write to every available durable store
@@ -195,7 +257,7 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
       if (!v) return;
       var o; try { o = JSON.parse(v); } catch (e) { return; }
       var n = 0;
-      Object.keys(o).forEach(function (k) { if (k.indexOf(SAVE_PREFIX) === 0 && o[k] != null) { localStorage.setItem(k, o[k]); n++; } });
+      Object.keys(o).forEach(function (k) { if (saveable(k) && o[k] != null) { localStorage.setItem(k, o[k]); n++; } });
       if (n) { sessionStorage.setItem("hm_restored", "1"); location.reload(); }
     }).catch(function () {});
   }
@@ -209,13 +271,16 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   // doesn't keep playing in the background (visibilitychange can be flaky in a webview).
   if (P.App && P.App.addListener) {
     try {
-      P.App.addListener("appStateChange", function (s) {
-        if (!s) return;
-        if (s.isActive) { if (window.__resumeAudio) window.__resumeAudio(); }
-        else if (window.__suspendAudio) window.__suspendAudio();
-      });
-      P.App.addListener("resume", function () { if (window.__resumeAudio) window.__resumeAudio(); });
-      P.App.addListener("pause", function () { if (window.__suspendAudio) window.__suspendAudio(); });
+      // appStateChange fires on ANY loss of focus (app switcher, Control Center, calls),
+      // not just full backgrounding: hold the audio until the app is active again
+      function setInactive(on) {
+        if (window.__audioHold) window.__audioHold("inactive", on);
+        else if (on) { if (window.__suspendAudio) window.__suspendAudio(); }
+        else if (window.__resumeAudio) window.__resumeAudio();
+      }
+      P.App.addListener("appStateChange", function (s) { if (s) setInactive(!s.isActive); });
+      P.App.addListener("pause", function () { setInactive(true); });
+      P.App.addListener("resume", function () { setInactive(false); });
     } catch (e) {}
   }
 
@@ -224,8 +289,8 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     // ATT is requested natively at launch (AppDelegate). Here we just spin up the
     // ads engine + rewarded video; by the time the first ad is due (post-honeymoon)
     // the tracking decision has long since resolved.
-    if (AdMob) AdMob.initialize({}).then(function () {
-      wireReward(); prepareAd(); prepareReward();
+    if (AdMob) gatherConsent().then(function () { return AdMob.initialize({}); }).then(function () {
+      wireReward(); prepareReward();
     }).catch(function () {});
     if (Purchases) {
       // any entitlement change (purchase, restore, renewal, cross-device sync) pushes
@@ -240,7 +305,7 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
         .then(function (res) { pushEnts(entsOf(res)); })
         .then(pushSave)
         .then(function () {   // show the store's LOCALIZED price on the buy buttons (e.g. "₺49,99")
-          return Purchases.getProducts({ productIdentifiers: [PRODUCT_FULL] }).then(function (res) {
+          return Purchases.getProducts({ productIdentifiers: [PRODUCT_FULL], type: "NON_SUBSCRIPTION" }).then(function (res) {
             var pr = res && res.products && res.products[0];
             if (pr && pr.priceString && window.__applyPrices) window.__applyPrices({ full: pr.priceString });
           });
