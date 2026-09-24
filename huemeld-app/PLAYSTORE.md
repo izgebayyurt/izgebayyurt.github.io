@@ -24,7 +24,8 @@ bottom.
 - [ ] AdMob → Apps → **Add app → Android** → "Huemeld".
 - [ ] Copy the **App ID** (`ca-app-pub-…~…`, with the `~`) → paste into `android/app/src/main/AndroidManifest.xml` (the `com.google.android.gms.ads.APPLICATION_ID` meta-data; currently Google's sample id).
 - [ ] Add a **Rewarded** ad unit. Copy its unit ID (`ca-app-pub-…/…`). (No interstitial needed — Huemeld shows **no forced ads**; ads are opt-in only: a rewarded hint, or "watch to unlock 8 pack levels". You can skip the Interstitial unit.)
-- [ ] In `native.js`: set `ANDROID_INTERSTITIAL_ID` and `ANDROID_REWARDED_ID`.
+- [ ] In `native.js`: set `ANDROID_REWARDED_ID` (the interstitial ID is unused).
+- [ ] **Privacy & messaging → GDPR**: add the Android app to the same GDPR message as iOS and publish (the consent form is already wired in `native.js`).
 
 ## 3. RevenueCat — Google Play app
 - [ ] RevenueCat → your Huemeld project → **Add app → Google Play** → package `com.griezwahlm.huemeld`.
@@ -58,16 +59,18 @@ npm run android          # sync-www + cap sync android + open Android Studio
 In Android Studio:
 - [ ] Let Gradle sync. Bump **versionCode**/**versionName** in `android/app/build.gradle` for each upload.
 - [ ] **Build → Generate Signed Bundle / APK → Android App Bundle (.aab)**. Create an upload keystore (keep it safe) and enroll in **Play App Signing**.
-- [ ] SDK: `compileSdk`/`targetSdk` should be 34+ (Play requires a recent target API). Capacitor 6 defaults are current; bump if Play flags it.
+- [x] SDK: `compileSdk`/`targetSdk` are **35** (Play's requirement since Aug 2025), with AGP 8.7.2 / Gradle 8.11.1 and an edge-to-edge opt-out in `styles.xml` so Android 15 doesn't draw the game under the status bar. **Verify** the first Gradle sync + a run on an Android 15 emulator — this was configured without an Android SDK to build against.
 
 ## 7. Internal testing pass
 - [ ] Play Console → **Testing → Internal testing** → upload the `.aab`, add your email as a tester, install via the opt-in link.
 - [ ] License testers (for IAP sandbox): Play Console → **Setup → License testing** → add your Google account. Purchases then run in test mode (no real charge).
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, music + haptics work.
-  - [ ] Solve 15 levels → an ad shows (test ads while `USE_TEST_ADS = true`).
+  - [ ] Solve levels → **no ad ever appears on its own** (there are no interstitials).
+  - [ ] Add your phone under AdMob → Settings → **Test devices** first (its ID is printed in Logcat when an ad loads), so the real ad units serve test ads to you.
   - [ ] **Hint** → rewarded test video → ghost pipe.
-  - [ ] Settings shows **Remove Ads** / **Huemeld Pro** / **Restore Purchases**; buy one (license tester) → it unlocks; **Restore** brings it back on reinstall.
+  - [ ] Settings shows **Huemeld Pro** (localized price), **Restore Purchases** and **Privacy choices**; buy Pro (license tester) → everything unlocks; after a reinstall, **Restore** brings it back.
+  - [ ] Past the 5-level teaser in a pack → **Watch to unlock 8 levels** → the batch opens.
 
 ## 8. Store listing
 - [ ] **Title**: `Huemeld` · **Short description** (80): `Mix colors, fill the board.`
@@ -85,11 +88,15 @@ Because AdMob uses the advertising ID:
 - [ ] Everything else: not collected.
 
 ## 10. Release
-- [ ] Flip `USE_TEST_ADS = false` in `native.js` **and** `UNLOCK_ALL = false` in `../huemeld/flow2.html`. Re-run `npm run android`, rebuild the `.aab`, bump versionCode.
-- [ ] Fill `ANDROID_INTERSTITIAL_ID`, `ANDROID_REWARDED_ID`, `RC_ANDROID_API_KEY`, and the real AdMob **App ID** in the manifest.
+- [x] Release flags already set: `USE_TEST_ADS = false`, `UNLOCK_ALL = false`.
+- [ ] **Paste the three Android values** — until then `native.js` switches ads and purchases **off** on Android (hint/unlock videos say "No video available", Pro can't be bought):
+  1. `ANDROID_REWARDED_ID` in `native.js` (AdMob → Android app → Rewarded unit, has a `/`)
+  2. `RC_ANDROID_API_KEY` in `native.js` (RevenueCat → Android app → public `goog_…` key)
+  3. the real AdMob **App ID** (has a `~`) in `android/app/src/main/AndroidManifest.xml`, replacing Google's sample ID
+- [ ] Re-run `npm run android`, rebuild the `.aab`, bump versionCode.
 - [ ] Upload to the **Production** track, roll out. First reviews are usually hours–days.
 
 ## Notes / known gaps
-- **Cross-reinstall save**: the save mirror now writes to **@capacitor/preferences** (native SharedPreferences) on Android, in addition to iCloud on iOS. Every `hm_flow2_*` key is captured (progress, settings, language, rewarded-unlocks). Because `allowBackup="true"` and Preferences use SharedPreferences, **Android Auto Backup includes them**, so a delete+reinstall restores — *provided the device has Google backup on* (Settings → Google → Backup) and a backup has run. It also survives app updates. (Play Games Saved Games is a heavier alternative if you ever want cloud saves that don't depend on Auto Backup.)
-- **ATT** is iOS-only; on Android there's no tracking prompt. For EEA/UK users you may later add a **UMP consent form** (GDPR) via the AdMob plugin — not required to launch elsewhere.
-- **Icons/splash**: Android currently uses the default Capacitor launcher icon. Generate a proper Android icon set (`@capacitor/assets` or Android Studio's Image Asset tool) before release.
+- **Cross-reinstall save**: the save mirror now writes to **@capacitor/preferences** (native SharedPreferences) on Android, in addition to iCloud on iOS. Every `hm_flow2_*` key except the purchase flags is captured (progress, settings, language, rewarded-unlocks) — purchases come back via **Restore Purchases**. Because `allowBackup="true"` and Preferences use SharedPreferences, **Android Auto Backup includes them**, so a delete+reinstall restores — *provided the device has Google backup on* (Settings → Google → Backup) and a backup has run. It also survives app updates. (Play Games Saved Games is a heavier alternative if you ever want cloud saves that don't depend on Auto Backup.)
+- **ATT** is iOS-only; on Android there's no tracking prompt. The Google **UMP consent form** (GDPR, EEA/UK/CH) is wired for both platforms — it just needs the published AdMob GDPR message.
+- **Icons/splash**: the launcher mipmaps already carry the Huemeld icon; double-check the adaptive icon on a device.

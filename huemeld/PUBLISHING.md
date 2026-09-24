@@ -21,8 +21,11 @@ icons). It ships two ways from the same code:
 
 ## 2. Content pipeline
 
-Levels are **generated and proven** — every level has exactly one solution, and
-each is machine-checked (solver + an end-to-end replay through the real engine).
+Levels are **generated from a known solution** — every level is solvable by
+construction, and each baked solution is replayed end-to-end through the real game
+(headless) before shipping. Uniqueness is NOT guaranteed: the exact solution counter
+(`flow-solve.mjs`) only understands walls, gates, ice and counters (not portals,
+bridges, prisms or arrows), and the shipped ramps don't run it.
 
 ```
 node huemeld/tools/flow-app.mjs   # writes flow-data.js (campaign + daily + packs)
@@ -33,8 +36,8 @@ node huemeld/tools/flow-app.mjs   # writes flow-data.js (campaign + daily + pack
 - `tools/flow-solve.mjs` — exact solution counter + one-solution extractor.
 - `tools/flow-gen2.mjs` — the single-emitter generator: grows the solution's paths
   first (three arms from a junction, or one square forking to two junctions) so the
-  board is a full-coverage single-emitter solution by construction, then the counter
-  confirms exactly one solution. One R/Y/B square each; secondary circles (O/G/P) as
+  board is a full-coverage single-emitter solution by construction (the counter only
+  runs for specs that ask for it via `tactical`/`measure`). One R/Y/B square each; secondary circles (O/G/P) as
   objectives.
 - `tools/flow-app.mjs` — the campaign ramp + daily pool.
 - `tools/flow-gen.mjs` / `flow-build.mjs` — the earlier multi-emitter snake generator
@@ -46,32 +49,35 @@ cycles through the `daily` pool, so grow that pool for a longer daily runway.
 
 ## 3. Monetization (native)
 
-The web build shows **no ads**. The native wrapper injects a bridge that turns the
-seams already in `flow2.html` into real ads/IAP:
+The web build shows **no ads** and has everything unlocked. The native wrapper
+(`huemeld-app/native.js`) injects a bridge that turns the seams in `flow2.html`
+into real ads/IAP:
 
 ```js
-// provided by the Capacitor shell on app start:
 window.HuemeldNative = {
-  interstitial()    { /* show interstitial (called every 4th solve) */ },
-  buyRemoveAds(cb)  { /* run IAP; cb(true) on success → ads removed forever */ },
+  rewarded(cb)        // cb(got, reason) — opt-in video; reason "unavailable"/"closed"/"busy"
+  buyFull(cb)         // Huemeld Pro; cb(true) once RevenueCat reports the entitlement
+  restore(cb)         // cb({noads, full}) from RevenueCat, or null on error
+  privacyChoices(cb)  // reopen Google's GDPR consent form (EEA/UK/CH)
+  haptic(kind)
 };
 ```
 
-Where each hooks in (search `flow2.html` for these):
-
-| Seam | Trigger | Function |
+| Seam | Trigger | Where in `flow2.html` |
 |------|---------|----------|
-| Interstitial | every 4th level solved | `maybeInterstitial()` |
-| Remove-Ads IAP | **Remove Ads** button (shown only when the bridge exists) | `btnNoAds` handler |
+| Rewarded hint | **Hint** button (free native players) | `btnHint` handler |
+| Rewarded unlock | tapping a locked pack level past the teaser | `btnUpNoAds` handler |
+| Huemeld Pro IAP | menu **Go Pro**, upsell, Settings | `btnUpBuy` / `btnFull` |
+| Restore / Privacy choices | Settings | `btnRestore` / `btnPrivacy` |
 
-The purchase persists in `localStorage` (`hm_flow2_noads`), which suppresses
-interstitials. For real receipts, have `buyRemoveAds` verify with the store and
-mirror the flag.
+Entitlements land in `localStorage` (`hm_flow2_ent_full`, legacy `hm_flow2_ent_noads`)
+via `window.__applyEnt(e, authoritative)`; RevenueCat is the source of truth, so a
+refund clears them on the next launch. There are **no interstitials**.
 
 ### Wrapping with Capacitor — BUILT, see `huemeld-app/`
 
 The wrapper now exists at the repo root: **`huemeld-app/`** contains the Capacitor
-project (AdMob interstitials + RevenueCat purchases, `native.js` bridge,
+project (AdMob rewarded videos + RevenueCat purchases, `native.js` bridge,
 `sync.mjs` build step) and **`huemeld-app/APPSTORE.md`** is the complete
 step-by-step App Store Connect checklist — accounts, ad units, IAP setup,
 Info.plist/ATT snippets, paste-ready store metadata, and the 8 ready-made
@@ -80,12 +86,11 @@ The privacy policy Apple requires is live at `huemeld/privacy.html`.
 
 ### The model (final — fully wired in the shell)
 - **Free**: the whole 250-level campaign (chapters gate by progress: solve 2/3 to
-  open the next), today's daily, and the first 5 levels of every pack — with
-  interstitials after a 15-solve honeymoon. The deep free tier IS the funnel:
-  anyone who plays 250 levels is ready to pay for silence and hungry for packs.
-- **$2.99 — No Ads** → flips `hm_flow2_ent_noads` (bridge: `buyRemoveAds(cb)`).
-- **$4.99 — Huemeld Pro** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
-  no ads + all 7 packs + the 150-level Medley (500 levels) + the daily archive
-  (last 3 weeks replayable, streak-repairing) + instant chapter unlock.
-Both purchase buttons live in Settings and appear only when the native bridge
-exists. Test any state on web via `__flow.entNoAds(true)` / `__flow.entFull(true)`.
+  open the next), today's daily, and the first 5 levels of every pack. **No forced
+  ads.** Optional rewarded videos: one reveals a hint pipe, one unlocks the next 8
+  levels of a pack.
+- **$2.99 — Huemeld Pro** → flips `hm_flow2_ent_full` (bridge: `buyFull(cb)`):
+  all 7 packs + the 250-level Medley (600 levels) + the daily archive (last 3
+  weeks replayable, streak-repairing) + instant chapter unlock + free hints.
+- Remove Ads (`hm_flow2_ent_noads`) is retired but still honoured for past buyers.
+The purchase buttons appear only when the native bridge exists. Test any state on web via `__flow.entNoAds(true)` / `__flow.entFull(true)`.
