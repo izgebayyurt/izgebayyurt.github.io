@@ -85,7 +85,7 @@ h1{ font-family:var(--font-d); font-weight:700; font-size:24px; line-height:1; }
 @keyframes discPop{ 0%{ opacity:0; transform:translate(-50%,-50%) scale(.4) } 16%{ opacity:1; transform:translate(-50%,-90%) scale(1.18) } 42%{ transform:translate(-50%,-112%) scale(1) } 100%{ opacity:0; transform:translate(-50%,-178%) scale(1) } }
 .dot.winspin{ animation:dotWin .7s ease-in-out infinite; }
 .toast{
-  position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:60;   /* above .ov panels (40): purchase/video feedback shows while they're open */
   background:var(--line); color:#fff; font-family:var(--font-d); font-weight:600; font-size:13px;
   padding:8px 18px; border-radius:16px; opacity:0; pointer-events:none; transition:opacity .2s;
   white-space:normal; max-width:calc(var(--bw) - 28px); text-align:center; line-height:1.35;
@@ -244,7 +244,7 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnMenuLevels" style="background:#bfe3ff">☰ Levels</button>
         <button class="mk" id="btnMenuSet" style="background:var(--card);color:var(--ink)">⚙ Settings</button>
         <button class="mk" id="btnMenuHelp" style="background:var(--card);color:var(--ink)" data-t="How to play">How to play</button>
-        <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro · Remove Ads</button>
+        <button class="mk" id="btnMenuPro" style="display:none;background:#bfe3ff">✦ Go Pro</button>
         <button class="mk" id="btnMenuKofi" style="display:none;background:#ffd6e0">♥ Support Huemeld</button>
         <button class="mk" id="btnMenuLang" style="background:var(--card);color:var(--ink)">Türkçe</button>
       </div>
@@ -313,6 +313,7 @@ body.menuopen .helpfab{ display:none; }
         <button class="mk" id="btnNoAds" style="display:none;background:#bfe3ff;margin-top:12px" data-t="Remove Ads · $2.99">Remove Ads · $2.99</button>
         <button class="mk" id="btnFull" style="display:none;background:#ffd15c;margin-top:6px">✦ Huemeld Pro · $2.99</button>
         <button class="mk" id="btnRestore" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Restore Purchases">Restore Purchases</button>
+        <button class="mk" id="btnPrivacy" style="display:none;background:var(--card);color:var(--ink);margin-top:6px;font-size:13px" data-t="Privacy choices">Privacy choices</button>
         <p style="margin-top:10px"><a href="https://izgebayyurt.github.io/huemeld/privacy.html" target="_blank" rel="noopener" style="color:var(--sub);font-size:12px" data-t="Privacy Policy">Privacy Policy</a></p>
         <p style="margin-top:8px;font-size:11px;color:var(--sub);line-height:1.6"><span data-t="Music from">Music from</span> <a href="https://uppbeat.io" target="_blank" rel="noopener" style="color:var(--sub)">Uppbeat</a>, by lloom:<br>
         <a href="https://uppbeat.io/t/lloom/vashon" target="_blank" rel="noopener" style="color:var(--sub)">Vashon</a><br>
@@ -359,6 +360,19 @@ body.menuopen .helpfab{ display:none; }
 <script>
 (function(){
 "use strict";
+/* storage safety net: a blocked localStorage (Safari "block all cookies", sandboxed
+   frames) throws on ACCESS, and a full one throws on setItem - either used to kill the
+   whole script (blank page). Fall back to an in-memory store / swallow quota errors. */
+(function(){
+  var ok=false; try{ ok=!!window.localStorage; window.localStorage.getItem("hm_probe"); }catch(e){ ok=false; }
+  if(!ok){ var m={}; var mem={ getItem:function(k){ return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null; },
+      setItem:function(k,v){ m[k]=""+v; }, removeItem:function(k){ delete m[k]; }, clear:function(){ m={}; },
+      key:function(i){ return Object.keys(m)[i]||null; }, get length(){ return Object.keys(m).length; } };
+    try{ Object.defineProperty(window,"localStorage",{value:mem, configurable:true}); }catch(e){} return; }
+  try{ var set=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){ try{ set.call(this,k,v); }catch(e){} }; }catch(e){}
+})();
+// read a JSON object from storage; a corrupted value reads as empty instead of throwing
+function lsJSON(k){ try{ var v=JSON.parse(localStorage.getItem(k)||"{}"); return (v && typeof v==="object") ? v : {}; }catch(e){ return {}; } }
 var HEX={R:"#ef4a5a",Y:"#f6c445",B:"#3d8bdf",O:"#f2913d",G:"#57c268",P:"#9b62d6",N:"#a8703f"};
 
 /* ---------- i18n: T() looks up the English string in the current language ---------- */
@@ -372,7 +386,7 @@ var TR = {
   "Settings":"Ayarlar",                                             /* 5 */
   "Language":"Dil",
   "How to play":"Nasıl oynanır",                                    /* 6 */
-  "Go Pro · Remove Ads":"Pro'ya Geç · Reklamsız",                   /* 7 */
+  "Go Pro":"Pro'ya Geç",                                            /* 7 */
   "Support Huemeld":"Huemeld'e Destek Ol",
   "Menu":"Menü",                                                    /* 8 */
   "Language":"Dil",                                                 /* 9 */
@@ -423,8 +437,6 @@ var TR = {
   "Plus the 250 level medley for extra challenges!":"Ekstra zorluk için 250 karma mekanikli bölüm!", /* 40 */
   "Daily archive - replay the last 3 weeks":"Günlük arşiv - son 3 haftayı tekrar oyna", /* 41 */
   "Every chapter unlocked instantly":"Tüm bölümler anında açılır", /* 42 */
-  "Remove Ads · $2.99":"Reklamları Kaldır · $2.99",                 /* 43 */
-  "Huemeld Pro · $4.99":"Huemeld Pro · $4.99",                      /* 44 */
   "Not now":"Şimdi değil",                                          /* 45 */
   "Tired of ads?":"Reklamlardan bıktın mı?",                        /* 46 */
   "Remove them forever - or unlock everything:":"Reklamlardan sonsuza dek kurtul, ya da pro sahibi ol:", /* 47 */
@@ -508,6 +520,11 @@ var TR = {
   "Loading a video…":"Video yükleniyor…",
   "{0} more levels unlocked!":"{0} bölüm daha açıldı!",
   "Not unlocked - the video didn't finish":"Açılmadı - video tamamlanmadı",
+  "No video available right now - try again in a moment":"Şu an video yok - birazdan tekrar dene",
+  "Purchases restored!":"Satın alımlar geri yüklendi!",
+  "No purchases to restore":"Geri yüklenecek satın alım yok",
+  "Privacy choices":"Gizlilik tercihleri",
+  "Privacy choices aren't needed in your region":"Bölgende gizlilik tercihi gerekmiyor",
   "Chapter {0} · {1}":"Bölüm {0} · {1}",                            /* 114 */
   // - win messages -
   "Whole board covered.":"Tüm tahta kaplandı.",                     /* 115 */
@@ -517,7 +534,7 @@ var TR = {
   "see you tomorrow!":"yarın görüşürüz!",                           /* 119 */
   "Chapter unlocked: {0}!":"Bölüm açıldı: {0}!",                    /* 120 */
   "That's the last level - more coming!":"Bu son bölüm, dahası geliyor!", /* 121 */
-  "{0} - pack complete!":"Bütün bölümler tamamlandı!",                 /* 122 */
+  "{0} - pack complete!":"{0} - paket tamamlandı!",                    /* 122 */
   "New mechanic: {0}":"Yeni mekanik: {0}",                          /* 123 */
   // - picker -
   "Levels · {0}/{1}":"Bölümler · {0}/{1}",                          /* 124 */
@@ -601,9 +618,10 @@ var CHAPTERS = (FLOWDATA && FLOWDATA.chapters && FLOWDATA.chapters.length) ? FLO
 /* ---------- chapters & entitlements ----------
    THE MENU: free gets the whole 250-level campaign (gated by progress: solve 2/3
    of a chapter to open the next), today's daily, and the first PACK_FREE levels
-   of every pack - with interstitials after a honeymoon. $2.99 (noads) silences
-   ads. $4.99 (full) = no ads + every pack + the Medley + the daily archive, and
-   as a bonus opens all chapters instantly. Store purchases flip these flags. */
+   of every pack (more batches unlock by watching an opt-in rewarded video). No
+   forced ads. Huemeld Pro ($2.99, "full") = every pack + the Medley + the daily
+   archive, and opens all chapters instantly. The retired Remove-Ads ("noads")
+   entitlement is still honoured for past buyers. Store purchases flip these flags. */
 /* The web build (GitHub Pages / PWA) is the FREE version: everything unlocked,
    no ads. Ads and purchases live only inside the native iOS/Android app, which
    is detected by the Capacitor runtime (native.js gates itself on the very same
@@ -633,7 +651,7 @@ function chapterOf(i){ var a=0; for(var c=0;c<CHAPTERS.length;c++){ a+=CHAPTERS[
 function chapterStart(c){ var a=0; for(var k=0;k<c;k++) a+=CHAPTERS[k].n; return a; }
 function chapterNeed(c){ return Math.ceil(CHAPTERS[c].n*2/3); }
 function solvedInChapter(c){
-  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+  var done=lsJSON("hm_flow2_done");
   var s=chapterStart(c), n=0;
   for(var i=s;i<s+CHAPTERS[c].n;i++) if(done[i]) n++;
   return n;
@@ -650,7 +668,8 @@ var board=document.getElementById("board"), canvas=document.getElementById("path
     lvNameEl=document.getElementById("lvName"), toastEl=document.getElementById("toast"),
     ovWin=document.getElementById("ovWin"), ovPick=document.getElementById("ovPick");
 
-var li=Math.min(+(localStorage.getItem("hm_flow2_i")||0), LEVELS.length-1);
+var winTid=0, dailyKey=null;   // pending "Solved!" card (shown ~1.25 s after the win)
+var li=Math.min(Math.max(0, +(localStorage.getItem("hm_flow2_i")||0) || 0), LEVELS.length-1);   // corrupt value -> 0, not NaN
 var N=5, ems=[], tgts=[], junctions=[], drag=null, solved=false, toastTid=0;
 var walls=[], wallSet={}, gates=[];
 var ices=[], iceSet={}, portals=[];      // pack mechanics: straight-through ice, paired warps
@@ -697,7 +716,7 @@ function dateAgo(n){ var d=new Date(); d.setDate(d.getDate()-n); return d; }
 function todayKey(){ return keyOf(new Date()); }
 /* consecutive solved days ending today (or yesterday, if today's not done yet) */
 function dailyStreak(){
-  var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
+  var dd=lsJSON("hm_flow2_daily");
   var d=new Date(), n=0;
   if(!dd[keyOf(d)]) d.setDate(d.getDate()-1);
   while(dd[keyOf(d)]){ n++; d.setDate(d.getDate()-1); }
@@ -721,19 +740,23 @@ function ensureAudio(){
   if(actx&&actx.state==="suspended") actx.resume();
   startMusic();   // first user gesture also unlocks + starts the background music
 }
-// on background, FADE the music down (don't hard-pause) so it never cuts out abruptly;
-// fade it back up on return. (On native iOS the webview may still suspend media while
-// backgrounded, but there's no jarring stop, and it eases back in on foreground.)
+/* audio holds: the page must stay silent while the app is not the active, visible
+   app (backgrounded, app switcher, Control Center/notification shade over it) or while
+   a full-screen video ad plays. A stray focus/pageshow event must not restart it then. */
+var audioHold={inactive:false, ad:false};
+function audioHeld(){ return document.hidden || audioHold.inactive || audioHold.ad; }
+window.__audioHold=function(k, on){ audioHold[k]=!!on; if(on) suspendAudio(); else resumeMusic(); };
 function resumeMusic(){
-  if(!musicOn || !musicStarted || demoing) return;
-  if(actx && actx.state==="suspended"){ try{ actx.resume(); }catch(e){} }
-  if(musicEl){ musicEl.volume=0; var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); fadeMusic(musicTargetVol(), 800); }
+  if(audioHeld()) return;
+  if(actx && actx.state==="suspended"){ try{ actx.resume(); }catch(e){} }   // SFX come back even with music off
+  if(!musicOn || !musicStarted || demoing || demoSoon) return;
+  if(musicEl){ setMusicLevel(0); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); fadeMusic(musicTargetVol(), 800); }
 }
 // leaving the app must actually PAUSE the audio, not just mute it - a muted <audio>
 // keeps playing (and holds the media session) in a native webview's background.
 function suspendAudio(){
   if(musicFade){ clearInterval(musicFade); musicFade=null; }
-  if(musicEl){ musicEl.volume=0; try{ musicEl.pause(); }catch(e){} }
+  if(musicEl){ setMusicLevel(0); try{ musicEl.pause(); }catch(e){} }
   if(actx && actx.state==="running"){ try{ actx.suspend(); }catch(e){} }
 }
 window.__resumeAudio=resumeMusic;   // native (Capacitor App resume) calls this too
@@ -747,6 +770,10 @@ document.addEventListener("visibilitychange", function(){
 window.addEventListener("pagehide", suspendAudio);
 window.addEventListener("pageshow", resumeMusic);
 window.addEventListener("focus", resumeMusic);
+// in the native app a window blur means the app itself lost focus (app switcher,
+// Control Center, a notification pulled down, a phone call) -> go quiet until it's back.
+// (Web only pauses on a hidden tab: blurring a desktop browser window keeps the music.)
+window.addEventListener("blur", function(){ if(isNativeApp()) suspendAudio(); });
 function setVolume(v){   // sound-effects volume only (music has its own slider)
   volume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_vol",""+volume);
   if(master&&actx){ try{ master.gain.setTargetAtTime(volGain(volume), actx.currentTime, 0.015); }catch(e){ master.gain.value=volGain(volume); } }
@@ -764,26 +791,42 @@ var musicEl=null, musicOrder=[0,1,2], musicIdx=0, musicStarted=false;
 var musicFade=null;
 function musicTargetVol(){ return Math.max(0,Math.min(1, musicVolume*MUSIC_VOL)); }
 function setMusicVolume(v){ musicVolume=Math.max(0,Math.min(1,v)); localStorage.setItem("hm_flow2_musicvol",""+musicVolume); applyMusicVol(); }
-function applyMusicVol(){ if(musicFade){ clearInterval(musicFade); musicFade=null; } if(musicEl) musicEl.volume=musicTargetVol(); }
-function fadeMusic(to, ms){
-  if(!musicEl) return;
+/* iOS WebKit ignores HTMLMediaElement.volume (read-only, always 1), so there the
+   slider, the fades and the ceiling did nothing. Where volume is read-only, the
+   <audio> is routed through a Web Audio GainNode and ALL music levels go through it. */
+var musicGain=null, volReadOnly=null;
+function mediaVolumeReadOnly(){
+  if(volReadOnly===null){ try{ var a=document.createElement("audio"); a.volume=0.5; volReadOnly=Math.abs(a.volume-0.5)>0.01; }catch(e){ volReadOnly=false; } }
+  return volReadOnly;
+}
+function getMusicLevel(){ return musicGain ? musicGain.gain.value : (musicEl ? musicEl.volume : 0); }
+function setMusicLevel(v){ v=Math.max(0,Math.min(1,v));
+  if(musicGain){ try{ musicGain.gain.cancelScheduledValues(0); }catch(e){} musicGain.gain.value=v; }
+  else if(musicEl) musicEl.volume=v; }
+function applyMusicVol(){ if(musicFade){ clearInterval(musicFade); musicFade=null; } if(musicEl) setMusicLevel(musicTargetVol()); }
+function fadeMusic(to, ms, done){
+  if(!musicEl){ if(done) done(); return; }
   if(musicFade){ clearInterval(musicFade); musicFade=null; }
-  var from=musicEl.volume, t0=nowMs(), dur=ms||500;
+  var from=getMusicLevel(), t0=nowMs(), dur=ms||500;
   musicFade=setInterval(function(){
     var k=dur>0 ? Math.min(1,(nowMs()-t0)/dur) : 1;
-    musicEl.volume=Math.max(0,Math.min(1, from+(to-from)*k));
-    if(k>=1){ clearInterval(musicFade); musicFade=null; }
+    setMusicLevel(from+(to-from)*k);
+    if(k>=1){ clearInterval(musicFade); musicFade=null; if(done) done(); }
   }, 40);
 }
 function ensureMusic(){
   if(musicEl) return;
   musicEl=document.createElement("audio"); musicEl.preload="none"; musicEl.setAttribute("aria-hidden","true"); musicEl.style.display="none";
   document.body.appendChild(musicEl);
+  if(actx && mediaVolumeReadOnly()){ try{   // iOS: level control via Web Audio (see above)
+    var src=actx.createMediaElementSource(musicEl); musicGain=actx.createGain(); musicGain.gain.value=0;
+    src.connect(musicGain); musicGain.connect(actx.destination);
+  }catch(e){ musicGain=null; } }
   musicEl.addEventListener("ended", function(){ musicIdx=(musicIdx+1)%MUSIC_TRACKS.length; musicPlayCurrent(); });
   for(var i=musicOrder.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=musicOrder[i]; musicOrder[i]=musicOrder[j]; musicOrder[j]=t; }  // shuffle the order
 }
 function musicPlayCurrent(){ if(!musicEl) return; musicEl.src=MUSIC_TRACKS[musicOrder[musicIdx]]; applyMusicVol(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); }
-function startMusic(){ if(!musicOn || demoing || demoSoon) return;   // no music during tutorials
+function startMusic(){ if(!musicOn || demoing || demoSoon || audioHeld()) return;   // no music during tutorials
   ensureMusic(); if(!musicStarted){ musicStarted=true; musicPlayCurrent(); } else { var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } }
 function stopMusic(){ if(musicEl) musicEl.pause(); }
 /* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
@@ -869,7 +912,7 @@ function applyLevel(L){
 function relabel(){
   if(!lvNameEl) return;
   if(mode==="pack" && PACKS[curPack]) lvNameEl.textContent=T(PACKS[curPack].name)+" · "+(packIdx+1)+"/"+PACKS[curPack].levels.length;
-  else if(mode==="daily" && DAILY.length){ var d=dateAgo(dailyOff), mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]; lvNameEl.textContent=T("Daily")+" · "+mo+" "+d.getDate(); }
+  else if(mode==="daily" && DAILY.length){ var d=dateAgo(dailyOff), mo=(LANG==="tr" ? ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"] : ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"])[d.getMonth()]; lvNameEl.textContent=T("Daily")+" · "+(LANG==="tr" ? d.getDate()+" "+mo : mo+" "+d.getDate()); }
   else { var ch=chapterOf(li); lvNameEl.textContent=T("Level")+" "+(li+1)+(CHAPTERS.length>1 ? " · "+T(CHAPTERS[ch].name) : ""); }
 }
 function loadLevel(i){
@@ -877,6 +920,7 @@ function loadLevel(i){
   var ch=chapterOf(want);
   if(!chapterUnlocked(ch)){
     var prev=CHAPTERS[ch-1];
+    ovWin.classList.remove("show");   // e.g. "Next" from the win card: drop the card so the message shows
     toast(Tf("{0} is locked - solve {1} more in {2} to unlock", T(CHAPTERS[ch].name), (chapterNeed(ch-1)-solvedInChapter(ch-1)), T(prev.name)));
     return;
   }
@@ -903,6 +947,7 @@ var dailyOff=0;   // 0 = today; >0 = archive, N days ago (full-game perk)
 function loadDaily(off){
   isTut=false; mode="daily"; dailyOff=off||0;
   var d=dateAgo(dailyOff);
+  dailyKey=keyOf(d);   // credit THIS puzzle's day even if it's solved after midnight
   var L = DAILY.length ? DAILY[dailyIndexFor(d)] : LEVELS[li];
   relabel();
   document.getElementById("btnPrev").style.visibility="hidden";
@@ -949,7 +994,7 @@ function demoFinish(){ stopDemo(); if(ovDemoEnd) ovDemoEnd.classList.add("show")
 function playDemoOn(demo, caps, marks){   // the board is already loaded; the ghost replays `demo`
   if(!demo || demoing) return false;                        // `marks`["gi:ci"]={cap,hold}: pause on a
   demoing=true;                                             // specific cell to change the caption
-  if(musicEl) fadeMusic(0, 400);   // no music over a tutorial
+  if(musicEl) fadeMusic(0, 400, function(){ if(demoing||demoSoon) try{ musicEl.pause(); }catch(e){} });   // no music over a tutorial (paused, not just quiet)
   ghostEl.style.display="block"; ghostEl.style.transition="left .27s linear, top .27s linear";
   demoskipEl.classList.add("show");
   marks=marks||{};
@@ -973,14 +1018,24 @@ function playDemoOn(demo, caps, marks){   // the board is already loaded; the gh
 function playDemo(){
   var demo=LEVELS[0] && LEVELS[0].demo;
   if(!demo || demoing) return false;
+  // hand the board back to wherever the player was (not campaign level 1), and keep
+  // their saved position: the demo borrows level 1 without overwriting it
+  var back = mode==="pack" ? {p:curPack,k:packIdx} : mode==="daily" ? {d:dailyOff} : {l:li};
+  var savedI=null; try{ savedI=localStorage.getItem("hm_flow2_i"); }catch(e){}
+  hideMenu();   // "Show me" can be launched from the main menu, which would hide the board
   loadLevel(0);
-  demoReturn=null;   // hand back to campaign level 1
+  try{ if(savedI!=null) localStorage.setItem("hm_flow2_i", savedI); }catch(e){}
+  demoReturn=function(){
+    if(back.p!=null) loadPackLevel(back.p, back.k);
+    else if(back.d!=null) loadDaily(back.d);
+    else loadLevel(back.l);
+  };
   // pause on the mix cell and the gate cell of level 1's baked solution
   var caps=[T("Drag a line out of a circle…"),T("Now bring in the other colour…"),T("Fill the board and light every square to win!")];
   var marks={ "1:7":  { cap:T("Where colours meet, they MIX - red + blue makes purple!"), hold:1700 },
       "1:10": { cap:T("A gate passes only its own colour. Purple flows right through."), hold:1900 },
       "1:18": { cap:T("Cover every cell and light each square to win!"), hold:1100 } };
-  demoReplay=function(){ loadLevel(0); playDemoOn(demo, caps, marks); };
+  demoReplay=function(){ loadLevel(0); try{ if(savedI!=null) localStorage.setItem("hm_flow2_i", savedI); }catch(e){} playDemoOn(demo, caps, marks); };
   return playDemoOn(demo, caps, marks);
 }
 function loadTutorial(){ if(!playDemo()) document.getElementById("ovHelp").classList.add("show"); }
@@ -1283,6 +1338,7 @@ board.addEventListener("pointerdown", function(e){
     if(isDbl){
       // double-tap resets the whole square (all rays), starts a fresh one so a double-tap-drag redraws
       while(E.legs.length){ destroyJunctionOf(E.legs[0]); E.legs.splice(0,1); }
+      reconcile();   // re-derive every square's done-state: one this square fed directly must pop out
       E.legs.push({cells:[[E.r,E.c]], jun:-1}); drag={t:"em", e:o.e, l:0};
       lastEmTap={e:-1, t:0};
     } else {
@@ -1567,28 +1623,28 @@ function checkWin(){
   if(demoing) return;   // the ghost demo celebrates but earns nothing - no progress, no overlay
   solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount);   // no forced ads - see monetization seams
   var wn=document.getElementById("btnWinNext");
-  document.querySelector("#ovWin h2").innerHTML="Solved! "+icn("spark",20);
+  document.querySelector("#ovWin h2").innerHTML=T("Solved!")+" "+icn("spark",20);
   var nextBtn = function(){ wn.innerHTML=T("Next")+" "+icn("arrowR",15); };
   var backBtn = function(){ wn.textContent=T("Back to levels"); };
   if(mode==="daily"){
-    var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}"); dd[keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
+    var dd=lsJSON("hm_flow2_daily"); dd[dailyKey||keyOf(dateAgo(dailyOff))]=1; localStorage.setItem("hm_flow2_daily", JSON.stringify(dd));
     var stk2=dailyStreak();
     var suf = stk2>1 ? " - "+Tf("{0}-day streak!", stk2) : (dailyOff?"":" - "+T("see you tomorrow!"));
     document.getElementById("winMsg").textContent=(dailyOff?T("Archive daily solved!"):T("Daily solved"))+suf;
     wn.style.display=""; backBtn();
   } else if(mode==="pack"){
     var pk=PACKS[curPack];
-    var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
+    var pd=lsJSON("hm_flow2_packdone");
     (pd[pk.id]=pd[pk.id]||{})[packIdx]=1; localStorage.setItem("hm_flow2_packdone", JSON.stringify(pd));
     var lastOne = packIdx+1>=pk.levels.length;
     var teaserEnd = !lastOne && !packLevelUnlocked(packIdx+1);
     var wm = T(pk.name)+" · "+(packIdx+1)+"/"+pk.levels.length;
     if(lastOne) wm = Tf("{0} - pack complete!", T(pk.name));
-    else if(teaserEnd) wm = Tf("{0} teaser done - {1} more levels in the full game!", T(pk.name), (pk.levels.length-PACK_FREE));
+    else if(teaserEnd) wm = Tf("{0} teaser done - {1} more levels in the full game!", T(pk.name), Math.max(0, pk.levels.length-PACK_FREE-adUnlocked(pk.id)));
     document.getElementById("winMsg").textContent = wm;
     wn.style.display=""; if(lastOne||teaserEnd) backBtn(); else nextBtn();
   } else {
-    var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}");
+    var done=lsJSON("hm_flow2_done");
     var newly=!done[li]; done[li]=1; localStorage.setItem("hm_flow2_done", JSON.stringify(done));
     var msg=T("Whole board covered.");
     var myCh=chapterOf(li);
@@ -1597,7 +1653,8 @@ function checkWin(){
     document.getElementById("winMsg").textContent = msg+(li+1<LEVELS.length ? "" : " "+T("That's the last level - more coming!"));
     wn.style.display = li+1<LEVELS.length ? "" : "none"; nextBtn();
   }
-  setTimeout(function(){ if(solved) ovWin.classList.add("show"); }, 1250);   // a reset in the window cancels it
+  if(winTid) clearTimeout(winTid);
+  winTid=setTimeout(function(){ winTid=0; if(solved && !ovMenu.classList.contains("show")) ovWin.classList.add("show"); }, 1250);   // a reset or Home in the window cancels it
 }
 
 /* ---------- render: marker-style SVG pipes with blend gradients ---------- */
@@ -1631,7 +1688,7 @@ function nowMs(){ return (window.performance&&performance.now)?performance.now()
    the junction bursts bigger and the colour names itself — teaching + rewarding the
    core "lines meet, colours mix" hook. Persisted, so it only celebrates once per colour. */
 var discovered=null, DISC_NAME={O:"Orange!",G:"Green!",P:"Purple!",N:"Brown!"};
-function discoveredSet(){ if(!discovered){ try{ discovered=JSON.parse(localStorage.getItem("hm_flow2_discovered")||"{}"); }catch(e){ discovered={}; } } return discovered; }
+function discoveredSet(){ if(!discovered){ try{ discovered=lsJSON("hm_flow2_discovered"); }catch(e){ discovered={}; } } return discovered; }
 function discover(col,r,c){
   if(demoing || "OGPN".indexOf(col)<0) return;      // only the mixed colours, and not during the ghost demo
   var D=discoveredSet(); if(D[col]) return;
@@ -2074,7 +2131,7 @@ function levelMechs(L){
   if(L.counts && L.counts.length) m.push("tally");
   return m;
 }
-function mechSeen(){ try{ return JSON.parse(localStorage.getItem("hm_flow2_mech")||"{}"); }catch(_e){ return {}; } }
+function mechSeen(){ try{ return lsJSON("hm_flow2_mech"); }catch(_e){ return {}; } }
 function markMechSeen(k){ var o=mechSeen(); o[k]=1; localStorage.setItem("hm_flow2_mech", JSON.stringify(o)); }
 var mechQueue=[], mechCur=null, mechRewatch=false, ovMech=null;
 function showMechCard(k, rewatch){
@@ -2168,10 +2225,10 @@ function packIcon(id,sz){
    per pack; tapping a card opens that set's level grid with a back button. */
 var pickView=null;   // null = hub; {ch:c} = a chapter's grid; {pk:pi} = a pack's grid; {arch:1} = daily archive
 function renderPicker(){
-  var done=JSON.parse(localStorage.getItem("hm_flow2_done")||"{}"), nd=0;
+  var done=lsJSON("hm_flow2_done"), nd=0;
   for(var i0=0;i0<LEVELS.length;i0++) if(done[i0]) nd++;
-  var dd=JSON.parse(localStorage.getItem("hm_flow2_daily")||"{}");
-  var pd=JSON.parse(localStorage.getItem("hm_flow2_packdone")||"{}");
+  var dd=lsJSON("hm_flow2_daily");
+  var pd=lsJSON("hm_flow2_packdone");
   var root=!pickView, h="";
   var pg=document.getElementById("pkgrid"), pa=document.getElementById("packsArea");
   // hub-only rows
@@ -2181,7 +2238,7 @@ function renderPicker(){
   document.getElementById("btnHow").style.display = root ? "" : "none";
   var ab=document.getElementById("btnArch");
   ab.style.display = root ? "" : "none";
-  ab.innerHTML = icn("cal",17)+" Daily Archive" + (entFull() ? "" : "  "+icn("lock",15));
+  ab.innerHTML = icn("cal",17)+" "+T("Daily Archive") + (entFull() ? "" : "  "+icn("lock",15));
   document.getElementById("archArea").style.display = (pickView && pickView.arch) ? "" : "none";
   // continue: the first unsolved level in an UNLOCKED chapter
   var cont=-1; for(var c2=0;c2<LEVELS.length;c2++){ if(!done[c2] && chapterUnlocked(chapterOf(c2))){ cont=c2; break; } }
@@ -2269,7 +2326,8 @@ document.getElementById("btnPick").addEventListener("click", function(){ ensureA
 document.getElementById("btnPickClose").addEventListener("click", function(){ ovPick.classList.remove("show"); });
 /* ---------- main menu: home screen at boot, the home button brings it back ---------- */
 var ovMenu=document.getElementById("ovMenu"), firstRun=false;
-function showMenu(){ hideToast(); ovWin.classList.remove("show"); ovPick.classList.remove("show"); ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
+function showMenu(){ hideToast(); if(winTid){ clearTimeout(winTid); winTid=0; } if(demoing) stopDemo(); if(ovDemoEnd) ovDemoEnd.classList.remove("show");
+  ovWin.classList.remove("show"); ovPick.classList.remove("show"); ovMenu.classList.add("show"); document.body.classList.add("menuopen"); updateProEntry(); }
 function hideMenu(){ ovMenu.classList.remove("show"); document.body.classList.remove("menuopen"); }
 document.body.classList.add("menuopen");   // the menu is up when the page opens
 updateProEntry();                           // show the Go Pro entry at boot (native app, non-owners)
@@ -2344,7 +2402,7 @@ document.getElementById("btnArch").addEventListener("click", function(){ ensureA
   if(entFull()){ pickView={arch:1}; renderPicker(); }
   else showUpsell("pro");
 });
-/* ---------- the two-tier upsell: Pro $4.99 + Remove Ads $2.99, headline per context ---------- */
+/* ---------- the upsell: Huemeld Pro, plus "watch a video to unlock a batch" on a locked pack level ---------- */
 function updateProEntry(){
   var b=document.getElementById("btnMenuPro");
   if(b) b.style.display = (!entFull() && nativeBridge()) ? "" : "none";
@@ -2386,12 +2444,13 @@ document.getElementById("btnUpNoAds").addEventListener("click", function(){
   var nb=nativeBridge();
   if(!nb || !nb.rewarded){ toast(T("Available in the app")); return; }
   toast(T("Loading a video…"));
-  nb.rewarded(function(ok){
+  nb.rewarded(function(ok, why){
     if(ok){ grantAdUnlock(PACKS[u.pi].id); pendingUnlock=null; ovUp.classList.remove("show");
       try{ renderPicker(); }catch(e){}
       toast(Tf("{0} more levels unlocked!", UNLOCK_BATCH));
       loadPackLevel(u.pi, u.k);
-    } else toast(T("Not unlocked - the video didn't finish"));
+    } else if(why==="unavailable") toast(T("No video available right now - try again in a moment"));
+    else if(why!=="busy") toast(T("Not unlocked - the video didn't finish"));
   });
 });
 document.getElementById("btnUpClose").addEventListener("click", function(){ ovUp.classList.remove("show"); });
@@ -2430,11 +2489,11 @@ document.getElementById("btnWinNext").addEventListener("click", function(){ ensu
   }
   else loadLevel(li+1); });
 
-document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(undoStack.length) restoreState(undoStack.pop()); });
+document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(demoing) return; if(undoStack.length) restoreState(undoStack.pop()); });
 
 /* ---------- monetization seams ----------
    Real ads/IAP live in the native (Capacitor) wrapper, which injects
-   window.HuemeldNative = { interstitial(), buyRemoveAds(cb), buyFull(cb) }.
+   window.HuemeldNative = { rewarded(cb), buyFull(cb), restore(cb), privacyChoices(cb) }.
    On the plain web build there is no bridge, so everything degrades gracefully
    (no ads shown). See PUBLISHING.md. */
 function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNative) ? window.HuemeldNative : null; }
@@ -2483,7 +2542,10 @@ document.getElementById("btnHint").addEventListener("click", function(){
   var nb=nativeBridge();
   if(entNoAds() || !nb || !nb.rewarded){ grantHint(); return; }   // paid players + web: free hints
   toast(T("Loading a video for your hint…"));
-  nb.rewarded(function(ok){ if(ok) grantHint(); else toast(T("No hint yet - the video didn't finish")); });
+  nb.rewarded(function(ok, why){
+    if(ok) grantHint();
+    else if(why==="unavailable") toast(T("No video available right now - try again in a moment"));
+    else if(why!=="busy") toast(T("No hint yet - the video didn't finish")); });
 });
 
 /* ---------- settings ---------- */
@@ -2492,21 +2554,35 @@ var ovSet=document.getElementById("ovSet");
   // "Remove Ads" is retired (there are no forced ads to remove): never offered for sale,
   // but existing owners keep their entitlement (entNoAds -> everything unlocked, no prompts).
   if(rm) rm.style.display="none";
-  function applyEnt(e){   // the bridge reports entitlements -> flip flags + refresh UI
-    if(e && e.noads) localStorage.setItem("hm_flow2_ent_noads","1");
-    if(e && e.full) localStorage.setItem("hm_flow2_ent_full","1");
+  /* the bridge reports entitlements -> flip flags + refresh UI. authoritative=true means
+     e is RevenueCat's real CustomerInfo (launch, restore, live updates): then flags are
+     also CLEARED, so a refunded purchase is revoked. Without it (the optimistic call
+     right after a successful buy) flags are only ever set. */
+  function applyEnt(e, authoritative){
+    if(!e) return;
+    try{
+      if(e.noads) localStorage.setItem("hm_flow2_ent_noads","1");
+      else if(authoritative) localStorage.removeItem("hm_flow2_ent_noads");
+      if(e.full) localStorage.setItem("hm_flow2_ent_full","1");
+      else if(authoritative) localStorage.removeItem("hm_flow2_ent_full");
+    }catch(_e){}
     fl.style.display = (n && n.buyFull && !entFull()) ? "" : "none";
+    updateProEntry(); refreshProLabels();
     try{ renderPicker(); }catch(_e){}
   }
   window.__applyEnt=applyEnt;   // native bootstrap calls this on launch + after purchases
   if(n && n.buyFull && !entFull()) fl.style.display="";
   if(n && n.restore) rs.style.display="";
+  var pv=document.getElementById("btnPrivacy");
+  if(n && n.privacyChoices) pv.style.display="";
+  pv.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.privacyChoices) return;
+    nb.privacyChoices(function(shown){ if(!shown) toast(T("Privacy choices aren't needed in your region")); }); });
   rm.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyRemoveAds){ toast(T("Available in the app")); return; }
     nb.buyRemoveAds(function(ok){ if(ok){ applyEnt({noads:1}); toast(T("Ads removed - thank you!")); } else toast(T("Purchase not completed")); }); });
   fl.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.buyFull){ toast(T("Available in the app")); return; }
     nb.buyFull(function(ok){ if(ok){ applyEnt({full:1}); toast(T("✦ Huemeld Pro unlocked - thank you!")); } else toast(T("Purchase not completed")); }); });
   rs.addEventListener("click", function(){ var nb=nativeBridge(); if(!nb||!nb.restore){ toast(T("Available in the app")); return; }
-    nb.restore(function(e){ applyEnt(e); toast(e && (e.noads||e.full) ? "Purchases restored!" : "No purchases to restore"); }); });
+    nb.restore(function(e){ if(e) applyEnt(e, true); toast(e && (e.noads||e.full) ? T("Purchases restored!") : T("No purchases to restore")); }); });
 })();
 function syncToggles(){ document.getElementById("tglSound").setAttribute("aria-pressed",soundOn?"true":"false");
   var tm=document.getElementById("tglMusic"); if(tm) tm.setAttribute("aria-pressed",musicOn?"true":"false");
