@@ -67,7 +67,7 @@ In Android Studio:
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, music + haptics work.
   - [ ] Solve levels → **no ad ever appears on its own** (there are no interstitials).
-  - [ ] Add your phone under AdMob → Settings → **Test devices** first (its ID is printed in Logcat when an ad loads), so the real ad units serve test ads to you.
+  - [ ] Add your phone under AdMob → Settings → **Test devices** first (platform Android, its **advertising ID** from phone Settings → Google → Ads / Privacy → Ads), so the real ad units serve test ads to you — look for the "Test Ad" label before tapping. (The ID Logcat prints is a hashed one for code, not for the website.)
   - [ ] **Hint** → rewarded test video → ghost pipe.
   - [ ] Settings shows **Huemeld Pro** (localized price), **Restore Purchases** and **Privacy choices**; buy Pro (license tester) → everything unlocks; after a reinstall, **Restore** brings it back.
   - [ ] Past the 5-level teaser in a pack → **Watch to unlock 8 levels** → the batch opens.

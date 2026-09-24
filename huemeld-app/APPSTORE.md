@@ -37,8 +37,16 @@ Consequences for store setup:
 - [ ] AdMob → Apps → **Add app** → iOS → "Huemeld" (say "not yet listed" — you can link the store listing after launch).
 - [ ] Copy the **App ID** — looks like `ca-app-pub-1234567890123456~0987654321` (note the `~`). You'll paste it into Info.plist in step 6.
 - [x] Inside the app → **Ad units → Add ad unit → Rewarded**, name it "hint-reveal". Its unit ID is already in `IOS_REWARDED_ID` (`native.js`) — it powers both the hint video and the "unlock 8 levels" video. (No Interstitial unit needed.)
-- [ ] **Privacy & messaging → GDPR → Create message** → select the Huemeld iOS app, language English (+ Turkish), leave the default options → **Publish**. The app shows this Google consent form to players in the EEA/UK/Switzerland before any ad loads (`native.js` → `gatherConsent`), and Settings → **Privacy choices** reopens it. Without a published message the form can't appear and ads in Europe are limited.
-- [ ] **Settings → Test devices → Add test device** → your iPhone. Its advertising ID is printed in the Xcode console the first time an ad loads ("To get test ads on this device, set: …"). Test devices always get test ads, even though `USE_TEST_ADS = false` and the real unit IDs ship — **never tap real ads on an unregistered device** (AdMob can flag invalid traffic).
+- [ ] **Privacy & messaging → European regulations** (older accounts: "GDPR") → **Create message**: apps = Huemeld (iOS); languages = English + Turkish; privacy policy URL (if asked) = `https://izgebayyurt.github.io/huemeld/privacy.html`; keep the default consent options, ad partners ("Commonly used") and targeting (EEA, UK, Switzerland) → **Publish** (not just Save). The app shows this Google consent form to players there before any ad loads (`native.js` → `gatherConsent`), and Settings → **Privacy choices** reopens it. Without a published message the form can't appear and ads in Europe are limited.
+  - **Skip the "IDFA explainer" message** if offered — the app already shows Apple's tracking prompt itself; the explainer would add a second screen.
+  - Check it: VPN set to an EU country → delete + reinstall → play until an ad would load → Google's form appears first.
+- [ ] **Register your iPhone as a test device** (AdMob matches it by its advertising ID, IDFA, which iOS only reveals when tracking is allowed):
+  1. iPhone → Settings → Privacy & Security → **Tracking** → turn on **Allow Apps to Request to Track**; in Huemeld tap **Allow** on the tracking prompt (or allow it on that Tracking screen).
+  2. Read the IDFA with a free helper app, e.g. **"My Device ID by AppsFlyer"** (allow tracking in it too). It must not be all zeros.
+  3. AdMob → **Settings** (gear) → **Test devices** → **Add test device**: any name, platform **iOS**, paste the IDFA, optional gesture "Shake" (opens Google's ad inspector) → Save.
+  4. After a few minutes, videos on the phone carry a **"Test Ad"** label. **Only tap ads that show it** — the real unit IDs ship (`USE_TEST_ADS = false`) and tapping real ads on your own phone can get the AdMob account flagged for invalid traffic.
+  - Turning tracking off for Huemeld, or resetting the advertising ID, un-registers the phone (re-add the new ID).
+  - (The ID the Xcode console prints — "To get test ads on this device, set: …" — is a hashed ID for code, **not** the one the AdMob website wants.)
 
 ## 3. RevenueCat (10 minutes)
 
