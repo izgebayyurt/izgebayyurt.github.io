@@ -346,11 +346,10 @@ h1{ font-size:30px; line-height:1; }
 </div>
 
 <script src="engine.js?v=5"></script>
-<script src="levels.js"></script>
 <script>
 (function(){
   "use strict";
-  var HM=window.HM, LEVELS=window.HUEMELD_LEVELS||[];
+  var HM=window.HM, LEVELS=[];   // filled by genRecipeLevels() below
 
   /* iOS Safari ignores user-scalable=no — block pinch (gesture events + multi-touch moves) and double-tap zoom */
   document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
@@ -365,7 +364,7 @@ h1{ font-size:30px; line-height:1; }
   /* Liquid Tubes preview — a flagged test level (goal:"tubes"): three vertical
      tubes (O/G/P) fill as you cash combos of that colour, and a big combo pours
      FAR more than small ones (triangular). Fill all three to win. Appended here
-     so it needs no levels.js rebuild and can't disturb the shipped levels. */
+     so it can't disturb the generated levels. */
   var TUBE_TEST={ id:"T", test:true, name:"Liquid Tubes (preview)",
     shape:["#######","#######","#######","#######","#######","#######","#######"],
     spawn:{ R:4, Y:4, B:4 }, moves:18, goal:"tubes", objectives:[],
@@ -1194,7 +1193,6 @@ h1{ font-size:30px; line-height:1; }
   aid=lsGet("hm_aid")==="1"; muted=lsGet("hm_mute")==="1";
   document.getElementById("btnAid").setAttribute("aria-pressed",aid?"true":"false");
   var sb=document.getElementById("btnSound"); sb.setAttribute("aria-pressed",muted?"false":"true"); sb.style.opacity=muted?"0.45":"1";
-  if(!LEVELS.length){ document.getElementById("levelGrid").innerHTML='<p style="grid-column:1/-1;color:var(--ink-soft)">No levels found — run tools/feeltest.mjs to generate levels.js.</p>'; }
   showLevels();
 })();
 </script>

@@ -940,7 +940,9 @@ function loadLevel(i){
     var forkCol=null; for(var pc in need) if(need[pc]>1) forkCol=pc;
     var fe=null; ems.forEach(function(E){ if(E.col===forkCol) fe=E; });
     toast(T("New: one circle can FORK - draw a second line from it!"));
-    if(fe){ var k=0, iv=setInterval(function(){ if(li>=0) bounceDot(fe.r,fe.c); if(++k>=5) clearInterval(iv); }, 850); }
+    // bounce the forking circle a few times - only while this same level is still on screen
+    if(fe){ var k=0, lvl=curLevelObj, iv=setInterval(function(){
+      if(curLevelObj!==lvl || ++k>5){ clearInterval(iv); return; } bounceDot(fe.r,fe.c); }, 850); }
   }
 }
 var dailyOff=0;   // 0 = today; >0 = archive, N days ago (full-game perk)
@@ -2092,8 +2094,15 @@ function renderPaths(){
   tgts.forEach(function(T2){ dots.forEach(function(d){ if(+d.dataset.dr===T2.r && +d.dataset.dc===T2.c) d.classList.toggle("donept", T2.done); }); });
 }
 window.addEventListener("resize", function(){ renderDots(); renderPaths(); });
-/* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti */
-function frame(){ animT=nowMs()-animStart; renderPaths();
+/* continuous render loop drives the living-paint gloss, blooms, sweeps, shimmer and confetti.
+   It idles (no redraw) while an opaque screen covers the board - the main menu, or the
+   near-opaque full-screen Settings / Pro panels - so the menu doesn't burn battery. */
+var ovSetEl=document.getElementById("ovSet"), ovUpEl=document.getElementById("ovUp");
+function boardHidden(){
+  return document.body.classList.contains("menuopen") || ovSetEl.classList.contains("show") || ovUpEl.classList.contains("show");
+}
+function frame(){ animT=nowMs()-animStart;
+  if(!boardHidden()) renderPaths();
   if(shakeAmp>0){ var st=nowMs()-shakeT0, e=st/shakeDur;
     if(e>=1){ shakeAmp=0; board.style.transform=""; }
     else { var k=(1-e)*(1-e), dx=Math.sin(st*0.061)*shakeAmp*k, dy=Math.cos(st*0.049)*shakeAmp*k; board.style.transform="translate("+dx.toFixed(2)+"px,"+dy.toFixed(2)+"px)"; }

@@ -40,8 +40,6 @@ node huemeld/tools/flow-app.mjs   # writes flow-data.js (campaign + daily + pack
   runs for specs that ask for it via `tactical`/`measure`). One R/Y/B square each; secondary circles (O/G/P) as
   objectives.
 - `tools/flow-app.mjs` — the campaign ramp + daily pool.
-- `tools/flow-gen.mjs` / `flow-build.mjs` — the earlier multi-emitter snake generator
-  (kept for reference).
 
 To add difficulty or more levels, edit the `CAMPAIGN` / `DAILY` ramps in
 `flow-app.mjs` and rerun. The **Daily Puzzle** is deterministic by UTC date and
