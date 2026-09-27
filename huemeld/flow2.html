@@ -683,13 +683,13 @@ var undoStack=[], preGesture=null, UNDO_CAP=60;
 function snapState(){ return JSON.stringify({
   ems:ems.map(function(E){ return E.legs.map(function(l){ return {c:l.cells.map(function(x){return [x[0],x[1]];}), j:l.jun}; }); }),
   tg:tgts.map(function(t){ return t.done; }),
-  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun), tr:J.triple?1:0}; })
+  jn:junctions.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), ju:(J.jun==null?-1:J.jun), tr:J.triple?1:0, hc:J.hit||null}; })
 }); }
 function restoreState(str){ var s=JSON.parse(str);
   s.ems.forEach(function(legs,i){ if(ems[i]) ems[i].legs=legs.map(function(l){ return {cells:l.c.map(function(x){return [x[0],x[1]];}), jun:l.j}; }); });
   s.tg.forEach(function(d,i){ if(tgts[i]) tgts[i].done=d; });
-  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju), triple:!!J.tr}; });
-  drag=null; renderPaths(); updateUndoUI();
+  junctions=s.jn.map(function(J){ return {cell:[J.cell[0],J.cell[1]], sec:J.sec, leg:J.leg.map(function(x){return [x[0],x[1]];}), jun:(J.ju==null?-1:J.ju), triple:!!J.tr, hit:J.hc||null}; });
+  drag=null; preGesture=null; renderPaths(); updateUndoUI();
 }
 function pushUndo(){ if(preGesture!=null && preGesture!==snapState()){ undoStack.push(preGesture); if(undoStack.length>UNDO_CAP) undoStack.shift(); } preGesture=null; updateUndoUI(); }
 function updateUndoUI(){ var b=document.getElementById("btnUndo"); if(b) b.disabled = solved || !undoStack.length; }
@@ -1054,6 +1054,7 @@ function tgtAt(r,c){ for(var i=0;i<tgts.length;i++) if(tgts[i].r===r && tgts[i].
 /* the colour of the pipe passing through a cell (feeder = its emitter's primary;
    blend leg = the junction's secondary), or null if unpainted. Used by colour gates. */
 function colorAt(r,c){
+  for(var j0=0;j0<junctions.length;j0++){ var J0=junctions[j0]; if(J0.cell && J0.cell[0]===r && J0.cell[1]===c) return J0.sec; }   // a mixing cell wears its OUTPUT (chain cells: the deeper mix)
   for(var j=0;j<junctions.length;j++){ if(indexIn(junctions[j].leg,r,c)>=0) return junctions[j].sec; }
   for(var e=0;e<ems.length;e++){ for(var l=0;l<ems[e].legs.length;l++){ if(indexIn(ems[e].legs[l].cells,r,c)>=0) return ems[e].col; } }
   return null;
@@ -1171,32 +1172,66 @@ function occAt(r,c){
   for(var t2=0;t2<tgts.length;t2++){ if(tgts[t2].r===r && tgts[t2].c===c) return {t:"tgt", i:t2}; }
   return null;
 }
-function dropJunction(j){
+/* the feeders of junction j: emitter legs ({leg, col}) and child junctions ({jn, col:sec}) */
+function feedersOf(j){
+  var out=[];
+  ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) out.push({leg:Lg, col:E.col}); }); });
+  junctions.forEach(function(K,ki){ if(ki!==j && K.jun===j) out.push({jn:K, col:K.sec}); });
+  return out;
+}
+/* a junction's output follows its CURRENT feeders (three primaries -> brown; two inputs -> their mix) */
+function refreshSec(j){
   var J=junctions[j]; if(!J) return;
-  if(J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<j) j--; J=junctions[j]; if(!J) return; }   // a chained child can't outlive its feeder
+  var fs=feedersOf(j);
+  if(fs.length>=3){ J.sec="N"; J.triple=true; }
+  else if(fs.length===2){ var m=mixOf(fs[0].col, fs[1].col); if(m){ J.sec=m; J.triple=false; } }
+}
+/* has this junction's blend reached its own circle? */
+function junDelivered(J){ var h=J.leg[J.leg.length-1], T=tgtAt(h[0],h[1]); return !!(T && T.col===J.sec); }
+/* Junction j is coming apart: if its blend leg was carved out of the line it HIT when the
+   mix formed (J.hit = that line's colour; null after a tip merge, where the blend was drawn
+   fresh), give those cells back to that line - unless it's the one being pulled (`exclude`).
+   The line then ends where the blend ended: if the blend fed a deeper mix, so does the line
+   again, and that mix re-derives its colour (brown back to purple, etc.). */
+function handBackTail(j, exclude){
+  var J=junctions[j]; if(!J || !J.hit) return null;
+  var tail=(J.leg && J.leg.length>1) ? J.leg.slice(1).map(function(c){ return c.slice(); }) : [];
+  var fs=feedersOf(j), owner=null;
+  fs.forEach(function(f){
+    if(f.col!==J.hit || f.leg===exclude || f.jn===exclude) return;
+    var cl=f.leg ? f.leg.cells : f.jn.leg, h=cl[cl.length-1];
+    if(h && same(h, J.cell)) owner=f;   // only a line still ending ON the cell can take the tail (keeps paths contiguous)
+  });
+  if(!owner) return null;
+  var parent=(J.jun!=null && J.jun>=0) ? J.jun : -1;
+  if(owner.leg){ owner.leg.cells=owner.leg.cells.concat(tail); owner.leg.jun=parent; }
+  else { owner.jn.leg=owner.jn.leg.concat(tail); owner.jn.jun=parent; }
+  J.jun=-1;   // the parent is fed by the owner now, not by this (dying) junction
+  if(parent>=0) refreshSec(parent);
+  return owner;
+}
+function dropJunction(j, exclude){
+  var J=junctions[j]; if(!J) return;
+  var owner=handBackTail(j, exclude);   // may re-point J.jun to -1 (parent kept alive through the owner)
+  if(!owner && J.jun!=null && J.jun>=0){ var ch=J.jun; J.jun=-1; dropJunction(ch); if(ch<j) j--; J=junctions[j]; if(!J) return; }   // a chained child can't outlive its feeder
   ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j) Lg.jun=-1; else if(Lg.jun>j) Lg.jun--; }); });
   junctions.forEach(function(K,ki){ if(ki===j) return; if(K.jun===j) K.jun=-1; else if(K.jun!=null && K.jun>j) K.jun--; });
-  var t=tgtFor(J.sec); if(t) t.done=false;
   junctions.splice(j,1);
 }
-function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun); }
-/* Pull ONE feeder out of its junction WITHOUT wrecking the other. The blend leg
-   was the surviving feeder's own tail before the mix, so hand it back: the other
-   line is restored whole (e.g. retreat the red you mixed in, the blue is untouched).
-   Detaches both feeders and collapses the blend so the next reconcile() drops the
-   now-orphaned junction cleanly. No-op across a chained blend (too fragile). */
-function separateFeeder(feederLeg){
+function destroyJunctionOf(leg){ if(leg && leg.jun>=0) dropJunction(leg.jun, leg); }
+/* Pull ONE feeder out of its junction WITHOUT wrecking the others.
+   - a TRIPLE (three primaries -> brown) just loses that colour: the other two keep
+     their own mix (R+Y stay orange) and the blend leg stays theirs.
+   - otherwise the blend is handed back to the line it was carved from (handBackTail),
+     both feeders are detached and the junction collapses; the caller reconciles. */
+function detachFeeder(feederLeg){
   if(!feederLeg || feederLeg.jun<0) return;
   var ji=feederLeg.jun, J=junctions[ji]; if(!J) return;
-  if(J.jun!=null && J.jun>=0){ destroyJunctionOf(feederLeg); return; }   // feeds a deeper mix downstream
-  var survivorEm=null, survivorJn=null;
-  ems.forEach(function(E){ E.legs.forEach(function(lg){ if(lg!==feederLeg && lg.jun===ji) survivorEm=lg; }); });
-  if(!survivorEm) junctions.forEach(function(K){ if(K!==J && K.jun===ji) survivorJn=K; });
-  var tail=(J.leg && J.leg.length>1) ? J.leg.slice(1).map(function(c){ return c.slice(); }) : [];
-  if(survivorEm){ survivorEm.cells=survivorEm.cells.concat(tail); survivorEm.jun=-1; }
-  else if(survivorJn){ survivorJn.leg=survivorJn.leg.concat(tail); survivorJn.jun=-1; }
+  if(J.triple){ feederLeg.jun=-1; refreshSec(ji); return; }
+  handBackTail(ji, feederLeg);
+  feedersOf(ji).forEach(function(f){ if(f.leg) f.leg.jun=-1; else f.jn.jun=-1; });
   feederLeg.jun=-1;
-  J.leg=[J.cell.slice()];   // 0 feeders now end on the junction cell -> reconcile() removes it
+  J.jun=-1; J.leg=[J.cell.slice()];   // 0 feeders now end on the junction cell -> reconcile() removes it
 }
 /* re-grabbing a junction/blend severs any chained child it was feeding; returns the (possibly shifted) index */
 function dropChildOf(ji){ var J=junctions[ji];
@@ -1245,7 +1280,13 @@ function reconcile(){
       // normal junctions have exactly 2 feeders; a TRIPLE (three primaries -> brown at one
       // point) has 3. Losing any feeder from a triple dissolves it (2 primaries aren't brown).
       var need = J.triple ? 3 : 2;
-      var ok = feeders.length===need && feeders.every(function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); });
+      var onCell=function(cl){ var h=cl[cl.length-1]; return h && same(h,J.cell); };
+      var ok = feeders.length===need && feeders.every(onCell);
+      if(!ok && J.triple && feeders.length===3 && feeders.filter(onCell).length===2){
+        // one colour dragged out of a brown triple: the other two keep their own mix
+        ems.forEach(function(E){ E.legs.forEach(function(Lg){ if(Lg.jun===j && !onCell(Lg.cells)) Lg.jun=-1; }); });
+        J.triple=false; refreshSec(j); ok=true;
+      }
       if(!ok){ dropJunction(j); stable=false; break; }
     }
   }
@@ -1326,13 +1367,13 @@ board.addEventListener("pointerdown", function(e){
   else if(o.t==="jun"){
     var ji=dropChildOf(o.i);
     var J=junctions[ji]; J.leg=[J.cell.slice()];
-    var tj=tgtFor(J.sec); if(tj) tj.done=false;
     drag={t:"jun", i:ji};
+    reconcileAndFixDrag();   // re-derive circles (the blend no longer delivers) + retract a prism's rays
   } else if(o.t==="jleg"){
     var ji2=dropChildOf(o.i);
     var J2=junctions[ji2]; J2.leg=J2.leg.slice(0, retreatCut(J2.leg, o.idx));
-    var tj2=tgtFor(J2.sec); if(tj2) tj2.done=false;
     drag={t:"jun", i:ji2};
+    reconcileAndFixDrag();   // tapping the delivered tip leaves it delivered until it's actually pulled back
   } else if(o.t==="emdot"){
     var E=ems[o.e];
     var now=Date.now(), isDbl=(lastEmTap.e===o.e && now-lastEmTap.t<DBL_MS);
@@ -1356,7 +1397,7 @@ board.addEventListener("pointerdown", function(e){
       // this line was mixed into another - it feeds a junction. Tap ANYWHERE on it
       // to pull it back to that cell; the line it merged into is handed its blend
       // tail back and left whole. Grab-drag from here to redraw.
-      separateFeeder(leg);
+      detachFeeder(leg);
       leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
       drag={t:"em", e:o.e, l:o.l};
       reconcileAndFixDrag();
@@ -1445,9 +1486,10 @@ function step(cell){
     if(fe>=0){
       var jcell=junctions[drag.i].cell.slice();
       var fleg=ems[fe].legs[fl];
-      destroyJunctionOf(fleg);   // un-merges both feeders (jun -> -1), removes junction + its blend leg
+      detachFeeder(fleg);        // pull this colour out (a triple just demotes; a pair collapses, tail handed back)
       if(fleg.cells.length>1 && same(fleg.cells[fleg.cells.length-1], jcell)) fleg.cells.pop();
       drag={t:"em", e:fe, l:fl};
+      reconcileAndFixDrag();
       sfxJun(); renderPaths(); return;
     }
     // CHAIN: the blend runs into a DIFFERENT primary line -> a deeper mix (browN)
@@ -1459,7 +1501,7 @@ function step(cell){
          && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
         MJ.leg.push(cell);
         var exc2=oleg2.cells.slice(o.idx+1);
-        var NJ2={cell:cell.slice(), sec:ns, leg:oleg2.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+        var NJ2={cell:cell.slice(), sec:ns, leg:oleg2.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1, hit:exc2.length?ems[o.e].col:null};
         oleg2.cells=oleg2.cells.slice(0, o.idx+1);
         junctions.push(NJ2);
         MJ.jun=junctions.length-1; oleg2.jun=junctions.length-1;
@@ -1475,7 +1517,7 @@ function step(cell){
     var sec=mixOf(me.col, other.col);
     var myLeg=me.legs[drag.l];
     var oHead=oleg.cells[oleg.cells.length-1];
-    var oDelivered=!!tgtAt(oHead[0],oHead[1]);   // the other pipe already delivers to a circle - it isn't free to hijack
+    var oT=tgtAt(oHead[0],oHead[1]), oDelivered=!!(oT && oT.col===other.col);   // the other pipe already delivers to ITS circle - it isn't free to hijack
     // the blend is wanted if its own circle needs it, OR it's a stepping stone to a browN circle
     var secWanted=(tgtFor(sec) && !tgtFor(sec).done) || (tgtFor("N") && !tgtFor("N").done);
     if(sec && myLeg.jun<0 && oleg.jun<0 && !oDelivered && secWanted
@@ -1484,7 +1526,7 @@ function step(cell){
       // and everything on that pipe BEYOND the tap becomes the blend leg (recoloured to the blend)
       myLeg.cells.push(cell);
       var excess=oleg.cells.slice(o.idx+1);
-      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+      var J={cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1, hit:excess.length?other.col:null};
       oleg.cells=oleg.cells.slice(0, o.idx+1);   // the other pipe now ends at the junction (a feeder)
       junctions.push(J);
       myLeg.jun=junctions.length-1; oleg.jun=junctions.length-1;
@@ -1505,9 +1547,9 @@ function step(cell){
       if(p2==null) junctions.forEach(function(K,ki){ if(ki!==fji && K.jun===fji) p2=K.sec; });
       var deep = p2!=null ? mixOf(sec, p2) : null;   // (our secondary) + the junction's other input
       var deepWanted = deep && ((tgtFor(deep)&&!tgtFor(deep).done) || (tgtFor("N")&&!tgtFor("N").done));
-      if(FJ && (FJ.jun==null||FJ.jun<0) && deep && deepWanted){
+      if(FJ && (FJ.jun==null||FJ.jun<0) && deep && deepWanted && !junDelivered(FJ)){   // never hijack a mix that already feeds its circle
         myLeg.cells.push(cell);
-        var GA={ cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:fji };
+        var GA={ cell:cell.slice(), sec:sec, leg:oleg.cells.slice(o.idx).map(function(c){ return c.slice(); }), jun:fji, hit:other.col };
         oleg.cells=oleg.cells.slice(0, o.idx+1);     // the other line now ends at the new mix (a feeder)
         junctions.push(GA); var gai=junctions.length-1;
         myLeg.jun=gai; oleg.jun=gai;                 // our line + the other now feed the new secondary
@@ -1529,7 +1571,7 @@ function step(cell){
        && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
       myL2.cells.push(cell);
       var exc3=PJ.leg.slice(o.idx+1);
-      var NJ3={cell:cell.slice(), sec:ns2, leg:PJ.leg.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1};
+      var NJ3={cell:cell.slice(), sec:ns2, leg:PJ.leg.slice(o.idx).map(function(c){ return c.slice(); }), jun:-1, hit:exc3.length?PJ.sec:null};
       PJ.leg=PJ.leg.slice(0, o.idx+1);   // the parent blend now ends at the new junction (a feeder)
       junctions.push(NJ3);
       myL2.jun=junctions.length-1; PJ.jun=junctions.length-1;
@@ -1543,7 +1585,7 @@ function step(cell){
   // colours meet at one point and make brown (instead of the two-step chain).
   if(drag.t==="em" && o.t==="jun"){
     var TJ=junctions[o.i], myL3=ems[drag.e].legs[drag.l];
-    var canTriple = TJ && !TJ.triple && (TJ.jun==null||TJ.jun<0) && "OGP".indexOf(TJ.sec)>=0;
+    var canTriple = TJ && !TJ.triple && (TJ.jun==null||TJ.jun<0) && "OGP".indexOf(TJ.sec)>=0 && !junDelivered(TJ);
     var ns3 = canTriple ? mixOf(TJ.sec, ems[drag.e].col) : null;
     if(ns3==="N" && myL3.jun<0 && tgtFor("N") && !tgtFor("N").done
        && !isIce(cell[0],cell[1]) && !portTwin(cell[0],cell[1])){
@@ -1594,7 +1636,7 @@ function noDangling(){
   for(var e=0;e<ems.length;e++){ var L=ems[e].legs;
     for(var l=0;l<L.length;l++){ var lg=L[l]; if(lg.cells.length<=1) continue;
       if(lg.jun>=0) continue;
-      var h=lg.cells[lg.cells.length-1]; if(tgtAt(h[0],h[1])) continue;
+      var h=lg.cells[lg.cells.length-1], HT=tgtAt(h[0],h[1]); if(HT && HT.col===ems[e].col) continue;   // must be ITS circle
       return false;
     }
   }
@@ -1610,6 +1652,7 @@ function noDangling(){
   return true;
 }
 function checkWin(){
+  recomputeTargets();   // never let a stale flag hide (or fake) a win
   if(!tgts.every(function(t){ return t.done; })) return;
   if(coverage()<paintTarget()){ toast(T("Cover the whole board to finish!")); return; }
   if(!noDangling()){ toast(T("A pipe has a loose end!")); return; }
@@ -2500,7 +2543,7 @@ document.getElementById("btnWinNext").addEventListener("click", function(){ ensu
   }
   else loadLevel(li+1); });
 
-document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(demoing) return; if(undoStack.length) restoreState(undoStack.pop()); });
+document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(demoing || drag) return; if(undoStack.length) restoreState(undoStack.pop()); });
 
 /* ---------- monetization seams ----------
    Real ads/IAP live in the native (Capacitor) wrapper, which injects
