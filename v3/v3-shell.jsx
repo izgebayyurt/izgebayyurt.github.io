@@ -146,7 +146,7 @@ V3.Hero = ({ c, fonts }) =>
   }}>
   
     <V3.Eyebrow c={c} fonts={fonts} accent={c.accent}>
-      Master's student · VR researcher · maker
+      PhD student · VR researcher · maker
     </V3.Eyebrow>
     <h1
     style={{
@@ -184,7 +184,7 @@ V3.Hero = ({ c, fonts }) =>
         textWrap: 'pretty', fontWeight: "400", lineHeight: "1.5", height: "129px", fontSize: "22px"
       }}>
       
-        I'm a master's student in teaching at <em style={{ ...{ color: c.ink, fontFamily: fonts.display, fontStyle: 'italic', fontSize: 22 }, color: "#003263", fontSize: "22px" }}>University of Maine</em>, working on the spot where interactive experiences and math learning overlap. On the side I make games and music, draw, grow things in my garden, and chase a better espresso pull.
+        I'm a PhD student at <em style={{ color: "#354CA1", fontFamily: fonts.display, fontStyle: 'italic', fontSize: "22px", textDecoration: 'underline', textDecorationColor: "#CC0035", textDecorationThickness: 2, textUnderlineOffset: 4 }}>Southern Methodist University</em>, working on the spot where interactive experiences and math learning overlap. On the side I make games and music, draw, grow things in my garden, and chase a better espresso pull.
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: fonts.body, fontSize: 14 }}>
         <div style={{ position: 'relative' }}>
@@ -240,12 +240,11 @@ V3.Hero = ({ c, fonts }) =>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${c.rule}` }}>
           <span style={{ color: c.inkFaint }}>Currently</span>
-          <span style={{ color: c.ink }}>Orono, ME</span>
+          <span style={{ color: c.ink }}>Dallas, TX</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${c.rule}` }}>
           <span style={{ color: c.inkFaint }}>This month</span>
-          <span style={{ color: c.ink }}>Finishing my thesis
-</span>
+          <span style={{ color: c.ink }}>Starting my PhD</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${c.rule}` }}>
           <span style={{ color: c.inkFaint }}>Open to</span>
