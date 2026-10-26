@@ -795,7 +795,7 @@ V3.About = ({ c, fonts }) =>
             ◆ Contact
           </div>
           {[
-        ['Email · academic', 'izge.bayyurt@maine.edu'],
+        ['Email · academic', 'ibayyurt@smu.edu'],
         ['Email · personal', 'izgebayyurt@gmail.com'],
         ['GitHub', '@izgebayyurt'],
         ['LinkedIn', '/in/izgebayyurt'],
