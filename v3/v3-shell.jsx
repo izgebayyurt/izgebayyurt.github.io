@@ -184,7 +184,7 @@ V3.Hero = ({ c, fonts }) =>
         textWrap: 'pretty', fontWeight: "400", lineHeight: "1.5", height: "129px", fontSize: "22px"
       }}>
       
-        I'm a PhD student at <em style={{ color: "#354CA1", fontFamily: fonts.display, fontStyle: 'italic', fontSize: "22px", textDecoration: 'underline', textDecorationColor: "#CC0035", textDecorationThickness: 2, textUnderlineOffset: 4 }}>Southern Methodist University</em>, working on the spot where interactive experiences and math learning overlap. On the side I make games and music, draw, grow things in my garden, and chase a better espresso pull.
+        I'm a PhD student at <em style={{ color: "#CC0035", fontFamily: fonts.display, fontStyle: 'italic', fontSize: "22px" }}>Southern Methodist University</em>, working on the spot where interactive experiences and math learning overlap. On the side I make games and music, draw, grow things in my garden, and chase a better espresso pull.
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: fonts.body, fontSize: 14 }}>
         <div style={{ position: 'relative' }}>
