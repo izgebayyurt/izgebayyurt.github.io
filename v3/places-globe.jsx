@@ -11,12 +11,13 @@ const PLACES = [
     kind: 'lived',
     label: 'Maine, USA',
     lat: 44.72, lng: -69.15, // somewhere between Waterville and Orono
-    year: '2018-22 · 2023 →',
+    year: '2018-22 · 2023-26',
     stays: [
       { sub: 'Waterville', year: '2018-22', note: 'Colby College. CS, INSITE Lab, a lot of snow.' },
-      { sub: 'Orono',      year: '2023 →', note: "UMaine. IMRE Lab. Currently here." },
+      { sub: 'Orono',      year: '2023-26', note: "UMaine. IMRE Lab. Master's in teaching." },
     ],
   },
+  { kind: 'lived',   label: 'Dallas, TX',               lat: 32.84, lng: -96.78,  year: '2026 →',    note: 'SMU. PhD. Currently here.' },
   { kind: 'studied', label: 'Copenhagen, Denmark',      lat: 55.68, lng: 12.57,   year: '2021-22',   note: 'MeetinVR internship + a study abroad in game design.' },
   { kind: 'lived',   label: 'San Francisco, CA',        lat: 37.77, lng: -122.42, year: '2022',         note: 'Pocket Gems. Mobile-game backends.' },
   { kind: 'visited', label: 'Geneva, Switzerland',      lat: 46.21, lng: 6.14,    year: '2018',         note: 'CERN, for the obvious reason.' },

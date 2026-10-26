@@ -752,7 +752,7 @@ V3.About = ({ c, fonts }) =>
             textWrap: 'pretty'
           }}>
           
-            I grew up in <em style={{ fontFamily: fonts.display, fontStyle: 'italic', color: c.ink, fontSize: 19 }}>Istanbul</em> and then kept moving: Mostar, Waterville, Copenhagen, San Francisco, and now Orono. Usually for school or a job, sometimes just because it sounded interesting. Computer Science at Colby (Davis UWC Scholar), and a master's in teaching at <em style={{ fontFamily: fonts.display, fontStyle: 'italic', color: c.ink, fontSize: 19 }}>UMaine</em>.
+            I grew up in <em style={{ fontFamily: fonts.display, fontStyle: 'italic', color: c.ink, fontSize: 19 }}>Istanbul</em> and then kept moving: Mostar, Waterville, Copenhagen, San Francisco, Orono, and now Dallas. Usually for school or a job, sometimes just because it sounded interesting. Computer Science at Colby (Davis UWC Scholar), and a master's in teaching at <em style={{ fontFamily: fonts.display, fontStyle: 'italic', color: c.ink, fontSize: 19 }}>UMaine</em>, and now a PhD at <em style={{ fontFamily: fonts.display, fontStyle: 'italic', color: "#CC0035", fontSize: 19 }}>SMU</em>.
           </p>
           <p
           style={{
