@@ -263,7 +263,7 @@ V3.Hero = ({ c, fonts }) =>
           cursor: 'pointer'
         }}>
           
-            izge.bayyurt@maine.edu
+            ibayyurt@smu.edu
           </a>
           <a
           href="Izge%20Bayyurt%20-%20CV.pdf"
