@@ -1,6 +1,13 @@
 /* Huemeld Flow 2 — exact solution counter.
 
-   Ruleset (matches flow2.html):
+   SCOPE (read first): this models the ORIGINAL ruleset below plus walls, gates,
+   ice and counters. It does NOT model portals, bridges (overpass), prisms, arrows
+   or brown/triple mixes, and the game has since grown mid-pipe branching (a leg
+   may root on a sibling leg). So a count here is only exact for levels using the
+   supported pieces; the shipped ramps don't call it — levels are solvable by
+   construction and verified by replaying their baked solution in the real game.
+
+   Ruleset (the original flow2.html rules):
    - Board is an N×N grid; some cells are walls (impassable, need not be painted).
    - SQUARES are primary paint sources, colour ∈ {R,Y,B}. A square sends out
      1..4 legs (simple pipe paths). All legs of a square share only the square
