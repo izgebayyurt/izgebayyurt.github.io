@@ -750,13 +750,15 @@ function resumeMusic(){
   if(audioHeld()) return;
   if(actx && actx.state==="suspended"){ try{ actx.resume(); }catch(e){} }   // SFX come back even with music off
   if(!musicOn || !musicStarted || demoing || demoSoon) return;
-  if(musicEl){ setMusicLevel(0); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); fadeMusic(musicTargetVol(), 800); }
+  if(musicEl){ setMusicLevel(0); reloadMusic(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); fadeMusic(musicTargetVol(), 800); }
 }
-// leaving the app must actually PAUSE the audio, not just mute it - a muted <audio>
-// keeps playing (and holds the media session) in a native webview's background.
+// leaving the app must actually STOP the audio, not just mute it - a muted <audio>
+// keeps playing in a native webview's background. It's UNLOADED, not just paused:
+// iOS keeps a paused <audio>'s media session alive, which shows up as a "Huemeld"
+// Now Playing widget (lock screen / Control Center) whose Play button restarts it.
 function suspendAudio(){
   if(musicFade){ clearInterval(musicFade); musicFade=null; }
-  if(musicEl){ setMusicLevel(0); try{ musicEl.pause(); }catch(e){} }
+  if(musicEl){ setMusicLevel(0); unloadMusic(); }
   if(actx && actx.state==="running"){ try{ actx.suspend(); }catch(e){} }
 }
 window.__resumeAudio=resumeMusic;   // native (Capacitor App resume) calls this too
@@ -825,10 +827,37 @@ function ensureMusic(){
   musicEl.addEventListener("ended", function(){ musicIdx=(musicIdx+1)%MUSIC_TRACKS.length; musicPlayCurrent(); });
   for(var i=musicOrder.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=musicOrder[i]; musicOrder[i]=musicOrder[j]; musicOrder[j]=t; }  // shuffle the order
 }
-function musicPlayCurrent(){ if(!musicEl) return; musicEl.src=MUSIC_TRACKS[musicOrder[musicIdx]]; applyMusicVol(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); }
+function musicPlayCurrent(){ if(!musicEl) return; musicUnloaded=false; musicEl.src=MUSIC_TRACKS[musicOrder[musicIdx]]; applyMusicVol(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); }
+/* unload = drop the track (remember where we were) so the OS media session goes away;
+   reload = put the same track back at that spot before playing again */
+var musicPos=0, musicUnloaded=false;
+function unloadMusic(){
+  if(!musicEl || !musicEl.getAttribute("src")) return;
+  musicPos=musicEl.currentTime||0;
+  try{ musicEl.pause(); }catch(e){}
+  musicEl.removeAttribute("src");
+  try{ musicEl.load(); }catch(e){}
+  musicUnloaded=true;
+}
+function reloadMusic(){
+  if(!musicEl || !musicUnloaded) return;
+  musicUnloaded=false;
+  var at=musicPos;
+  musicEl.src=MUSIC_TRACKS[musicOrder[musicIdx]]+(at>0.5 ? "#t="+at.toFixed(2) : "");
+  musicEl.addEventListener("loadedmetadata", function seek(){   // fallback if the #t fragment is ignored
+    musicEl.removeEventListener("loadedmetadata", seek);
+    if(at>0.5 && Math.abs((musicEl.currentTime||0)-at)>1){ try{ musicEl.currentTime=at; }catch(e){} }
+  });
+}
 function startMusic(){ if(!musicOn || demoing || demoSoon || audioHeld()) return;   // no music during tutorials
-  ensureMusic(); if(!musicStarted){ musicStarted=true; musicPlayCurrent(); } else { var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } }
-function stopMusic(){ if(musicEl) musicEl.pause(); }
+  ensureMusic(); if(!musicStarted){ musicStarted=true; musicPlayCurrent(); } else { reloadMusic(); var p=musicEl.play(); if(p&&p.catch) p.catch(function(){}); } }
+function stopMusic(){ unloadMusic(); }
+/* the page never answers lock-screen / headphone media controls: the music is
+   background ambience, not something to play from outside the game */
+(function(){ try{ var ms=navigator.mediaSession; if(!ms) return; ms.metadata=null;
+  ["play","pause","seekbackward","seekforward","seekto","previoustrack","nexttrack","stop"].forEach(function(a){
+    try{ ms.setActionHandler(a, function(){}); }catch(e){} });
+}catch(e){} })();
 /* one soft voice: gentle attack, lowpass warmth, optional pitch glide, exponential release */
 function voice(freq,dur,o){
   if(!actx || !soundOn) return; o=o||{};
