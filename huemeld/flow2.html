@@ -207,8 +207,14 @@ body.menuopen .helpfab{ display:none; }
 .vol::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid var(--line); box-shadow:0 2px 3px rgba(0,0,0,.3); cursor:pointer; }
 .vol:disabled{ opacity:.4; }
 /* colour-blind glyph on dots */
-.dot .cb{ position:absolute; z-index:3; font-family:var(--font-d); font-weight:700; font-size:12px; color:#fff; -webkit-text-stroke:.8px var(--line); left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
-.dot.sq .cb{ top:31%; }   /* the ✦ objectives are squares - lift the colour-blind glyph clear of the star */
+.dot .cb{ position:absolute; z-index:3; font-family:var(--font-d); font-weight:700; font-size:16px; line-height:1; color:#fff; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; letter-spacing:-.02em;
+  -webkit-text-stroke:.14em var(--line); paint-order:stroke fill;
+  text-shadow:0 .06em 0 var(--line), 0 -.06em 0 var(--line), .06em 0 0 var(--line), -.06em 0 0 var(--line); }
+/* colour-blind squares: the ✦ goes small at the top, the colour letter sits big below it */
+.dot.sq.cbm{ flex-direction:column; }
+.dot.sq.cbm .st{ position:absolute; top:6%; left:50%; transform:translateX(-50%) scale(.8); }
+.dot.sq.cbm .cb{ top:60%; }
+.dot.prism2 .cb{ top:66%; }   /* prism: the letter of the blend it wants, in the triangle's belly */
 </style>
 </head>
 <body>
@@ -330,7 +336,7 @@ body.menuopen .helpfab{ display:none; }
           <p data-th="<b>Drag</b> from a circle to draw a line."><b>Drag</b> from a circle to draw a line.</p>
           <p data-th="When two lines <b>meet</b>, their colours <b>mix</b>.">When two lines <b>meet</b>, their colours <b>mix</b>.</p>
           <p data-th="Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.">Draw a line into each <b>✦ square</b> with the matching colour to <b>light it up</b>. You might need to mix the lines to make the correct colour.</p>
-          <p data-th="<b>Tap a line</b> anywhere - or retrace it - to <b>pull it back</b> to that spot."><b>Tap a line</b> anywhere - or retrace it - to <b>pull it back</b> to that spot.</p>
+          <p data-th="<b>Double-tap a line</b> to cut it there, or <b>drag its end back</b> to pull it in."><b>Double-tap a line</b> to cut it there, or <b>drag its end back</b> to pull it in.</p>
           <p data-th="<b>Double-tap a circle</b> to <b>erase</b> its whole line."><b>Double-tap a circle</b> to <b>erase</b> its whole line.</p>
           <p data-th="A <b>gate</b> only lets its own colour pass.">A <b>gate</b> only lets its own colour pass.</p>
           <p data-th="Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.">Light up every ✦ square and cover the whole board to <b>win</b>! Leave no unconnected lines.</p>
@@ -417,7 +423,7 @@ var TR = {
   "Watch it again, or take it from here.":"Tekrar izle ya da buradan devam et.",
   "My turn!":"Sıra bende!",
   "Watch again":"Tekrar izle",
-  "<b>Tap a line</b> anywhere - or retrace it - to <b>pull it back</b> to that spot.":"Geri çekmek için <b>çizginin</b> herhangi bir yerine dokun ya da üzerinden geri git; çizgi oraya kadar geri çekilir.",
+  "<b>Double-tap a line</b> to cut it there, or <b>drag its end back</b> to pull it in.":"Kesmek için <b>çizgiye çift dokun</b> ya da <b>ucunu geri sürükle</b>.",
   "<b>Double-tap a circle</b> to <b>erase</b> its whole line.":"Bir <b>daireye çift dokun</b>arak çizgisinin tamamını <b>sil</b>.",
   // - settings -
   "Dark theme":"Koyu tema",                                         /* 29 */
@@ -476,6 +482,11 @@ var TR = {
   "Cover every cell and light each square to win!":"Kazanmak için her noktayı kapla ve her kareyi aydınlat!", /* 78 */
   // - mechanic names -
   "Brown":"Kahverengi",                                             /* 79 */
+  "Gates":"Kapılar",
+  "A gate only lets its own colour through - the line passing it must be that colour.":"Bir kapı yalnızca kendi rengine yol verir - içinden geçen çizgi o renkte olmalı.",
+  "See the coloured gate?…":"Renkli kapıyı görüyor musun?…",
+  "…only a line of ITS colour may pass through it.":"…içinden yalnızca KENDİ rengindeki çizgi geçebilir.",
+  "Plan your mix so the right colour reaches each gate.":"Karışımını, her kapıya doğru renk ulaşacak şekilde planla.",
   "Arrows":"Oklar",                                                 /* 80 */
   "Ice":"Buz",                                                      /* 81 */
   "Portals":"Portallar",                                            /* 82 */
@@ -595,8 +606,8 @@ document.addEventListener("touchend", function(e){ var now=Date.now(); if(now-la
    secondary circles (O/G/P) as the objective, plus COLOUR GATES for challenge.
    Rebuild the full dataset with: node tools/flow-app.mjs */
 var LEVELS=[
-  { n:5, sq:[["B",0,0],["R",2,4]], ci:[["P",4,1]], walls:[], gates:[["P",3,3]] },
-  { n:5, sq:[["R",0,0],["Y",3,3]], ci:[["O",0,4]], walls:[], gates:[["O",0,2]] },
+  { n:5, sq:[["B",0,0],["R",2,4]], ci:[["P",4,1]], walls:[], gates:[] },
+  { n:5, sq:[["R",0,0],["Y",3,3]], ci:[["O",0,4]], walls:[], gates:[] },
   { n:6, sq:[["B",4,4],["R",2,1]], ci:[["P",4,2]], walls:[], gates:[["P",5,1],["P",4,0]] },
   { n:6, sq:[["R",1,5],["Y",3,4]], ci:[["O",3,0]], walls:[], gates:[["R",5,3],["O",1,1],["O",0,0]] },
   { n:6, sq:[["Y",2,3],["R",4,5],["B",4,1]], ci:[["O",0,5],["G",0,3]], walls:[[0,0],[0,1],[2,2],[3,0],[3,3]], gates:[["B",5,0],["B",5,3],["B",3,2]] },
@@ -676,6 +687,7 @@ var ices=[], iceSet={}, portals=[];      // pack mechanics: straight-through ice
 var bridges=[], bridgeSet={};            // pack mechanic: a cell two lines may CROSS (perpendicular)
 var counters=[];                         // pack mechanic: EXACTLY n of my 8 neighbours wear this colour
 var lastEmTap={e:-1, t:0};   // for double-tap-to-reset on emitters
+var lastLineTap={key:"", t:0};   // for double-tap-to-CUT a line (a single tap never cuts)
 var DBL_MS=340;
 var isTut=false;
 /* undo - snapshot the board before each gesture, restore on demand */
@@ -911,7 +923,7 @@ function applyLevel(L){
   // reset revealed hints only when the LEVEL actually changes - a Reset reloads the
   // same object, so a hint the player watched an ad for survives the reset.
   if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; }
-  N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0};
+  N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0}; lastLineTap={key:"",t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
   shakeAmp=0; board.style.transform="";
   undoStack=[]; preGesture=null;
@@ -960,6 +972,7 @@ function loadLevel(i){
   document.getElementById("btnPrev").style.visibility = li>0 ? "" : "hidden";
   document.getElementById("btnNext").style.visibility = li<LEVELS.length-1 ? "" : "hidden";
   applyLevel(LEVELS[li]);
+  maybeMechIntro(LEVELS[li]);   // gates arrive at level 11 with their own card + demo
   // first FORK level: teach the one move nobody discovers alone - a circle can
   // feed TWO lines. Pulse the square that has to do it.
   var L=LEVELS[li];
@@ -984,6 +997,7 @@ function loadDaily(off){
   document.getElementById("btnPrev").style.visibility="hidden";
   document.getElementById("btnNext").style.visibility="hidden";
   applyLevel(L);
+  maybeMechIntro(L);   // a newcomer who opens the Daily first still gets the gates intro
 }
 var curPack=-1, packIdx=0;
 function loadPackLevel(pi, k){
@@ -1061,10 +1075,9 @@ function playDemo(){
     else if(back.d!=null) loadDaily(back.d);
     else loadLevel(back.l);
   };
-  // pause on the mix cell and the gate cell of level 1's baked solution
+  // pause on the mix cell of level 1's baked solution (no gates until level 11)
   var caps=[T("Drag a line out of a circle…"),T("Now bring in the other colour…"),T("Fill the board and light every square to win!")];
   var marks={ "1:7":  { cap:T("Where colours meet, they MIX - red + blue makes purple!"), hold:1700 },
-      "1:10": { cap:T("A gate passes only its own colour. Purple flows right through."), hold:1900 },
       "1:18": { cap:T("Cover every cell and light each square to win!"), hold:1100 } };
   demoReplay=function(){ loadLevel(0); try{ if(savedI!=null) localStorage.setItem("hm_flow2_i", savedI); }catch(e){} playDemoOn(demo, caps, marks); };
   return playDemoOn(demo, caps, marks);
@@ -1394,15 +1407,23 @@ board.addEventListener("pointerdown", function(e){
     drag={t:"em", e:pri, l:PE.legs.length-1};
   }
   else if(o.t==="jun"){
-    var ji=dropChildOf(o.i);
-    var J=junctions[ji]; J.leg=[J.cell.slice()];
-    drag={t:"jun", i:ji};
-    reconcileAndFixDrag();   // re-derive circles (the blend no longer delivers) + retract a prism's rays
+    // the mixing cell: cutting it erases the blend back to this cell
+    var oi=o.i;
+    lineCut(o, cell, function(){
+      var ji=dropChildOf(oi);
+      var J=junctions[ji]; J.leg=[J.cell.slice()];
+      drag={t:"jun", i:ji};
+      reconcileAndFixDrag();   // re-derive circles (the blend no longer delivers) + retract a prism's rays
+    });
   } else if(o.t==="jleg"){
-    var ji2=dropChildOf(o.i);
-    var J2=junctions[ji2]; J2.leg=J2.leg.slice(0, retreatCut(J2.leg, o.idx));
-    drag={t:"jun", i:ji2};
-    reconcileAndFixDrag();   // tapping the delivered tip leaves it delivered until it's actually pulled back
+    var oi2=o.i, oidx2=o.idx, J0=junctions[o.i];
+    if(oidx2===J0.leg.length-1) drag={t:"jun", i:oi2};   // grabbing the blend's TIP: drag back to retreat, or extend
+    else lineCut(o, cell, function(){
+      var ji2=dropChildOf(oi2);
+      var J2=junctions[ji2]; J2.leg=J2.leg.slice(0, retreatCut(J2.leg, oidx2));
+      drag={t:"jun", i:ji2};
+      reconcileAndFixDrag();
+    });
   } else if(o.t==="emdot"){
     var E=ems[o.e];
     var now=Date.now(), isDbl=(lastEmTap.e===o.e && now-lastEmTap.t<DBL_MS);
@@ -1421,21 +1442,24 @@ board.addEventListener("pointerdown", function(e){
       else { drag=null; }   // all 4 rays out - a single tap does nothing (double-tap resets)
     }
   } else if(o.t==="em"){
-    var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1);
+    var E2=ems[o.e], leg=E2.legs[o.l], isHead=(o.idx===leg.cells.length-1), oe=o.e, ol=o.l, oidx=o.idx;
     if(leg.jun>=0){
-      // this line was mixed into another - it feeds a junction. Tap ANYWHERE on it
-      // to pull it back to that cell; the line it merged into is handed its blend
-      // tail back and left whole. Grab-drag from here to redraw.
-      detachFeeder(leg);
-      leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
-      drag={t:"em", e:o.e, l:o.l};
-      reconcileAndFixDrag();
+      // this line was mixed into another - it feeds a junction. Cutting it pulls it back
+      // to that cell; the line it merged into is handed its blend tail back, left whole.
+      lineCut(o, cell, function(){
+        detachFeeder(leg);
+        leg.cells=leg.cells.slice(0, retreatCut(leg.cells, oidx));
+        drag={t:"em", e:oe, l:ol};
+        reconcileAndFixDrag();
+      });
     } else if(isHead){ drag={t:"em", e:o.e, l:o.l}; }   // grab a TIP -> drag back to retreat, or extend
     else {
-      // tap partway along your own line -> retreat it to the tapped cell (then drag to redraw)
-      leg.cells=leg.cells.slice(0, retreatCut(leg.cells, o.idx));
-      drag={t:"em", e:o.e, l:o.l};
-      reconcileAndFixDrag();
+      // partway along your own line: cut it back to this cell (then drag to redraw)
+      lineCut(o, cell, function(){
+        leg.cells=leg.cells.slice(0, retreatCut(leg.cells, oidx));
+        drag={t:"em", e:oe, l:ol};
+        reconcileAndFixDrag();
+      });
     }
   } else return;
   try{ board.setPointerCapture(e.pointerId); }catch(_e){}
@@ -1450,9 +1474,25 @@ board.addEventListener("pointermove", function(e){
 board.addEventListener("pointerup", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); pushUndo(); renderPaths(); });
 board.addEventListener("pointercancel", function(){ if(demoing && !demoFiring) return; drag=null; pruneStrayLegs(); pushUndo(); renderPaths(); });
 board.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+/* CUTTING a line is deliberate: a single tap on a line never changes it (stray taps
+   used to undo work). The cut happens on a DOUBLE-TAP at that spot, or - for "press
+   mid-line and drag to redraw" - as soon as the finger moves off the pressed cell. */
+function lineCut(o, cell, doCut){
+  var key=o.t+":"+(o.e!=null?o.e+"."+o.l:o.i)+"@"+cell[0]+","+cell[1], now=Date.now();
+  var isDbl=(lastLineTap.key===key && now-lastLineTap.t<DBL_MS);
+  lastLineTap={key:key, t:now};
+  if(isDbl){ lastLineTap={key:"", t:0}; doCut(); }
+  else drag={t:"pending", cell:cell.slice(), cut:doCut};
+}
 function legOf(d){ return d.t==="em" ? (ems[d.e].legs[d.l]&&ems[d.e].legs[d.l].cells) : (junctions[d.i]&&junctions[d.i].leg); }
 
 function step(cell){
+  if(drag.t==="pending"){   // pressed mid-line: the cut commits once the finger actually moves
+    if(same(cell, drag.cell)) return;
+    var cut=drag.cut; drag=null; cut();
+    lastLineTap={key:"", t:0};
+    if(!drag) return;
+  }
   var leg=legOf(drag); if(!leg){ drag=null; return; }
   var head=leg[leg.length-1];
   if(same(cell,head)) return;
@@ -1480,7 +1520,7 @@ function step(cell){
   }
   var o=occAt(cell[0],cell[1]);
   if(!o){
-    leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true);   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
+    leg.push(cell); lastEmTap={e:-1,t:0}; lastLineTap={key:"",t:0}; penTick(true);   // a drawn stroke clears the double-tap window, so re-tapping a square to fork never reads as a reset
     var tw=portTwin(cell[0],cell[1]);                      // warp: entering a portal carries the line out of its twin
     if(tw && !isWall(tw[0],tw[1]) && !occAt(tw[0],tw[1])){
       leg.push([tw[0],tw[1]]);
@@ -1502,7 +1542,7 @@ function step(cell){
       if(!v) return false;
       return (v[0]!==0)!==(d0[0]!==0);   // different axes
     });
-    if(okX){ leg.push(cell); lastEmTap={e:-1,t:0}; penTick(true); renderPaths(); }
+    if(okX){ leg.push(cell); lastEmTap={e:-1,t:0}; lastLineTap={key:"",t:0}; penTick(true); renderPaths(); }
     return;   // parallel entry into an occupied bridge is blocked
   }
 
@@ -1736,8 +1776,9 @@ function renderDots(){
   var s=cs(), h="";
   function dot(col,r,c,shape,star){
     var sz=s*0.84, off=(s-sz)/2;
-    var cb = cbOn ? '<span class="cb">'+(CBGLYPH[col]||col)+'</span>' : '';
-    return '<div class="dot '+shape+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
+    var g=CBGLYPH[col]||col, fs=Math.round(sz*(shape==="sq" ? 0.40 : 0.48)*(g.length>1 ? 0.78 : 1));   // scales with the board; "Br" a touch smaller
+    var cb = cbOn ? '<span class="cb" style="font-size:'+fs+'px">'+g+'</span>' : '';
+    return '<div class="dot '+shape+(cbOn?' cbm':'')+'" data-dr="'+r+'" data-dc="'+c+'" style="left:'+(c*s+off)+'px;top:'+(r*s+off)+'px;width:'+sz+'px;height:'+sz+'px;background:'+HEX[col]+'">'+(star?'<span class="st">✦</span>':'')+cb+'</div>';
   }
   ems.forEach(function(E){ if(E.lock!=null) return; h+=dot(E.col,E.r,E.c,"ci",false); });   // emitters are round… (prism rays draw with the prism)
   tgts.forEach(function(T){
@@ -1749,7 +1790,7 @@ function renderDots(){
         +'<path d="M50 8 L93 88 L7 88 Z" fill="'+HEX[T.col]+'" stroke="'+INK+'" stroke-width="11" stroke-linejoin="round"/>'
         +'<path d="M50 8 L7 88 L50 88" fill="none" stroke="'+HEX[comp[0]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
         +'<path d="M50 8 L93 88 L50 88" fill="none" stroke="'+HEX[comp[1]]+'" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>'
-        +'</svg></div>';
+        +'</svg>'+(cbOn ? '<span class="cb" style="font-size:'+Math.round(sz*0.36)+'px">'+(CBGLYPH[T.col]||T.col)+'</span>' : '')+'</div>';
       return;
     }
     h+=dot(T.col,T.r,T.c,"sq",true);   // …objectives are square (gates are square too, so squares read as "goals")
@@ -2111,8 +2152,8 @@ function renderPaths(){
         });
         ctx.restore();
       }
-      if(cbOn){ var ty=G.dir? y-s*0.10 : cy;
-        ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.024; ctx.font="700 "+(s*0.22*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(CBGLYPH[G.col]||G.col,cx,ty); ctx.fillText(CBGLYPH[G.col]||G.col,cx,ty); }
+      if(cbOn){ var ty=G.dir? y-s*0.07 : cy+s*0.01;
+        ctx.globalAlpha=1; ctx.fillStyle="#fff"; ctx.strokeStyle=INK; ctx.lineWidth=s*0.055; ctx.lineJoin="round"; ctx.font="700 "+(s*(G.dir?0.25:0.32)*pop)+"px 'Fredoka',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeText(CBGLYPH[G.col]||G.col,cx,ty); ctx.fillText(CBGLYPH[G.col]||G.col,cx,ty); }
       ctx.restore();
     });
   }
@@ -2149,10 +2190,20 @@ function renderPaths(){
       ctx.font="700 "+(s*0.30*pop)+"px 'Fredoka',sans-serif";
       ctx.globalAlpha = exact||over ? 1 : 0.8;
       ctx.fillText(""+K.n, cxk, cyk+s*0.012);
-      if(cbOn){ ctx.font="700 "+(s*0.115)+"px 'Fredoka',sans-serif"; ctx.fillStyle="#fff";
-        ctx.fillText(CBGLYPH[K.col]||K.col, cxk, cyk+cw/2+s*0.075); }
+      if(cbOn){ ctx.globalAlpha=1; ctx.font="700 "+(s*0.2)+"px 'Fredoka',sans-serif"; ctx.fillStyle="#fff";
+        ctx.strokeStyle=INK; ctx.lineWidth=s*0.045; ctx.lineJoin="round";
+        var kg=CBGLYPH[K.col]||K.col, ky=cyk+cw/2+s*0.075;
+        ctx.strokeText(kg, cxk, ky); ctx.fillText(kg, cxk, ky); }
       ctx.restore();
     });
+  }
+  // 6b - colour-blind: label every mixing cell with the colour it makes
+  if(cbOn && junctions.length){
+    ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineJoin="round";
+    ctx.font="700 "+(s*0.34)+"px 'Fredoka',sans-serif"; ctx.lineWidth=s*0.06; ctx.strokeStyle=INK; ctx.fillStyle="#fff";
+    junctions.forEach(function(J){ if(!J.cell) return; var g=CBGLYPH[J.sec]||J.sec, jx=J.cell[1]*s+s/2, jy=J.cell[0]*s+s/2+s*0.01;
+      ctx.strokeText(g,jx,jy); ctx.fillText(g,jx,jy); });
+    ctx.restore();
   }
   // 7 - win confetti (marker chips, on top of everything)
   confetti=confetti.filter(function(p){ return nowMs()-p.t0<p.life; });
@@ -2188,6 +2239,8 @@ requestAnimationFrame(frame);
    appears, with the ghost hand teaching it on that pack's first board.
    Rewatchable from the pack's page in the picker; seen-flags persist. ---------- */
 var MECHS={
+  gates:{ name:"Gates", blurb:"A gate only lets its own colour through - the line passing it must be that colour.",
+    caps:["See the coloured gate?…","…only a line of ITS colour may pass through it.","Plan your mix so the right colour reaches each gate."] },
   brown:{ name:"Brown", blurb:"Combine all 3 primary colors (a secondary + a primary) to create brown.",
     caps:["Mix two primaries into a secondary…","…then run the THIRD primary into it: brown!","Brown squares want the full triple mix."] },
   arrows:{ name:"Arrows", blurb:"Arrows only pass their colour - ridden straight through, the way they point.",
@@ -2205,6 +2258,7 @@ var MECHS={
 };
 function levelMechs(L){
   var m=[];
+  if((L.gates||[]).some(function(g){ return !g[3]; })) m.push("gates");   // plain colour gates (campaign from level 11)
   if((L.ci||[]).some(function(t){ return t[0]==="N"; })) m.push("brown");
   if((L.gates||[]).some(function(g){ return g[3]; })) m.push("arrows");
   if(L.ice && L.ice.length) m.push("ice");
@@ -2236,6 +2290,10 @@ function watchMech(k, rewatch){
   var M=MECHS[k], pi=-1;
   for(var i=0;i<PACKS.length;i++) if(PACKS[i].id===k) pi=i;
   var dl = pi>=0 && PACKS[pi].levels[0];
+  if(k==="gates"){   // not a pack: demo the first campaign level that has a plain gate
+    dl=null; for(var gi=0;gi<LEVELS.length && !dl;gi++){ var GL=LEVELS[gi]; if((GL.gates||[]).some(function(g){ return !g[3]; }) && (GL.sol||GL.demo)) dl=GL; }
+    if(dl && !dl.demo) dl=Object.assign({}, dl, {demo:dl.sol});
+  }
   if(!dl || !dl.demo){ showNextMech(); return; }
   // where to hand the board back after "now you try":
   //  - a rewatch launched from the picker: that mechanic's OWN pack, level 1
@@ -2289,6 +2347,7 @@ function packIcon(id,sz){
   var W='<svg width="'+(sz||22)+'" height="'+(sz||22)+'" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.22em">';
   var E='</svg>';
   switch(id){
+    case "gates": return W+'<rect x="4.5" y="4.5" width="15" height="15" rx="4" fill="#9b62d6" stroke="var(--line)" stroke-width="2.2"/><rect x="8.6" y="8.6" width="6.8" height="6.8" rx="1.8" fill="var(--paper)" stroke="var(--line)" stroke-width="1.6"/>'+E;
     case "brown": return W+'<circle cx="12" cy="12" r="8" fill="#a8703f" stroke="var(--line)" stroke-width="2.2"/>'+E;
     case "arrows": return W+'<path d="M6 5.5 12.5 12 6 18.5M12 5.5 18.5 12 12 18.5" stroke="#efe7d6" stroke-width="2.8"/>'+E;
     case "ice": return W+'<g stroke="#9ed2ff" stroke-width="2"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M12 6.4 9.9 4.9M12 6.4l2.1-1.5M12 17.6l-2.1 1.5M12 17.6l2.1 1.5"/></g>'+E;
@@ -2714,6 +2773,14 @@ if(!(LEVELS[0] && LEVELS[0].demo)) document.getElementById("btnDemo").style.disp
 if(!localStorage.getItem("hm_flow2_seen")){
   localStorage.setItem("hm_flow2_seen","1");
   firstRun=true;   // the ghost-hand demo runs when they tap Play on the menu
+}
+// one-time migration: players from before gates got their own intro already know them,
+// so don't surprise them with the card. Runs once per profile (a new player who later
+// reaches level 11 still gets it).
+if(!localStorage.getItem("hm_flow2_gatesmig")){
+  localStorage.setItem("hm_flow2_gatesmig","1");
+  var prog=lsJSON("hm_flow2_done"), pprog=lsJSON("hm_flow2_packdone");
+  if(Object.keys(prog).length || Object.keys(pprog).length || localStorage.getItem("hm_flow2_daily")) markMechSeen("gates");
 }
 
 /* PWA: installable + offline. Registered from a subpath so scope stays under /huemeld/. */
