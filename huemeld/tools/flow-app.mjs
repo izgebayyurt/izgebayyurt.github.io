@@ -48,9 +48,12 @@ function buildSet(ramp, label) {
 
 // campaign — 250 levels in five 50-level chapters; gates and boards scale up
 const CAMPAIGN = [
-  // Chapter 1 — MIX (50): one junction, full boards, gates ease in
-  [10, { n: 5, type: "junction", minOpen: 25, gates: 1 }],
-  [10, { n: 5, type: "junction", minOpen: 24, gates: 2 }],
+  // Chapter 1 — MIX (50): one junction, full boards. Levels 1-10 have NO gates
+  // (just mixing); gates are introduced at level 11 (1 each), then ease up.
+  // Lowering a tier's gate count never changes the RNG stream, so every board
+  // (and the daily pool after it) stays identical - only the gates differ.
+  [10, { n: 5, type: "junction", minOpen: 25, gates: 0 }],
+  [10, { n: 5, type: "junction", minOpen: 24, gates: 1 }],
   [10, { n: 6, type: "junction", minOpen: 34, looseness: 0.9, gates: 2 }],
   [10, { n: 6, type: "junction", minOpen: 33, looseness: 0.9, gates: 3 }],
   [10, { n: 6, type: "junction", minOpen: 33, looseness: 1.0, gates: 4 }],
