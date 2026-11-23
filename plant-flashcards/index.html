@@ -14,18 +14,27 @@ html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 "Instrument Sans",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;overflow-x:clip;-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.top{width:min(100%,560px);display:flex;align-items:center;gap:8px;padding:14px 16px 6px}
+.top{width:min(100%,560px);display:flex;align-items:center;gap:8px;padding:14px 16px 4px}
 .top h1{font:500 17px/1 "Newsreader",serif;margin:0;flex:1;letter-spacing:.01em}
-.left{color:var(--mute);font-variant-numeric:tabular-nums;margin-right:4px}
-.ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--mute)}
+.ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--mute);transition:background .2s,color .2s}
 .ic:hover{background:var(--bg2);color:var(--ink)}
+.ic.armed{background:var(--acc);color:#fff}
 .ic svg{width:20px;height:20px}
-.chips{width:min(100%,560px);display:flex;gap:6px;overflow-x:auto;padding:6px 16px 12px;scrollbar-width:none}
+.prog{width:min(100%,560px);padding:4px 16px 6px}
+.track{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--bg2)}
+.track i{display:block;height:100%;transition:width .4s}
+.track .m{background:var(--ok)}.track .l3{background:#6aa77a}.track .l2{background:#4e875d}.track .l1{background:#3d6c4a}.track .l0{background:var(--acc)}
+.stats{margin-top:6px;font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums}
+.chips{width:min(100%,560px);display:flex;gap:6px;overflow-x:auto;padding:6px 16px 10px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;padding:7px 13px;border-radius:999px;background:var(--bg2);color:var(--mute);font-size:14px;white-space:nowrap}
 .chip[aria-pressed=true]{background:var(--ink);color:var(--bg)}
-.stage{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:4px 16px;perspective:1600px}
-.card{position:relative;height:min(64vh,620px);width:min(100%,calc(min(64vh,620px)*.8));transform-style:preserve-3d;transition:transform .5s cubic-bezier(.3,.7,.2,1);cursor:pointer;touch-action:pan-y;user-select:none}
+.stage{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:4px 16px}
+.slot{perspective:1600px;transition:transform .36s cubic-bezier(.4,0,.2,1),opacity .36s}
+.slot.r{transform:translateX(70%) rotate(10deg);opacity:0}
+.slot.l{transform:translateX(-70%) rotate(-10deg);opacity:0}
+.slot.in{transform:scale(.94);opacity:0;transition:none}
+.card{position:relative;height:min(60vh,600px);width:min(calc(100vw - 32px),calc(min(60vh,600px)*.8));transform-style:preserve-3d;transition:transform .5s cubic-bezier(.3,.7,.2,1);cursor:pointer;touch-action:pan-y;user-select:none}
 .card.flip{transform:rotateY(180deg)}
 .card.noanim{transition:none}
 .face{position:absolute;inset:0;border-radius:22px;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,.55)}
@@ -34,14 +43,24 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .front img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .25s}
 .front img.on{opacity:1}
 .front .miss{position:absolute;inset:0;display:none;place-items:center;color:var(--mute)}
+.new{position:absolute;top:14px;left:14px;padding:4px 10px;border-radius:999px;background:rgba(251,250,247,.92);color:var(--bg);font-size:13px;font-weight:600;display:none}
+.new.on{display:block}
 .back{background:var(--card);color:var(--cink);transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 26px;gap:6px}
+.back::after{content:"";position:absolute;inset:0;border-radius:22px;box-shadow:inset 0 0 0 0 transparent;transition:box-shadow .2s;pointer-events:none}
+.card.ok .back::after{box-shadow:inset 0 0 0 5px var(--ok)}
+.card.no .back::after{box-shadow:inset 0 0 0 5px var(--acc)}
 .thumb{width:84px;height:84px;border-radius:50%;object-fit:cover;margin-bottom:18px;box-shadow:0 0 0 4px #fff,0 6px 18px -6px rgba(0,0,0,.35)}
 .common{font:500 clamp(28px,7vw,40px)/1.08 "Newsreader",serif;text-wrap:balance;margin:0}
 .sci{font:italic 400 clamp(19px,4.6vw,24px)/1.25 "Newsreader",serif;color:var(--csub);text-wrap:balance;margin-top:8px}
 .sci .r{font-style:normal}
 .cv{font:400 17px/1.3 "Newsreader",serif;color:var(--csub);text-wrap:balance}
-.grp{margin-top:20px;font-size:13px;color:#8a998c}
-.bar{width:min(100%,560px);display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:10px;padding:16px 16px max(20px,env(safe-area-inset-bottom))}
+.dots{display:flex;gap:8px;margin-top:22px}
+.dots i{width:10px;height:10px;border-radius:50%;background:#dfe5dc;transition:background .3s,transform .3s}
+.dots i.f{background:#3f8f57}
+.dots.m i{background:var(--ok)}
+.dots i.pop{transform:scale(1.7)}
+.grp{margin-top:12px;font-size:13px;color:#8a998c}
+.ctl{width:min(100%,560px);display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:10px;padding:14px 16px max(20px,env(safe-area-inset-bottom))}
 .nav{width:52px;height:52px;border-radius:50%;background:var(--bg2);display:grid;place-items:center}
 .nav svg{width:22px;height:22px}
 .mid{display:flex;gap:10px;justify-content:center}
@@ -52,28 +71,30 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .done{display:none;flex-direction:column;align-items:center;gap:18px;text-align:center}
 .done p{font:500 30px/1.1 "Newsreader",serif;margin:0}
 .done .btn{flex:none;padding:0 28px;background:var(--ink);color:var(--bg)}
-body.empty .card,body.empty .bar{display:none}
+body.empty .slot,body.empty .ctl{display:none}
 body.empty .done{display:flex}
 @media (min-width:700px){.chips{flex-wrap:wrap;justify-content:center;width:min(100%,820px)}}
-@media (prefers-reduced-motion:reduce){.card{transition:none}}
+@media (prefers-reduced-motion:reduce){.card,.slot,.track i{transition:none}}
 </style>
 </head>
 <body>
 <header class="top">
   <h1>Green Lake · Dallas</h1>
-  <span class="left" id="left"></span>
   <button class="ic" id="shuffle" title="Shuffle" aria-label="Shuffle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
   <button class="ic" id="reset" title="Reset progress" aria-label="Reset progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
 </header>
+<div class="prog"><div class="track" id="track"></div><div class="stats" id="stats"></div></div>
 <nav class="chips" id="chips"></nav>
 <main class="stage">
-  <div class="card" id="card" role="button" tabindex="0" aria-label="Flip card">
-    <div class="face front"><div class="blur" id="blur"></div><img id="img" alt="Plant photo"><div class="miss" id="miss">Photo unavailable</div></div>
-    <div class="face back"><img class="thumb" id="thumb" alt=""><p class="common" id="common"></p><div class="sci" id="sci"></div><div class="cv" id="cv"></div><div class="grp" id="grp"></div></div>
+  <div class="slot" id="slot">
+    <div class="card" id="card" role="button" tabindex="0" aria-label="Flip card">
+      <div class="face front"><div class="blur" id="blur"></div><img id="img" alt="Plant photo"><div class="miss" id="miss">Photo unavailable</div><span class="new" id="new">New</span></div>
+      <div class="face back"><img class="thumb" id="thumb" alt=""><p class="common" id="common"></p><div class="sci" id="sci"></div><div class="cv" id="cv"></div><div class="dots" id="dots"></div><div class="grp" id="grp"></div></div>
+    </div>
   </div>
-  <div class="done"><p>All learned.</p><button class="btn" id="again-all">Start over</button></div>
+  <div class="done"><p>All mastered.</p><button class="btn" id="again-all">Start over</button></div>
 </main>
-<footer class="bar">
+<footer class="ctl">
   <button class="nav" id="prev" title="Previous (←)" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
   <div class="mid" id="mid"></div>
   <button class="nav" id="next" title="Next (→)" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
@@ -85,20 +106,45 @@ const BASE = 'https://picturepro.blob.core.windows.net/00dbdee9-29b1-4256-98ca-c
 const GROUPS = [['all','All'],['a','Annuals'],['p','Pansies & Violas'],['e','Perennials'],['s','Shrubs & Trees'],['c','Succulents & Cacti'],['g','Grasses & Sedges'],['h','Herbs & Edibles'],['v','Vines']];
 const GNAME = Object.fromEntries(GROUPS);
 const CARDS = RAW.trim().split('\n').map(l => { const [k, common, bin, cv, g] = l.split('|'); return {id: k, src: BASE + k.replace(/~$/, '.jpg'), common, bin, cv, g}; });
+const MAX = 4, GAP = [3, 6, 15, 35], KEY = 'glf-progress-v1';
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 const sci = b => '<i>' + esc(b).split(' ').map(t => /^(×|var\.|subsp\.)$/.test(t) ? '<span class="r">' + t + '</span>' : t).join(' ') + '</i>';
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const frame2 = f => requestAnimationFrame(() => requestAnimationFrame(f));
 
-let learned = new Set();
-try { learned = new Set(JSON.parse(localStorage.getItem('glf-learned') || '[]')); } catch (e) {}
-const save = () => { try { localStorage.setItem('glf-learned', JSON.stringify([...learned])); } catch (e) {} };
+let P = {};
+try {
+  P = JSON.parse(localStorage.getItem(KEY) || '{}');
+  const old = JSON.parse(localStorage.getItem('glf-learned') || '[]');
+  if (old.length) { for (const id of old) if (!P[id]) P[id] = [1, 1]; localStorage.setItem(KEY, JSON.stringify(P)); localStorage.removeItem('glf-learned'); }
+} catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(P)); } catch (e) {} };
+const lvl = id => P[id] ? P[id][0] : 0;
+const seen = id => P[id] ? P[id][1] : 0;
 
-let group = 'all', deck = [], pos = 0, flipped = false;
+let group = 'all', deck = [], pos = 0, flipped = false, busy = false;
+const inGroup = c => group === 'all' || c.g === group;
 
 function build() {
-  deck = shuffle(CARDS.filter(c => (group === 'all' || c.g === group) && !learned.has(c.id)));
-  pos = 0; render();
+  const pri = c => { const l = lvl(c.id); return !seen(c.id) ? 2 : l === 0 ? 0 : l === 1 ? 1 : l + 1; };
+  deck = shuffle(CARDS.filter(c => inGroup(c) && lvl(c.id) < MAX)).sort((a, b) => pri(a) - pri(b));
+  pos = 0; render(); stats();
+}
+
+function stats() {
+  const cs = CARDS.filter(inGroup), n = cs.length || 1, k = {m: 0, l3: 0, l2: 0, l1: 0, l0: 0, nw: 0};
+  for (const c of cs) { const l = lvl(c.id); if (l >= MAX) k.m++; else if (!seen(c.id)) k.nw++; else k['l' + l]++; }
+  $('track').innerHTML = ['m', 'l3', 'l2', 'l1', 'l0'].map(x => `<i class="${x}" style="width:${k[x] / n * 100}%"></i>`).join('');
+  $('stats').textContent = `${k.m} mastered · ${k.l3 + k.l2 + k.l1 + k.l0} learning · ${k.nw} new`;
+}
+
+function dots(l, pop) {
+  const d = $('dots');
+  d.className = 'dots' + (l >= MAX ? ' m' : '');
+  d.innerHTML = Array.from({length: MAX}, (_, i) => `<i class="${i < l ? 'f' : ''}${pop && i === l - 1 ? ' pop' : ''}"></i>`).join('');
+  if (pop) frame2(() => d.querySelectorAll('.pop').forEach(x => x.classList.remove('pop')));
 }
 
 function setFlip(f) { flipped = f; $('card').classList.toggle('flip', f); controls(); }
@@ -109,15 +155,16 @@ function controls() {
     : '<button class="btn show" id="b-show" title="Flip (Space)">Show name</button>';
 }
 
-function render() {
+function render(enter) {
   document.body.classList.toggle('empty', deck.length === 0);
-  $('left').textContent = deck.length ? deck.length + ' left' : '';
   if (!deck.length) return;
-  pos = (pos + deck.length) % deck.length;
-  const c = deck[pos];
-  const cd = $('card');
-  cd.classList.add('noanim'); setFlip(false); void cd.offsetWidth;
-  requestAnimationFrame(() => requestAnimationFrame(() => cd.classList.remove('noanim')));
+  pos = (pos % deck.length + deck.length) % deck.length;
+  const c = deck[pos], cd = $('card'), slot = $('slot');
+  cd.classList.add('noanim'); cd.classList.remove('ok', 'no'); setFlip(false);
+  slot.classList.remove('r', 'l');
+  if (enter && !RM) slot.classList.add('in');
+  void slot.offsetWidth;
+  frame2(() => { cd.classList.remove('noanim'); slot.classList.remove('in'); });
   const img = $('img');
   img.classList.remove('on'); $('miss').style.display = 'none';
   img.onload = () => img.classList.add('on');
@@ -125,45 +172,71 @@ function render() {
   img.src = c.src;
   $('blur').style.backgroundImage = 'url("' + c.src + '")';
   $('thumb').src = c.src;
+  $('new').classList.toggle('on', !seen(c.id));
   $('common').textContent = c.common;
   $('sci').innerHTML = sci(c.bin);
   $('cv').textContent = c.cv;
   $('grp').textContent = GNAME[c.g];
+  dots(lvl(c.id));
   for (let i = 1; i <= 2; i++) { const n = deck[(pos + i) % deck.length]; if (n) new Image().src = n.src; }
 }
 
-function go(d) { if (!deck.length) return; pos += d; render(); }
-function again() { const [c] = deck.splice(pos, 1); deck.splice(Math.min(pos + 5, deck.length), 0, c); render(); }
-function got() { const [c] = deck.splice(pos, 1); learned.add(c.id); save(); render(); }
+function answer(ok) {
+  if (busy || !deck.length || !flipped) return;
+  busy = true;
+  const c = deck[pos], p = P[c.id] || [0, 0];
+  const l = ok ? Math.min(p[0] + 1, MAX) : 0;
+  P[c.id] = [l, p[1] + 1]; save(); stats();
+  dots(l, ok);
+  $('card').classList.add(ok ? 'ok' : 'no');
+  setTimeout(() => {
+    $('slot').classList.add(ok ? 'r' : 'l');
+    setTimeout(() => {
+      deck.splice(pos, 1);
+      if (l < MAX) deck.splice(Math.min(pos + GAP[l], deck.length), 0, c);
+      render(true); busy = false;
+    }, RM ? 0 : 360);
+  }, RM ? 0 : 450);
+}
+
+function go(d) { if (busy || !deck.length) return; pos += d; render(); }
+
+function resetGroup() { for (const c of CARDS) if (inGroup(c)) delete P[c.id]; save(); build(); }
 
 $('chips').innerHTML = GROUPS.map(([k, n]) => '<button class="chip" data-g="' + k + '" aria-pressed="' + (k === group) + '">' + esc(n) + '</button>').join('');
-$('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; group = b.dataset.g; for (const x of $('chips').children) x.setAttribute('aria-pressed', x === b); build(); });
-$('mid').addEventListener('click', e => { const id = e.target.id; if (id === 'b-show') setFlip(true); else if (id === 'b-again') again(); else if (id === 'b-got') got(); });
+$('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b || busy) return; group = b.dataset.g; for (const x of $('chips').children) x.setAttribute('aria-pressed', x === b); build(); });
+$('mid').addEventListener('click', e => { const id = e.target.id; if (id === 'b-show') setFlip(true); else if (id === 'b-again') answer(false); else if (id === 'b-got') answer(true); });
 $('prev').onclick = () => go(-1);
 $('next').onclick = () => go(1);
-$('shuffle').onclick = build;
-$('reset').onclick = () => { learned.clear(); save(); build(); };
-$('again-all').onclick = () => { for (const c of CARDS) if (group === 'all' || c.g === group) learned.delete(c.id); save(); build(); };
+$('shuffle').onclick = () => { if (!busy) build(); };
+let armed = 0, armT;
+$('reset').onclick = () => {
+  const b = $('reset');
+  if (Date.now() - armed < 3000) { armed = 0; clearTimeout(armT); b.classList.remove('armed'); b.title = 'Reset progress'; resetGroup(); return; }
+  armed = Date.now(); b.classList.add('armed'); b.title = 'Tap again to reset';
+  armT = setTimeout(() => { b.classList.remove('armed'); b.title = 'Reset progress'; }, 3000);
+};
+$('again-all').onclick = resetGroup;
 
 let sx = null, sy = 0;
 const card = $('card');
 card.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; });
 card.addEventListener('pointerup', e => {
-  if (sx === null) return;
+  if (sx === null || busy) return;
   const dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
   if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
   else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) setFlip(!flipped);
 });
-card.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); setFlip(!flipped); } });
+card.addEventListener('keydown', e => { if (e.key === 'Enter' && !busy) { e.preventDefault(); setFlip(!flipped); } });
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
+  if (busy) return;
   if (e.key === ' ') { e.preventDefault(); setFlip(!flipped); }
   else if (e.key === 'ArrowRight') go(1);
   else if (e.key === 'ArrowLeft') go(-1);
-  else if (flipped && e.key === '1') again();
-  else if (flipped && e.key === '2') got();
+  else if (flipped && e.key === '1') answer(false);
+  else if (flipped && e.key === '2') answer(true);
 });
-
 document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && e.detail > 0) b.blur(); });
 
 build();
