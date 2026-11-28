@@ -5,6 +5,17 @@ game, ads (AdMob), purchases (RevenueCat), haptics and music are all shared —
 you only add **Google-side accounts + a few Android-specific IDs**. Work top to
 bottom.
 
+**Android ads differ from iOS.** Besides the opt-in rewarded videos (hint / unlock
+8 pack levels), free Android players get an occasional **between-levels interstitial**.
+iOS has none. The rules (in `flow2.html` → `interstitialDue()`):
+- only when tapping **Next** on the win card — never mid-puzzle, never in a tutorial;
+- none until **10 solves** in total;
+- from the **2nd solve of each app session** on, at most one per gap that follows the
+  player's pace: **3 min** for fast solvers (median ≤ 30 s), up to **5 min** for slow
+  ones (median ≥ 120 s) — slow players are never rushed;
+- any ad, rewarded videos included, restarts the clock; Pro / old Remove-Ads owners never see them;
+- if no ad is loaded the game just continues.
+
 **What's already in the repo**
 
 | Thing | Where |
@@ -23,8 +34,8 @@ bottom.
 ## 2. AdMob — Android app + units
 - [ ] AdMob → Apps → **Add app → Android** → "Huemeld".
 - [ ] Copy the **App ID** (`ca-app-pub-…~…`, with the `~`) → paste into `android/app/src/main/AndroidManifest.xml` (the `com.google.android.gms.ads.APPLICATION_ID` meta-data; currently Google's sample id).
-- [ ] Add a **Rewarded** ad unit. Copy its unit ID (`ca-app-pub-…/…`). (No interstitial needed — Huemeld shows **no forced ads**; ads are opt-in only: a rewarded hint, or "watch to unlock 8 pack levels". You can skip the Interstitial unit.)
-- [ ] In `native.js`: set `ANDROID_REWARDED_ID` (the interstitial ID is unused).
+- [ ] Add a **Rewarded** ad unit, name it "hint-reveal". Copy its unit ID (`ca-app-pub-…/…`) → `ANDROID_REWARDED_ID` in `native.js`.
+- [ ] Add an **Interstitial** ad unit, name it "between-levels". Copy its unit ID → `ANDROID_INTERSTITIAL_ID` in `native.js`. (Leave it as the placeholder and interstitials simply stay off; rewarded still works.)
 - [ ] **Privacy & messaging → GDPR**: add the Android app to the same GDPR message as iOS and publish (the consent form is already wired in `native.js`).
 
 ## 3. RevenueCat — Google Play app
@@ -44,7 +55,7 @@ Monetize → **In-app products** → create **one** one-time (managed) product w
 | `huemeld_pro` | Huemeld Pro | **$2.99** |
 
 - [ ] Activate it. Then attach it to the RevenueCat `huemeld_pro` entitlement (step 3).
-- [ ] **Do NOT create `huemeld_no_ads`.** It's retired — the app shows no forced ads, so there's nothing to "remove". Ship Pro only. (iOS keeps the old product live only so past buyers can restore.)
+- [ ] **Do NOT create `huemeld_no_ads`.** It's retired — Pro is the one purchase, and it removes the Android interstitials too. Ship Pro only. (iOS keeps the old product live only so past buyers can restore.)
 - [ ] Set the **Turkey** price sensibly — the auto price from $2.99 USD may be high for local purchasing power; lower it if so.
 
 ## 6. Build the app bundle (Android Studio)
@@ -66,15 +77,25 @@ In Android Studio:
 - [ ] License testers (for IAP sandbox): Play Console → **Setup → License testing** → add your Google account. Purchases then run in test mode (no real charge).
 - [ ] Verify, in order:
   - [ ] Game boots, plays, dark theme, music + haptics work.
-  - [ ] Solve levels → **no ad ever appears on its own** (there are no interstitials).
+    - [ ] **Interstitials** (free player, not Pro): the first 10 solves are ad-free; after that, on the **2nd solve of a session**, tapping **Next** shows a full-screen ad, the music pauses under it, and the next level opens when you close it. Then no ad again for ~3–5 min (depending on how fast you solve), and never mid-puzzle. Buy Pro → they stop.
   - [ ] Add your phone under AdMob → Settings → **Test devices** first (platform Android, its **advertising ID** from phone Settings → Google → Ads / Privacy → Ads), so the real ad units serve test ads to you — look for the "Test Ad" label before tapping. (The ID Logcat prints is a hashed one for code, not for the website.)
-  - [ ] **Hint** → rewarded test video → ghost pipe.
+  - [ ] **Hint** → rewarded test video → ghost pipe (and no interstitial for the next few minutes).
   - [ ] Settings shows **Huemeld Pro** (localized price), **Restore Purchases** and **Privacy choices**; buy Pro (license tester) → everything unlocks; after a reinstall, **Restore** brings it back.
   - [ ] Past the 5-level teaser in a pack → **Watch to unlock 8 levels** → the batch opens.
 
 ## 8. Store listing
 - [ ] **Title**: `Huemeld` · **Short description** (80): `Mix colors, fill the board.`
-- [ ] **Full description**: reuse the App Store copy in `APPSTORE.md` §8 (Google allows ~4000 chars).
+- [ ] **Full description**: reuse the App Store copy in `APPSTORE.md` §8 (Google allows ~4000 chars), but replace its FAIR PRICING paragraph — Android has occasional ads between levels:
+  ```
+  FAIR PRICING
+  The 250-level campaign and the daily puzzle are free. You'll see a short
+  ad between levels now and then - never in the middle of a puzzle, and less
+  often the more time you take. Watch a video if you want a hint or more pack
+  levels. One purchase, Huemeld Pro, removes the ads and unlocks everything -
+  every pack, the Medley, the daily archive, instant chapter unlocks and free
+  hints. No subscriptions, no energy, no coins.
+  ```
+- [ ] **Contains ads**: Play Console → App content → **Ads** → "Yes, my app contains ads" (required; shows the "Contains ads" label).
 - [ ] **App icon**: 512×512 PNG. **Feature graphic**: 1024×500 PNG (required).
 - [ ] **Phone screenshots**: 2–8, **1080×1920** (or any 9:16). ⚠️ The iOS shots (1284×2778) are **too tall** for Play (Play caps the long:short ratio at 2:1) — regenerate at 1080×1920. Ask and I'll produce them.
 - [ ] **Category**: Games › Puzzle. **Content rating**: fill the questionnaire → Everyone. **Privacy Policy**: `https://izgebayyurt.github.io/huemeld/privacy.html`.
@@ -89,10 +110,11 @@ Because AdMob uses the advertising ID:
 
 ## 10. Release
 - [x] Release flags already set: `USE_TEST_ADS = false`, `UNLOCK_ALL = false`.
-- [ ] **Paste the three Android values** — until then `native.js` switches ads and purchases **off** on Android (hint/unlock videos say "No video available", Pro can't be bought):
+- [ ] **Paste the four Android values** — until then `native.js` switches ads and purchases **off** on Android (hint/unlock videos say "No video available", Pro can't be bought, no interstitials):
   1. `ANDROID_REWARDED_ID` in `native.js` (AdMob → Android app → Rewarded unit, has a `/`)
-  2. `RC_ANDROID_API_KEY` in `native.js` (RevenueCat → Android app → public `goog_…` key)
-  3. the real AdMob **App ID** (has a `~`) in `android/app/src/main/AndroidManifest.xml`, replacing Google's sample ID
+  2. `ANDROID_INTERSTITIAL_ID` in `native.js` (AdMob → Android app → Interstitial unit, has a `/`)
+  3. `RC_ANDROID_API_KEY` in `native.js` (RevenueCat → Android app → public `goog_…` key)
+  4. the real AdMob **App ID** (has a `~`) in `android/app/src/main/AndroidManifest.xml`, replacing Google's sample ID
 - [ ] Re-run `npm run android`, rebuild the `.aab`, bump versionCode.
 - [ ] Upload to the **Production** track, roll out. First reviews are usually hours–days.
 
