@@ -36,9 +36,12 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   // Android IDs still placeholders? Then keep ads + purchases OFF on that platform
   // (fail cleanly as "unavailable") instead of firing broken requests at AdMob/RevenueCat.
   var PLACEHOLDER = /X{6}|N{6}/;
-  if (PLACEHOLDER.test(rewardUnit)) AdMob = null;   // rewarded is the only ad format in use
+  if (PLACEHOLDER.test(rewardUnit)) AdMob = null;   // no ads at all until the rewarded unit is real
   if (PLACEHOLDER.test(RC_API_KEY)) Purchases = null;
-  var adReady = false, attAsked = false, attInFlight = false;
+  // Interstitials are ANDROID ONLY (iOS stays opt-in-videos-only), and need their own real unit:
+  // a missing interstitial ID switches off just interstitials, rewarded videos keep working.
+  var useInterstitials = isAndroid && !!AdMob && !PLACEHOLDER.test(adUnit);
+  var adReady = false, adLoading = false, adCb = null, adWired = false, attAsked = false, attInFlight = false;
   var rewardReady = false, rewardGot = false, rewardCb = null, rewardWired = false;
   var rewardLoading = null, rewardShowing = false;
   // hold the game's audio while a full-screen ad plays (focus/pageshow can't restart it)
@@ -46,9 +49,23 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   function audioOn() { if (window.__audioHold) window.__audioHold("ad", false); else if (window.__resumeAudio) window.__resumeAudio(); }
 
   function prepareAd() {
-    if (!AdMob) return;
-    AdMob.prepareInterstitial({ adId: adUnit }).then(function () { adReady = true; })
-      .catch(function () { adReady = false; });
+    if (!useInterstitials || adReady || adLoading) return;
+    adLoading = true;
+    AdMob.prepareInterstitial({ adId: adUnit })
+      .then(function () { adReady = true; }, function () { adReady = false; })
+      .then(function () { adLoading = false; });
+  }
+  // the interstitial is over (closed, or it couldn't show): hand control back to the game once
+  function adDone() {
+    var cb = adCb; adCb = null; audioOn(); prepareAd();
+    if (cb) cb();
+  }
+  function wireAd() {
+    if (adWired || !useInterstitials) return;
+    adWired = true;
+    AdMob.addListener("interstitialAdShowed", function () { if (window.__adShown) window.__adShown(); });
+    AdMob.addListener("interstitialAdDismissed", adDone);
+    AdMob.addListener("interstitialAdFailedToShow", adDone);
   }
 
   /* ---- rewarded video: the player watches one to reveal a hint pipe ----
@@ -144,15 +161,17 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
   }
 
   window.HuemeldNative = {
-    interstitial: function () {
-      if (!AdMob) return;
-      ensureATT().then(function () {
-        if (!adReady) { prepareAd(); return; }        // not loaded yet: the due flag keeps it owed
-        adReady = false;
-        AdMob.showInterstitial()
-          .then(function () { if (window.__adShown) window.__adShown(); })  // only a SHOWN ad clears the slot
-          .finally(prepareAd);
-      });
+    /* Android-only between-levels ad. cb() runs once the ad is closed - or right away when
+       there's nothing to show (not loaded yet, iOS, placeholder IDs), so the game never waits.
+       The game's scheduler decides WHEN; this only shows one if it's ready. */
+    interstitialReady: function () { return useInterstitials && adReady; },
+    interstitial: function (cb) {
+      cb = cb || function () {};
+      if (!useInterstitials || adCb) { cb(); return; }
+      if (!adReady) { prepareAd(); cb(); return; }   // not loaded: skip now, the next break shows it
+      adReady = false; adCb = cb;
+      audioOff();   // a full-screen ad doesn't hide the webview: silence the game music
+      AdMob.showInterstitial().catch(adDone);
     },
     /* cb(got, reason): got=true only when the video played to the end.
        reason: "unavailable" (no video could load in time / failed to show),
@@ -290,7 +309,7 @@ var ENT_NOADS = "no_ads", ENT_FULL = "huemeld_pro";            // RevenueCat ent
     // ads engine + rewarded video; by the time the first ad is due (post-honeymoon)
     // the tracking decision has long since resolved.
     if (AdMob) gatherConsent().then(function () { return AdMob.initialize({}); }).then(function () {
-      wireReward(); prepareReward();
+      wireReward(); prepareReward(); wireAd(); prepareAd();
     }).catch(function () {});
     if (Purchases) {
       // any entitlement change (purchase, restore, renewal, cross-device sync) pushes

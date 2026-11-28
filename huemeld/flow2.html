@@ -922,7 +922,7 @@ function applyLevel(L){
   if(demoing) stopDemo();   // navigating anywhere cancels a running ghost demo
   // reset revealed hints only when the LEVEL actually changes - a Reset reloads the
   // same object, so a hint the player watched an ad for survives the reset.
-  if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; }
+  if(L!==curLevelObj){ curLevelObj=L; ghostStrokes=[]; hintOrder=null; hintN=0; levelActiveMs=0; }
   N=L.n; drag=null; solved=false; junctions=[]; lastEmTap={e:-1,t:0}; lastLineTap={key:"",t:0};
   blooms=[]; sweeps=[]; confetti=[]; rejects=[]; drawSteps=0;
   shakeAmp=0; board.style.transform="";
@@ -1744,7 +1744,8 @@ function checkWin(quiet){
   solved=true; preGesture=null; sfxWin(); playWinCascade(); hap("success");
   updateUndoUI(); updateHintUI();
   if(demoing) return;   // the ghost demo celebrates but earns nothing - no progress, no overlay
-  solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount);   // no forced ads - see monetization seams
+  solveCount++; localStorage.setItem("hm_flow2_solves",""+solveCount);
+  sessionSolves++; noteSolveTime(levelActiveMs);   // feeds the (Android-only) ad scheduler - see monetization seams
   var wn=document.getElementById("btnWinNext");
   document.querySelector("#ovWin h2").innerHTML=T("Solved!")+" "+icn("spark",20);
   var nextBtn = function(){ wn.innerHTML=T("Next")+" "+icn("arrowR",15); };
@@ -2235,8 +2236,10 @@ function boardHidden(){
   for(var i=0;i<overlayEls.length;i++) if(overlayEls[i].classList.contains("show")) return true;
   return false;
 }
+var levelActiveMs=0, lastFrameMs=0;   // time actually spent on the board (menus, overlays, app-away excluded)
 function frame(){ animT=nowMs()-animStart;
-  if(!boardHidden()) renderPaths();
+  var fnow=nowMs(), fd=fnow-lastFrameMs; lastFrameMs=fnow;
+  if(!boardHidden()){ renderPaths(); if(!solved && !demoing && fd>0 && fd<1000) levelActiveMs+=fd; }
   if(shakeAmp>0){ var st=nowMs()-shakeT0, e=st/shakeDur;
     if(e>=1){ shakeAmp=0; board.style.transform=""; }
     else { var k=(1-e)*(1-e), dx=Math.sin(st*0.061)*shakeAmp*k, dy=Math.cos(st*0.049)*shakeAmp*k; board.style.transform="translate("+dx.toFixed(2)+"px,"+dy.toFixed(2)+"px)"; }
@@ -2596,7 +2599,7 @@ document.getElementById("btnUpNoAds").addEventListener("click", function(){
   if(!nb || !nb.rewarded){ toast(T("Available in the app")); return; }
   toast(T("Loading a video…"));
   nb.rewarded(function(ok, why){
-    if(ok){ grantAdUnlock(PACKS[u.pi].id); pendingUnlock=null; ovUp.classList.remove("show");
+    if(ok){ noteAdShown(); grantAdUnlock(PACKS[u.pi].id); pendingUnlock=null; ovUp.classList.remove("show");
       try{ renderPicker(); }catch(e){}
       toast(Tf("{0} more levels unlocked!", UNLOCK_BATCH));
       loadPackLevel(u.pi, u.k);
@@ -2633,12 +2636,14 @@ document.getElementById("btnPrev").addEventListener("click", function(){ ensureA
 document.getElementById("btnNext").addEventListener("click", function(){ ensureAudio(); if(mode==="campaign") loadLevel(li+1); else if(mode==="pack") loadPackLevel(curPack, packIdx+1); });
 document.getElementById("btnReset").addEventListener("click", function(){ ensureAudio(); if(mode==="daily") loadDaily(dailyOff); else if(mode==="pack") loadPackLevel(curPack, packIdx); else loadLevel(li); });
 document.getElementById("btnWinNext").addEventListener("click", function(){ ensureAudio();
-  if(mode==="daily") loadLevel(li);
-  else if(mode==="pack"){
-    if(packIdx+1<PACKS[curPack].levels.length && packLevelUnlocked(packIdx+1)) loadPackLevel(curPack, packIdx+1);
-    else loadLevel(li);
-  }
-  else loadLevel(li+1); });
+  maybeInterstitial(function(){   // Android free players: an occasional ad sits here, between levels
+    if(mode==="daily") loadLevel(li);
+    else if(mode==="pack"){
+      if(packIdx+1<PACKS[curPack].levels.length && packLevelUnlocked(packIdx+1)) loadPackLevel(curPack, packIdx+1);
+      else loadLevel(li);
+    }
+    else loadLevel(li+1);
+  }); });
 
 document.getElementById("btnUndo").addEventListener("click", function(){ ensureAudio(); if(demoing || drag) return; if(undoStack.length){ restoreState(undoStack.pop()); checkWin(true); } });
 
@@ -2649,11 +2654,47 @@ document.getElementById("btnUndo").addEventListener("click", function(){ ensureA
    (no ads shown). See PUBLISHING.md. */
 function nativeBridge(){ return (typeof window!=="undefined" && window.HuemeldNative) ? window.HuemeldNative : null; }
 var solveCount=+(localStorage.getItem("hm_flow2_solves")||0);
-/* NO FORCED ADS. Huemeld never shows an interstitial. Ads are opt-in only:
-   a rewarded video for a hint, or to unlock the next batch of pack levels.
-   (Kept as harmless no-ops in case the native bootstrap references them.) */
-function maybeInterstitial(){}
-window.__adShown=function(){};
+/* ADS. Everywhere: opt-in rewarded videos only (a hint, or the next batch of pack levels).
+   ANDROID free players additionally get an occasional between-levels interstitial -
+   never on iOS, never on the web, never for Pro / legacy Remove-Ads owners - only at the
+   natural break of tapping Next on the win card, and gently:
+   - none until 10 solves in total (the gentle opening stays ad-free);
+   - from the 2nd solve of each app session on, at most one per GAP, where GAP follows
+     the player's pace: 3 min for fast solvers (median <= 30 s), 5 min for slow ones
+     (median >= 120 s), linear between - slow players are never rushed;
+   - any ad (rewarded videos included) restarts the clock;
+   - if no ad is loaded, play just continues (it shows at a later Next). */
+var sessionSolves=0;
+var AD_GRACE_SOLVES=10, AD_GAP_FAST=180e3, AD_GAP_SLOW=300e3, PACE_FAST=30, PACE_SLOW=120;
+function isAndroidApp(){ try{ return isNativeApp() && window.Capacitor.getPlatform()==="android"; }catch(e){ return false; } }
+function noteSolveTime(ms){
+  var sec=Math.round(ms/1000); if(!(sec>0)) return;
+  var a=[]; try{ a=JSON.parse(localStorage.getItem("hm_flow2_pace")||"[]"); }catch(e){}
+  if(!Array.isArray(a)) a=[];
+  a.push(sec); while(a.length>5) a.shift();
+  localStorage.setItem("hm_flow2_pace", JSON.stringify(a));
+}
+function paceGap(){   // ms between interstitials for THIS player's pace
+  var a=[]; try{ a=JSON.parse(localStorage.getItem("hm_flow2_pace")||"[]"); }catch(e){}
+  if(!Array.isArray(a) || !a.length) return AD_GAP_SLOW;   // no data yet: be gentle
+  var b=a.slice().sort(function(x,y){ return x-y; }), m=b[Math.floor(b.length/2)];
+  var k=Math.max(0, Math.min(1, (m-PACE_FAST)/(PACE_SLOW-PACE_FAST)));
+  return Math.round(AD_GAP_FAST + k*(AD_GAP_SLOW-AD_GAP_FAST));
+}
+function lastAdAt(){ return +(localStorage.getItem("hm_flow2_lastad")||0) || 0; }
+function noteAdShown(){ localStorage.setItem("hm_flow2_lastad", ""+Date.now()); }
+function interstitialDue(){
+  var nb=nativeBridge();
+  if(!nb || !nb.interstitial || !isAndroidApp() || entNoAds() || demoing) return false;
+  if(solveCount<AD_GRACE_SOLVES || sessionSolves<2) return false;
+  return Date.now()-lastAdAt() >= paceGap();
+}
+/* the win card's Next: show the ad (if due and loaded) BETWEEN levels, then continue */
+function maybeInterstitial(then){
+  if(!interstitialDue()){ then(); return; }
+  nativeBridge().interstitial(then);
+}
+window.__adShown=noteAdShown;   // the bridge calls this when an interstitial actually appears
 
 /* ---------- rewarded-ad hints: watch a video, reveal a ghost of one pipe ----------
    Solution strokes ship as L.sol (or L.demo on tutorial/pack-1 boards). Longest
@@ -2694,7 +2735,7 @@ document.getElementById("btnHint").addEventListener("click", function(){
   if(entNoAds() || !nb || !nb.rewarded){ grantHint(); return; }   // paid players + web: free hints
   toast(T("Loading a video for your hint…"));
   nb.rewarded(function(ok, why){
-    if(ok) grantHint();
+    if(ok){ noteAdShown(); grantHint(); }
     else if(why==="unavailable") toast(T("No video available right now - try again in a moment"));
     else if(why!=="busy") toast(T("No hint yet - the video didn't finish")); });
 });
